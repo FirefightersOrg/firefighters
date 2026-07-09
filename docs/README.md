@@ -1,10 +1,10 @@
-# Documentacion del proyecto
+# Project Documentation
 
-## Objetivo
+## Objective
 
-Esta carpeta contiene el diseno funcional, tecnico y operativo del sistema de gestion de bonos/rifas de Bomberos.
+This folder contains the functional, technical, and operational design for the Firefighters bond/raffle management system.
 
-## Lectura recomendada
+## Recommended Reading
 
 1. `mvp.md`
 2. `functional-design.md`
@@ -13,37 +13,37 @@ Esta carpeta contiene el diseno funcional, tecnico y operativo del sistema de ge
 5. `state-machines.md`
 6. `implementation-plan.md`
 
-## Documentos funcionales
+## Functional Documents
 
-- `mvp.md`: alcance de la primera version.
-- `functional-design.md`: modulos, roles, pantallas y flujos.
-- `screens.md`: pantallas prioritarias y experiencia funcional.
-- `draw-rules.md`: reglas de sorteos, padrones y ganadores.
-- `documents.md`: remitos y constancias HTML imprimibles.
-- `corrections.md`: anulaciones y correcciones auditadas.
+- `mvp.md`: scope of the first version.
+- `functional-design.md`: modules, roles, screens, and flows.
+- `screens.md`: priority screens and functional experience.
+- `draw-rules.md`: rules for draws, draw rosters, and winners.
+- `documents.md`: printable HTML delivery notes and certificates.
+- `corrections.md`: audited cancellations and corrections.
 
-## Documentos tecnicos
+## Technical Documents
 
-- `technical-design.md`: arquitectura SvelteKit + Supabase.
-- `data-model.md`: entidades, relaciones y constraints.
-- `state-machines.md`: estados y transiciones.
-- `permissions.md`: roles, permisos y matriz inicial.
-- `imports.md`: carga por codigo de barras, archivos y sistema viejo.
-- `commissions.md`: reglas, excepciones y ajustes manuales.
+- `technical-design.md`: SvelteKit + Supabase architecture.
+- `data-model.md`: entities, relationships, and constraints.
+- `state-machines.md`: states and transitions.
+- `permissions.md`: roles, permissions, and initial matrix.
+- `imports.md`: loading by barcode, files, and legacy system.
+- `commissions.md`: rules, exceptions, and manual adjustments.
 
-## Operacion e implementacion
+## Operation and Implementation
 
-- `migration.md`: migracion desde sistema antiguo.
-- `backup-operations.md`: backups, recuperacion y operacion productiva.
-- `implementation-plan.md`: fases de construccion.
-- `open-questions.md`: decisiones cerradas y dudas pendientes.
+- `migration.md`: migration from the legacy system.
+- `backup-operations.md`: backups, recovery, and production operation.
+- `implementation-plan.md`: build phases.
+- `open-questions.md`: closed decisions and pending questions.
 
-## Criterios clave
+## Key Criteria
 
-- El MVP es web/PWA con SvelteKit, TypeScript y Supabase.
-- Los numeros son configurables por campana, no globales.
-- Los saldos de cobradores se calculan desde movimientos.
-- Las rendiciones cerradas no se reabren.
-- Los sorteos usan padrones congelados.
-- Las correcciones se hacen con anulaciones o ajustes auditados.
-- Los documentos iniciales son HTML imprimibles.
+- The MVP is a web/PWA with SvelteKit, TypeScript, and Supabase.
+- Numbers are configurable per campaign, not globally.
+- Collector balances are calculated from movements.
+- Closed collector settlements are not reopened.
+- Draws use frozen draw rosters.
+- Corrections are made through audited cancellations or adjustments.
+- Initial documents are printable HTML.
