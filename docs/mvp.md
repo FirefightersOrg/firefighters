@@ -1,176 +1,176 @@
-# Alcance del MVP
+# MVP Scope
 
-## Objetivo
+## Objective
 
-El MVP debe reemplazar el control operativo principal de bonos, pagos, rendiciones y sorteos. No debe intentar cubrir todas las mejoras futuras, pero si debe resolver el ciclo administrativo central sin depender de Excel como fuente de verdad.
+The MVP must replace the main operational control of bonds, payments, collector settlements, and draws. It must not attempt to cover every future improvement, but it must solve the core administrative cycle without depending on Excel as the source of truth.
 
-## Alcance incluido
+## Included Scope
 
-### Campanas
+### Campaigns
 
-- Crear campana anual.
-- Configurar valor de bono simple.
-- Configurar cantidad de cuotas.
-- Configurar cantidad de cifras de numeros.
-- Configurar numero maximo permitido.
-- Configurar offset de numero asociado.
-- Configurar reglas basicas de comision.
-- Configurar tipos de sorteos de la campana.
+- Create annual campaign.
+- Configure simple bond value.
+- Configure number of installments.
+- Configure number of number digits.
+- Configure maximum allowed number.
+- Configure associated number offset.
+- Configure basic commission rules.
+- Configure campaign draw types.
 
-### Bonos y patas
+### Bonds and patas (multi-number bond/packages)
 
-- Cargar bonos simples.
-- Cargar patas basicas.
-- Cargar o buscar bonos mediante codigo de barras.
-- Calcular numero asociado.
-- Mostrar numeros con ceros a la izquierda segun configuracion de campana.
-- Validar duplicados de numeros participantes.
-- Validar que numero base y numero asociado no superen `max_number`.
-- Consultar ficha unica del bono.
+- Load simple bonds.
+- Load basic patas.
+- Load or search bonds by barcode.
+- Calculate associated number.
+- Display numbers with leading zeros according to campaign configuration.
+- Validate duplicate participating numbers.
+- Validate that base number and associated number do not exceed `max_number`.
+- Query the single bond record.
 
-### Cobradores
+### Collectors
 
-- Crear y editar cobradores.
-- Consultar bonos asignados.
-- Consultar ventas, pagos, rendiciones y saldo.
-- Generar reporte operativo por cobrador.
+- Create and edit collectors.
+- Query assigned bonds.
+- Query sales, payments, collector settlements, and balance.
+- Generate operational report by collector.
 
-### Compradores
+### Buyers
 
-- Crear y editar compradores.
-- Asociar comprador a una venta.
-- Consultar historial de bonos, cuotas, pagos y premios dentro de la informacion disponible.
+- Create and edit buyers.
+- Associate buyer with a sale.
+- Query history of bonds, installments, payments, and prizes within the available information.
 
-### Entrega de bonos
+### Bond Delivery
 
-- Asignar bonos a cobradores.
-- Registrar fecha, usuario y observaciones.
-- Emitir remito de entrega imprimible.
-- Registrar devoluciones y reasignaciones basicas.
+- Assign bonds to collectors.
+- Record date, user, and notes.
+- Issue printable delivery note.
+- Register basic returns and reassignments.
 
-### Ventas
+### Sales
 
-- Registrar venta de bono simple o pata.
-- Asociar comprador, cobrador y modalidad de pago.
-- Generar plan de cuotas.
-- Registrar pago inicial si corresponde.
+- Register sale of a simple bond or pata.
+- Associate buyer, collector, and payment mode.
+- Generate installment plan.
+- Register initial payment when applicable.
 
-### Pagos y cuotas
+### Payments and Installments
 
-- Registrar pagos de contado.
-- Registrar pagos por cuota.
-- Registrar pagos adelantados.
-- Diferenciar efectivo y transferencia.
-- Asociar pagos a una rendicion cuando corresponda.
-- Consultar cuotas pendientes, pagas, adelantadas y vencidas.
+- Register cash payments.
+- Register installment payments.
+- Register early payments.
+- Differentiate cash and transfer.
+- Associate payments with a collector settlement when applicable.
+- Query pending, paid, early paid, and overdue installments.
 
-### Rendiciones
+### Collector Settlements
 
-- Crear rendicion por cobrador.
-- Agregar pagos a la rendicion.
-- Mostrar totales en tiempo real.
-- Calcular comision preliminar.
-- Cerrar rendicion.
-- Confirmar comisiones al cierre.
-- Generar movimientos de cuenta corriente.
-- Emitir remito de rendicion imprimible.
-- Corregir errores posteriores mediante anulaciones o ajustes auditados.
+- Create collector settlement by collector.
+- Add payments to the collector settlement.
+- Show real-time totals.
+- Calculate preliminary commission.
+- Close collector settlement.
+- Confirm commissions at closing.
+- Generate collector ledger entries.
+- Issue printable settlement note.
+- Correct later errors through audited annulments or adjustments.
 
-### Comisiones
+### Commissions
 
-- Configurar reglas basicas por campana.
-- Configurar reglas especiales por cobrador.
-- Calcular comision preliminar durante rendicion abierta.
-- Confirmar comision al cerrar rendicion.
-- Ajustar comision manualmente con permiso y motivo obligatorio.
-- Registrar comision generada en cuenta corriente del cobrador.
-- Registrar comision liquidada si se paga en la rendicion.
+- Configure basic rules by campaign.
+- Configure special rules by collector.
+- Calculate preliminary commission during an open collector settlement.
+- Confirm commission when closing collector settlement.
+- Manually adjust commission with permission and mandatory reason.
+- Record generated commission in the collector ledger.
+- Record settled commission if paid in the collector settlement.
 
-### Cuenta corriente del cobrador
+### Collector Ledger
 
-- Registrar movimientos auditables.
-- Calcular saldo desde movimientos.
-- Diferenciar comisiones generadas, comisiones liquidadas, efectivo rendido, transferencias y ajustes.
+- Record auditable entries.
+- Calculate balance from entries.
+- Differentiate generated commissions, settled commissions, submitted cash, transfers, and adjustments.
 
-### Sorteos
+### Draws
 
-- Crear sorteos mensuales.
-- Crear sorteo extraordinario por pago total.
-- Crear sorteo final.
-- Crear sorteos consuelo.
-- Configurar fecha del sorteo y fecha/hora de corte.
-- Generar padron congelado.
-- Cargar numeros ganadores.
-- Validar si el numero ganador corresponde a un bono habilitado.
-- Registrar premios adjudicados, pendientes o no adjudicados.
+- Create monthly draws.
+- Create extraordinary draw for full payment.
+- Create final draw.
+- Create consolation draws.
+- Configure draw date and cutoff date/time.
+- Generate frozen draw roster.
+- Load winning numbers.
+- Validate whether the winning number belongs to an eligible bond.
+- Record prizes as awarded, pending, or not awarded.
 
-Reglas incluidas:
+Included rules:
 
-- Sorteo mensual: debe estar al dia hasta la cuota requerida.
-- Sorteo extraordinario: debe estar pago completo antes del corte y suma N numeros extra segun cantidad de numeros base.
-- Sorteo final: debe estar pago completo para ganar.
-- Sorteo consuelo: participan solo no ganadores y que esten al dia.
+- Monthly draw: must be up to date through the required installment.
+- Extraordinary draw: must be fully paid before the cutoff and adds N extra numbers based on the number of base numbers.
+- Final draw: must be fully paid to win.
+- Consolation draw: only non-winners who are up to date participate.
 
-### Reportes y remitos
+### Reports and Notes
 
-- Remito de entrega de bonos.
-- Remito de rendicion.
-- Constancia de pago.
-- Constancia de premio entregado o no adjudicado.
-- Resumen mensual por cobrador.
-- Reporte de bonos vendidos, disponibles y entregados.
-- Reporte de cuotas pagas, pendientes y vencidas.
-- Reporte de padron de sorteo.
-- Reporte de ganadores y premios.
+- Bond delivery note.
+- Collector settlement note.
+- Payment receipt.
+- Delivered or not-awarded prize receipt.
+- Monthly summary by collector.
+- Report of sold, available, and delivered bonds.
+- Report of paid, pending, and overdue installments.
+- Draw roster report.
+- Winners and prizes report.
 
-### Auditoria
+### Audit
 
-- Auditar acciones sensibles.
-- Registrar usuario, fecha, accion, entidad, datos anteriores y datos nuevos cuando aplique.
+- Audit sensitive actions.
+- Record user, date, action, entity, previous data, and new data when applicable.
 
-### Migracion inicial
+### Initial Migration
 
-- Importar cobradores desde sistema viejo si hay exportacion disponible.
-- Importar compradores desde sistema viejo si hay exportacion disponible.
-- Importar numeros historicos para generar reservas y conflictos.
-- Validar datos en staging antes de confirmar.
+- Import collectors from the old system if an export is available.
+- Import buyers from the old system if an export is available.
+- Import historical numbers to generate reservations and conflicts.
+- Validate data in staging before confirming.
 
-## Fuera del MVP
+## Outside the MVP
 
-- Portal publico de comprador.
-- Portal completo de cobrador.
-- Notificaciones por WhatsApp, email o SMS.
-- Conciliacion bancaria automatica.
-- QR propio para nuevas impresiones.
-- Caja diaria avanzada.
-- Analitica comparativa entre campanas.
-- Integracion AWS nativa.
+- Public buyer portal.
+- Complete collector portal.
+- Notifications by WhatsApp, email, or SMS.
+- Automatic bank reconciliation.
+- Own QR for new print runs.
+- Advanced daily cash register.
+- Comparative analytics between campaigns.
+- Native AWS integration.
 
-## Criterios de aceptacion del MVP
+## MVP Acceptance Criteria
 
-- La administracion puede crear una campana y cargar bonos.
-- El sistema impide numeros participantes duplicados dentro de una campana.
-- El sistema respeta cantidad de cifras por campana.
-- Se puede asignar bonos a cobradores y emitir remito.
-- Se puede vender un bono a un comprador.
-- Se puede registrar pagos de contado, por cuota y adelantados.
-- Se puede crear y cerrar una rendicion.
-- El cierre de rendicion genera comisiones y movimientos de cuenta corriente.
-- Una rendicion cerrada no se edita directamente.
-- Se puede aplicar regla especial o ajuste manual de comision con auditoria.
-- Se puede generar padron congelado para sorteo.
-- Se puede cargar ganador y validar habilitacion segun padron.
-- Se puede consultar saldo de cobrador desde movimientos.
-- Se puede cargar o buscar bonos por codigo de barras segun configuracion de campana.
-- Se pueden emitir documentos HTML imprimibles principales.
+- Administration can create a campaign and load bonds.
+- The system prevents duplicate participating numbers within a campaign.
+- The system respects number digit count per campaign.
+- Bonds can be assigned to collectors and a delivery note can be issued.
+- A bond can be sold to a buyer.
+- Cash, installment, and early payments can be registered.
+- A collector settlement can be created and closed.
+- Closing a collector settlement generates commissions and collector ledger entries.
+- A closed collector settlement is not edited directly.
+- A special rule or manual commission adjustment can be applied with audit.
+- A frozen draw roster can be generated for a draw.
+- A winner can be loaded and eligibility validated according to the draw roster.
+- Collector balance can be queried from entries.
+- Bonds can be loaded or searched by barcode according to campaign configuration.
+- Main printable HTML documents can be issued.
 
-## Riesgos principales
+## Main Risks
 
-- Reglas de patas incompletas.
-- Comisiones exactas pendientes.
-- Posible complejidad si se intenta digitalizar todos los procesos futuros en la primera version.
+- Incomplete pata rules.
+- Exact commissions pending.
+- Possible complexity if every future process is digitized in the first version.
 
-## Documentos relacionados
+## Related Documents
 
 - `docs/permissions.md`
 - `docs/screens.md`
@@ -183,6 +183,6 @@ Reglas incluidas:
 - `docs/backup-operations.md`
 - `docs/implementation-plan.md`
 
-## Estrategia de control de alcance
+## Scope Control Strategy
 
-El MVP debe priorizar trazabilidad y consistencia sobre automatizaciones avanzadas. Si una regla no esta confirmada, debe quedar configurable o documentada como decision temporal, no hardcodeada como verdad permanente.
+The MVP must prioritize traceability and consistency over advanced automation. If a rule is not confirmed, it must remain configurable or documented as a temporary decision, not hardcoded as permanent truth.
