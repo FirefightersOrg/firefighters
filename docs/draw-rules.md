@@ -1,115 +1,115 @@
-# Reglas de sorteos
+# Draw Rules
 
-## Objetivo
+## Objective
 
-Definir reglas funcionales de elegibilidad para los sorteos del MVP.
+Define functional eligibility rules for MVP draws.
 
-## Tipos de sorteo
+## Draw Types
 
-- Mensual.
-- Extraordinario por pago total.
+- Monthly.
+- Extraordinary for full payment.
 - Final.
-- Consuelo.
+- Consolation.
 
-## Sorteo mensual
+## Monthly Draw
 
-Regla:
+Rule:
 
 ```txt
-Para participar debe tener paga la cuota requerida del sorteo y todas las anteriores antes de la fecha de corte.
+To participate, the required installment for the draw and all previous installments must be paid before the cutoff date.
 ```
 
-Ejemplo:
+Example:
 
 ```txt
-Sorteo diciembre
-Cuota requerida: 3
-Debe tener pagas cuotas 1, 2 y 3 antes del corte.
+December draw
+Required installment: 3
+Installments 1, 2, and 3 must be paid before the cutoff.
 ```
 
-## Sorteo extraordinario por pago total
+## Extraordinary Draw for Full Payment
 
-Regla:
+Rule:
 
 ```txt
-Participan quienes hayan pagado el total del bono antes de la fecha de corte.
+Participants are those who have paid the full bond before the cutoff date.
 ```
 
-Numeros extra:
+Extra numbers:
 
 ```txt
-Bono simple = 1 numero extra
-Pata = N numeros extra segun cantidad de numeros base
+Simple bond = 1 extra number
+Pata (multi-number bond/package) = N extra numbers based on the number of base numbers
 ```
 
-Ejemplo:
+Example:
 
 ```txt
-Pata con 5 numeros base
-Participacion normal: 5 base + 5 asociados = 10 numeros
-Participacion extraordinaria adicional: 5 numeros extra
+Pata with 5 base numbers
+Normal participation: 5 base + 5 associated = 10 numbers
+Additional extraordinary participation: 5 extra numbers
 ```
 
-Los numeros extra deben quedar persistidos o congelados en el padron del sorteo extraordinario para justificar resultados historicos.
+The extra numbers must remain persisted or frozen in the extraordinary draw roster to justify historical results.
 
-## Sorteo final
+## Final Draw
 
-Regla definida:
+Defined rule:
 
 ```txt
-Para ganar el sorteo final, el bono debe estar completamente pago.
+To win the final draw, the bond must be fully paid.
 ```
 
-La validacion debe hacerse contra pagos confirmados antes del corte definido para el sorteo final.
+Validation must be done against payments confirmed before the cutoff defined for the final draw.
 
-## Sorteos consuelo
+## Consolation Draws
 
-Regla definida:
+Defined rule:
 
 ```txt
-Participan solo bonos no ganadores y que esten al dia.
+Only non-winning bonds that are up to date participate.
 ```
 
-Condiciones:
+Conditions:
 
-- No haber ganado en sorteos previos que excluyan de consuelo.
-- Estar al dia segun cuota requerida o regla configurada del consuelo.
-- Figurar habilitado en el padron congelado.
+- Must not have won in previous draws that exclude the bond from consolation.
+- Must be up to date according to the required installment or configured consolation rule.
+- Must appear as enabled in the frozen draw roster.
 
-## Padron congelado
+## Frozen Draw Roster
 
-Todos los sorteos deben tener padron congelado antes de cargar ganadores.
+All draws must have a frozen draw roster before winners are loaded.
 
-El padron debe incluir:
+The draw roster must include:
 
-- Habilitados.
-- No habilitados.
-- Motivo de no habilitacion.
-- Numero participante.
-- Bono.
-- Comprador.
-- Cobrador.
-- Fecha/hora de generacion.
-- Fecha/hora de congelamiento.
+- Enabled entries.
+- Disabled entries.
+- Reason for being disabled.
+- Participant number.
+- Bond.
+- Buyer.
+- Collector.
+- Generation date/time.
+- Freeze date/time.
 
-## Carga de ganador
+## Winner Loading
 
 ```txt
-Ingresar numero ganador
+Enter winning number
 ↓
-Buscar en padron congelado
+Search in frozen draw roster
 ↓
-Determinar bono asociado
+Determine associated bond
 ↓
-Verificar habilitacion
+Verify eligibility
 ↓
-Registrar resultado
+Record result
 ```
 
-Resultados posibles:
+Possible results:
 
-- Ganador habilitado.
-- Premio no adjudicado por falta de pago.
-- Premio no adjudicado por no cumplir regla del sorteo.
-- Numero sin coincidencia.
-- Pendiente de revision.
+- Eligible winner.
+- Prize not awarded due to lack of payment.
+- Prize not awarded due to not meeting the draw rule.
+- Number with no match.
+- Pending review.
