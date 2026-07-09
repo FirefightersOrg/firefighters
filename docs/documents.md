@@ -1,123 +1,123 @@
-# Documentos imprimibles
+# Printable Documents
 
-## Objetivo
+## Objective
 
-Definir documentos operativos del MVP. La primera version usara HTML imprimible. PDF persistente queda como mejora futura.
+Define MVP operational documents. The first version will use printable HTML. Persistent PDF remains a future improvement.
 
-## Decision MVP
+## MVP Decision
 
 ```txt
-Formato inicial: HTML imprimible
+Initial format: printable HTML
 ```
 
-Motivos:
+Reasons:
 
-- Menor complejidad tecnica.
-- Facil de imprimir desde navegador.
-- Suficiente para remitos administrativos.
-- Puede evolucionar a PDF sin cambiar los datos base.
+- Lower technical complexity.
+- Easy to print from the browser.
+- Sufficient for administrative receipts.
+- Can evolve to PDF without changing the base data.
 
-## Regla general
+## General Rule
 
-Los datos estructurados deben guardarse en base de datos. El HTML es solo una representacion imprimible.
+Structured data must be stored in the database. The HTML is only a printable representation.
 
-## Remito de entrega de bonos
+## Bond Delivery Receipt
 
-Debe incluir:
+Must include:
 
-- Nombre de la institucion.
-- Campana.
-- Numero de remito.
-- Fecha.
-- Cobrador.
-- Usuario que registra.
-- Bonos entregados.
-- Tipo de bono.
-- Numeros base y asociados.
-- Codigo de barras si existe.
-- Observaciones.
-- Firma de cobrador.
-- Firma de administracion.
+- Institution name.
+- Campaign.
+- Receipt number.
+- Date.
+- Collector.
+- User who records it.
+- Delivered bonds.
+- Bond type.
+- Base and associated numbers.
+- Barcode if it exists.
+- Notes.
+- Collector signature.
+- Administration signature.
 
-## Remito de rendicion
+## Collector Settlement Receipt
 
-Debe incluir:
+Must include:
 
-- Campana.
-- Numero de rendicion.
-- Fecha de apertura y cierre.
-- Cobrador.
-- Usuario que cierra.
-- Pagos incluidos.
-- Bono.
-- Comprador.
-- Cuotas pagadas.
-- Medio de pago.
-- Total efectivo.
-- Total transferencia.
-- Total general.
-- Comision generada.
-- Comision liquidada.
-- Ajustes manuales.
-- Neto para Bomberos.
-- Saldo resultante del cobrador.
-- Observaciones.
-- Firmas.
+- Campaign.
+- Collector settlement number.
+- Opening and closing date.
+- Collector.
+- User who closes it.
+- Included payments.
+- Bond.
+- Buyer.
+- Paid installments.
+- Payment method.
+- Total cash.
+- Total transfer.
+- Grand total.
+- Generated commission.
+- Settled commission.
+- Manual adjustments.
+- Net amount for Firefighters.
+- Collector resulting balance.
+- Notes.
+- Signatures.
 
-## Constancia de pago
+## Payment Receipt
 
-Debe incluir:
+Must include:
 
-- Campana.
-- Bono.
-- Numeros participantes principales.
-- Comprador.
-- Cobrador.
-- Cuotas cubiertas.
-- Importe.
-- Medio de pago.
-- Fecha de pago.
-- Fecha de registracion.
-- Usuario que registro.
-- Numero de comprobante interno.
+- Campaign.
+- Bond.
+- Main participant numbers.
+- Buyer.
+- Collector.
+- Covered installments.
+- Amount.
+- Payment method.
+- Payment date.
+- Registration date.
+- User who recorded it.
+- Internal receipt number.
 
-## Constancia de premio entregado
+## Delivered Prize Receipt
 
-Debe incluir:
+Must include:
 
-- Sorteo.
-- Fecha.
-- Premio.
-- Numero ganador.
-- Bono asociado.
-- Comprador.
-- Cobrador.
-- Estado en padron.
-- Fecha de entrega.
-- Usuario que registra.
-- Observaciones.
-- Firma de receptor.
+- Draw.
+- Date.
+- Prize.
+- Winning number.
+- Associated bond.
+- Buyer.
+- Collector.
+- Status in draw roster.
+- Delivery date.
+- User who records it.
+- Notes.
+- Recipient signature.
 
-## Constancia de premio no adjudicado
+## Prize Not Awarded Receipt
 
-Debe incluir:
+Must include:
 
-- Sorteo.
-- Premio.
-- Numero ganador.
-- Bono asociado si existe.
-- Comprador si existe.
-- Motivo de no adjudicacion.
-- Estado en padron.
-- Usuario que registra.
-- Fecha.
-- Observaciones.
+- Draw.
+- Prize.
+- Winning number.
+- Associated bond if it exists.
+- Buyer if it exists.
+- Reason for not awarding.
+- Status in draw roster.
+- User who records it.
+- Date.
+- Notes.
 
-## Versionado futuro
+## Future Versioning
 
-A futuro se puede agregar:
+In the future, the following can be added:
 
-- Generacion PDF.
-- Persistencia de PDF en storage.
-- Codigo QR de validacion.
-- Firma digital o sello institucional.
+- PDF generation.
+- PDF persistence in storage.
+- Validation QR code.
+- Digital signature or institutional seal.
