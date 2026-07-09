@@ -1,280 +1,280 @@
-# Modelo de negocio — Sistema de Gestión de Rifas / Bonos de Bomberos
+# Business Model — Firefighters Raffle / Bond Management System
 
-## 1. Objetivo del sistema
+## 1. System objective
 
-El objetivo del sistema es reemplazar el sistema actual obsoleto y los controles manuales en Excel por una aplicación web moderna, eficiente e intuitiva para gestionar integralmente las rifas/bonos de los Bomberos Voluntarios.
+The objective of the system is to replace the current obsolete system and manual Excel controls with a modern, efficient, and intuitive web application to comprehensively manage the Volunteer Firefighters raffles/bonds.
 
-El sistema debe permitir administrar todo el ciclo de vida de una campaña anual de bonos:
+The system must allow managing the full life cycle of an annual bond campaign:
 
-1. Crear una nueva campaña anual.
-2. Cargar bonos simples y bonos tipo “pata”.
-3. Asignar bonos a vendedores/cobradores.
-4. Registrar ventas a compradores.
-5. Registrar pagos de contado, pagos por cuota y pagos adelantados.
-6. Controlar cobranzas y rendiciones de cobradores.
-7. Calcular comisiones.
-8. Controlar saldos a favor de cobradores o de Bomberos.
-9. Gestionar sorteos mensuales, extraordinarios, consuelos y sorteo final.
-10. Determinar si un bono está habilitado para participar/cobrar premio.
-11. Registrar ganadores y premios.
-12. Emitir remitos, constancias, reportes y respaldos.
+1. Create a new annual campaign.
+2. Load simple bonds and “pata” bonds.
+3. Assign bonds to sellers/collectors.
+4. Record sales to buyers.
+5. Record cash payments, installment payments, and advance payments.
+6. Control collections and collector settlements.
+7. Calculate commissions.
+8. Control balances in favor of collectors or Firefighters.
+9. Manage monthly, extraordinary, consolation, and final draws.
+10. Determine whether a bond is eligible to participate/claim a prize.
+11. Record winners and prizes.
+12. Issue delivery notes, receipts, reports, and backups.
 
-La aplicación será web y deberá estar pensada para ser accesible desde distintos dispositivos.
+The application will be web-based and must be designed to be accessible from different devices.
 
 ---
 
-## 2. Terminología del negocio
+## 2. Business terminology
 
-Para evitar confusiones, se propone estandarizar estos términos dentro del sistema.
+To avoid confusion, these terms should be standardized within the system.
 
-| Término | Significado |
+| Term | Meaning |
 |---|---|
-| Campaña | Período anual del bono/rifa. Ejemplo: “Bono Contribución 2025-2026”. |
-| Sorteo | Evento puntual dentro de una campaña. Puede ser mensual, final, consuelo o extraordinario. |
-| Bono | Cartón físico que se vende a un comprador. Puede ser simple o pata. |
-| Bono simple | Bono individual con un número base visible y un número asociado calculado. |
-| Pata | Bono con varios números base. Se vende como una unidad comercial más grande, usualmente a empresas o comercios. |
-| Número base | Número principal impreso en el bono. |
-| Número asociado | Número calculado a partir del número base sumando 4871. |
-| Número participante | Cualquier número que participa en sorteos: número base o número asociado. |
-| Comprador | Persona, comercio o empresa que compra un bono. |
-| Cobrador / Vendedor | Persona que recibe bonos, los vende, cobra cuotas y rinde a Bomberos. |
-| Entrega de bonos | Acto administrativo por el cual Bomberos entrega bonos físicos a un cobrador. |
-| Venta | Acto por el cual un bono queda asociado a un comprador. |
-| Pago | Registro de dinero abonado por un comprador. Puede ser efectivo o transferencia. |
-| Rendición | Acto por el cual un cobrador informa pagos, entrega dinero y se calcula su comisión. |
-| Comisión | Porcentaje o monto que corresponde al cobrador por la venta/cobro. |
-| Liquidación de comisión | Pago efectivo de comisiones acumuladas a favor del cobrador. |
-| Padrón de sorteo | Lista congelada de bonos/números habilitados para participar en un sorteo. |
+| Campaign | Annual period of the bond/raffle. Example: “Contribution Bond 2025-2026”. |
+| Draw | Specific event within a campaign. It can be monthly, final, consolation, or extraordinary. |
+| Bond | Physical ticket/card sold to a buyer. It can be simple or pata. |
+| Simple bond | Individual bond with one visible base number and one calculated associated number. |
+| Pata | Pata (multi-number bond/package) with several base numbers. It is sold as a larger commercial unit, usually to companies or businesses. |
+| Base number | Main number printed on the bond. |
+| Associated number | Number calculated from the base number by adding 4871. |
+| Participant number | Any number that participates in draws: base number or associated number. |
+| Buyer | Person, business, or company that buys a bond. |
+| Collector / Seller | Person who receives bonds, sells them, collects installments, and settles with Firefighters. |
+| Bond delivery | Administrative act through which Firefighters deliver physical bonds to a collector. |
+| Sale | Act through which a bond becomes associated with a buyer. |
+| Payment | Record of money paid by a buyer. It can be cash or transfer. |
+| Collector settlement | Act through which a collector reports payments, hands over money, and their commission is calculated. |
+| Commission | Percentage or amount owed to the collector for the sale/collection. |
+| Commission payout | Effective payment of accumulated commissions in favor of the collector. |
+| Draw roster | Frozen list of bonds/numbers eligible to participate in a draw. |
 
 ---
 
-## 3. Campañas
+## 3. Campaigns
 
-Una campaña representa el período anual completo de una edición del bono.
+A campaign represents the full annual period of a bond edition.
 
-Ejemplo:
+Example:
 
 ```text
-Campaña: Bono Contribución 2025-2026
-Valor del bono simple: $60.000
-Cantidad de cuotas: 10
-Valor de cada cuota: $6.000
+Campaign: Contribution Bond 2025-2026
+Simple bond value: $60,000
+Number of installments: 10
+Value of each installment: $6,000
 ```
 
-Una campaña contiene:
+A campaign contains:
 
-- Bonos simples.
-- Bonos tipo pata.
-- Compradores.
-- Cobradores.
-- Entregas de bonos.
-- Ventas.
-- Pagos.
-- Rendiciones.
-- Sorteos mensuales.
-- Sorteo extraordinario por pago total.
-- Sorteos consuelo.
-- Sorteo final.
-- Premios.
-- Reglas de comisión.
-- Reglas de elegibilidad.
+- Simple bonds.
+- Pata bonds.
+- Buyers.
+- Collectors.
+- Bond deliveries.
+- Sales.
+- Payments.
+- Collector settlements.
+- Monthly draws.
+- Extraordinary draw for full payment.
+- Consolation draws.
+- Final draw.
+- Prizes.
+- Commission rules.
+- Eligibility rules.
 
-### 3.1. Ciclo anual de una campaña
+### 3.1. Annual campaign cycle
 
-El flujo general es:
+The general flow is:
 
 ```text
-1. Finaliza la campaña anterior.
-2. Se crea la nueva campaña.
-3. Llegan los bonos impresos.
-4. Se cargan los bonos simples y patas en el sistema.
-5. Se revisan los números históricos de compradores del año anterior.
-6. Se asignan bonos a los cobradores.
-7. Los cobradores se llevan los bonos físicos.
-8. Los cobradores venden los bonos.
-9. Los cobradores rinden ventas y pagos a la administración.
-10. Administración registra compradores, pagos, cuotas y medios de pago.
-11. El sistema calcula comisiones y saldos.
-12. Mensualmente se generan padrones de sorteo.
-13. Se cargan números ganadores.
-14. El sistema valida si el bono ganador estaba habilitado.
-15. Se registran premios.
-16. Al finalizar el período, se cierra la campaña.
+1. The previous campaign ends.
+2. The new campaign is created.
+3. The printed bonds arrive.
+4. Simple bonds and patas are loaded into the system.
+5. Historical buyer numbers from the previous year are reviewed.
+6. Bonds are assigned to collectors.
+7. Collectors take the physical bonds.
+8. Collectors sell the bonds.
+9. Collectors settle sales and payments with administration.
+10. Administration records buyers, payments, installments, and payment methods.
+11. The system calculates commissions and balances.
+12. Draw rosters are generated monthly.
+13. Winning numbers are loaded.
+14. The system validates whether the winning bond was eligible.
+15. Prizes are recorded.
+16. At the end of the period, the campaign is closed.
 ```
 
 ---
 
-## 4. Bonos
+## 4. Bonds
 
-El bono es la unidad vendible del sistema.
+The bond is the sellable unit of the system.
 
-Un bono puede ser:
+A bond can be:
 
-1. Bono simple.
-2. Bono tipo pata.
+1. Simple bond.
+2. Pata bond.
 
-Ambos son bonos. La diferencia está en la cantidad de números base que contienen y, por consecuencia, en su valor.
+Both are bonds. The difference is the number of base numbers they contain and, consequently, their value.
 
 ---
 
-## 5. Bono simple
+## 5. Simple bond
 
-Un bono simple posee:
+A simple bond has:
 
-- Un número base.
-- Un número asociado calculado.
-- Un comprador, si fue vendido.
-- Un cobrador asignado.
-- Un plan de pago.
-- Cuotas.
-- Pagos.
-- Estado comercial.
-- Estado financiero.
+- One base number.
+- One calculated associated number.
+- One buyer, if it was sold.
+- One assigned collector.
+- One payment plan.
+- Installments.
+- Payments.
+- Commercial status.
+- Financial status.
 
-Ejemplo real observado:
+Real observed example:
 
 ```text
-Número base: 1658
-Número asociado: 6529
+Base number: 1658
+Associated number: 6529
 ```
 
-La relación es:
+The relationship is:
 
 ```text
 1658 + 4871 = 6529
 ```
 
-Por lo tanto:
+Therefore:
 
 ```text
-número_asociado = número_base + 4871
+associated_number = base_number + 4871
 ```
 
-### 5.1. Regla principal del bono simple
+### 5.1. Main simple bond rule
 
-Aunque visualmente parezca que el bono tiene dos números independientes, en realidad tiene:
+Although visually it may look like the bond has two independent numbers, it actually has:
 
 ```text
-1 número base
+1 base number
 +
-1 número asociado calculado automáticamente
+1 automatically calculated associated number
 ```
 
-El comprador del bono participa con ambos números.
+The bond buyer participates with both numbers.
 
-Ejemplo:
+Example:
 
 ```text
-Bono 1658
+Bond 1658
 
-Participa con:
+Participates with:
 - 1658
 - 6529
 ```
 
-Si sale sorteado cualquiera de esos dos números, el ganador es el mismo bono.
+If either of those two numbers is drawn, the winner is the same bond.
 
 ```text
-Si sale 1658 → gana el Bono 1658
-Si sale 6529 → gana el Bono 1658
+If 1658 is drawn -> Bond 1658 wins
+If 6529 is drawn -> Bond 1658 wins
 ```
 
-El sistema debe evitar interpretar esos números como dos bonos distintos.
+The system must avoid interpreting those numbers as two different bonds.
 
 ---
 
-## 6. Número asociado +4871
+## 6. Associated number +4871
 
-Todos los bonos usan una lógica de número asociado.
+All bonds use associated-number logic.
 
-Regla:
+Rule:
 
 ```text
-número asociado = número base + 4871
+associated number = base number + 4871
 ```
 
-Esta regla debe estar configurada en el sistema, idealmente a nivel campaña, para no dejarla fija en el código.
+This rule must be configured in the system, ideally at campaign level, so it is not hardcoded.
 
-### 6.1. Objetivo operativo
+### 6.1. Operational objective
 
-El número asociado está ligado al mismo bono. El objetivo es que el mismo bono tenga más de una chance de salir sorteado sin que se genere doble asignación de premio a dos bonos distintos.
+The associated number is tied to the same bond. The objective is for the same bond to have more than one chance of being drawn without generating double prize assignment to two different bonds.
 
-### 6.2. Validación de duplicados
+### 6.2. Duplicate validation
 
-El sistema debe validar que un número participante no se repita dentro de la misma campaña.
+The system must validate that a participant number is not repeated within the same campaign.
 
-Número participante significa:
+Participant number means:
 
-- número base,
-- número asociado calculado.
+- base number,
+- calculated associated number.
 
-Ejemplo de situación problemática:
+Example of a problematic situation:
 
 ```text
-Bono A:
+Bond A:
 base 1658
-asociado 6529
+associated 6529
 
-Bono B:
+Bond B:
 base 6529
-asociado 11400
+associated 11400
 ```
 
-En este caso, el número 6529 quedaría ligado a dos bonos diferentes. El sistema debería impedirlo, advertirlo o exigir una resolución administrativa.
+In this case, number 6529 would be tied to two different bonds. The system should prevent it, warn about it, or require an administrative resolution.
 
-### 6.3. Duda pendiente sobre límite de 4 cifras
+### 6.3. Open question about 4-digit limit
 
-Todavía debe confirmarse qué ocurre cuando:
+It still must be confirmed what happens when:
 
 ```text
-número_base + 4871 > 9999
+base_number + 4871 > 9999
 ```
 
-Ejemplo:
+Example:
 
 ```text
 7000 + 4871 = 11871
 ```
 
-Posibles reglas a confirmar:
+Possible rules to confirm:
 
-1. Nunca se usan números base tan altos.
-2. Se toman las últimas 4 cifras.
-3. Existe un rango máximo permitido para los números base.
-4. La campaña puede trabajar con más de 4 cifras en ciertos casos.
+1. Such high base numbers are never used.
+2. The last 4 digits are taken.
+3. There is a maximum allowed range for base numbers.
+4. The campaign can work with more than 4 digits in certain cases.
 
-Hasta confirmar esta regla, el sistema debe tratarlo como una validación pendiente.
+Until this rule is confirmed, the system must treat it as a pending validation.
 
 ---
 
-## 7. Bonos tipo “pata”
+## 7. “Pata” bonds
 
-Una pata es un bono impreso que posee varios números base.
+A pata is a printed bond that has several base numbers.
 
-No debe modelarse como muchos bonos separados, sino como:
+It must not be modeled as many separate bonds, but as:
 
 ```text
-1 bono tipo pata
+1 pata bond
 +
-varios números base
+several base numbers
 +
-varios números asociados calculados
+several calculated associated numbers
 ```
 
-Ejemplo conceptual:
+Conceptual example:
 
 ```text
 Pata 1200
 
-Números base:
+Base numbers:
 - 1200
 - 1315
 - 2200
 - 3100
 - 4500
 
-Números asociados:
+Associated numbers:
 - 6071
 - 6186
 - 7071
@@ -282,1266 +282,1266 @@ Números asociados:
 - 9371
 ```
 
-Si una pata tiene 5 números base, participa con 10 números totales.
+If a pata has 5 base numbers, it participates with 10 total numbers.
 
-### 7.1. Venta de patas
+### 7.1. Pata sale
 
-Las patas se venden como una unidad.
+Patas are sold as one unit.
 
-Habitualmente se venden a empresas, comercios o compradores grandes porque tienen más números y, por lo tanto, mayor valor.
+They are usually sold to companies, businesses, or large buyers because they have more numbers and therefore higher value.
 
-### 7.2. Valor de una pata
+### 7.2. Pata value
 
-El valor de una pata debe depender de la cantidad de números/unidades comerciales que contiene.
+The value of a pata must depend on the number of numbers/commercial units it contains.
 
-Regla probable, pendiente de confirmación exacta:
-
-```text
-Bono simple = 1 unidad comercial = 1 número base + 1 número asociado
-Pata = N unidades comerciales
-Valor pata = valor bono simple × N
-```
-
-Ejemplo:
+Likely rule, pending exact confirmation:
 
 ```text
-Bono simple:
-1 número base
-1 número asociado
-Valor: $60.000
-
-Pata con 5 números base:
-5 números base
-5 números asociados
-Valor probable: $300.000
+Simple bond = 1 commercial unit = 1 base number + 1 associated number
+Pata = N commercial units
+Pata value = simple bond value x N
 ```
 
-Esta regla debe confirmarse con administración o con el sistema anterior antes de implementarse definitivamente.
+Example:
+
+```text
+Simple bond:
+1 base number
+1 associated number
+Value: $60,000
+
+Pata with 5 base numbers:
+5 base numbers
+5 associated numbers
+Likely value: $300,000
+```
+
+This rule must be confirmed with administration or with the previous system before being implemented definitively.
 
 ---
 
-## 8. Creación de nuevas patas
+## 8. Creating new patas
 
-Además de las patas impresas, puede ocurrir que se necesite armar una nueva pata agrupando varios bonos simples.
+In addition to printed patas, it may be necessary to assemble a new pata by grouping several simple bonds.
 
-Esto sucede cuando:
+This happens when:
 
-- no quedan patas impresas disponibles,
-- un comprador desea comprar varios números,
-- una empresa o comercio solicita una pata.
+- no printed patas remain available,
+- a buyer wants to buy several numbers,
+- a company or business requests a pata.
 
-En ese caso, el sistema debe permitir agrupar bonos simples.
+In that case, the system must allow grouping simple bonds.
 
-### 8.1. Regla de trazabilidad
+### 8.1. Traceability rule
 
-Cuando se arma una pata con bonos simples, no se debe perder la identidad original de esos bonos.
+When a pata is assembled from simple bonds, the original identity of those bonds must not be lost.
 
-El sistema debe registrar:
+The system must record:
 
-- qué bonos simples fueron agrupados,
-- cuándo se agruparon,
-- quién realizó la agrupación,
-- para qué cobrador o comprador se agrupó,
-- si luego se desagrupó,
-- motivo de la agrupación o desagrupación.
+- which simple bonds were grouped,
+- when they were grouped,
+- who performed the grouping,
+- for which collector or buyer they were grouped,
+- whether they were later ungrouped,
+- reason for grouping or ungrouping.
 
-### 8.2. Venta de una pata armada
+### 8.2. Selling an assembled pata
 
-Aunque esté armada a partir de bonos simples, comercialmente debe poder venderse como una pata/paquete único.
-
----
-
-## 9. Historial y reserva de números
-
-Una característica importante del negocio es que muchos compradores quieren conservar el mismo número todos los años.
-
-Por eso, al comenzar una nueva campaña, se intenta asignar a cada cobrador los mismos números que vendió el año anterior a los mismos compradores.
-
-### 9.1. Reserva histórica
-
-El sistema debería registrar el historial de números por comprador.
-
-Ejemplo:
-
-```text
-Comprador: Diego Fernández
-Número habitual: 0068
-Cobrador habitual: Juan Pérez
-Última campaña: 2024-2025
-```
-
-Al cargar la nueva campaña, el sistema debería ayudar a detectar:
-
-```text
-El número 0068 está disponible.
-Puede asignarse nuevamente al comprador histórico.
-```
-
-O:
-
-```text
-El número 0068 este año pertenece a una pata.
-No está disponible como bono simple.
-Debe ofrecerse un número alternativo.
-```
-
-### 9.2. Conflicto con patas
-
-Puede ocurrir que un número que históricamente compraba una persona ahora pertenezca a una pata.
-
-En ese caso:
-
-1. El número no se asigna al comprador histórico.
-2. Se asigna otro número al cobrador.
-3. El cobrador informa al comprador que su número habitual no está disponible.
-4. Se registra la reasignación para mantener trazabilidad.
+Even if it is assembled from simple bonds, commercially it must be sellable as a single pata/package.
 
 ---
 
-## 10. Asignación de bonos a cobradores
+## 9. Number history and reservation
 
-Antes de comenzar la campaña, Bomberos entrega bonos físicos a los cobradores.
+An important business feature is that many buyers want to keep the same number every year.
 
-Esta entrega debe registrarse formalmente en el sistema.
+Therefore, when starting a new campaign, the system attempts to assign each collector the same numbers they sold the previous year to the same buyers.
 
-### 10.1. Entrega de bonos
+### 9.1. Historical reservation
 
-Una entrega debe contener:
+The system should record number history by buyer.
 
-- número de entrega/remito,
-- fecha,
-- cobrador,
-- usuario administrador que la registró,
-- listado de bonos entregados,
-- observaciones,
-- estado,
-- posibilidad de impresión.
-
-Ejemplo:
+Example:
 
 ```text
-Remito de entrega N° 000123
-Fecha: 01/09/2025
-Cobrador: Juan Pérez
+Buyer: Diego Fernandez
+Usual number: 0068
+Usual collector: Juan Perez
+Last campaign: 2024-2025
+```
 
-Bonos entregados:
-- Bono 0068
-- Bono 0100
+When loading the new campaign, the system should help detect:
+
+```text
+Number 0068 is available.
+It can be assigned again to the historical buyer.
+```
+
+Or:
+
+```text
+Number 0068 belongs to a pata this year.
+It is not available as a simple bond.
+An alternative number must be offered.
+```
+
+### 9.2. Conflict with patas
+
+It may happen that a number historically bought by a person now belongs to a pata.
+
+In that case:
+
+1. The number is not assigned to the historical buyer.
+2. Another number is assigned to the collector.
+3. The collector informs the buyer that their usual number is not available.
+4. The reassignment is recorded to maintain traceability.
+
+---
+
+## 10. Assigning bonds to collectors
+
+Before starting the campaign, Firefighters deliver physical bonds to collectors.
+
+This delivery must be formally recorded in the system.
+
+### 10.1. Bond delivery
+
+A delivery must contain:
+
+- delivery note number,
+- date,
+- collector,
+- administrator user who recorded it,
+- list of delivered bonds,
+- notes,
+- status,
+- printing capability.
+
+Example:
+
+```text
+Delivery note No. 000123
+Date: 09/01/2025
+Collector: Juan Perez
+
+Delivered bonds:
+- Bond 0068
+- Bond 0100
 - Pata 1200
 - Pata 1300
 ```
 
-### 10.2. Estado del bono después de la entrega
+### 10.2. Bond status after delivery
 
-Cuando se entrega a un cobrador:
+When delivered to a collector:
 
 ```text
-Disponible en administración
-→ Entregado a cobrador
+Available in administration
+-> Delivered to collector
 ```
 
-Esto no significa que el bono esté vendido.
+This does not mean the bond has been sold.
 
-Solo significa que el cobrador tiene físicamente el bono.
+It only means the collector physically has the bond.
 
-### 10.3. Devolución o desasignación
+### 10.3. Return or unassignment
 
-Debe existir la posibilidad de:
+It must be possible to:
 
-- devolver bonos a administración,
-- desasignar bonos de un cobrador,
-- reasignar bonos a otro cobrador,
-- registrar pérdida/extravío,
-- anular una asignación errónea.
+- return bonds to administration,
+- unassign bonds from a collector,
+- reassign bonds to another collector,
+- record loss/misplacement,
+- void an erroneous assignment.
 
-Todas estas acciones deben quedar auditadas.
+All these actions must be audited.
 
 ---
 
-## 11. Venta de bonos
+## 11. Bond sales
 
-La venta ocurre cuando el cobrador informa que un bono fue vendido a un comprador.
+The sale occurs when the collector reports that a bond was sold to a buyer.
 
-La venta debe registrar:
+The sale must record:
 
-- bono vendido,
-- cobrador que lo vendió,
-- comprador,
-- fecha de venta,
-- modalidad de pago,
-- cantidad de cuotas si aplica,
-- pago inicial si corresponde,
-- medio de pago,
-- observaciones.
+- sold bond,
+- collector who sold it,
+- buyer,
+- sale date,
+- payment mode,
+- number of installments if applicable,
+- initial payment if applicable,
+- payment method,
+- notes.
 
-### 11.1. Modalidades de venta
+### 11.1. Sale modes
 
-El comprador puede pagar:
+The buyer can pay:
 
-1. De contado.
-2. En cuotas.
-3. En cuotas con adelantos posteriores.
-4. En cuotas pero completando el total antes del sorteo extraordinario.
+1. In full.
+2. In installments.
+3. In installments with later advance payments.
+4. In installments but completing the total before the extraordinary draw.
 
-### 11.2. Estado del bono después de la venta
+### 11.2. Bond status after sale
 
-Ejemplo:
+Example:
 
 ```text
-Entregado a cobrador
-→ Vendido
+Delivered to collector
+-> Sold
 ```
 
-El estado financiero dependerá de los pagos:
+The financial status will depend on payments:
 
 ```text
-Sin pagos
-Con pagos parciales
-Al día
-Atrasado
-Pagado completo
+No payments
+With partial payments
+Up to date
+Overdue
+Fully paid
 ```
 
-No conviene mezclar el estado comercial con el financiero.
+It is not advisable to mix commercial status with financial status.
 
-Un bono puede estar:
-
-```text
-Estado comercial: vendido
-Estado financiero: atrasado
-```
-
----
-
-## 12. Compradores
-
-Los compradores pueden ser:
-
-- personas físicas,
-- comercios,
-- empresas,
-- instituciones.
-
-Datos mínimos:
-
-- nombre,
-- apellido o razón social,
-- domicilio,
-- teléfono,
-- documento o CUIT si se decide registrarlo,
-- observaciones,
-- cobrador habitual,
-- historial de bonos comprados,
-- historial de números.
-
-### 12.1. Historial del comprador
-
-El sistema debería permitir ver:
-
-- campañas en las que participó,
-- bonos comprados,
-- números comprados,
-- pagos realizados,
-- deuda pendiente,
-- premios ganados,
-- cobradores asociados.
-
----
-
-## 13. Plan de pago y cuotas
-
-Cada bono vendido debe tener un plan de pago.
-
-Ejemplo de la campaña observada:
+A bond can be:
 
 ```text
-Valor total del bono simple: $60.000
-Cantidad de cuotas: 10
-Valor cuota: $6.000
-```
-
-Cada cuota debe registrar:
-
-- número de cuota,
-- mes correspondiente,
-- vencimiento,
-- importe,
-- estado,
-- fecha de pago,
-- medio de pago,
-- cobrador asociado,
-- rendición asociada,
-- comisión generada.
-
-### 13.1. Estados posibles de una cuota
-
-```text
-Pendiente
-Pagada
-Pagada adelantada
-Vencida
-Anulada
-```
-
-### 13.2. Pago adelantado
-
-Un comprador puede pagar cuotas antes de su vencimiento.
-
-El sistema debe permitir seleccionar varias cuotas y pagarlas en una misma operación.
-
-Ejemplo:
-
-```text
-El comprador paga cuota 3, 4 y 5 juntas.
-```
-
-El sistema debe registrar:
-
-- fecha real del pago,
-- cuotas cubiertas,
-- medio de pago,
-- rendición,
-- comisión generada por cada cuota o por el pago total, según regla de campaña.
-
----
-
-## 14. Pago de contado
-
-Cuando un comprador paga el total del bono, el bono queda como pagado completo.
-
-```text
-Estado financiero:
-Pagado completo
-```
-
-Además, si paga dentro de las condiciones establecidas, participa del sorteo extraordinario por pago total.
-
-### 14.1. Sorteo extraordinario por pago total
-
-El comprador que paga de contado participa con números extra.
-
-Regla conversada:
-
-- Si compra un bono simple, obtiene 1 número extra para el sorteo extraordinario.
-- Si compra una pata, obtiene N números extra según la cantidad de números/unidades comerciales que haya comprado.
-
-### 14.2. Pago total posterior
-
-Si un comprador comienza pagando en cuotas y luego completa todo el pago antes de la fecha límite del sorteo extraordinario, debería participar del sorteo extraordinario.
-
-Si completa el pago después de esa fecha límite, solo queda con cuotas adelantadas/pagadas, pero no participa del sorteo extraordinario ya realizado.
-
-Ejemplo:
-
-```text
-Fecha sorteo extraordinario: 27/12/2025
-Fecha límite para pago total: 26/12/2025
-
-Bono A:
-Pagó completo el 20/12/2025 → participa
-
-Bono B:
-Pagó completo el 28/12/2025 → no participa
+Commercial status: sold
+Financial status: overdue
 ```
 
 ---
 
-## 15. Medios de pago
+## 12. Buyers
 
-El sistema debe diferenciar claramente el medio de pago.
+Buyers can be:
 
-Medios mínimos:
+- individuals,
+- businesses,
+- companies,
+- institutions.
 
-1. Efectivo.
-2. Transferencia.
+Minimum data:
 
-Opcionalmente en el futuro:
+- first name,
+- last name or legal/business name,
+- address,
+- phone,
+- document or tax ID if registration is decided,
+- notes,
+- usual collector,
+- history of purchased bonds,
+- history of numbers.
 
-- tarjeta de débito,
-- tarjeta de crédito,
-- billetera virtual,
-- cheque,
-- otro.
+### 12.1. Buyer history
 
----
+The system should allow viewing:
 
-## 16. Pagos en efectivo
-
-En pagos en efectivo:
-
-```text
-Comprador → paga al cobrador
-Cobrador → rinde a Bomberos
-```
-
-El cobrador puede entregar a Bomberos el dinero neto luego de descontar su comisión, o puede rendir el total y cobrar comisión después, según la operatoria administrativa.
-
-El sistema debe permitir registrar:
-
-- total cobrado en efectivo,
-- comisión generada,
-- comisión descontada en la rendición,
-- efectivo entregado a Bomberos,
-- saldo pendiente.
+- campaigns in which they participated,
+- purchased bonds,
+- purchased numbers,
+- payments made,
+- outstanding debt,
+- prizes won,
+- associated collectors.
 
 ---
 
-## 17. Pagos por transferencia
+## 13. Payment plan and installments
 
-Regla confirmada:
+Each sold bond must have a payment plan.
 
-```text
-Comprador → transfiere directo a Bomberos
-```
-
-En este caso, Bomberos recibe el total del pago.
-
-Pero el cobrador sigue generando comisión.
-
-Por lo tanto:
+Example from the observed campaign:
 
 ```text
-Pago transferencia: $6.000
-Bomberos recibió: $6.000
-Comisión cobrador: $1.500
-Saldo a favor del cobrador: $1.500
+Total simple bond value: $60,000
+Number of installments: 10
+Installment value: $6,000
 ```
 
-Esto obliga a manejar una cuenta corriente del cobrador.
+Each installment must record:
+
+- installment number,
+- corresponding month,
+- due date,
+- amount,
+- status,
+- payment date,
+- payment method,
+- associated collector,
+- associated collector settlement,
+- generated commission.
+
+### 13.1. Possible installment statuses
+
+```text
+Pending
+Paid
+Paid in advance
+Overdue
+Voided
+```
+
+### 13.2. Advance payment
+
+A buyer can pay installments before their due date.
+
+The system must allow selecting multiple installments and paying them in a single operation.
+
+Example:
+
+```text
+The buyer pays installments 3, 4, and 5 together.
+```
+
+The system must record:
+
+- actual payment date,
+- covered installments,
+- payment method,
+- collector settlement,
+- commission generated by each installment or by the total payment, depending on the campaign rule.
 
 ---
 
-## 18. Comisiones
+## 14. Full payment
 
-El sistema debe calcular comisiones de cobradores.
-
-Regla general conocida:
+When a buyer pays the full bond amount, the bond becomes fully paid.
 
 ```text
-Comisión general: 25%
+Financial status:
+Fully paid
 ```
 
-Pero hay una regla adicional:
+In addition, if they pay under the established conditions, they participate in the extraordinary draw for full payment.
 
-- Si el bono se paga en cuotas, el cobrador cobra comisión por cada cuota.
-- La primera cuota y la última cuota pueden tener un porcentaje de comisión más alto.
-- Las cuotas intermedias pueden tener otro porcentaje.
+### 14.1. Extraordinary draw for full payment
 
-Por lo tanto, la comisión no debe estar fija en el código.
+The buyer who pays in full participates with extra numbers.
 
-Debe ser configurable por campaña.
+Discussed rule:
 
-### 18.1. Configuración de comisiones por campaña
+- If they buy a simple bond, they get 1 extra number for the extraordinary draw.
+- If they buy a pata, they get N extra numbers according to the number of numbers/commercial units purchased.
 
-Ejemplo conceptual:
+### 14.2. Later full payment
 
-```text
-Campaña 2025-2026
+If a buyer starts paying in installments and later completes the full payment before the extraordinary draw deadline, they should participate in the extraordinary draw.
 
-Comisión pago contado: 25%
+If they complete the payment after that deadline, they only have advance/paid installments, but they do not participate in the extraordinary draw that already took place.
 
-Comisión cuotas:
-- Cuota 1: porcentaje especial
-- Cuotas intermedias: porcentaje normal
-- Última cuota: porcentaje especial
-```
-
-Los porcentajes reales deben cargarse según las reglas administrativas de Bomberos.
-
-### 18.2. Comisión generada vs comisión pagada
-
-El sistema debe separar:
+Example:
 
 ```text
-Comisión generada
-```
+Extraordinary draw date: 12/27/2025
+Full payment deadline: 12/26/2025
 
-de:
+Bond A:
+Fully paid on 12/20/2025 -> participates
 
-```text
-Comisión liquidada/pagada
-```
-
-Ejemplo:
-
-```text
-Comisiones generadas: $50.000
-Comisiones pagadas: $20.000
-Saldo pendiente a favor del cobrador: $30.000
-```
-
-Esto permite acumular comisiones y liquidarlas después.
-
----
-
-## 19. Cuenta corriente del cobrador
-
-Cada cobrador debe tener una cuenta corriente interna.
-
-No necesariamente representa una cuenta bancaria. Representa el saldo administrativo entre Bomberos y el cobrador.
-
-Debe registrar movimientos como:
-
-- comisiones generadas,
-- comisiones pagadas,
-- efectivo rendido,
-- transferencias recibidas por Bomberos,
-- saldos a favor del cobrador,
-- saldos a favor de Bomberos,
-- ajustes,
-- anulaciones.
-
-### 19.1. Ejemplo con pago por transferencia
-
-```text
-Comprador paga por transferencia: $6.000
-Bomberos recibe: $6.000
-Comisión generada: $1.500
-Saldo a favor del cobrador: $1.500
-```
-
-### 19.2. Ejemplo con pago en efectivo
-
-```text
-Comprador paga en efectivo: $6.000
-Comisión generada: $1.500
-Neto para Bomberos: $4.500
+Bond B:
+Fully paid on 12/28/2025 -> does not participate
 ```
 
 ---
 
-## 20. Rendiciones de cobradores
+## 15. Payment methods
 
-La rendición es uno de los procesos centrales del sistema.
+The system must clearly differentiate the payment method.
 
-Hoy parte de esta información se controla en Excel. El nuevo sistema debe reemplazar ese Excel.
+Minimum methods:
 
-### 20.1. Qué es una rendición
+1. Cash.
+2. Transfer.
 
-Una rendición es el momento en que el cobrador informa a administración:
+Optionally in the future:
 
-- qué bonos vendió,
-- qué cuotas cobró,
-- qué pagos recibió,
-- qué pagos fueron en efectivo,
-- qué pagos fueron por transferencia,
-- cuánto corresponde de comisión,
-- cuánto dinero queda para Bomberos,
-- cuánto saldo queda a favor del cobrador.
+- debit card,
+- credit card,
+- digital wallet,
+- check,
+- other.
 
-### 20.2. Datos de una rendición
+---
 
-Una rendición debe contener:
+## 16. Cash payments
 
-- número de rendición,
-- fecha,
-- cobrador,
-- usuario administrador,
-- pagos incluidos,
-- total cobrado,
-- total efectivo,
-- total transferencia,
-- comisión generada,
-- comisión liquidada en esa rendición,
-- saldo a favor del cobrador,
-- neto para Bomberos,
-- observaciones,
-- estado,
-- remito imprimible.
-
-### 20.3. Resumen de rendición
-
-Ejemplo:
+For cash payments:
 
 ```text
-Rendición N° 00045
-Fecha: 10/10/2025
-Cobrador: Juan Pérez
-
-Pagos:
-- Bono 0068 - Cuota 1 - $6.000 - efectivo
-- Bono 0100 - Cuota 1 - $6.000 - transferencia
-- Pata 1200 - Pago contado - $300.000 - efectivo
-
-Total efectivo: $306.000
-Total transferencia: $6.000
-Total general: $312.000
-
-Comisión generada: $78.000
-Comisión liquidada: $50.000
-Saldo a favor cobrador: $28.000
-Neto Bomberos: $234.000
+Buyer -> pays the collector
+Collector -> settles with Firefighters
 ```
 
-### 20.4. Remito de rendición
+The collector can hand over to Firefighters the net money after deducting their commission, or they can settle the full amount and collect commission afterward, depending on the administrative process.
 
-El sistema debe imprimir un remito de rendición para el cobrador y la administración.
+The system must allow recording:
 
-Debe incluir:
-
-- cobrador,
-- fecha,
-- listado de bonos/cuotas/pagos,
-- medio de pago,
-- importes,
-- comisiones,
-- total efectivo,
-- total transferencia,
-- neto Bomberos,
-- saldo cobrador,
-- firmas.
+- total collected in cash,
+- generated commission,
+- commission deducted in the collector settlement,
+- cash delivered to Firefighters,
+- outstanding balance.
 
 ---
 
-## 21. Resumen mensual por cobrador
+## 17. Transfer payments
 
-El sistema debe poder generar un resumen para cada cobrador con:
-
-- todos los bonos asignados,
-- números base y asociados,
-- comprador de cada bono,
-- estado de venta,
-- cuotas pagas,
-- cuotas pendientes,
-- cuotas vencidas,
-- pagos adelantados,
-- total recaudado,
-- total pendiente,
-- comisión generada,
-- saldo a favor o en contra.
-
-Este resumen es clave para el seguimiento operativo mensual.
-
----
-
-## 22. Sorteos
-
-Una campaña tiene distintos sorteos.
-
-Tipos conocidos:
-
-1. Sorteos mensuales.
-2. Sorteo final.
-3. Sorteos consuelo.
-4. Sorteo extraordinario por pago total.
-
-Cada sorteo debe registrar:
-
-- campaña,
-- tipo,
-- fecha,
-- descripción,
-- cuota requerida hasta cierto mes, si aplica,
-- fecha/hora de corte para pagos,
-- premios,
-- números ganadores,
-- padrón de habilitados,
-- estado.
-
----
-
-## 23. Sorteos mensuales
-
-Los sorteos mensuales requieren que el bono esté al día.
-
-Regla confirmada:
-
-Para participar debe estar paga:
+Confirmed rule:
 
 ```text
-la cuota correspondiente al mes del sorteo
+Buyer -> transfers directly to Firefighters
+```
+
+In this case, Firefighters receive the full payment.
+
+But the collector still generates commission.
+
+Therefore:
+
+```text
+Transfer payment: $6,000
+Firefighters received: $6,000
+Collector commission: $1,500
+Balance in favor of collector: $1,500
+```
+
+This requires managing a collector current account.
+
+---
+
+## 18. Commissions
+
+The system must calculate collector commissions.
+
+Known general rule:
+
+```text
+General commission: 25%
+```
+
+But there is an additional rule:
+
+- If the bond is paid in installments, the collector earns commission for each installment.
+- The first installment and the last installment may have a higher commission percentage.
+- Intermediate installments may have another percentage.
+
+Therefore, commission must not be hardcoded.
+
+It must be configurable by campaign.
+
+### 18.1. Commission configuration by campaign
+
+Conceptual example:
+
+```text
+Campaign 2025-2026
+
+Full payment commission: 25%
+
+Installment commissions:
+- Installment 1: special percentage
+- Intermediate installments: normal percentage
+- Last installment: special percentage
+```
+
+The real percentages must be loaded according to Firefighters administrative rules.
+
+### 18.2. Generated commission vs paid commission
+
+The system must separate:
+
+```text
+Generated commission
+```
+
+from:
+
+```text
+Paid/settled commission
+```
+
+Example:
+
+```text
+Generated commissions: $50,000
+Paid commissions: $20,000
+Outstanding balance in favor of collector: $30,000
+```
+
+This allows accumulating commissions and paying them later.
+
+---
+
+## 19. Collector current account
+
+Each collector must have an internal current account.
+
+It does not necessarily represent a bank account. It represents the administrative balance between Firefighters and the collector.
+
+It must record movements such as:
+
+- generated commissions,
+- paid commissions,
+- settled cash,
+- transfers received by Firefighters,
+- balances in favor of the collector,
+- balances in favor of Firefighters,
+- adjustments,
+- voids.
+
+### 19.1. Example with transfer payment
+
+```text
+Buyer pays by transfer: $6,000
+Firefighters receive: $6,000
+Generated commission: $1,500
+Balance in favor of collector: $1,500
+```
+
+### 19.2. Example with cash payment
+
+```text
+Buyer pays in cash: $6,000
+Generated commission: $1,500
+Net for Firefighters: $4,500
+```
+
+---
+
+## 20. Collector settlements
+
+The collector settlement is one of the system's core processes.
+
+Today, part of this information is controlled in Excel. The new system must replace that Excel file.
+
+### 20.1. What a collector settlement is
+
+A collector settlement is the moment when the collector reports to administration:
+
+- which bonds they sold,
+- which installments they collected,
+- which payments they received,
+- which payments were in cash,
+- which payments were by transfer,
+- how much commission is owed,
+- how much money remains for Firefighters,
+- how much balance remains in favor of the collector.
+
+### 20.2. Collector settlement data
+
+A collector settlement must contain:
+
+- settlement number,
+- date,
+- collector,
+- administrator user,
+- included payments,
+- total collected,
+- total cash,
+- total transfer,
+- generated commission,
+- commission paid in that settlement,
+- balance in favor of the collector,
+- net for Firefighters,
+- notes,
+- status,
+- printable delivery note.
+
+### 20.3. Collector settlement summary
+
+Example:
+
+```text
+Collector settlement No. 00045
+Date: 10/10/2025
+Collector: Juan Perez
+
+Payments:
+- Bond 0068 - Installment 1 - $6,000 - cash
+- Bond 0100 - Installment 1 - $6,000 - transfer
+- Pata 1200 - Full payment - $300,000 - cash
+
+Total cash: $306,000
+Total transfer: $6,000
+Grand total: $312,000
+
+Generated commission: $78,000
+Paid commission: $50,000
+Balance in favor of collector: $28,000
+Net Firefighters: $234,000
+```
+
+### 20.4. Collector settlement delivery note
+
+The system must print a collector settlement delivery note for the collector and administration.
+
+It must include:
+
+- collector,
+- date,
+- list of bonds/installments/payments,
+- payment method,
+- amounts,
+- commissions,
+- total cash,
+- total transfer,
+- net Firefighters,
+- collector balance,
+- signatures.
+
+---
+
+## 21. Monthly summary by collector
+
+The system must be able to generate a summary for each collector with:
+
+- all assigned bonds,
+- base and associated numbers,
+- buyer of each bond,
+- sale status,
+- paid installments,
+- pending installments,
+- overdue installments,
+- advance payments,
+- total collected,
+- total pending,
+- generated commission,
+- balance in favor or against.
+
+This summary is key for monthly operational follow-up.
+
+---
+
+## 22. Draws
+
+A campaign has different draws.
+
+Known types:
+
+1. Monthly draws.
+2. Final draw.
+3. Consolation draws.
+4. Extraordinary draw for full payment.
+
+Each draw must record:
+
+- campaign,
+- type,
+- date,
+- description,
+- required installment up to a certain month, if applicable,
+- cutoff date/time for payments,
+- prizes,
+- winning numbers,
+- eligible draw roster,
+- status.
+
+---
+
+## 23. Monthly draws
+
+Monthly draws require the bond to be up to date.
+
+Confirmed rule:
+
+To participate, the following must be paid:
+
+```text
+the installment corresponding to the draw month
 +
-todas las cuotas anteriores
+all previous installments
 ```
 
-Ejemplo:
+Example:
 
 ```text
-Sorteo diciembre 2025
-Cuota requerida: 3
+December 2025 draw
+Required installment: 3
 
-Debe tener pagas:
-- cuota 1
-- cuota 2
-- cuota 3
+Must have paid:
+- installment 1
+- installment 2
+- installment 3
 ```
 
-Si falta una cuota anterior o la cuota del mes:
+If a previous installment or the month's installment is missing:
 
 ```text
-El bono no está habilitado para cobrar premio.
+The bond is not eligible to claim a prize.
 ```
 
-### 23.1. Fecha de corte
+### 23.1. Cutoff date
 
-Cada sorteo debería tener una fecha/hora de corte para determinar pagos válidos.
+Each draw should have a cutoff date/time to determine valid payments.
 
-Ejemplo:
+Example:
 
 ```text
-Sorteo: Diciembre 2025
-Fecha del sorteo: 27/12/2025
-Corte de pagos: 26/12/2025 23:59
+Draw: December 2025
+Draw date: 12/27/2025
+Payment cutoff: 12/26/2025 23:59
 ```
 
-Esto evita discusiones si alguien paga después del sorteo.
+This avoids disputes if someone pays after the draw.
 
 ---
 
-## 24. Padrón de sorteo
+## 24. Draw roster
 
-Antes de cada sorteo se debe generar un padrón de participantes habilitados.
+Before each draw, a roster of eligible participants must be generated.
 
-El padrón debe quedar congelado.
+The roster must remain frozen.
 
-No debe recalcularse dinámicamente después, porque alguien podría pagar tarde y alterar la situación histórica.
+It must not be recalculated dynamically afterward, because someone could pay late and alter the historical situation.
 
-### 24.1. Datos del padrón
+### 24.1. Roster data
 
-El padrón debe registrar:
+The roster must record:
 
-- sorteo,
-- bono,
-- números participantes,
-- comprador,
-- cobrador,
-- si está habilitado,
-- motivo si no está habilitado,
-- fecha/hora de generación.
+- draw,
+- bond,
+- participant numbers,
+- buyer,
+- collector,
+- whether it is eligible,
+- reason if it is not eligible,
+- generation date/time.
 
-Ejemplo:
+Example:
 
 ```text
-Sorteo mensual diciembre 2025
+December 2025 monthly draw
 
-Bono 0068:
-Cuotas 1, 2 y 3 pagas antes del corte
-Estado: habilitado
+Bond 0068:
+Installments 1, 2, and 3 paid before cutoff
+Status: eligible
 
-Bono 0090:
-Cuota 3 impaga
-Estado: no habilitado
-Motivo: deuda de cuota 3
+Bond 0090:
+Installment 3 unpaid
+Status: not eligible
+Reason: installment 3 debt
 ```
 
 ---
 
-## 25. Carga de números ganadores
+## 25. Loading winning numbers
 
-El sistema debe permitir cargar rifas/bonos beneficiados o números ganadores.
+The system must allow loading benefited raffles/bonds or winning numbers.
 
-Debe soportar números de distinta cantidad de cifras, por ejemplo:
+It must support numbers with different digit counts, for example:
 
-- 3 cifras,
-- 4 cifras.
+- 3 digits,
+- 4 digits.
 
-Al cargar un número ganador, el sistema debe buscar coincidencias contra:
+When loading a winning number, the system must search for matches against:
 
-- números base,
-- números asociados calculados,
-- números extraordinarios si corresponde al sorteo.
+- base numbers,
+- calculated associated numbers,
+- extraordinary numbers if applicable to the draw.
 
-### 25.1. Validación de ganador
+### 25.1. Winner validation
 
-Cuando se carga un número ganador, el sistema debe determinar:
+When a winning number is loaded, the system must determine:
 
-1. Qué bono corresponde a ese número.
-2. Quién es el comprador.
-3. Qué cobrador lo vendió.
-4. Si estaba habilitado en el padrón.
-5. Si corresponde entregar premio.
-6. Si el premio queda rechazado/no adjudicado por falta de pago.
-7. Si queda pendiente de revisión.
+1. Which bond corresponds to that number.
+2. Who the buyer is.
+3. Which collector sold it.
+4. Whether it was eligible in the roster.
+5. Whether the prize should be awarded.
+6. Whether the prize is rejected/not awarded due to non-payment.
+7. Whether it remains pending review.
 
 ---
 
-## 26. Regla de premio ante falta de pago
+## 26. Prize rule for non-payment
 
-Regla confirmada:
+Confirmed rule:
 
-Si alguien no paga la cuota correspondiente, y se realizó el sorteo, no recibirá el premio.
+If someone does not pay the corresponding installment and the draw has taken place, they will not receive the prize.
 
-Por lo tanto:
+Therefore:
 
 ```text
-Número ganador
-→ Buscar bono
-→ Revisar padrón congelado
-→ Si estaba habilitado, puede cobrar
-→ Si no estaba habilitado, no corresponde premio
+Winning number
+-> Search bond
+-> Check frozen roster
+-> If it was eligible, it can claim
+-> If it was not eligible, prize does not apply
 ```
 
-El sistema debe dejar registro del resultado.
+The system must keep a record of the result.
 
-Ejemplo:
+Example:
 
 ```text
-Número ganador: 6529
-Bono asociado: 1658
-Comprador: Diego Fernández
-Estado en padrón: no habilitado
-Motivo: cuota 3 impaga
+Winning number: 6529
+Associated bond: 1658
+Buyer: Diego Fernandez
+Roster status: not eligible
+Reason: installment 3 unpaid
 
-Resultado: premio no adjudicado por falta de pago
+Result: prize not awarded due to non-payment
 ```
 
 ---
 
-## 27. Sorteo extraordinario por pago total
+## 27. Extraordinary draw for full payment
 
-Este sorteo es exclusivo para compradores que hayan pagado el bono completo dentro de la fecha límite definida.
+This draw is exclusive to buyers who paid the full bond within the defined deadline.
 
-Participan quienes:
+Participants are those who:
 
-- pagaron de contado al inicio,
-- o completaron todas las cuotas antes de la fecha límite del sorteo extraordinario.
+- paid in full at the beginning,
+- or completed all installments before the extraordinary draw deadline.
 
-No participan quienes completaron el pago después del sorteo o después de la fecha de corte.
+Those who completed payment after the draw or after the cutoff date do not participate.
 
-### 27.1. Números extra
+### 27.1. Extra numbers
 
-Al pagar de contado o completar el pago a tiempo, el comprador participa con números extra.
+When paying in full or completing payment on time, the buyer participates with extra numbers.
 
-Regla conversada:
+Discussed rule:
 
-- Bono simple: 1 número extra.
-- Pata: N números extra, según la cantidad de unidades comerciales/números base que incluya.
+- Simple bond: 1 extra number.
+- Pata: N extra numbers, according to the number of commercial units/base numbers it includes.
 
-Esta regla exacta debe confirmarse con administración antes de implementarse.
-
----
-
-## 28. Sorteo final
-
-El sorteo final ocurre al concluir la campaña.
-
-Debe tener sus propios premios y reglas de elegibilidad.
-
-Según la información disponible, debería requerir que el bono esté al día o completamente pago, pero esta regla debe confirmarse explícitamente.
+This exact rule must be confirmed with administration before implementation.
 
 ---
 
-## 29. Sorteos consuelo
+## 28. Final draw
 
-Los sorteos consuelo forman parte de la campaña y deben modelarse como sorteos independientes.
+The final draw occurs at the end of the campaign.
 
-Deben tener:
+It must have its own prizes and eligibility rules.
 
-- fecha,
-- premios,
-- reglas de elegibilidad,
-- padrón,
-- números ganadores,
-- resultado.
-
-La regla exacta de participación debe confirmarse.
+Based on the available information, it should require the bond to be up to date or fully paid, but this rule must be explicitly confirmed.
 
 ---
 
-## 30. Código de barras
+## 29. Consolation draws
 
-El bono impreso tiene código de barras.
+Consolation draws are part of the campaign and must be modeled as independent draws.
 
-Actualmente se intentó usar para escanear bonos y registrar más rápido, pero no funciona correctamente.
+They must have:
 
-### 30.1. Regla actual no confirmada
+- date,
+- prizes,
+- eligibility rules,
+- roster,
+- winning numbers,
+- result.
 
-No está confirmado si el código de barras representa:
+The exact participation rule must be confirmed.
 
-1. el número base visible,
-2. el número del bono,
-3. un identificador interno,
-4. otro dato del sistema anterior.
+---
 
-La hipótesis actual es que representa el número visible superior.
+## 30. Barcode
 
-### 30.2. Recomendación para el nuevo sistema
+The printed bond has a barcode.
 
-El sistema nuevo debe tener un identificador interno propio para cada bono.
+It was previously attempted for scanning bonds and recording faster, but it does not work correctly.
 
-Ejemplo:
+### 30.1. Current unconfirmed rule
+
+It is not confirmed whether the barcode represents:
+
+1. the visible base number,
+2. the bond number,
+3. an internal identifier,
+4. other data from the previous system.
+
+The current hypothesis is that it represents the upper visible number.
+
+### 30.2. Recommendation for the new system
+
+The new system must have its own internal identifier for each bond.
+
+Example:
 
 ```text
 BONO-2025-2026-000068
 ```
 
-Y además guardar, si existe:
+And also store, if it exists:
 
-- código de barras impreso,
-- número base,
-- campaña,
-- tipo de bono.
+- printed barcode,
+- base number,
+- campaign,
+- bond type.
 
-El escaneo debería permitir:
+Scanning should allow:
 
-1. Buscar bono.
-2. Abrir ficha del bono.
-3. Registrar venta.
-4. Registrar pago.
-5. Incluir bono/cuota en una rendición.
+1. Search bond.
+2. Open bond record.
+3. Record sale.
+4. Record payment.
+5. Include bond/installment in a collector settlement.
 
-No se debe depender exclusivamente del código de barras viejo si no se confirma su significado.
+The system must not depend exclusively on the old barcode if its meaning is not confirmed.
 
 ---
 
-## 31. Estados del bono
+## 31. Bond statuses
 
-El bono debería tener al menos dos dimensiones de estado:
+The bond should have at least two status dimensions:
 
-1. Estado operativo/comercial.
-2. Estado financiero.
+1. Operational/commercial status.
+2. Financial status.
 
-### 31.1. Estado operativo/comercial
+### 31.1. Operational/commercial status
 
-Estados posibles:
+Possible statuses:
 
 ```text
-Creado
-Disponible en administración
-Entregado a cobrador
-Vendido
-Devuelto
-Anulado
-Extraviado
-Cerrado
+Created
+Available in administration
+Delivered to collector
+Sold
+Returned
+Voided
+Lost
+Closed
 ```
 
-### 31.2. Estado financiero
+### 31.2. Financial status
 
-Estados posibles:
+Possible statuses:
 
 ```text
-Sin pagos
-Con pagos parciales
-Al día
-Atrasado
-Pagado completo
-Incobrable
-Anulado
+No payments
+With partial payments
+Up to date
+Overdue
+Fully paid
+Uncollectible
+Voided
 ```
 
-No conviene usar un solo estado para todo, porque un bono puede estar vendido y atrasado al mismo tiempo.
+It is not advisable to use a single status for everything, because a bond can be sold and overdue at the same time.
 
 ---
 
-## 32. Auditoría y trazabilidad
+## 32. Audit and traceability
 
-El sistema debe estar diseñado para no perder historial.
+The system must be designed not to lose history.
 
-Regla recomendada:
+Recommended rule:
 
 ```text
-No borrar información histórica.
-Anular, corregir o revertir mediante movimientos auditados.
+Do not delete historical information.
+Void, correct, or reverse through audited movements.
 ```
 
-Deben quedar auditadas acciones como:
+Actions such as the following must be audited:
 
-- creación de campaña,
-- carga de bonos,
-- asignación de bonos,
-- devolución de bonos,
-- venta,
-- cambio de comprador,
-- registro de pago,
-- anulación de pago,
-- creación de rendición,
-- liquidación de comisión,
-- generación de padrón,
-- carga de ganador,
-- entrega o rechazo de premio,
-- armado/desarmado de patas,
-- cambios de configuración.
+- campaign creation,
+- bond loading,
+- bond assignment,
+- bond return,
+- sale,
+- buyer change,
+- payment recording,
+- payment voiding,
+- collector settlement creation,
+- commission payout,
+- roster generation,
+- winner loading,
+- prize delivery or rejection,
+- pata assembly/disassembly,
+- configuration changes.
 
-Cada auditoría debería registrar:
+Each audit record should include:
 
-- usuario,
-- fecha/hora,
-- acción,
-- entidad afectada,
-- valor anterior,
-- valor nuevo,
-- motivo u observación.
-
----
-
-## 33. Usuarios y permisos
-
-El sistema debe tener usuarios con roles.
-
-Roles iniciales sugeridos:
-
-### 33.1. Administrador
-
-Puede:
-
-- crear campañas,
-- configurar reglas,
-- cargar bonos,
-- asignar bonos,
-- registrar ventas,
-- registrar pagos,
-- crear rendiciones,
-- liquidar comisiones,
-- gestionar sorteos,
-- cargar ganadores,
-- emitir reportes,
-- administrar usuarios.
-
-### 33.2. Operador administrativo
-
-Puede:
-
-- registrar ventas,
-- registrar pagos,
-- generar rendiciones,
-- consultar bonos,
-- consultar compradores,
-- imprimir remitos,
-- generar reportes operativos.
-
-No debería poder cambiar reglas críticas de campaña.
-
-### 33.3. Cobrador
-
-Puede, si se decide darle acceso:
-
-- ver sus bonos asignados,
-- ver compradores asociados,
-- ver cuotas pendientes,
-- informar pagos,
-- consultar su saldo de comisión.
-
-Inicialmente podría no tener acceso y operar todo desde administración.
-
-### 33.4. Visualizador / Auditor
-
-Puede:
-
-- consultar información,
-- ver reportes,
-- no modificar datos.
+- user,
+- date/time,
+- action,
+- affected entity,
+- previous value,
+- new value,
+- reason or note.
 
 ---
 
-## 34. Reportes necesarios
+## 33. Users and permissions
 
-El sistema debe permitir generar reportes como mínimo de:
+The system must have users with roles.
 
-### 34.1. Bonos
+Suggested initial roles:
 
-- bonos disponibles,
-- bonos entregados,
-- bonos vendidos,
-- bonos devueltos,
-- bonos anulados,
-- bonos extraviados,
-- patas disponibles,
-- patas vendidas,
-- bonos por cobrador,
-- bonos por comprador.
+### 33.1. Administrator
 
-### 34.2. Pagos
+Can:
 
-- cuotas pagas,
-- cuotas pendientes,
-- cuotas vencidas,
-- pagos por fecha,
-- pagos por medio de pago,
-- pagos por cobrador,
-- pagos por comprador,
-- pagos adelantados.
+- create campaigns,
+- configure rules,
+- load bonds,
+- assign bonds,
+- record sales,
+- record payments,
+- create collector settlements,
+- pay commissions,
+- manage draws,
+- load winners,
+- issue reports,
+- administer users.
 
-### 34.3. Cobradores
+### 33.2. Administrative operator
 
-- resumen mensual por cobrador,
-- bonos asignados,
-- bonos vendidos,
-- deuda pendiente,
-- efectivo rendido,
-- transferencias registradas,
-- comisiones generadas,
-- comisiones liquidadas,
-- saldo a favor del cobrador,
-- saldo a favor de Bomberos.
+Can:
 
-### 34.4. Rendiciones
+- record sales,
+- record payments,
+- generate collector settlements,
+- query bonds,
+- query buyers,
+- print delivery notes,
+- generate operational reports.
 
-- rendiciones por fecha,
-- rendiciones por cobrador,
-- detalle de pagos incluidos,
-- total efectivo,
-- total transferencia,
-- comisión,
-- neto Bomberos.
+Should not be able to change critical campaign rules.
 
-### 34.5. Sorteos
+### 33.3. Collector
 
-- padrón de habilitados,
-- padrón de no habilitados,
-- números ganadores,
-- ganadores habilitados,
-- ganadores rechazados por deuda,
-- premios entregados,
-- premios pendientes.
+Can, if access is granted:
 
-### 34.6. Compradores
+- view their assigned bonds,
+- view associated buyers,
+- view pending installments,
+- report payments,
+- check their commission balance.
 
-- historial por comprador,
-- números habituales,
-- deuda por comprador,
-- bonos comprados,
-- premios ganados.
+Initially, they might not have access and everything could be operated from administration.
+
+### 33.4. Viewer / Auditor
+
+Can:
+
+- query information,
+- view reports,
+- not modify data.
 
 ---
 
-## 35. Constancias y remitos
+## 34. Required reports
 
-El sistema debe emitir documentos imprimibles.
+The system must allow generating reports at least for:
 
-### 35.1. Remito de entrega de bonos al cobrador
+### 34.1. Bonds
 
-Debe incluir:
+- available bonds,
+- delivered bonds,
+- sold bonds,
+- returned bonds,
+- voided bonds,
+- lost bonds,
+- available patas,
+- sold patas,
+- bonds by collector,
+- bonds by buyer.
 
-- número de remito,
-- fecha,
-- cobrador,
-- listado de bonos entregados,
-- números base y asociados,
-- tipo de bono,
-- observaciones,
-- firma del cobrador,
-- firma de administración.
+### 34.2. Payments
 
-Debe imprimirse al menos por duplicado:
+- paid installments,
+- pending installments,
+- overdue installments,
+- payments by date,
+- payments by payment method,
+- payments by collector,
+- payments by buyer,
+- advance payments.
 
-- copia para cobrador,
-- copia para administración.
+### 34.3. Collectors
 
-### 35.2. Constancia/remito de rendición
+- monthly summary by collector,
+- assigned bonds,
+- sold bonds,
+- outstanding debt,
+- settled cash,
+- registered transfers,
+- generated commissions,
+- paid commissions,
+- balance in favor of the collector,
+- balance in favor of Firefighters.
 
-Debe incluir:
+### 34.4. Collector settlements
 
-- número de rendición,
-- fecha,
-- cobrador,
-- pagos rendidos,
-- bonos,
-- cuotas,
-- compradores,
-- medios de pago,
-- importes,
-- comisiones,
-- total efectivo,
-- total transferencia,
-- neto Bomberos,
-- saldo cobrador,
-- firmas.
+- settlements by date,
+- settlements by collector,
+- detail of included payments,
+- total cash,
+- total transfer,
+- commission,
+- net Firefighters.
 
-### 35.3. Constancia de pago
+### 34.5. Draws
 
-Debe incluir:
+- eligible roster,
+- not eligible roster,
+- winning numbers,
+- eligible winners,
+- winners rejected due to debt,
+- delivered prizes,
+- pending prizes.
 
-- bono,
-- número base,
-- número asociado,
-- comprador,
-- cobrador,
-- cuota pagada,
-- fecha de venta,
-- importe total del bono,
-- monto pagado,
-- medio de pago,
-- comisión asociada,
-- fecha de pago.
+### 34.6. Buyers
+
+- history by buyer,
+- usual numbers,
+- debt by buyer,
+- purchased bonds,
+- prizes won.
 
 ---
 
-## 36. Copias de seguridad
+## 35. Receipts and delivery notes
 
-El sistema debe contar con mecanismos de respaldo.
+The system must issue printable documents.
 
-Tipos de respaldo recomendados:
+### 35.1. Bond delivery note to collector
 
-1. Backup automático de base de datos.
-2. Exportaciones periódicas.
-3. Descarga manual de reportes.
-4. Respaldo de documentos generados.
+It must include:
 
-Como la aplicación se montará en AWS, se recomienda:
+- delivery note number,
+- date,
+- collector,
+- list of delivered bonds,
+- base and associated numbers,
+- bond type,
+- notes,
+- collector signature,
+- administration signature.
 
-- base de datos PostgreSQL en Amazon RDS,
-- backups automáticos de RDS,
+It must be printed at least in duplicate:
+
+- copy for collector,
+- copy for administration.
+
+### 35.2. Collector settlement receipt/delivery note
+
+It must include:
+
+- settlement number,
+- date,
+- collector,
+- settled payments,
+- bonds,
+- installments,
+- buyers,
+- payment methods,
+- amounts,
+- commissions,
+- total cash,
+- total transfer,
+- net Firefighters,
+- collector balance,
+- signatures.
+
+### 35.3. Payment receipt
+
+It must include:
+
+- bond,
+- base number,
+- associated number,
+- buyer,
+- collector,
+- paid installment,
+- sale date,
+- total bond amount,
+- paid amount,
+- payment method,
+- associated commission,
+- payment date.
+
+---
+
+## 36. Backups
+
+The system must include backup mechanisms.
+
+Recommended backup types:
+
+1. Automatic database backup.
+2. Periodic exports.
+3. Manual report download.
+4. Backup of generated documents.
+
+Since the application will be deployed on AWS, the following are recommended:
+
+- PostgreSQL database on Amazon RDS,
+- automatic RDS backups,
 - snapshots,
-- exportaciones a S3,
-- versionado de archivos en S3,
-- políticas de retención.
+- exports to S3,
+- file versioning in S3,
+- retention policies.
 
 ---
 
-## 37. Reglas de negocio consolidadas
+## 37. Consolidated business rules
 
-1. Una campaña contiene todos los bonos, sorteos, ventas, pagos y rendiciones de un período anual.
-2. Un bono puede ser simple o pata.
-3. Un bono simple tiene un número base y un número asociado calculado.
-4. El número asociado se calcula sumando 4871 al número base.
-5. Una pata es un bono con varios números base.
-6. Cada número base de una pata genera su número asociado.
-7. Un comprador participa con todos los números participantes del bono comprado.
-8. Si sale sorteado el número base o el asociado, el ganador es el mismo bono.
-9. No debe haber números participantes duplicados dentro de una campaña.
-10. Los compradores suelen intentar conservar su número histórico.
-11. Si un número histórico queda dentro de una pata, se asigna otro número alternativo.
-12. Los bonos se entregan primero a cobradores antes de venderse.
-13. La entrega al cobrador debe generar remito.
-14. Una venta asocia bono, comprador y cobrador.
-15. Los pagos pueden ser de contado, por cuota o adelantados.
-16. Los pagos pueden ser en efectivo o transferencia.
-17. Las transferencias van directo a Bomberos.
-18. Las transferencias generan comisión a favor del cobrador.
-19. Las comisiones pueden acumularse y liquidarse después.
-20. Las reglas de comisión deben ser configurables por campaña.
-21. Para participar en un sorteo mensual deben estar pagas la cuota del mes y todas las anteriores.
-22. La elegibilidad debe calcularse con una fecha de corte.
-23. El padrón del sorteo debe quedar congelado.
-24. Si un bono no estaba habilitado al momento del sorteo, no corresponde entregar premio.
-25. El sorteo extraordinario requiere pago total antes de la fecha límite.
-26. El código de barras debe usarse como ayuda, pero no como única clave del sistema hasta confirmar su significado.
-27. No se debe borrar historial; se debe anular o corregir con auditoría.
-28. El sistema debe reemplazar el control manual actual en Excel.
-
----
-
-## 38. Dudas pendientes a confirmar
-
-Antes de pasar al diseño técnico definitivo, quedan pendientes estas definiciones:
-
-1. ¿Qué ocurre si `número_base + 4871` supera 9999?
-2. ¿El valor de una pata siempre es proporcional al valor del bono simple?
-3. ¿Los números extra del sorteo extraordinario se calculan por cantidad de números base o por otra regla?
-4. ¿El sorteo final requiere estar completamente pago o solo al día?
-5. ¿Los sorteos consuelo tienen la misma regla de elegibilidad que los mensuales?
-6. ¿Qué información exacta contiene el código de barras?
-7. ¿Se permitirá acceso directo a cobradores o todo será operado por administración?
-8. ¿Qué datos legales/fiscales se desean registrar de compradores empresas?
-9. ¿Qué ocurre con bonos no vendidos al cierre de campaña?
-10. ¿Qué procedimiento formal existe para premios no adjudicados por falta de pago?
+1. A campaign contains all bonds, draws, sales, payments, and collector settlements for an annual period.
+2. A bond can be simple or pata.
+3. A simple bond has one base number and one calculated associated number.
+4. The associated number is calculated by adding 4871 to the base number.
+5. A pata is a bond with several base numbers.
+6. Each base number in a pata generates its associated number.
+7. A buyer participates with all participant numbers of the purchased bond.
+8. If the base number or associated number is drawn, the winner is the same bond.
+9. There must be no duplicate participant numbers within a campaign.
+10. Buyers usually try to keep their historical number.
+11. If a historical number becomes part of a pata, another alternative number is assigned.
+12. Bonds are first delivered to collectors before being sold.
+13. Delivery to the collector must generate a delivery note.
+14. A sale associates bond, buyer, and collector.
+15. Payments can be full, by installment, or in advance.
+16. Payments can be in cash or by transfer.
+17. Transfers go directly to Firefighters.
+18. Transfers generate commission in favor of the collector.
+19. Commissions can accumulate and be paid later.
+20. Commission rules must be configurable by campaign.
+21. To participate in a monthly draw, the installment for the month and all previous installments must be paid.
+22. Eligibility must be calculated with a cutoff date.
+23. The draw roster must remain frozen.
+24. If a bond was not eligible at the time of the draw, the prize must not be awarded.
+25. The extraordinary draw requires full payment before the deadline.
+26. The barcode must be used as an aid, but not as the system's only key until its meaning is confirmed.
+27. History must not be deleted; it must be voided or corrected with audit.
+28. The system must replace the current manual Excel control.
 
 ---
 
-## 39. Próximo paso recomendado
+## 38. Open questions to confirm
 
-A partir de este modelo de negocio, el siguiente paso debería ser armar el diseño funcional del sistema.
+Before moving to the final technical design, these definitions remain pending:
 
-Orden recomendado:
+1. What happens if `base_number + 4871` exceeds 9999?
+2. Is the value of a pata always proportional to the value of a simple bond?
+3. Are the extra numbers for the extraordinary draw calculated by number of base numbers or by another rule?
+4. Does the final draw require full payment or only being up to date?
+5. Do consolation draws have the same eligibility rule as monthly draws?
+6. What exact information does the barcode contain?
+7. Will direct access for collectors be allowed, or will everything be operated by administration?
+8. What legal/tax data should be recorded for company buyers?
+9. What happens to unsold bonds at campaign close?
+10. What formal procedure exists for prizes not awarded due to non-payment?
 
-1. Definir módulos del sistema.
-2. Definir pantallas principales.
-3. Definir flujos de usuario.
-4. Definir estados y transiciones.
-5. Armar el modelo DER.
-6. Definir endpoints/API.
-7. Armar tasklist de implementación.
-8. Priorizar MVP.
-9. Diseñar infraestructura AWS.
-10. Implementar backend, frontend y base de datos.
+---
+
+## 39. Recommended next step
+
+Based on this business model, the next step should be to prepare the system's functional design.
+
+Recommended order:
+
+1. Define system modules.
+2. Define main screens.
+3. Define user flows.
+4. Define statuses and transitions.
+5. Build the ERD model.
+6. Define endpoints/API.
+7. Build implementation task list.
+8. Prioritize MVP.
+9. Design AWS infrastructure.
+10. Implement backend, frontend, and database.
