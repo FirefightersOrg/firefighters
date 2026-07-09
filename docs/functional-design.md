@@ -1,366 +1,366 @@
-# Diseno funcional
+# Functional Design
 
-## Objetivo
+## Objective
 
-Definir modulos, roles, pantallas y flujos principales del sistema de gestion de bonos. Este documento describe comportamiento esperado desde el punto de vista operativo.
+Define modules, roles, screens, and main flows for the bond management system. This document describes expected behavior from an operational point of view.
 
 ## Roles
 
-El sistema debe usar permisos granulares agrupados en roles. La definicion detallada esta en `docs/permissions.md`.
+The system must use granular permissions grouped into roles. The detailed definition is in `docs/permissions.md`.
 
-### Administrador
+### Administrator
 
-Puede gestionar configuracion general, campanas, usuarios, reglas, bonos, pagos, rendiciones, sorteos, premios y reportes.
+Can manage general configuration, campaigns, users, rules, bonds, payments, collector settlements, draws, prizes, and reports.
 
-### Operador administrativo
+### Administrative Operator
 
-Puede cargar compradores, ventas, pagos, rendiciones, remitos y consultas operativas. No debe modificar reglas criticas de campana.
+Can load buyers, sales, payments, collector settlements, delivery notes, and operational queries. Must not modify critical campaign rules.
 
-### Tesorero
+### Treasurer
 
-Puede consultar y gestionar informacion economica, rendiciones, comisiones, cuenta corriente, transferencias, reportes y cierres.
+Can query and manage financial information, collector settlements, commissions, collector ledger, transfers, reports, and closings.
 
-### Cobrador
+### Collector
 
-Inicialmente puede no tener acceso directo. El modelo debe permitir que en el futuro consulte su cartera, pagos, cuotas pendientes y saldo.
+Initially may not have direct access. The model must allow a collector to query their portfolio, payments, pending installments, and balance in the future.
 
-### Consulta
+### Read-Only
 
-Solo lectura, con acceso a reportes y consultas definidas.
+Read-only, with access to defined reports and queries.
 
-## Modulos funcionales
+## Functional Modules
 
-### Campanas
+### Campaigns
 
-Permite crear y configurar el periodo anual del bono.
+Allows creating and configuring the annual bond period.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Listado de campanas.
-- Crear/editar campana.
-- Configuracion de numeros.
-- Configuracion de cuotas.
-- Configuracion de comisiones.
-- Configuracion de sorteos.
+- Campaign list.
+- Create/edit campaign.
+- Number configuration.
+- Installment configuration.
+- Commission configuration.
+- Draw configuration.
 
-### Bonos y patas
+### Bonds and patas (multi-number bond/packages)
 
-Permite administrar bonos simples y patas.
+Allows managing simple bonds and patas.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Listado de bonos.
-- Ficha unica de bono.
-- Carga manual de bono.
-- Carga de pata.
-- Carga/busqueda por codigo de barras.
-- Validacion de numeros.
-- Busqueda por numero visible, asociado, codigo de barras o identificador interno.
+- Bond list.
+- Single bond record.
+- Manual bond loading.
+- Pata loading.
+- Barcode loading/search.
+- Number validation.
+- Search by visible number, associated number, barcode, or internal identifier.
 
-### Cobradores
+### Collectors
 
-Permite administrar vendedores/cobradores y consultar su situacion.
+Allows managing sellers/collectors and querying their status.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Listado de cobradores.
-- Ficha unica de cobrador.
-- Bonos asignados.
-- Rendiciones.
-- Cuenta corriente.
-- Resumen mensual.
+- Collector list.
+- Single collector record.
+- Assigned bonds.
+- Collector settlements.
+- Collector ledger.
+- Monthly summary.
 
-### Compradores
+### Buyers
 
-Permite administrar compradores y su historial.
+Allows managing buyers and their history.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Listado de compradores.
-- Ficha unica de comprador.
-- Bonos comprados.
-- Pagos.
-- Premios.
+- Buyer list.
+- Single buyer record.
+- Purchased bonds.
+- Payments.
+- Prizes.
 
-### Entregas de bonos
+### Bond Deliveries
 
-Permite registrar entrega fisica de bonos a cobradores.
+Allows registering physical delivery of bonds to collectors.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Nueva entrega.
-- Detalle de entrega.
-- Remito imprimible.
-- Devolucion o reasignacion.
+- New delivery.
+- Delivery detail.
+- Printable delivery note.
+- Return or reassignment.
 
-### Ventas
+### Sales
 
-Permite registrar que un bono fue vendido a un comprador.
+Allows registering that a bond was sold to a buyer.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Nueva venta.
-- Seleccion de bono.
-- Seleccion o creacion de comprador.
-- Modalidad de pago.
-- Generacion de cuotas.
+- New sale.
+- Bond selection.
+- Buyer selection or creation.
+- Payment mode.
+- Installment generation.
 
-### Pagos
+### Payments
 
-Permite registrar pagos de contado, cuotas y adelantos.
+Allows registering cash payments, installments, and early payments.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Registrar pago.
-- Seleccion de bono y cuotas.
-- Medio de pago.
-- Estado de cuotas.
-- Historial de pagos.
+- Register payment.
+- Bond and installment selection.
+- Payment method.
+- Installment status.
+- Payment history.
 
-### Rendiciones
+### Collector Settlements
 
-Permite registrar el proceso en que un cobrador rinde ventas y pagos a administracion.
+Allows registering the process where a collector submits sales and payments to administration.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Crear rendicion.
-- Carga asistida de pagos.
-- Resumen en tiempo real.
-- Cierre de rendicion.
-- Remito imprimible.
-- Correcciones auditadas.
-- Ajustes manuales de comision con permiso.
+- Create collector settlement.
+- Assisted payment loading.
+- Real-time summary.
+- Collector settlement closing.
+- Printable settlement note.
+- Audited corrections.
+- Manual commission adjustments with permission.
 
-### Sorteos
+### Draws
 
-Permite administrar sorteos y validar ganadores.
+Allows managing draws and validating winners.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Listado de sorteos.
-- Crear sorteo.
-- Generar padron.
-- Ver padron congelado.
-- Cargar ganador.
-- Resultado de validacion.
-- Premios.
+- Draw list.
+- Create draw.
+- Generate draw roster.
+- View frozen draw roster.
+- Load winner.
+- Validation result.
+- Prizes.
 
-Las reglas especificas de sorteo estan en `docs/draw-rules.md`.
+Specific draw rules are in `docs/draw-rules.md`.
 
-### Importaciones
+### Imports
 
-Permite cargar datos por codigo de barras, archivo o exportacion del sistema viejo.
+Allows loading data by barcode, file, or export from the old system.
 
-Pantallas sugeridas:
+Suggested screens:
 
-- Nueva sesion de importacion.
-- Carga por escaneo.
-- Vista previa de lote.
-- Reporte de errores.
-- Confirmacion de importacion.
+- New import session.
+- Scan loading.
+- Batch preview.
+- Error report.
+- Import confirmation.
 
-### Documentos
+### Documents
 
-Permite emitir HTML imprimible para remitos y constancias.
+Allows issuing printable HTML for delivery notes and receipts.
 
-Documentos iniciales:
+Initial documents:
 
-- Remito de entrega.
-- Remito de rendicion.
-- Constancia de pago.
-- Constancia de premio entregado.
-- Constancia de premio no adjudicado.
+- Delivery note.
+- Collector settlement note.
+- Payment receipt.
+- Delivered prize receipt.
+- Not-awarded prize receipt.
 
-## Flujos principales
+## Main Flows
 
-### Crear campana
+### Create Campaign
 
 ```txt
-Administrador crea campana
+Administrator creates campaign
 ↓
-Configura valor de bono simple
+Configures simple bond value
 ↓
-Configura cuotas
+Configures installments
 ↓
-Configura numeracion
+Configures numbering
 ↓
-Configura comisiones
+Configures commissions
 ↓
-Configura sorteos esperados
+Configures expected draws
 ↓
-Campana queda activa para carga de bonos
+Campaign becomes active for bond loading
 ```
 
-### Cargar bono simple
+### Load Simple Bond
 
 ```txt
-Usuario ingresa numero base
+User enters base number
 ↓
-Sistema calcula numero asociado
+System calculates associated number
 ↓
-Sistema valida rango segun campana
+System validates range according to campaign
 ↓
-Sistema valida duplicados de numeros participantes
+System validates duplicate participating numbers
 ↓
-Sistema crea bono
+System creates bond
 ↓
-Bono queda disponible en administracion
+Bond becomes available in administration
 ```
 
-### Cargar pata
+### Load Pata
 
 ```txt
-Usuario crea pata
+User creates pata
 ↓
-Ingresa varios numeros base
+Enters several base numbers
 ↓
-Sistema calcula asociados
+System calculates associated numbers
 ↓
-Sistema valida rango y duplicados
+System validates range and duplicates
 ↓
-Sistema calcula valor provisional de pata
+System calculates provisional pata value
 ↓
-Pata queda disponible en administracion
+Pata becomes available in administration
 ```
 
-### Entregar bonos a cobrador
+### Deliver Bonds to Collector
 
 ```txt
-Usuario crea entrega
+User creates delivery
 ↓
-Selecciona cobrador
+Selects collector
 ↓
-Selecciona bonos disponibles
+Selects available bonds
 ↓
-Confirma entrega
+Confirms delivery
 ↓
-Bonos pasan a entregados a cobrador
+Bonds move to delivered to collector
 ↓
-Sistema genera remito
+System generates delivery note
 ```
 
-### Registrar venta
+### Register Sale
 
 ```txt
-Usuario busca bono
+User searches for bond
 ↓
-Sistema verifica que este asignado o disponible segun regla operativa
+System verifies that it is assigned or available according to operational rule
 ↓
-Usuario selecciona o crea comprador
+User selects or creates buyer
 ↓
-Usuario define modalidad de pago
+User defines payment mode
 ↓
-Sistema genera plan de cuotas
+System generates installment plan
 ↓
-Bono queda vendido
+Bond becomes sold
 ```
 
-### Registrar pago dentro de rendicion
+### Register Payment Inside Collector Settlement
 
 ```txt
-Usuario abre o crea rendicion del cobrador
+User opens or creates collector settlement for the collector
 ↓
-Busca bono vendido
+Searches for sold bond
 ↓
-Selecciona cuotas o pago total
+Selects installments or full payment
 ↓
-Indica medio de pago
+Indicates payment method
 ↓
-Sistema agrega pago a rendicion abierta
+System adds payment to open collector settlement
 ↓
-Sistema recalcula totales y comision preliminar
+System recalculates totals and preliminary commission
 ```
 
-### Cerrar rendicion
+### Close Collector Settlement
 
 ```txt
-Usuario revisa resumen
+User reviews summary
 ↓
-Sistema muestra efectivo, transferencia, total, comision y neto
+System shows cash, transfer, total, commission, and net amount
 ↓
-Usuario confirma cierre
+User confirms closing
 ↓
-Sistema confirma pagos
+System confirms payments
 ↓
-Sistema consolida comisiones
+System consolidates commissions
 ↓
-Sistema genera movimientos de cuenta corriente
+System generates collector ledger entries
 ↓
-Sistema bloquea edicion directa de la rendicion
+System blocks direct editing of the collector settlement
 ↓
-Sistema emite remito
+System issues settlement note
 ```
 
-### Corregir rendicion cerrada
+### Correct Closed Collector Settlement
 
 ```txt
-Usuario detecta error
+User detects error
 ↓
-Solicita correccion con motivo
+Requests correction with reason
 ↓
-Sistema genera anulacion o ajuste auditado
+System generates audited annulment or adjustment
 ↓
-Sistema actualiza saldos desde nuevos movimientos
+System updates balances from new entries
 ↓
-La rendicion original permanece cerrada como historial
+The original collector settlement remains closed as history
 ```
 
-### Generar padron de sorteo
+### Generate Draw Roster
 
 ```txt
-Usuario selecciona sorteo
+User selects draw
 ↓
-Sistema evalua regla de elegibilidad
+System evaluates eligibility rule
 ↓
-Sistema usa pagos confirmados antes del corte
+System uses confirmed payments before the cutoff
 ↓
-Sistema genera participantes habilitados y no habilitados
+System generates eligible and ineligible participants
 ↓
-Usuario revisa
+User reviews
 ↓
-Sistema congela padron
+System freezes draw roster
 ```
 
-### Cargar numero ganador
+### Load Winning Number
 
 ```txt
-Usuario ingresa numero ganador
+User enters winning number
 ↓
-Sistema busca coincidencia en padron congelado
+System searches for match in frozen draw roster
 ↓
-Sistema identifica bono, comprador y cobrador
+System identifies bond, buyer, and collector
 ↓
-Sistema informa si estaba habilitado
+System reports whether it was eligible
 ↓
-Usuario registra resultado del premio
+User records prize result
 ```
 
-## Pantallas prioritarias del MVP
+## MVP Priority Screens
 
-- Dashboard de campana.
-- Campanas.
-- Bonos.
-- Ficha de bono.
-- Cobradores.
-- Ficha de cobrador.
-- Compradores.
-- Entrega de bonos.
-- Venta.
-- Rendicion asistida.
-- Cuenta corriente de cobrador.
-- Sorteos.
-- Padron de sorteo.
-- Carga de ganador.
-- Reportes basicos.
+- Campaign dashboard.
+- Campaigns.
+- Bonds.
+- Bond record.
+- Collectors.
+- Collector record.
+- Buyers.
+- Bond delivery.
+- Sale.
+- Assisted collector settlement.
+- Collector ledger.
+- Draws.
+- Draw roster.
+- Winner loading.
+- Basic reports.
 
-Detalle ampliado de pantallas: `docs/screens.md`.
+Expanded screen details: `docs/screens.md`.
 
-## Correcciones
+## Corrections
 
-Los flujos de anulacion y correccion estan definidos en `docs/corrections.md`.
+Annulment and correction flows are defined in `docs/corrections.md`.
 
-Regla principal:
+Main rule:
 
 ```txt
-No se borra historial sensible. Se anula, ajusta o compensa con auditoria.
+Sensitive history is not deleted. It is annulled, adjusted, or offset with audit.
 ```
