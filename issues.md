@@ -1,259 +1,259 @@
-# Issues y consideraciones criticas
+# Issues and critical considerations
 
-Este documento resume los puntos que deben aclararse o resolverse a partir del modelo de negocio definido en `README.md`.
+This document summarizes the points that must be clarified or resolved based on the business model defined in `README.md`.
 
-## Veredicto general
+## General verdict
 
-El sistema es viable como aplicacion web administrativa. No parece inviable, pero tiene complejidad media-alta por tres areas principales:
+The system is viable as an administrative web application. It does not seem infeasible, but it has medium-high complexity due to three main areas:
 
-- Numeracion de bonos, patas y sorteos.
-- Pagos, cuotas, adelantos y rendiciones.
-- Cuenta corriente y comisiones de cobradores.
+- Bond, pata, and draw numbering.
+- Payments, installments, advance payments, and collector settlements.
+- Collector current account and commissions.
 
-El `README.md` esta bien como documento de negocio, pero todavia falta convertirlo en diseño funcional y tecnico.
+The `README.md` works well as a business document, but it still needs to be converted into functional and technical design.
 
-## Issues criticos
+## Critical issues
 
-### 1. Definir plataforma principal
+### 1. Define the main platform
 
-El documento indica que la aplicacion sera web y accesible desde distintos dispositivos.
+The document states that the application will be web-based and accessible from different devices.
 
-Si ese es el objetivo, la plataforma principal deberia ser una web app o PWA con backend centralizado y base de datos compartida.
+If that is the objective, the main platform should be a web app or PWA with a centralized backend and shared database.
 
-Tauri puede servir para una app desktop administrativa, pero no deberia ser la plataforma principal si se requiere acceso desde celulares, tablets y distintos dispositivos.
+Tauri can work for an administrative desktop app, but it should not be the main platform if access is required from phones, tablets, and different devices.
 
-Decision pendiente:
+Pending decision:
 
-- Web app como producto principal.
-- Tauri solo como opcion complementaria.
-- O descartar Tauri para este proyecto.
+- Web app as the main product.
+- Tauri only as a complementary option.
+- Or discard Tauri for this project.
 
-### 2. Cerrar la regla del numero asociado `+4871`
+### 2. Finalize the `+4871` associated-number rule
 
-La regla de numero asociado es central para todo el sistema:
+The associated-number rule is central to the entire system:
 
 ```text
-numero_asociado = numero_base + 4871
+associated_number = base_number + 4871
 ```
 
-Debe confirmarse que ocurre cuando el resultado supera `9999`.
+It must be confirmed what happens when the result exceeds `9999`.
 
-Opciones posibles:
+Possible options:
 
-1. No se permiten numeros base que generen asociados mayores a `9999`.
-2. Se toman las ultimas 4 cifras.
-3. La campana admite numeros de mas de 4 cifras.
-4. Existe otra regla heredada del sistema anterior.
+1. Base numbers that generate associated numbers greater than `9999` are not allowed.
+2. The last 4 digits are taken.
+3. The campaign supports numbers with more than 4 digits.
+4. There is another rule inherited from the previous system.
 
-Esto bloquea decisiones de base de datos, validaciones, busqueda de ganadores, importacion de bonos y control de duplicados.
+This blocks database decisions, validations, winner lookup, bond import, and duplicate control.
 
-### 3. Definir unicidad de numeros participantes
+### 3. Define uniqueness of participant numbers
 
-Debe quedar formalmente definido que un numero participante no puede apuntar a mas de un bono dentro de la misma campana.
+It must be formally defined that a participant number cannot point to more than one bond within the same campaign.
 
-Numero participante incluye:
+Participant number includes:
 
-- Numero base.
-- Numero asociado calculado.
-- Numeros incluidos en patas.
-- Numeros extra de sorteos extraordinarios, si aplican.
+- Base number.
+- Calculated associated number.
+- Numbers included in patas.
+- Extra numbers for extraordinary draws, if applicable.
 
-Hay que definir que hace el sistema ante duplicados:
+The system behavior for duplicates must be defined:
 
-- Bloquear carga.
-- Permitir con advertencia.
-- Exigir resolucion administrativa.
-- Marcar conflicto pendiente.
+- Block loading.
+- Allow with warning.
+- Require administrative resolution.
+- Mark pending conflict.
 
-Recomendacion: bloquear por defecto y permitir excepciones solo con rol administrador y auditoria.
+Recommendation: block by default and allow exceptions only with administrator role and audit.
 
-### 4. Modelar la cuenta corriente del cobrador como movimientos
+### 4. Model the collector current account as movements
 
-La cuenta corriente del cobrador es un componente central. No deberia modelarse solo con saldos calculados o campos editables.
+The collector current account is a central component. It should not be modeled only with calculated balances or editable fields.
 
-Debe modelarse como un ledger de movimientos auditables.
+It must be modeled as a ledger of auditable movements.
 
-Movimientos posibles:
+Possible movements:
 
-- Comision generada.
-- Comision liquidada.
-- Pago recibido por transferencia.
-- Efectivo rendido.
-- Ajuste manual.
-- Anulacion de pago.
-- Anulacion de comision.
-- Saldo a favor del cobrador.
-- Saldo a favor de Bomberos.
+- Generated commission.
+- Paid commission.
+- Payment received by transfer.
+- Settled cash.
+- Manual adjustment.
+- Payment void.
+- Commission void.
+- Balance in favor of the collector.
+- Balance in favor of Firefighters.
 
-Esto es critico para evitar descuadres entre efectivo, transferencias, comisiones y rendiciones.
+This is critical to avoid mismatches between cash, transfers, commissions, and collector settlements.
 
-### 5. Definir estados y transiciones
+### 5. Define statuses and transitions
 
-El README propone estados comerciales y financieros, pero falta una maquina de estados formal.
+The README proposes commercial and financial statuses, but a formal state machine is still missing.
 
-Hay que definir transiciones permitidas, por ejemplo:
+Allowed transitions must be defined, for example:
 
-- `Disponible en administracion` -> `Entregado a cobrador`.
-- `Entregado a cobrador` -> `Vendido`.
-- `Entregado a cobrador` -> `Devuelto`.
-- `Vendido` -> `Anulado`.
-- `Vendido` -> `Cerrado`.
-- `Disponible en administracion` -> `Extraviado`.
+- `Available in administration` -> `Delivered to collector`.
+- `Delivered to collector` -> `Sold`.
+- `Delivered to collector` -> `Returned`.
+- `Sold` -> `Voided`.
+- `Sold` -> `Closed`.
+- `Available in administration` -> `Lost`.
 
-Tambien deben definirse reversiones:
+Reversals must also be defined:
 
-- Venta cargada por error.
-- Pago mal registrado.
-- Bono asignado al cobrador equivocado.
-- Cambio de comprador.
-- Devolucion de bono ya entregado.
+- Sale loaded by mistake.
+- Incorrectly recorded payment.
+- Bond assigned to the wrong collector.
+- Buyer change.
+- Return of an already delivered bond.
 
-Recomendacion: no borrar datos; anular o revertir mediante movimientos auditados.
+Recommendation: do not delete data; void or reverse through audited movements.
 
-### 6. Recortar alcance MVP
+### 6. Reduce MVP scope
 
-El alcance completo es grande. Intentar implementar todo de una vez aumenta mucho el riesgo.
+The full scope is large. Trying to implement everything at once greatly increases risk.
 
-MVP recomendado:
+Recommended MVP:
 
-1. Campanas.
-2. Cobradores.
-3. Compradores.
-4. Bonos simples.
-5. Carga/importacion de bonos.
-6. Asignacion de bonos a cobradores.
-7. Venta de bonos.
-8. Plan de cuotas.
-9. Registro de pagos.
-10. Rendiciones basicas.
-11. Comisiones basicas.
-12. Cuenta corriente del cobrador.
-13. Reportes operativos basicos.
+1. Campaigns.
+2. Collectors.
+3. Buyers.
+4. Simple bonds.
+5. Bond loading/import.
+6. Assignment of bonds to collectors.
+7. Bond sale.
+8. Installment plan.
+9. Payment recording.
+10. Basic collector settlements.
+11. Basic commissions.
+12. Collector current account.
+13. Basic operational reports.
 
-Fase posterior:
+Later phase:
 
-1. Patas avanzadas.
-2. Armado/desarmado de patas.
-3. Sorteos mensuales.
-4. Padrón congelado.
-5. Premios.
-6. Sorteo extraordinario.
-7. Sorteos consuelo.
-8. Acceso directo de cobradores.
-9. Codigo de barras.
-10. Infraestructura AWS productiva.
+1. Advanced patas.
+2. Pata assembly/disassembly.
+3. Monthly draws.
+4. Frozen roster.
+5. Prizes.
+6. Extraordinary draw.
+7. Consolation draws.
+8. Direct collector access.
+9. Barcode.
+10. Production AWS infrastructure.
 
-## Dudas abiertas importantes
+## Important open questions
 
-### Numeracion y bonos
+### Numbering and bonds
 
-1. Que ocurre si `numero_base + 4871 > 9999`.
-2. Si el numero asociado siempre se calcula igual en todas las campanas.
-3. Si la regla `+4871` debe ser configurable por campana.
-4. Si los numeros con ceros a la izquierda deben conservar formato fijo, por ejemplo `0068`.
-5. Si se permiten numeros de 3, 4 o mas cifras en una misma campana.
-6. Como se resuelve un numero historico que ahora pertenece a una pata.
+1. What happens if `base_number + 4871 > 9999`.
+2. Whether the associated number is always calculated the same way in all campaigns.
+3. Whether the `+4871` rule must be configurable by campaign.
+4. Whether numbers with leading zeros must keep a fixed format, for example `0068`.
+5. Whether numbers with 3, 4, or more digits are allowed in the same campaign.
+6. How to resolve a historical number that now belongs to a pata.
 
 ### Patas
 
-1. Si una pata siempre vale `valor_bono_simple x cantidad_de_numeros_base`.
-2. Si una pata armada desde bonos simples puede desarmarse despues de venderse.
-3. Si una pata puede desarmarse despues de tener pagos registrados.
-4. Si una pata puede desarmarse despues de participar en sorteos.
-5. Como se imprimen o documentan patas armadas manualmente.
+1. Whether a pata is always worth `simple_bond_value x base_number_count`.
+2. Whether a pata assembled from simple bonds can be disassembled after being sold.
+3. Whether a pata can be disassembled after having recorded payments.
+4. Whether a pata can be disassembled after participating in draws.
+5. How manually assembled patas are printed or documented.
 
-### Pagos y rendiciones
+### Payments and collector settlements
 
-1. Como se anula un pago mal cargado.
-2. Como se corrige un medio de pago incorrecto.
-3. Si una transferencia requiere comprobante adjunto.
-4. Si los pagos por transferencia deben conciliarse contra movimientos bancarios.
-5. Si una rendicion cerrada puede reabrirse.
-6. Que pasa si un cobrador rinde menos efectivo del esperado.
-7. Que pasa si un cobrador descuenta una comision distinta a la calculada.
+1. How an incorrectly loaded payment is voided.
+2. How an incorrect payment method is corrected.
+3. Whether a transfer requires an attached receipt.
+4. Whether transfer payments must be reconciled against bank movements.
+5. Whether a closed collector settlement can be reopened.
+6. What happens if a collector settles less cash than expected.
+7. What happens if a collector deducts a commission different from the calculated one.
 
-### Comisiones
+### Commissions
 
-1. Porcentaje exacto de comision por pago contado.
-2. Porcentaje exacto por primera cuota.
-3. Porcentaje exacto por cuotas intermedias.
-4. Porcentaje exacto por ultima cuota.
-5. Si la comision se genera al registrar el pago o al cerrar la rendicion.
-6. Si la comision puede modificarse manualmente.
-7. Si hay cobradores con reglas especiales.
+1. Exact commission percentage for full payment.
+2. Exact percentage for first installment.
+3. Exact percentage for intermediate installments.
+4. Exact percentage for last installment.
+5. Whether commission is generated when recording the payment or when closing the collector settlement.
+6. Whether commission can be modified manually.
+7. Whether some collectors have special rules.
 
-### Sorteos
+### Draws
 
-1. Regla exacta de elegibilidad del sorteo final.
-2. Regla exacta de elegibilidad de sorteos consuelo.
-3. Como se calculan los numeros extra del sorteo extraordinario.
-4. Si los numeros extra deben ser generados por el sistema o cargados manualmente.
-5. Que procedimiento formal existe para premios no adjudicados por falta de pago.
-6. Si el padron congelado debe incluir tambien no habilitados o solo habilitados.
+1. Exact eligibility rule for the final draw.
+2. Exact eligibility rule for consolation draws.
+3. How extra numbers for the extraordinary draw are calculated.
+4. Whether extra numbers must be generated by the system or loaded manually.
+5. What formal procedure exists for prizes not awarded due to non-payment.
+6. Whether the frozen roster must include not eligible entries too, or only eligible entries.
 
-### Usuarios y acceso
+### Users and access
 
-1. Si los cobradores tendran usuario propio.
-2. Si los cobradores podran cargar pagos directamente.
-3. Si administracion debe aprobar pagos informados por cobradores.
-4. Si se necesita acceso desde celulares en campo.
-5. Si debe soportar mala conectividad o modo offline.
+1. Whether collectors will have their own user.
+2. Whether collectors will be able to load payments directly.
+3. Whether administration must approve payments reported by collectors.
+4. Whether field access from phones is needed.
+5. Whether poor connectivity or offline mode must be supported.
 
-### Datos y migracion
+### Data and migration
 
-1. Como se importaran datos desde Excel.
-2. Si existe exportacion del sistema anterior.
-3. Que datos historicos son obligatorios para arrancar.
-4. Si se migraran campanas anteriores completas o solo numeros habituales.
-5. Como se normalizaran compradores duplicados.
+1. How data will be imported from Excel.
+2. Whether an export from the previous system exists.
+3. What historical data is mandatory to start.
+4. Whether complete previous campaigns will be migrated or only usual numbers.
+5. How duplicate buyers will be normalized.
 
-### Documentos y reportes
+### Documents and reports
 
-1. Si los remitos deben ser PDF, impresos A4, Excel o todos.
-2. Si deben tener numeracion fiscal o solo administrativa.
-3. Si las constancias de pago deben entregarse al comprador.
-4. Si se deben firmar digitalmente o solo imprimir.
+1. Whether delivery notes must be PDF, printed A4, Excel, or all of them.
+2. Whether they must have tax numbering or only administrative numbering.
+3. Whether payment receipts must be delivered to the buyer.
+4. Whether they must be digitally signed or only printed.
 
-## Mejoras recomendadas antes del diseño tecnico
+## Recommended improvements before technical design
 
-### 1. Crear un documento de MVP
+### 1. Create an MVP document
 
-Separar claramente:
+Clearly separate:
 
-- Que entra en primera version.
-- Que queda para segunda version.
-- Que queda solo como deseable.
+- What goes into the first version.
+- What remains for the second version.
+- What remains only as desirable.
 
-### 2. Crear flujos funcionales principales
+### 2. Create main functional flows
 
-Antes de programar, conviene definir flujos paso a paso para:
+Before programming, it is advisable to define step-by-step flows for:
 
-- Crear campana.
-- Cargar bonos.
-- Entregar bonos a cobrador.
-- Registrar venta.
-- Registrar pago.
-- Crear rendicion.
-- Liquidar comision.
-- Generar padron.
-- Cargar ganador.
-- Rechazar premio por falta de pago.
+- Create campaign.
+- Load bonds.
+- Deliver bonds to collector.
+- Record sale.
+- Record payment.
+- Create collector settlement.
+- Pay commission.
+- Generate roster.
+- Load winner.
+- Reject prize due to non-payment.
 
-### 3. Crear maquina de estados
+### 3. Create state machine
 
-Definir estados y transiciones para:
+Define statuses and transitions for:
 
-- Bono.
-- Cuota.
-- Pago.
-- Rendicion.
-- Premio.
-- Campana.
-- Sorteo.
+- Bond.
+- Installment.
+- Payment.
+- Collector settlement.
+- Prize.
+- Campaign.
+- Draw.
 
-### 4. Crear modelo DER preliminar
+### 4. Create preliminary ERD model
 
-Entidades probables:
+Likely entities:
 
 - `campaigns`
 - `collectors`
@@ -276,86 +276,86 @@ Entidades probables:
 - `users`
 - `roles`
 
-### 5. Definir importaciones
+### 5. Define imports
 
-El sistema probablemente necesite importar datos desde Excel.
+The system will likely need to import data from Excel.
 
-Se deberia definir:
+The following should be defined:
 
-- Formato de Excel esperado.
-- Validaciones.
-- Previsualizacion antes de importar.
-- Reporte de errores.
-- Deteccion de duplicados.
-- Rollback o anulacion de importacion.
+- Expected Excel format.
+- Validations.
+- Preview before importing.
+- Error report.
+- Duplicate detection.
+- Rollback or import voiding.
 
-### 6. Definir seguridad y permisos
+### 6. Define security and permissions
 
-Permisos minimos a definir:
+Minimum permissions to define:
 
-- Quien puede crear campanas.
-- Quien puede cambiar reglas de comision.
-- Quien puede anular pagos.
-- Quien puede cerrar rendiciones.
-- Quien puede generar padrones.
-- Quien puede cargar ganadores.
-- Quien puede modificar datos historicos.
+- Who can create campaigns.
+- Who can change commission rules.
+- Who can void payments.
+- Who can close collector settlements.
+- Who can generate rosters.
+- Who can load winners.
+- Who can modify historical data.
 
-### 7. Definir auditoria obligatoria
+### 7. Define mandatory audit
 
-Acciones que deben auditarse si o si:
+Actions that must always be audited:
 
-- Cambios de reglas de campana.
-- Carga o anulacion de pagos.
-- Cambios de comprador.
-- Asignacion y devolucion de bonos.
-- Cierre o reapertura de rendiciones.
-- Liquidacion de comisiones.
-- Generacion de padrones.
-- Carga de ganadores.
-- Rechazo de premios.
-- Ajustes manuales de saldos.
+- Campaign rule changes.
+- Payment loading or voiding.
+- Buyer changes.
+- Bond assignment and return.
+- Closing or reopening collector settlements.
+- Commission payout.
+- Roster generation.
+- Winner loading.
+- Prize rejection.
+- Manual balance adjustments.
 
-## Riesgos principales
+## Main risks
 
-### Riesgo 1: empezar a programar sin cerrar reglas de negocio
+### Risk 1: starting to program before finalizing business rules
 
-Impacto: alto.
+Impact: high.
 
-Puede obligar a rehacer base de datos, validaciones y pantallas.
+It may force rework of the database, validations, and screens.
 
-### Riesgo 2: mezclar saldos calculados con dinero real
+### Risk 2: mixing calculated balances with real money
 
-Impacto: alto.
+Impact: high.
 
-La cuenta corriente debe poder reconstruirse desde movimientos auditables.
+The current account must be reconstructable from auditable movements.
 
-### Riesgo 3: no congelar padrones de sorteo
+### Risk 3: not freezing draw rosters
 
-Impacto: alto.
+Impact: high.
 
-Si el padron se recalcula dinamicamente, los pagos tardios pueden alterar resultados historicos.
+If the roster is recalculated dynamically, late payments can alter historical results.
 
-### Riesgo 4: no separar estado comercial y financiero
+### Risk 4: not separating commercial and financial status
 
-Impacto: medio-alto.
+Impact: medium-high.
 
-Un bono puede estar vendido, atrasado, entregado, anulado o cerrado en dimensiones distintas.
+A bond can be sold, overdue, delivered, voided, or closed in different dimensions.
 
-### Riesgo 5: permitir borrado fisico de informacion historica
+### Risk 5: allowing physical deletion of historical information
 
-Impacto: alto.
+Impact: high.
 
-Para pagos, rendiciones, premios y auditoria, debe usarse anulacion/reversion, no borrado.
+For payments, collector settlements, prizes, and audit, void/reversal must be used, not deletion.
 
-## Recomendacion final
+## Final recommendation
 
-Antes de implementar backend o frontend, conviene resolver en este orden:
+Before implementing backend or frontend, it is advisable to resolve in this order:
 
-1. Cerrar reglas de numeracion y duplicados.
-2. Definir MVP.
-3. Definir maquina de estados.
-4. Definir ledger de cobradores y rendiciones.
-5. Definir flujos funcionales principales.
-6. Armar DER preliminar.
-7. Recién despues, definir API, pantallas e implementacion.
+1. Finalize numbering and duplicate rules.
+2. Define MVP.
+3. Define state machine.
+4. Define collector ledger and collector settlements.
+5. Define main functional flows.
+6. Build preliminary ERD.
+7. Only then define API, screens, and implementation.
