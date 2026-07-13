@@ -1,274 +1,274 @@
-# Pantallas y experiencia funcional
+# Screens and functional experience
 
-## Objetivo
+## Objective
 
-Definir pantallas prioritarias del MVP y dejar una base adaptable para futuras funcionalidades.
+Define MVP priority screens and provide an adaptable foundation for future functionality.
 
-## Principios de UI
+## UI principles
 
-- Diseñar por flujos operativos, no solo por CRUD.
-- Mostrar acciones segun permisos.
-- Priorizar busqueda rapida por numero, comprador, cobrador y codigo de barras.
-- Mantener fichas unicas para resolver reclamos rapidamente.
-- Todas las pantallas clave deben funcionar en desktop y mobile.
+- Design by operational flows, not just CRUD.
+- Show actions based on permissions.
+- Prioritize quick search by number, buyer, collector, and barcode.
+- Maintain single records to resolve claims quickly.
+- All key screens must work on desktop and mobile.
 
-## Navegacion principal
+## Main navigation
 
-Secciones sugeridas:
+Suggested sections:
 
 - Dashboard.
-- Campanas.
-- Bonos.
-- Cobradores.
-- Compradores.
-- Ventas.
-- Rendiciones.
-- Sorteos.
-- Reportes.
-- Administracion.
+- Campaigns.
+- Bonds.
+- Collectors.
+- Buyers.
+- Sales.
+- Settlements.
+- Draws.
+- Reports.
+- Administration.
 
-## Pantallas del MVP
+## MVP screens
 
-### Dashboard de campana
+### Campaign dashboard
 
-Objetivo: mostrar estado general de la campana activa.
+Objective: show overall status of the active campaign.
 
-Debe mostrar:
+Must display:
 
-- Bonos totales, vendidos, disponibles y entregados.
-- Recaudacion esperada, cobrada y pendiente.
-- Efectivo y transferencias.
-- Comisiones generadas y liquidadas.
-- Saldos de cobradores.
-- Proximo sorteo.
-- Bonos en riesgo para el proximo sorteo.
+- Total bonds, sold, available, and delivered.
+- Expected, collected, and pending revenue.
+- Cash and transfers.
+- Generated and settled commissions.
+- Collector balances.
+- Next draw.
+- Bonds at risk for the next draw.
 
-### Bonos
+### Bonds
 
-Objetivo: buscar y filtrar bonos.
+Objective: search and filter bonds.
 
-Filtros:
+Filters:
 
-- Campana.
-- Numero base.
-- Numero asociado.
-- Codigo de barras.
-- Tipo: simple o pata.
-- Estado comercial.
-- Estado financiero.
-- Cobrador.
-- Comprador.
+- Campaign.
+- Base number.
+- Associated number.
+- Barcode.
+- Type: simple or pata.
+- Commercial status.
+- Financial status.
+- Collector.
+- Buyer.
 
-Acciones:
+Actions:
 
-- Crear bono.
-- Crear pata.
-- Cargar por codigo de barras.
-- Asignar a cobrador.
-- Ver ficha.
+- Create bond.
+- Create pata.
+- Load by barcode.
+- Assign to collector.
+- View record.
 
-### Ficha de bono
+### Bond record
 
-Objetivo: expediente completo del bono.
+Objective: complete bond file.
 
-Secciones:
+Sections:
 
-- Datos generales.
-- Numeros participantes.
-- Codigo de barras.
-- Cobrador actual.
-- Comprador actual.
-- Venta.
-- Cuotas.
-- Pagos.
-- Rendiciones.
-- Comisiones.
-- Sorteos y padrones.
-- Premios.
-- Auditoria.
+- General data.
+- Participating numbers.
+- Barcode.
+- Current collector.
+- Current buyer.
+- Sale.
+- Installments.
+- Payments.
+- Settlements.
+- Commissions.
+- Draws and rosters.
+- Prizes.
+- Audit.
 
-### Carga por codigo de barras
+### Barcode loading
 
-Objetivo: acelerar carga o busqueda de bonos fisicos.
+Objective: speed up loading or searching for physical bonds.
 
-Flujo:
-
-```txt
-Seleccionar campana
-↓
-Elegir modo de lectura
-↓
-Escanear codigo
-↓
-Sistema interpreta valor
-↓
-Sistema muestra resultado
-↓
-Usuario confirma o corrige
-```
-
-Modos posibles:
-
-- Codigo representa numero base.
-- Codigo representa identificador interno.
-- Codigo representa codigo heredado externo.
-- Codigo requiere mapeo manual.
-
-### Cobradores
-
-Objetivo: administrar vendedores/cobradores.
-
-Debe mostrar:
-
-- Datos de contacto.
-- Bonos asignados.
-- Bonos vendidos.
-- Deuda de cartera.
-- Rendiciones.
-- Comisiones.
-- Saldo actual.
-
-### Ficha de cobrador
-
-Objetivo: vista integral del cobrador.
-
-Secciones:
-
-- Datos generales.
-- Bonos asignados.
-- Compradores asociados.
-- Cuotas pendientes.
-- Rendiciones.
-- Cuenta corriente.
-- Reporte mensual.
-- Auditoria.
-
-### Compradores
-
-Objetivo: gestionar compradores e historial.
-
-Debe permitir:
-
-- Alta/edicion.
-- Busqueda por nombre, telefono, documento o CUIT.
-- Ver bonos comprados.
-- Ver deuda.
-- Ver premios.
-- Ver numeros historicos si fueron migrados.
-
-### Venta
-
-Objetivo: registrar venta de bono o pata.
-
-Flujo:
+Flow:
 
 ```txt
-Buscar bono
+Select campaign
 ↓
-Validar disponibilidad
+Choose read mode
 ↓
-Seleccionar o crear comprador
+Scan code
 ↓
-Confirmar cobrador
+System interprets value
 ↓
-Elegir modalidad de pago
+System displays result
 ↓
-Generar cuotas
-↓
-Registrar pago inicial si corresponde
+User confirms or corrects
 ```
 
-### Rendicion asistida
+Possible modes:
 
-Objetivo: reemplazar el Excel operativo.
+- Code represents base number.
+- Code represents internal identifier.
+- Code represents external legacy code.
+- Code requires manual mapping.
 
-Debe mostrar en tiempo real:
+### Collectors
 
-- Total efectivo.
-- Total transferencia.
-- Total general.
-- Comision preliminar.
-- Comision liquidada ahora.
-- Neto para Bomberos.
-- Saldo a favor del cobrador.
+Objective: manage sellers/collectors.
 
-Acciones:
+Must display:
 
-- Agregar pago.
-- Quitar pago de rendicion abierta.
-- Ajustar comision con permiso.
-- Cerrar rendicion.
-- Imprimir remito.
+- Contact information.
+- Assigned bonds.
+- Sold bonds.
+- Portfolio debt.
+- Settlements.
+- Commissions.
+- Current balance.
 
-### Cuenta corriente de cobrador
+### Collector record
 
-Objetivo: explicar el saldo administrativo.
+Objective: comprehensive collector view.
 
-Debe mostrar:
+Sections:
 
-- Movimientos.
-- Tipo.
-- Origen.
-- Rendicion vinculada.
-- Pago vinculado.
-- Debe/haber o credito/debito.
-- Saldo acumulado.
-- Ajustes y anulaciones.
+- General data.
+- Assigned bonds.
+- Associated buyers.
+- Pending installments.
+- Settlements.
+- Current account.
+- Monthly report.
+- Audit.
 
-### Sorteos
+### Buyers
 
-Objetivo: administrar sorteos de la campana.
+Objective: manage buyers and history.
 
-Debe permitir:
+Must allow:
 
-- Crear sorteo mensual, extraordinario, final o consuelo.
-- Configurar fecha y corte.
-- Configurar regla de elegibilidad.
-- Generar padron.
-- Congelar padron.
-- Cargar ganadores.
+- Create/edit.
+- Search by name, phone, document, or tax ID.
+- View purchased bonds.
+- View debt.
+- View prizes.
+- View historical numbers if migrated.
 
-### Padron de sorteo
+### Sale
 
-Objetivo: justificar participantes y no participantes.
+Objective: register sale of bond or pata.
 
-Debe mostrar:
-
-- Numero participante.
-- Bono.
-- Comprador.
-- Cobrador.
-- Habilitado o no habilitado.
-- Motivo de no habilitacion.
-- Fecha de generacion y congelamiento.
-
-### Carga de ganador
-
-Objetivo: resolver resultado de sorteo.
-
-Flujo:
+Flow:
 
 ```txt
-Ingresar numero ganador
+Search bond
 ↓
-Buscar en padron congelado
+Validate availability
 ↓
-Mostrar bono, comprador y cobrador
+Select or create buyer
 ↓
-Mostrar estado de habilitacion
+Confirm collector
 ↓
-Registrar premio adjudicado o no adjudicado
+Choose payment method
+↓
+Generate installments
+↓
+Record initial payment if applicable
 ```
 
-### Reportes
+### Assisted settlement
 
-Reportes MVP:
+Objective: replace the operational spreadsheet.
 
-- Bonos por estado.
-- Bonos por cobrador.
-- Cuotas pendientes.
-- Pagos por fecha.
-- Rendiciones por cobrador.
-- Cuenta corriente de cobrador.
-- Padron de sorteo.
-- Ganadores y premios.
+Must display in real time:
+
+- Total cash.
+- Total transfer.
+- Grand total.
+- Preliminary commission.
+- Commission settled now.
+- Net to Firefighters.
+- Collector credit balance.
+
+Actions:
+
+- Add payment.
+- Remove payment from open settlement.
+- Adjust commission with permission.
+- Close settlement.
+- Print delivery note.
+
+### Collector current account
+
+Objective: explain the administrative balance.
+
+Must display:
+
+- Entries.
+- Type.
+- Source.
+- Linked settlement.
+- Linked payment.
+- Debit/credit.
+- Accumulated balance.
+- Adjustments and annulments.
+
+### Draws
+
+Objective: manage campaign draws.
+
+Must allow:
+
+- Create monthly, extraordinary, final, or consolation draw.
+- Configure date and cutoff.
+- Configure eligibility rule.
+- Generate roster.
+- Freeze roster.
+- Load winners.
+
+### Draw roster
+
+Objective: justify participants and non-participants.
+
+Must display:
+
+- Participating number.
+- Bond.
+- Buyer.
+- Collector.
+- Eligible or not eligible.
+- Reason for ineligibility.
+- Generation and freeze date.
+
+### Winner loading
+
+Objective: resolve draw result.
+
+Flow:
+
+```txt
+Enter winning number
+↓
+Search in frozen roster
+↓
+Display bond, buyer, and collector
+↓
+Display eligibility status
+↓
+Record awarded or unawarded prize
+```
+
+### Reports
+
+MVP reports:
+
+- Bonds by status.
+- Bonds by collector.
+- Pending installments.
+- Payments by date.
+- Settlements by collector.
+- Collector current account.
+- Draw roster.
+- Winners and prizes.

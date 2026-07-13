@@ -1,232 +1,232 @@
-# Plan de implementacion
+# Implementation Plan
 
-## Objetivo
+## Objective
 
-Ordenar la construccion del MVP en etapas tecnicas verificables.
+Organize the MVP construction into verifiable technical stages.
 
-## Fase 0: Preparacion del repositorio
+## Phase 0: Repository Setup
 
-Entregables:
+Deliverables:
 
-- Inicializar SvelteKit con TypeScript.
-- Configurar pnpm.
-- Configurar lint, format y check.
-- Configurar estructura `src/lib`.
-- Agregar `.env.example`.
-- Agregar Supabase local.
+- Initialize SvelteKit with TypeScript.
+- Configure pnpm.
+- Configure lint, format, and check.
+- Set up `src/lib` structure.
+- Add `.env.example`.
+- Add local Supabase.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- `pnpm check` ejecuta correctamente.
-- Supabase local puede iniciar.
+- `pnpm check` runs successfully.
+- Local Supabase can start.
 
-## Fase 1: Auth, roles y permisos
+## Phase 1: Auth, Roles, and Permissions
 
-Entregables:
+Deliverables:
 
 - Supabase Auth.
-- Tablas `profiles`, `roles`, `permissions`, `role_permissions`, `user_roles`.
-- RLS base.
-- Helpers server-side de permisos.
-- Pantallas basicas de login y sesion.
+- Tables `profiles`, `roles`, `permissions`, `role_permissions`, `user_roles`.
+- Base RLS.
+- Server-side permission helpers.
+- Basic login and session screens.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Un usuario autenticado tiene roles.
-- Una accion sensible valida permiso server-side.
+- An authenticated user has roles.
+- A sensitive action validates permission server-side.
 
-## Fase 2: Campanas y configuracion
+## Phase 2: Campaigns and Configuration
 
-Entregables:
+Deliverables:
 
-- CRUD de campanas.
-- Configuracion de numeracion.
-- Configuracion de cuotas.
-- Configuracion de reglas base de comision.
+- Campaign CRUD.
+- Numbering configuration.
+- Installment configuration.
+- Base commission rule configuration.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Se puede crear campana con `number_digits`, `max_number` y `associated_number_offset`.
+- A campaign can be created with `number_digits`, `max_number`, and `associated_number_offset`.
 
-## Fase 3: Bonos, patas y numeros
+## Phase 3: Bonds, Patas, and Numbers
 
-Entregables:
+Deliverables:
 
-- Tablas `bonds` y `bond_numbers`.
-- Calculo de numero asociado.
-- Formato visual por campana.
-- Validacion de duplicados.
-- Carga manual de bono simple.
-- Carga basica de pata.
+- Tables `bonds` and `bond_numbers`.
+- Associated number calculation.
+- Visual format per campaign.
+- Duplicate validation.
+- Manual simple bond entry.
+- Basic pata entry.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- No se pueden duplicar numeros participantes en una campana.
-- El sistema soporta configuracion futura de 5 cifras.
+- Participating numbers cannot be duplicated within a campaign.
+- The system supports future 5-digit configuration.
 
-## Fase 4: Carga por codigo de barras e importaciones
+## Phase 4: Barcode Entry and Imports
 
-Entregables:
+Deliverables:
 
-- Sesiones de importacion.
-- Carga por escaneo.
-- Configuracion `barcode_mode`.
-- Vista previa de errores.
-- Confirmacion de lote.
+- Import sessions.
+- Scan entry.
+- `barcode_mode` configuration.
+- Error preview.
+- Batch confirmation.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Se puede cargar un lote escaneado sin impactar datos hasta confirmar.
+- A scanned batch can be loaded without affecting data until confirmed.
 
-## Fase 5: Cobradores y compradores
+## Phase 5: Collectors and Buyers
 
-Entregables:
+Deliverables:
 
-- CRUD de cobradores.
-- CRUD de compradores.
-- Ficha de cobrador.
-- Ficha de comprador.
+- Collector CRUD.
+- Buyer CRUD.
+- Collector record.
+- Buyer record.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Se puede asociar comprador y cobrador a una venta.
+- A buyer and collector can be associated with a sale.
 
-## Fase 6: Entrega de bonos
+## Phase 6: Bond Delivery
 
-Entregables:
+Deliverables:
 
-- Asignar bonos a cobradores.
-- Registrar devoluciones.
-- Remito HTML imprimible.
-- Historial de asignaciones.
+- Assign bonds to collectors.
+- Record returns.
+- Printable HTML delivery note.
+- Assignment history.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Un bono entregado cambia de estado y queda en historial.
+- A delivered bond changes status and is recorded in history.
 
-## Fase 7: Ventas, planes y cuotas
+## Phase 7: Sales, Plans, and Installments
 
-Entregables:
+Deliverables:
 
-- Registrar venta.
-- Generar plan de pago.
-- Generar cuotas.
-- Registrar modalidad contado/cuotas.
+- Record sale.
+- Generate payment plan.
+- Generate installments.
+- Record cash/installment modality.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Un bono vendido queda asociado a comprador, cobrador y cuotas.
+- A sold bond is associated with buyer, collector, and installments.
 
-## Fase 8: Pagos y rendicion asistida
+## Phase 8: Payments and Assisted Settlement
 
-Entregables:
+Deliverables:
 
-- Crear rendicion.
-- Agregar pagos.
-- Seleccionar cuotas.
-- Diferenciar efectivo y transferencia.
-- Resumen en tiempo real.
-- Cierre de rendicion.
-- Remito HTML.
+- Create settlement.
+- Add payments.
+- Select installments.
+- Differentiate cash and transfer.
+- Real-time summary.
+- Settlement closing.
+- HTML delivery note.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Al cerrar rendicion se confirman pagos y se bloquea edicion directa.
+- When closing a settlement, payments are confirmed and direct editing is blocked.
 
-## Fase 9: Comisiones y ledger
+## Phase 9: Commissions and Ledger
 
-Entregables:
+Deliverables:
 
-- Reglas generales de comision.
-- Reglas especiales por cobrador.
-- Ajustes manuales auditados.
+- General commission rules.
+- Special per-collector rules.
+- Audited manual adjustments.
 - `collector_ledger_entries`.
-- Vista de cuenta corriente.
+- Current account view.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- El saldo del cobrador se reconstruye desde movimientos.
+- The collector balance is reconstructed from ledger entries.
 
-## Fase 10: Correcciones y anulaciones
+## Phase 10: Corrections and Voiding
 
-Entregables:
+Deliverables:
 
-- Anular pagos.
-- Corregir medio de pago.
-- Corregir ventas con auditoria.
-- Ajustar rendicion cerrada sin reabrir.
-- Auditar cambios.
+- Void payments.
+- Correct payment method.
+- Correct sales with audit.
+- Adjust closed settlement without reopening.
+- Audit changes.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Una rendicion cerrada no se modifica directamente.
+- A closed settlement cannot be modified directly.
 
-## Fase 11: Sorteos y padrones
+## Phase 11: Draws and Rosters
 
-Entregables:
+Deliverables:
 
-- Crear sorteos.
-- Configurar reglas.
-- Generar padron.
-- Congelar padron.
-- Numeros extra de extraordinario.
+- Create draws.
+- Configure rules.
+- Generate roster.
+- Freeze roster.
+- Extra numbers for extraordinary draws.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- El padron congelado no cambia aunque se carguen pagos posteriores.
+- The frozen roster does not change even if subsequent payments are entered.
 
-## Fase 12: Ganadores y premios
+## Phase 12: Winners and Prizes
 
-Entregables:
+Deliverables:
 
-- Cargar numero ganador.
-- Buscar en padron congelado.
-- Validar habilitacion.
-- Registrar premio adjudicado, entregado o no adjudicado.
+- Enter winning number.
+- Search in frozen roster.
+- Validate eligibility.
+- Record awarded, delivered, or unawarded prize.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- El sistema explica por que un ganador cobra o no cobra.
+- The system explains why a winner collects or does not collect.
 
-## Fase 13: Reportes
+## Phase 13: Reports
 
-Entregables:
+Deliverables:
 
-- Bonos por estado.
-- Pagos por fecha.
-- Rendiciones por cobrador.
-- Cuenta corriente.
-- Padrones.
-- Ganadores y premios.
+- Bonds by status.
+- Payments by date.
+- Settlements by collector.
+- Current account.
+- Rosters.
+- Winners and prizes.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Administracion puede operar sin Excel como fuente de verdad.
+- Administration can operate without Excel as the source of truth.
 
-## Fase 14: Migracion desde sistema viejo
+## Phase 14: Migration from Old System
 
-Entregables:
+Deliverables:
 
-- Staging de migracion.
-- Importar cobradores.
-- Importar compradores.
-- Importar numeros historicos.
-- Generar reservas/conflictos.
+- Migration staging.
+- Import collectors.
+- Import buyers.
+- Import historical numbers.
+- Generate reservations/conflicts.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- Los datos historicos se importan con vista previa y resolucion de conflictos.
+- Historical data is imported with preview and conflict resolution.
 
-## Fase 15: Hardening productivo
+## Phase 15: Production Hardening
 
-Entregables:
+Deliverables:
 
-- Backups verificados.
-- Exportaciones operativas.
-- Revision RLS.
-- Tests criticos.
-- Documentacion de operacion.
+- Verified backups.
+- Operational exports.
+- RLS review.
+- Critical tests.
+- Operations documentation.
 
-Criterio de aceptacion:
+Acceptance criteria:
 
-- El sistema puede usarse en produccion con procedimientos de recuperacion definidos.
+- The system can be used in production with defined recovery procedures.

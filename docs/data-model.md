@@ -1,26 +1,26 @@
-# Modelo de datos preliminar
+# Preliminary data model
 
-## Objetivo
+## Objective
 
-Definir el modelo relacional conceptual para el MVP. Los nombres son preliminares y deben convertirse luego en migraciones SQL versionadas.
+Define the conceptual relational model for the MVP. Names are preliminary and must later become versioned SQL migrations.
 
-## Principios
+## Principles
 
-- PostgreSQL sera la fuente de verdad.
-- Usar claves foraneas reales.
-- Usar constraints para invariantes criticas.
-- No borrar datos economicos historicos.
-- Modelar saldos como movimientos, no como campos editables.
-- Separar valor interno de formato visible en numeros de bonos.
-- Mantener reglas configurables por campana.
+- PostgreSQL will be the source of truth.
+- Use real foreign keys.
+- Use constraints for critical invariants.
+- Do not delete historical financial data.
+- Model balances as entries, not as editable fields.
+- Separate internal value from visible format in bond numbers.
+- Maintain configurable rules per campaign.
 
-## Entidades principales
+## Main entities
 
 ### campaigns
 
-Representa una campana anual.
+Represents an annual campaign.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `name`
@@ -38,18 +38,18 @@ Campos sugeridos:
 - `created_at`
 - `updated_at`
 
-Constraints sugeridas:
+Suggested constraints:
 
 - `number_digits > 0`
 - `max_number > 0`
 - `associated_number_offset >= 0`
-- `overflow_policy in ('reject')` inicialmente
+- `overflow_policy in ('reject')` initially
 
 ### profiles
 
-Representa usuarios de aplicacion vinculados a Supabase Auth.
+Represents application users linked to Supabase Auth.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `auth_user_id`
@@ -60,9 +60,9 @@ Campos sugeridos:
 
 ### roles
 
-Roles de aplicacion.
+Application roles.
 
-Valores iniciales:
+Initial values:
 
 - `admin`
 - `operador`
@@ -72,15 +72,15 @@ Valores iniciales:
 
 ### permissions
 
-Permisos granulares de aplicacion.
+Granular application permissions.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `code`
 - `description`
 
-Ejemplos:
+Examples:
 
 - `payment.annul`
 - `rendition.close`
@@ -89,27 +89,27 @@ Ejemplos:
 
 ### role_permissions
 
-Relacion entre roles y permisos.
+Relationship between roles and permissions.
 
-Campos sugeridos:
+Suggested fields:
 
 - `role_id`
 - `permission_id`
 
 ### user_roles
 
-Relacion entre usuarios y roles.
+Relationship between users and roles.
 
-Campos sugeridos:
+Suggested fields:
 
 - `user_id`
 - `role_id`
 
 ### collectors
 
-Cobradores o vendedores.
+Collectors or sellers.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `display_name`
@@ -122,9 +122,9 @@ Campos sugeridos:
 
 ### buyers
 
-Compradores.
+Buyers.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `type`
@@ -141,9 +141,9 @@ Campos sugeridos:
 
 ### bonds
 
-Unidad comercial vendible: bono simple o pata.
+Sellable commercial unit: simple bond or pata.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -159,26 +159,26 @@ Campos sugeridos:
 - `total_value`
 - `created_at`
 
-Valores de `kind`:
+`kind` values:
 
 - `simple`
 - `pata`
 
-Valores de `origin`:
+`origin` values:
 
 - `printed`
 - `manual_grouping`
 
-Regla:
+Rule:
 
-- Para bono simple, `commercial_unit_count = 1`.
-- Para pata, `commercial_unit_count = cantidad de numeros base`.
+- For simple bond, `commercial_unit_count = 1`.
+- For pata, `commercial_unit_count = number of base numbers`.
 
 ### bond_numbers
 
-Numeros participantes asociados a bonos.
+Participating numbers associated with bonds.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -188,28 +188,28 @@ Campos sugeridos:
 - `source_base_number_id`
 - `created_at`
 
-Valores de `number_kind`:
+`number_kind` values:
 
 - `base`
 - `associated`
 - `extraordinary`
 
-Constraints criticas:
+Critical constraints:
 
-- Unico `(campaign_id, number_value)` para evitar duplicados de numeros participantes.
+- Unique `(campaign_id, number_value)` to prevent duplicate participating numbers.
 - `number_value >= 0`.
-- `number_value <= campaign.max_number` debe validarse por servicio o trigger documentado, ya que cruza contra configuracion de campana.
+- `number_value <= campaign.max_number` must be validated by service or documented trigger, since it crosses campaign configuration.
 
-Notas:
+Notes:
 
-- El numero visible se deriva de `number_value` y `campaign.number_digits`.
-- No usar `char(4)` ni longitud fija.
+- The visible number is derived from `number_value` and `campaign.number_digits`.
+- Do not use `char(4)` or fixed length.
 
 ### bond_assignments
 
-Historial de entrega, devolucion y reasignacion de bonos.
+History of bond delivery, return, and reassignment.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -222,7 +222,7 @@ Campos sugeridos:
 - `created_by`
 - `notes`
 
-Tipos:
+Types:
 
 - `delivery`
 - `return`
@@ -231,9 +231,9 @@ Tipos:
 
 ### delivery_notes
 
-Remitos de entrega.
+Delivery notes.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -246,18 +246,18 @@ Campos sugeridos:
 
 ### delivery_note_items
 
-Items de remitos de entrega.
+Delivery note items.
 
-Campos sugeridos:
+Suggested fields:
 
 - `delivery_note_id`
 - `bond_id`
 
 ### sales
 
-Venta de un bono a un comprador.
+Sale of a bond to a buyer.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -272,9 +272,9 @@ Campos sugeridos:
 
 ### payment_plans
 
-Plan de pago generado para una venta.
+Payment plan generated for a sale.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `sale_id`
@@ -284,9 +284,9 @@ Campos sugeridos:
 
 ### installments
 
-Cuotas del plan de pago.
+Installments of the payment plan.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `payment_plan_id`
@@ -297,13 +297,13 @@ Campos sugeridos:
 
 Constraints:
 
-- Unico `(payment_plan_id, installment_number)`.
+- Unique `(payment_plan_id, installment_number)`.
 
 ### payments
 
-Pagos registrados.
+Recorded payments.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -321,12 +321,12 @@ Campos sugeridos:
 - `annulled_at`
 - `annulment_reason`
 
-Metodos:
+Methods:
 
 - `cash`
 - `transfer`
 
-Estados:
+States:
 
 - `draft`
 - `pending_in_rendition`
@@ -336,9 +336,9 @@ Estados:
 
 ### payment_installments
 
-Relacion entre pagos y cuotas cubiertas.
+Relationship between payments and covered installments.
 
-Campos sugeridos:
+Suggested fields:
 
 - `payment_id`
 - `installment_id`
@@ -346,9 +346,9 @@ Campos sugeridos:
 
 ### renditions
 
-Rendiciones de cobradores.
+Collector settlements.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -367,15 +367,15 @@ Campos sugeridos:
 - `net_to_firefighters`
 - `notes`
 
-Regla:
+Rule:
 
-- Totales pueden guardarse como snapshot al cierre, pero deben poder reconstruirse desde pagos y movimientos.
+- Totals can be saved as a snapshot at closing, but must be reconstructable from payments and entries.
 
 ### commission_rules
 
-Reglas de comision por campana.
+Commission rules per campaign.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -389,9 +389,9 @@ Campos sugeridos:
 
 ### commission_adjustments
 
-Ajustes manuales de comision.
+Manual commission adjustments.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -404,11 +404,11 @@ Campos sugeridos:
 - `created_by`
 - `created_at`
 
-Regla:
+Rule:
 
-- Todo ajuste debe generar movimiento de cuenta corriente y auditoria.
+- Every adjustment must generate a current account entry and audit.
 
-Tipos:
+Types:
 
 - `cash_full_payment`
 - `installment_first`
@@ -418,9 +418,9 @@ Tipos:
 
 ### collector_ledger_entries
 
-Ledger de cuenta corriente del cobrador.
+Collector current account ledger.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -435,20 +435,20 @@ Campos sugeridos:
 - `created_by`
 - `reason`
 
-Valores de `direction`:
+`direction` values:
 
 - `collector_credit`
 - `collector_debit`
 
-Regla:
+Rule:
 
-- El saldo del cobrador se calcula sumando movimientos no anulados.
+- Collector balance is calculated by summing non-annulled entries.
 
 ### draws
 
-Sorteos.
+Draws.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -460,7 +460,7 @@ Campos sugeridos:
 - `eligibility_rule`
 - `status`
 
-Tipos:
+Types:
 
 - `monthly`
 - `extraordinary_full_payment`
@@ -469,9 +469,9 @@ Tipos:
 
 ### draw_rosters
 
-Padrones de sorteo.
+Draw rosters.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `draw_id`
@@ -483,9 +483,9 @@ Campos sugeridos:
 
 ### draw_roster_entries
 
-Entradas congeladas de padron.
+Frozen roster entries.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `draw_roster_id`
@@ -497,15 +497,15 @@ Campos sugeridos:
 - `eligible`
 - `ineligibility_reason`
 
-Regla:
+Rule:
 
-- Guardar snapshots suficientes para justificar resultado historico aunque cambien datos actuales.
+- Save enough snapshots to justify historical results even if current data changes.
 
 ### prizes
 
-Premios de sorteos.
+Draw prizes.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `draw_id`
@@ -516,9 +516,9 @@ Campos sugeridos:
 
 ### winning_numbers
 
-Numeros ganadores cargados.
+Loaded winning numbers.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `draw_id`
@@ -530,7 +530,7 @@ Campos sugeridos:
 - `loaded_at`
 - `notes`
 
-Estados de resultado:
+Result states:
 
 - `pending_review`
 - `eligible_winner`
@@ -539,9 +539,9 @@ Estados de resultado:
 
 ### prize_awards
 
-Resultado administrativo de premios.
+Administrative prize results.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `prize_id`
@@ -557,9 +557,9 @@ Campos sugeridos:
 
 ### audit_log
 
-Auditoria general.
+General audit.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `actor_user_id`
@@ -574,9 +574,9 @@ Campos sugeridos:
 
 ### import_sessions
 
-Sesiones de carga por codigo de barras, archivo o sistema viejo.
+Loading sessions by barcode, file, or old system.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -589,9 +589,9 @@ Campos sugeridos:
 
 ### import_session_items
 
-Items de una sesion de importacion.
+Items of an import session.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `import_session_id`
@@ -604,9 +604,9 @@ Campos sugeridos:
 
 ### legacy_migration_staging
 
-Area de staging para datos exportados del sistema viejo.
+Staging area for data exported from the old system.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `source_file_id`
@@ -616,29 +616,29 @@ Campos sugeridos:
 - `status`
 - `error_message`
 
-## Indices sugeridos
+## Suggested indexes
 
-- `bond_numbers(campaign_id, number_value)` unico.
+- `bond_numbers(campaign_id, number_value)` unique.
 - `bonds(campaign_id, commercial_status)`.
 - `bonds(campaign_id, current_collector_id)`.
-- `buyers(document_number)` cuando exista.
-- `buyers(tax_id)` cuando exista.
+- `buyers(document_number)` when it exists.
+- `buyers(tax_id)` when it exists.
 - `payments(campaign_id, status)`.
 - `payments(rendition_id)`.
-- `installments(payment_plan_id, installment_number)` unico.
+- `installments(payment_plan_id, installment_number)` unique.
 - `collector_ledger_entries(collector_id, campaign_id, occurred_at)`.
 - `draw_roster_entries(draw_roster_id, number_value)`.
 - `import_sessions(campaign_id, status)`.
 - `import_session_items(import_session_id, status)`.
 
-## Reglas de integridad criticas
+## Critical integrity rules
 
-- No duplicar numeros participantes por campana.
-- No vender un bono anulado o extraviado.
-- No reasignar directamente un bono vendido.
-- No editar directamente rendiciones cerradas.
-- No editar directamente pagos confirmados.
-- No recalcular padrones congelados.
-- No calcular saldos desde campos manuales editables.
-- No confirmar importaciones con errores bloqueantes.
-- No aplicar ajustes de comision sin motivo y auditoria.
+- Do not duplicate participating numbers per campaign.
+- Do not sell an annulled or lost bond.
+- Do not directly reassign a sold bond.
+- Do not directly edit closed settlements.
+- Do not directly edit confirmed payments.
+- Do not recalculate frozen rosters.
+- Do not calculate balances from editable manual fields.
+- Do not confirm imports with blocking errors.
+- Do not apply commission adjustments without reason and audit.

@@ -1,183 +1,183 @@
-# Anulaciones y correcciones
+# Annulments and corrections
 
-## Objetivo
+## Objective
 
-Definir flujos seguros para corregir errores sin borrar historial.
+Define secure flows for correcting errors without deleting history.
 
-## Principio general
-
-```txt
-No borrar informacion historica sensible.
-Anular, ajustar o compensar con auditoria.
-```
-
-## Pago mal cargado
+## General principle
 
 ```txt
-Pago confirmado
-↓
-Usuario solicita anulacion
-↓
-Sistema exige motivo
-↓
-Sistema anula pago
-↓
-Sistema revierte estado de cuotas afectadas
-↓
-Sistema genera movimiento compensatorio de comision si corresponde
-↓
-Sistema registra auditoria
+Do not delete sensitive historical information.
+Annul, adjust, or compensate with audit.
 ```
 
-Reglas:
-
-- Si el pago estaba en una rendicion cerrada, no se modifica la rendicion original.
-- Se crea una correccion vinculada a la rendicion.
-
-## Medio de pago incorrecto
+## Incorrectly loaded payment
 
 ```txt
-Pago confirmado con medio incorrecto
+Confirmed payment
 ↓
-Usuario solicita correccion
+User requests annulment
 ↓
-Sistema exige motivo
+System requires reason
 ↓
-Sistema registra ajuste de medio de pago
+System annuls payment
 ↓
-Sistema recalcula impacto en efectivo, transferencia y cuenta corriente
+System reverts state of affected installments
 ↓
-Sistema genera movimientos compensatorios
+System generates compensatory commission movement if applicable
+↓
+System records audit
 ```
 
-Ejemplo:
+Rules:
 
-- Si era efectivo y debia ser transferencia, cambia el impacto de caja y puede cambiar saldo a favor del cobrador.
+- If the payment was in a closed settlement, the original settlement is not modified.
+- A correction linked to the settlement is created.
 
-## Venta con comprador equivocado
+## Incorrect payment method
 
 ```txt
-Venta registrada
+Payment confirmed with incorrect method
 ↓
-Sistema verifica si tiene pagos confirmados
+User requests correction
 ↓
-Si no tiene pagos confirmados, permite correccion autorizada
+System requires reason
 ↓
-Si tiene pagos confirmados, exige correccion auditada con motivo
+System records payment method adjustment
 ↓
-Sistema conserva snapshot historico
+System recalculates impact on cash, transfer, and current account
+↓
+System generates compensatory movements
 ```
 
-Reglas:
+Example:
 
-- Si ya hubo rendiciones o premios, la correccion debe requerir rol autorizado.
-- No debe perderse el comprador originalmente registrado.
+- If it was cash and should have been a transfer, it changes the cash impact and may change the collector's balance.
 
-## Bono vendido por cobrador equivocado
+## Sale with wrong buyer
 
 ```txt
-Detectar cobrador incorrecto
+Registered sale
 ↓
-Sistema verifica rendiciones asociadas
+System checks if it has confirmed payments
 ↓
-Si no hay rendiciones cerradas, permite correccion autorizada
+If no confirmed payments, allows authorized correction
 ↓
-Si hay rendiciones cerradas, genera ajuste entre cobradores
+If it has confirmed payments, requires audited correction with reason
 ↓
-Sistema registra auditoria
+System preserves historical snapshot
 ```
 
-Reglas:
+Rules:
 
-- No mover comisiones historicas sin movimiento compensatorio.
-- Si el error afecta cuenta corriente, crear movimientos en ambos cobradores.
+- If there have already been settlements or prizes, the correction must require an authorized role.
+- The originally registered buyer must not be lost.
 
-## Rendicion cerrada con diferencia
+## Bond sold by wrong collector
 
 ```txt
-Rendicion cerrada
+Detect incorrect collector
 ↓
-Usuario registra correccion con motivo
+System checks associated settlements
 ↓
-Sistema crea ajuste vinculado a la rendicion original
+If no closed settlements, allows authorized correction
 ↓
-Sistema genera movimientos compensatorios
+If there are closed settlements, generates adjustment between collectors
 ↓
-Sistema actualiza saldos calculados
+System records audit
 ```
 
-Reglas:
+Rules:
 
-- No reabrir rendicion.
-- No editar totales originales.
-- El ajuste debe aparecer en la cuenta corriente y reportes.
+- Do not move historical commissions without a compensatory movement.
+- If the error affects the current account, create movements for both collectors.
 
-## Comision calculada incorrectamente
+## Closed settlement with difference
 
 ```txt
-Detectar diferencia
+Closed settlement
 ↓
-Usuario con permiso registra ajuste de comision
+User records correction with reason
 ↓
-Sistema exige motivo
+System creates adjustment linked to the original settlement
 ↓
-Sistema crea movimiento de cuenta corriente
+System generates compensatory movements
 ↓
-Sistema audita accion
+System updates calculated balances
 ```
 
-## Premio cargado mal
+Rules:
+
+- Do not reopen the settlement.
+- Do not edit original totals.
+- The adjustment must appear in the current account and reports.
+
+## Incorrectly calculated commission
 
 ```txt
-Premio registrado
+Detect difference
 ↓
-Usuario autorizado solicita anulacion
+User with permission records commission adjustment
 ↓
-Sistema exige motivo
+System requires reason
 ↓
-Sistema marca resultado anterior como anulado
+System creates current account movement
 ↓
-Usuario carga resultado correcto si corresponde
-↓
-Sistema conserva ambos eventos en auditoria
+System audits action
 ```
 
-## Bono asignado al cobrador equivocado
+## Incorrectly loaded prize
 
 ```txt
-Asignacion registrada
+Registered prize
 ↓
-Si bono no fue vendido, permitir reasignacion auditada
+Authorized user requests annulment
 ↓
-Si bono fue vendido, corregir venta y asignacion con rol autorizado
+System requires reason
 ↓
-Si hubo pagos/rendiciones, generar ajustes necesarios
+System marks previous result as voided
+↓
+User loads correct result if applicable
+↓
+System preserves both events in audit
 ```
 
-## Transferencia mal asociada
+## Bond assigned to wrong collector
 
 ```txt
-Transferencia asociada a pago incorrecto
+Assignment registered
 ↓
-Usuario solicita correccion
+If bond was not sold, allow audited reassignment
 ↓
-Sistema anula asociacion anterior
+If bond was sold, correct sale and assignment with authorized role
 ↓
-Sistema asocia transferencia al pago correcto
-↓
-Sistema ajusta cuotas, comisiones y cuenta corriente
-↓
-Auditoria
+If there were payments/settlements, generate necessary adjustments
 ```
 
-## Campos minimos de una correccion
+## Incorrectly associated transfer
 
-- Tipo de correccion.
-- Entidad afectada.
-- Entidad relacionada.
-- Motivo.
-- Usuario.
-- Fecha.
-- Valor anterior.
-- Valor nuevo.
-- Movimientos compensatorios generados.
+```txt
+Transfer associated with incorrect payment
+↓
+User requests correction
+↓
+System annuls previous association
+↓
+System associates transfer with correct payment
+↓
+System adjusts installments, commissions, and current account
+↓
+Audit
+```
+
+## Minimum correction fields
+
+- Correction type.
+- Affected entity.
+- Related entity.
+- Reason.
+- User.
+- Date.
+- Previous value.
+- New value.
+- Generated compensatory movements.

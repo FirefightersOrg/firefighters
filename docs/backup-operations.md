@@ -1,112 +1,112 @@
-# Backups y operacion productiva
+# Backups and production operations
 
-## Objetivo
+## Objective
 
-Definir una politica inicial adecuada para operar el MVP con datos economicos y administrativos sensibles.
+Define an adequate initial policy for operating the MVP with sensitive economic and administrative data.
 
-## Principios
+## Principles
 
-- La base de datos es la fuente de verdad.
-- Toda operacion economica debe ser reconstruible desde movimientos.
-- Los backups deben probarse, no solo configurarse.
-- Antes de cargas masivas o migraciones debe existir exportacion previa.
+- The database is the source of truth.
+- Every economic operation must be reconstructable from movements.
+- Backups must be tested, not just configured.
+- Before bulk loads or migrations, a prior export must exist.
 
-## Objetivos iniciales
+## Initial objectives
 
 ```txt
-RPO: maximo 24 horas de perdida aceptable
-RTO: restauracion operativa durante el mismo dia
+RPO: maximum 24 hours of acceptable data loss
+RTO: operational restoration within the same day
 ```
 
-Estos objetivos pueden endurecerse cuando el sistema entre en uso intensivo.
+These objectives can be tightened when the system enters intensive use.
 
 ## Supabase MVP
 
-Politica recomendada:
+Recommended policy:
 
-- Usar plan con backups automaticos de base de datos.
-- Confirmar retencion disponible del plan contratado.
-- Exportar manualmente antes de importaciones masivas.
-- Exportar manualmente antes de cambios grandes de reglas o migraciones.
-- Mantener copias periodicas de reportes criticos.
+- Use a plan with automatic database backups.
+- Confirm available retention of the contracted plan.
+- Manually export before bulk imports.
+- Manually export before major rule changes or migrations.
+- Maintain periodic copies of critical reports.
 
-## Retencion recomendada
+## Recommended retention
 
-- Backups automaticos: segun plan Supabase, ideal minimo 7 dias.
-- Exportacion semanal de datos criticos: 30 dias.
-- Exportacion mensual: 6 a 12 meses.
-- Reporte final de campana: conservacion indefinida.
+- Automatic backups: per Supabase plan, ideally a minimum of 7 days.
+- Weekly export of critical data: 30 days.
+- Monthly export: 6 to 12 months.
+- Final campaign report: indefinite retention.
 
-## Datos criticos a respaldar
+## Critical data to back up
 
-- Campanas.
-- Bonos y numeros.
-- Compradores.
-- Cobradores.
-- Ventas.
-- Pagos.
-- Rendiciones.
-- Cuenta corriente.
-- Sorteos y padrones.
-- Ganadores y premios.
-- Auditoria.
+- Campaigns.
+- Bonds and numbers.
+- Buyers.
+- Collectors.
+- Sales.
+- Payments.
+- Settlements.
+- Current account.
+- Draws and rosters.
+- Winners and prizes.
+- Audit.
 
 ## Storage
 
-Si se guardan comprobantes o documentos:
+If receipts or documents are stored:
 
-- Usar buckets privados.
-- Definir politicas de acceso.
-- Respaldar o exportar archivos importantes.
-- No depender solo de enlaces temporales.
+- Use private buckets.
+- Define access policies.
+- Back up or export important files.
+- Do not rely solely on temporary links.
 
-## Procedimiento antes de operacion riesgosa
+## Procedure before risky operations
 
-Operaciones riesgosas:
+Risky operations:
 
-- Importacion masiva.
-- Migracion desde sistema viejo.
-- Cambio de reglas de campana.
-- Correccion masiva.
-- Cierre de campana.
+- Bulk import.
+- Migration from legacy system.
+- Campaign rule changes.
+- Bulk correction.
+- Campaign closure.
 
-Procedimiento:
+Procedure:
 
 ```txt
-1. Exportar datos criticos.
-2. Registrar motivo de la operacion.
-3. Ejecutar en entorno de prueba si es posible.
-4. Ejecutar en produccion.
-5. Validar reportes principales.
-6. Registrar resultado.
+1. Export critical data.
+2. Record the reason for the operation.
+3. Execute in a test environment if possible.
+4. Execute in production.
+5. Validate main reports.
+6. Record the result.
 ```
 
-## Restauracion
+## Restoration
 
-Debe existir un procedimiento documentado para:
+A documented procedure must exist for:
 
-- Identificar backup valido.
-- Restaurar en entorno separado.
-- Validar integridad.
-- Decidir si reemplaza produccion.
-- Comunicar interrupcion si aplica.
+- Identifying a valid backup.
+- Restoring in a separate environment.
+- Validating integrity.
+- Deciding whether to replace production.
+- Communicating interruption if applicable.
 
-## Monitoreo minimo
+## Minimum monitoring
 
-- Errores de aplicacion.
-- Fallos de login.
-- Fallos de cierre de rendicion.
-- Fallos de generacion de padron.
-- Fallos de importacion.
-- Uso de permisos criticos.
+- Application errors.
+- Login failures.
+- Settlement closure failures.
+- Roster generation failures.
+- Import failures.
+- Use of critical permissions.
 
-## Exportaciones operativas
+## Operational exports
 
-Aunque existan backups, el sistema debe permitir exportar reportes administrativos:
+Even if backups exist, the system must allow exporting administrative reports:
 
-- Bonos por campana.
-- Pagos por periodo.
-- Rendiciones.
-- Cuenta corriente de cobradores.
-- Padrones congelados.
-- Ganadores y premios.
+- Bonds per campaign.
+- Payments by period.
+- Settlements.
+- Collector current accounts.
+- Frozen rosters.
+- Winners and prizes.

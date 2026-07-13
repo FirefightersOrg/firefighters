@@ -1,32 +1,32 @@
-# Decisiones y preguntas abiertas
+# Decisions and open questions
 
-## Objetivo
+## Objective
 
-Este documento separa las decisiones ya tomadas de las dudas que siguen abiertas. Sirve como registro de criterios para no bloquear el diseno funcional y tecnico del sistema.
+This document separates decisions already made from questions that remain open. It serves as a criteria record to avoid blocking the functional and technical design of the system.
 
-## Decisiones cerradas
+## Closed decisions
 
-### Plataforma del MVP
+### MVP platform
 
-El MVP sera una webapp instalable tipo PWA.
+The MVP will be an installable PWA webapp.
 
-Stack definido:
+Defined stack:
 
 ```txt
 SvelteKit + TypeScript + Supabase + PWA
 ```
 
-Quedan fuera del MVP:
+Out of MVP scope:
 
 - Tauri.
 - Rust.
-- Backend propio complejo desde el dia 1.
+- Complex custom backend from day 1.
 
-### Numeracion por campana
+### Numbering per campaign
 
-La cantidad de cifras no sera una regla global del sistema. Sera configuracion de cada campana.
+The number of digits will not be a global system rule. It will be configuration per campaign.
 
-Configuracion inicial para el MVP:
+Initial configuration for the MVP:
 
 ```txt
 number_digits = 4
@@ -35,7 +35,7 @@ associated_number_offset = 4871
 overflow_policy = reject
 ```
 
-Ejemplo de campana futura con 5 cifras:
+Example of a future campaign with 5 digits:
 
 ```txt
 number_digits = 5
@@ -44,159 +44,159 @@ associated_number_offset = 4871
 overflow_policy = reject
 ```
 
-Regla:
+Rule:
 
 ```txt
-numero_asociado = numero_base + associated_number_offset
+associated_number = base_number + associated_number_offset
 ```
 
-Para el MVP, si `numero_asociado > max_number`, la carga se bloquea.
+For the MVP, if `associated_number > max_number`, loading is blocked.
 
-### Ceros a la izquierda
+### Leading zeros
 
-Los ceros a la izquierda deben conservarse visualmente.
+Leading zeros must be preserved visually.
 
-El sistema debe diferenciar:
+The system must differentiate:
 
 ```txt
-valor interno: 68
-valor visible: 0068
-cantidad de cifras de campana: 4
+internal value: 68
+visible value: 0068
+campaign digit count: 4
 ```
 
-No se debe hardcodear `padStart(4)`. El formateo debe usar la configuracion de la campana.
+`padStart(4)` must not be hardcoded. Formatting must use the campaign configuration.
 
-### Unicidad de numeros participantes
+### Uniqueness of participating numbers
 
-Dentro de una misma campana, un numero participante no puede apuntar a mas de un bono.
+Within the same campaign, a participating number cannot point to more than one bond.
 
-Numero participante incluye:
+Participating number includes:
 
-- Numero base.
-- Numero asociado.
-- Numeros base incluidos en patas.
-- Numeros asociados de patas.
-- Numeros extraordinarios si se implementan como numeros persistidos.
+- Base number.
+- Associated number.
+- Base numbers included in patas.
+- Associated numbers of patas.
+- Extraordinary numbers if implemented as persisted numbers.
 
-Regla por defecto: bloquear duplicados.
+Default rule: block duplicates.
 
-### Valor de patas
+### Pata value
 
-Regla provisional:
+Provisional rule:
 
 ```txt
-valor_pata = valor_bono_simple * cantidad_numeros_base
+pata_value = simple_bond_value * base_number_count
 ```
 
-Esta regla debe quedar configurable por campana para permitir ajuste administrativo futuro.
+This rule must be configurable per campaign to allow future administrative adjustment.
 
-### Comisiones
+### Commissions
 
-La comision no se consolida al cargar un pago aislado. Se calcula de forma preliminar mientras la rendicion esta abierta y se confirma al cerrar la rendicion.
+Commission is not consolidated when recording an isolated payment. It is calculated on a preliminary basis while the settlement is open and confirmed when closing the settlement.
 
-Al cerrar una rendicion, el sistema genera movimientos definitivos en la cuenta corriente del cobrador.
+When closing a settlement, the system generates definitive entries in the collector's current account.
 
-### Rendiciones cerradas
+### Closed settlements
 
-Una rendicion cerrada no se reabre ni se edita directamente.
+A closed settlement is not reopened or edited directly.
 
-Todo error posterior se corrige mediante anulacion o ajuste auditado.
+Any subsequent error is corrected through annulment or audited adjustment.
 
-### Sorteos en MVP
+### Draws in MVP
 
-El MVP debe incluir sorteos, con alcance controlado:
+The MVP must include draws, with controlled scope:
 
-- Sorteos mensuales.
-- Sorteo extraordinario por pago total.
-- Sorteo final.
-- Sorteos consuelo.
-- Padron congelado.
-- Carga de numeros ganadores.
-- Validacion de ganador habilitado o no habilitado.
-- Registro de premios adjudicados, pendientes o no adjudicados.
+- Monthly draws.
+- Extraordinary draw for full payment.
+- Final draw.
+- Consolation draws.
+- Frozen roster.
+- Loading of winning numbers.
+- Validation of eligible or ineligible winner.
+- Recording of awarded, pending, or unawarded prizes.
 
-Reglas confirmadas:
+Confirmed rules:
 
-- Sorteo final: para ganar debe estar pago completo.
-- Sorteos consuelo: participan solo bonos no ganadores y que esten al dia.
-- Sorteo extraordinario: agrega N numeros extra segun cantidad de numeros base del bono.
+- Final draw: must be fully paid to win.
+- Consolation draws: only non-winning bonds that are up to date participate.
+- Extraordinary draw: adds N extra numbers based on the count of base numbers of the bond.
 
-### Permisos adaptables
+### Adaptable permissions
 
-El sistema usara roles como agrupadores de permisos granulares. No se debe hardcodear comportamiento solo por nombre de rol.
+The system will use roles as groupers of granular permissions. Behavior must not be hardcoded solely by role name.
 
-Documento de referencia: `docs/permissions.md`.
+Reference document: `docs/permissions.md`.
 
-### Pantallas adaptables
+### Adaptable screens
 
-Las pantallas se disenan por flujo operativo y las acciones visibles dependen de permisos. Esto permite agregar roles o cambiar permisos sin rehacer pantallas completas.
+Screens are designed by operational flow and visible actions depend on permissions. This allows adding roles or changing permissions without rebuilding entire screens.
 
-Documento de referencia: `docs/screens.md`.
+Reference document: `docs/screens.md`.
 
-### Carga por codigo de barras
+### Barcode loading
 
-Cada bono fisico contiene codigo de barras. El MVP debe contemplar carga y busqueda por escaneo.
+Each physical bond contains a barcode. The MVP must support loading and searching by scanning.
 
-Como no esta confirmado que representa el codigo viejo, la interpretacion debe ser configurable por campana mediante `barcode_mode`.
+Since it is not confirmed what the old code represents, the interpretation must be configurable per campaign via `barcode_mode`.
 
-Documento de referencia: `docs/imports.md`.
+Reference document: `docs/imports.md`.
 
-### Documentos imprimibles
+### Printable documents
 
-El MVP usara HTML imprimible para remitos y constancias. PDF persistente queda como mejora futura.
+The MVP will use printable HTML for delivery notes and certificates. Persistent PDF is left as a future improvement.
 
-Documento de referencia: `docs/documents.md`.
+Reference document: `docs/documents.md`.
 
-### Comisiones especiales y ajustes
+### Special commissions and adjustments
 
-El sistema debe contemplar reglas especiales por cobrador y ajustes manuales de comision autorizados por administracion.
+The system must support special rules per collector and manual commission adjustments authorized by administration.
 
-Todo ajuste debe exigir motivo y auditoria.
+Every adjustment must require a reason and audit.
 
-Documento de referencia: `docs/commissions.md`.
+Reference document: `docs/commissions.md`.
 
-### Migracion desde sistema viejo
+### Migration from old system
 
-Se contempla que el sistema antiguo pueda exportar cobradores, compradores y numeros historicos de la campana anterior.
+It is considered that the old system may export collectors, buyers, and historical numbers from the previous campaign.
 
-La migracion debe pasar por staging, validacion y confirmacion antes de impactar datos definitivos.
+Migration must go through staging, validation, and confirmation before impacting definitive data.
 
-Documento de referencia: `docs/migration.md`.
+Reference document: `docs/migration.md`.
 
-### Backups y operacion
+### Backups and operations
 
-El MVP debe operar con backups automaticos, exportaciones previas a operaciones riesgosas y procedimiento de restauracion.
+The MVP must operate with automatic backups, exports before risky operations, and a restoration procedure.
 
-Objetivos iniciales:
+Initial objectives:
 
 ```txt
-RPO: maximo 24 horas
-RTO: restauracion durante el mismo dia
+RPO: maximum 24 hours
+RTO: restoration within the same day
 ```
 
-Documento de referencia: `docs/backup-operations.md`.
+Reference document: `docs/backup-operations.md`.
 
-## Preguntas abiertas
+## Open questions
 
-### Valor definitivo de patas
+### Definitive pata value
 
-Pendiente confirmar si la pata siempre vale `valor_bono_simple * cantidad_numeros_base` o si existen excepciones comerciales.
+Pending confirmation of whether a pata always equals `simple_bond_value * base_number_count` or if there are commercial exceptions.
 
-Decision temporal: implementar regla configurable con valor por defecto proporcional.
+Temporary decision: implement a configurable rule with proportional default value.
 
-### Comisiones especiales
+### Special commissions
 
-Pendiente confirmar porcentajes exactos:
+Pending confirmation of exact percentages:
 
-- Pago contado.
-- Primera cuota.
-- Cuotas intermedias.
-- Ultima cuota.
+- Cash payment.
+- First installment.
+- Middle installments.
+- Last installment.
 
-Decision temporal: modelar reglas configurables por campana, tipo de cuota/pago y cobrador.
+Temporary decision: model configurable rules per campaign, installment/payment type, and collector.
 
-### Acceso de cobradores
+### Collector access
 
-Pendiente confirmar si los cobradores tendran usuario propio en el MVP.
+Pending confirmation of whether collectors will have their own user accounts in the MVP.
 
-Decision temporal: operar desde administracion, pero modelar rol `cobrador` para no bloquear acceso futuro.
+Temporary decision: operate from administration, but model a `cobrador` role to avoid blocking future access.

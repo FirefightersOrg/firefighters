@@ -1,35 +1,35 @@
-# Importaciones y carga por codigo de barras
+# Imports and Barcode Entry
 
-## Objetivo
+## Objective
 
-Definir como ingresar datos de bonos, compradores, cobradores e historicos sin depender de carga manual uno por uno.
+Define how to enter bond, buyer, collector, and historical data without relying on manual one-by-one entry.
 
-## Carga de bonos por codigo de barras
+## Bond Entry by Barcode
 
-Cada bono fisico contiene un codigo de barras. El sistema debe poder usarlo para acelerar la carga y busqueda.
+Each physical bond contains a barcode. The system must be able to use it to speed up entry and search.
 
-## Problema a resolver
+## Problem to Solve
 
-Todavia no esta confirmado que dato representa el codigo de barras del sistema viejo.
+It is not yet confirmed what data the barcode from the old system represents.
 
-Posibilidades:
+Possibilities:
 
-- Numero base visible.
-- Identificador interno del bono.
-- Codigo heredado externo.
-- Otro valor no documentado.
+- Visible base number.
+- Internal bond identifier.
+- External legacy code.
+- Other undocumented value.
 
-## Configuracion por campana
+## Configuration per Campaign
 
-La campana debe definir como interpretar codigos.
+The campaign must define how to interpret codes.
 
-Campo sugerido:
+Suggested field:
 
 ```txt
 barcode_mode
 ```
 
-Valores:
+Values:
 
 ```txt
 base_number
@@ -38,53 +38,53 @@ external_legacy_code
 manual_mapping
 ```
 
-## Flujo de carga por escaneo
+## Scan Entry Flow
 
 ```txt
-Crear sesion de carga
+Create entry session
 ↓
-Seleccionar campana
+Select campaign
 ↓
-Seleccionar tipo de carga: bono simple o pata
+Select entry type: simple bond or pata
 ↓
-Escanear codigo de barras
+Scan barcode
 ↓
-Sistema interpreta el valor segun barcode_mode
+System interprets value per barcode_mode
 ↓
-Sistema calcula numero asociado si corresponde
+System calculates associated number if applicable
 ↓
-Sistema valida rango y duplicados
+System validates range and duplicates
 ↓
-Sistema agrega item a vista previa
+System adds item to preview
 ↓
-Usuario confirma lote
+User confirms batch
 ↓
-Sistema crea bonos y numeros participantes
+System creates bonds and participating numbers
 ```
 
-## Carga de patas por escaneo
+## Pata Entry by Scan
 
-Para patas, el sistema debe permitir agrupar varios escaneos en una misma unidad comercial.
+For patas, the system must allow grouping multiple scans into a single commercial unit.
 
 ```txt
-Crear pata
+Create pata
 ↓
-Escanear N numeros base
+Scan N base numbers
 ↓
-Sistema calcula N asociados
+System calculates N associated numbers
 ↓
-Sistema valida N unidades comerciales
+System validates N commercial units
 ↓
-Sistema calcula valor de pata
+System calculates pata value
 ↓
-Confirmar pata
+Confirm pata
 ```
 
-## Sesiones de importacion
+## Import Sessions
 
-Toda carga masiva debe tener una sesion.
+Every bulk load must have a session.
 
-Campos sugeridos:
+Suggested fields:
 
 - `id`
 - `campaign_id`
@@ -95,14 +95,14 @@ Campos sugeridos:
 - `confirmed_at`
 - `notes`
 
-Tipos de origen:
+Source types:
 
 - `barcode_scan`
 - `csv_file`
 - `excel_file`
 - `legacy_system_export`
 
-Estados:
+Statuses:
 
 - `draft`
 - `validated`
@@ -110,22 +110,22 @@ Estados:
 - `cancelled`
 - `failed`
 
-## Validaciones
+## Validations
 
-Antes de confirmar una carga, el sistema debe validar:
+Before confirming a load, the system must validate:
 
-- Formato del numero.
-- Rango segun campana.
-- Numero asociado dentro del maximo.
-- Numero participante duplicado.
-- Codigo de barras duplicado.
-- Pata incompleta.
-- Bono ya existente.
-- Conflicto con reserva historica si aplica.
+- Number format.
+- Range per campaign.
+- Associated number within maximum.
+- Duplicate participating number.
+- Duplicate barcode.
+- Incomplete pata.
+- Already existing bond.
+- Conflict with historical reservation if applicable.
 
-## Importacion desde archivo
+## File Import
 
-Formato CSV inicial sugerido para bonos:
+Initial suggested CSV format for bonds:
 
 ```csv
 tipo_bono,grupo_pata,numero_base,barcode
@@ -135,39 +135,39 @@ pata,PATA1200,1200,PATA1200-1200
 pata,PATA1200,1315,PATA1200-1315
 ```
 
-Formato CSV inicial sugerido para historicos:
+Initial suggested CSV format for historical data:
 
 ```csv
 collector_name,buyer_name,buyer_phone,number_value,campaign_name
 Juan Perez,Diego Fernandez,1122334455,0068,2024-2025
 ```
 
-## Vista previa
+## Preview
 
-Antes de confirmar, mostrar:
+Before confirming, show:
 
-- Total de bonos simples.
-- Total de patas.
-- Total de numeros base.
-- Total de numeros participantes.
-- Errores bloqueantes.
-- Advertencias.
-- Duplicados.
+- Total simple bonds.
+- Total patas.
+- Total base numbers.
+- Total participating numbers.
+- Blocking errors.
+- Warnings.
+- Duplicates.
 
-## Confirmacion
+## Confirmation
 
-La importacion confirmada debe crear datos definitivos en una transaccion cuando sea posible.
+Confirmed import must create definitive data in a transaction when possible.
 
-Si falla parcialmente, debe quedar registro del error y no dejar datos inconsistentes.
+If it partially fails, the error must be recorded and no inconsistent data should remain.
 
-## Rollback funcional
+## Functional Rollback
 
-Si una importacion fue confirmada por error, no se debe borrar silenciosamente.
+If an import was confirmed by mistake, it must not be silently deleted.
 
-Regla:
+Rule:
 
 ```txt
-Anular importacion mediante proceso auditado.
+Void import through audited process.
 ```
 
-La anulacion debe marcar como anulados los bonos creados si no tienen ventas, pagos o rendiciones. Si ya tienen operaciones, requiere correccion administrativa especifica.
+Voiding must mark created bonds as voided if they have no sales, payments, or settlements. If they already have operations, it requires specific administrative correction.
