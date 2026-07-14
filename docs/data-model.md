@@ -65,10 +65,10 @@ Application roles.
 Initial values:
 
 - `admin`
-- `operador`
-- `tesorero`
-- `cobrador`
-- `consulta`
+- `operator`
+- `treasurer`
+- `collector`
+- `read-only`
 
 ### permissions
 
@@ -83,7 +83,7 @@ Suggested fields:
 Examples:
 
 - `payment.annul`
-- `rendition.close`
+- `settlement.close`
 - `commission.adjust`
 - `draw.freeze_roster`
 
@@ -205,6 +205,28 @@ Notes:
 - The visible number is derived from `number_value` and `campaign.number_digits`.
 - Do not use `char(4)` or fixed length.
 
+### bond_groups
+
+Tracks the composition of manually assembled patas and their grouping/ungrouping history.
+
+Suggested fields:
+
+- `id`
+- `pata_bond_id`
+- `member_bond_id`
+- `grouped_at`
+- `grouped_by`
+- `ungrouped_at`
+- `ungrouped_by`
+- `reason`
+
+Rules:
+
+- Only applies to patas with `origin = manual_grouping`.
+- Printed patas do not use this table (their composition is intrinsic).
+- A member bond can only belong to one active pata at a time (where `ungrouped_at IS NULL`).
+- Ungrouping does not delete the row; it sets `ungrouped_at` and `ungrouped_by` for audit.
+
 ### bond_assignments
 
 History of bond delivery, return, and reassignment.
@@ -310,7 +332,7 @@ Suggested fields:
 - `sale_id`
 - `collector_id`
 - `buyer_id`
-- `rendition_id`
+- `settlement_id`
 - `amount`
 - `payment_method`
 - `payment_date`
@@ -329,7 +351,7 @@ Methods:
 States:
 
 - `draft`
-- `pending_in_rendition`
+- `pending_in_settlement`
 - `confirmed`
 - `annulled`
 - `adjusted`
@@ -344,7 +366,7 @@ Suggested fields:
 - `installment_id`
 - `amount_applied`
 
-### renditions
+### settlements
 
 Collector settlements.
 
@@ -352,7 +374,7 @@ Suggested fields:
 
 - `id`
 - `campaign_id`
-- `rendition_number`
+- `settlement_number`
 - `collector_id`
 - `status`
 - `opened_at`
@@ -396,7 +418,7 @@ Suggested fields:
 - `id`
 - `campaign_id`
 - `collector_id`
-- `rendition_id`
+- `settlement_id`
 - `payment_id`
 - `amount`
 - `direction`
@@ -425,7 +447,7 @@ Suggested fields:
 - `id`
 - `campaign_id`
 - `collector_id`
-- `rendition_id`
+- `settlement_id`
 - `payment_id`
 - `entry_type`
 - `direction`
@@ -624,12 +646,15 @@ Suggested fields:
 - `buyers(document_number)` when it exists.
 - `buyers(tax_id)` when it exists.
 - `payments(campaign_id, status)`.
-- `payments(rendition_id)`.
+- `payments(settlement_id)`.
 - `installments(payment_plan_id, installment_number)` unique.
 - `collector_ledger_entries(collector_id, campaign_id, occurred_at)`.
 - `draw_roster_entries(draw_roster_id, number_value)`.
 - `import_sessions(campaign_id, status)`.
 - `import_session_items(import_session_id, status)`.
+- `bond_groups(pata_bond_id)`.
+- `bond_groups(member_bond_id)`.
+- `bond_groups(member_bond_id)` where `ungrouped_at IS NULL` (active memberships only).
 
 ## Critical integrity rules
 

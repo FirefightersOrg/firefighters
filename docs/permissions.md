@@ -18,10 +18,10 @@ This allows changing permissions of a role without rewriting business logic, scr
 | Role | Purpose |
 |---|---|
 | `admin` | Full configuration, users, rules, and critical corrections. |
-| `operador` | Daily operations for bonds, buyers, sales, payments, and open settlements. |
-| `tesorero` | Settlements, commissions, current account, cash register, and financial reports. |
-| `cobrador` | Future limited access to own portfolio. |
-| `consulta` | Read-only within defined scope. |
+| `operator` | Daily operations for bonds, buyers, sales, payments, and open settlements. |
+| `treasurer` | Settlements, commissions, current account, cash register, and financial reports. |
+| `collector` | Future limited access to own portfolio. |
+| `read-only` | Read-only within defined scope. |
 
 ## Granular permissions
 
@@ -67,10 +67,10 @@ This allows changing permissions of a role without rewriting business logic, scr
 | `sale.correct` | Correct sales with audit. |
 | `payment.create` | Register payments. |
 | `payment.annul` | Annul confirmed payments. |
-| `rendition.create` | Create settlements. |
-| `rendition.update_open` | Edit open settlements. |
-| `rendition.close` | Close settlements. |
-| `rendition.correct` | Correct closed settlements through adjustments. |
+| `settlement.create` | Create settlements. |
+| `settlement.update_open` | Edit open settlements. |
+| `settlement.close` | Close settlements. |
+| `settlement.correct` | Correct closed settlements through adjustments. |
 
 ### Commissions
 
@@ -106,7 +106,7 @@ This allows changing permissions of a role without rewriting business logic, scr
 
 ## Initial suggested matrix
 
-| Permission | admin | operador | tesorero | cobrador | consulta |
+| Permission | admin | operator | treasurer | collector | read-only |
 |---|---:|---:|---:|---:|---:|
 | `campaign.view` | yes | yes | yes | no | yes |
 | `campaign.create` | yes | no | no | no | no |
@@ -120,9 +120,9 @@ This allows changing permissions of a role without rewriting business logic, scr
 | `sale.create` | yes | yes | no | no | no |
 | `payment.create` | yes | yes | yes | future | no |
 | `payment.annul` | yes | no | yes | no | no |
-| `rendition.create` | yes | yes | yes | no | no |
-| `rendition.close` | yes | no | yes | no | no |
-| `rendition.correct` | yes | no | yes | no | no |
+| `settlement.create` | yes | yes | yes | no | no |
+| `settlement.close` | yes | no | yes | no | no |
+| `settlement.correct` | yes | no | yes | no | no |
 | `commission.rule_manage` | yes | no | no | no | no |
 | `commission.adjust` | yes | no | yes | no | no |
 | `draw.freeze_roster` | yes | no | yes | no | no |

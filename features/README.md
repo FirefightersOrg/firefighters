@@ -1551,13 +1551,15 @@ Based on the improvements above, the functional modules could be:
 
 ---
 
-# 42. MVP Prioritization
+# 42. Implementation Phases
 
-It is not advisable to implement everything from the start. It is proposed to divide into stages.
+The MVP scope is defined in `docs/mvp.md` as a single delivery. To avoid context overload and segment the work, implementation is divided into internal phases. These are NOT separate MVP deliveries — they are all part of the same MVP.
+
+The authoritative MVP scope is `docs/mvp.md`. The implementation plan in `docs/implementation-plan.md` defines the detailed phase breakdown.
 
 ---
 
-## MVP 1 — Real Basic Operational Control
+## Phase 1 — Core Operations
 
 Objective: replace the current system and the main Excel.
 
@@ -1582,7 +1584,7 @@ Features:
 
 ---
 
-## MVP 2 — Draws and Eligibility
+## Phase 2 — Draws and Eligibility
 
 Objective: control participation and prizes.
 
@@ -1601,26 +1603,26 @@ Features:
 
 ---
 
-## MVP 3 — Operational Optimization
+## Phase 3 — Operational Optimization (Post-MVP)
 
 Objective: reduce manual workload and improve tracking.
 
 Features:
 
-- Barcode scanning.
-- Internal QR.
-- Bulk bond import.
-- Import from previous campaign.
-- Historical reservations.
-- Number conflict management.
-- Expiry alerts.
-- Campaign dashboard.
-- Pre-draw risk report.
-- Unidentified transfers.
+- Barcode scanning (included in MVP).
+- Bulk bond import (included in MVP).
+- Import from previous campaign (included in MVP).
+- Internal QR (post-MVP).
+- Historical reservations (post-MVP).
+- Number conflict management (post-MVP).
+- Expiry alerts (post-MVP).
+- Campaign dashboard (post-MVP).
+- Pre-draw risk report (post-MVP).
+- Unidentified transfers (post-MVP).
 
 ---
 
-## MVP 4 — Advanced Digitalization
+## Phase 4 — Advanced Digitalization (Post-MVP)
 
 Objective: improve communication and self-service.
 

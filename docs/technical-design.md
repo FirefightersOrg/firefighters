@@ -97,8 +97,8 @@ Examples:
 - `createBond`
 - `assignBondsToCollector`
 - `registerSale`
-- `addPaymentToRendition`
-- `closeRendition`
+- `addPaymentToSettlement`
+- `closeSettlement`
 - `generateDrawRoster`
 - `loadWinningNumber`
 
@@ -176,7 +176,7 @@ Settlement closing is a critical operation.
 
 It must run server-side.
 
-Responsibilities of `closeRendition`:
+Responsibilities of `closeSettlement`:
 
 - Verify the settlement is open.
 - Verify included payments.
@@ -273,10 +273,10 @@ The permission model is detailed in `docs/permissions.md`.
 Initial suggested policies:
 
 - `admin`: full functional access.
-- `operador`: administrative operations without critical configuration.
-- `tesorero`: settlements, financial reports, and current account.
-- `cobrador`: only own data when access is enabled.
-- `consulta`: read-only.
+- `operator`: administrative operations without critical configuration.
+- `treasurer`: settlements, financial reports, and current account.
+- `collector`: only own data when access is enabled.
+- `read-only`: read-only.
 
 ## Audit
 

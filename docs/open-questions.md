@@ -199,4 +199,4 @@ Temporary decision: model configurable rules per campaign, installment/payment t
 
 Pending confirmation of whether collectors will have their own user accounts in the MVP.
 
-Temporary decision: operate from administration, but model a `cobrador` role to avoid blocking future access.
+Temporary decision: operate from administration, but model a `collector` role to avoid blocking future access.
