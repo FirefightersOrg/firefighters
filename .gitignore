@@ -1,0 +1,35 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Tooling & Agent Local Data
+.atl
+opencode.json
+
+# Supabase
+supabase/.temp
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea
