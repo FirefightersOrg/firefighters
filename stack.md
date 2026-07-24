@@ -83,24 +83,24 @@ The MVP must not become an irreversible dependency on Supabase. Code decisions s
 
 ## 4. MVP Technology Stack
 
-| Area | Technology | Decision |
-|---|---|---|
-| Web framework | SvelteKit | Main application framework |
-| Language | TypeScript | Mandatory for frontend and minimal server-side logic |
-| App type | PWA | Installable web, responsive and usable on PC/mobile/tablet |
-| Runtime | Node.js LTS | For SvelteKit server-side when appropriate |
-| Package manager | pnpm | Only allowed package manager |
-| Initial backend | SvelteKit server actions / API routes | Only for sensitive logic or minimal endpoints |
-| Database | Supabase Postgres | Main relational database for the MVP |
-| Authentication | Supabase Auth | Login, sessions, and MVP users |
-| Authorization | RLS + server-side logic | Row Level Security in Supabase and additional server-side controls |
-| Storage | Supabase Storage | Files, vouchers, receipts, or attachments for the MVP |
-| Validations | Zod | Form validation, DTOs, and input data |
-| Styles/UI | Tailwind CSS or custom CSS | Define before implementing large-scale screens |
-| Testing | Vitest / Playwright | Unit tests and end-to-end tests when applicable |
-| Local development | Supabase CLI + Docker | Reproducible local stack |
-| CI/CD | GitHub Actions | Automated checks per PR/push |
-| Local security | Gitleaks / ESLint / TypeScript checks | Prevention of basic errors and secrets |
+| Area              | Technology                            | Decision                                                           |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| Web framework     | SvelteKit                             | Main application framework                                         |
+| Language          | TypeScript                            | Mandatory for frontend and minimal server-side logic               |
+| App type          | PWA                                   | Installable web, responsive and usable on PC/mobile/tablet         |
+| Runtime           | Node.js LTS                           | For SvelteKit server-side when appropriate                         |
+| Package manager   | pnpm                                  | Only allowed package manager                                       |
+| Initial backend   | SvelteKit server actions / API routes | Only for sensitive logic or minimal endpoints                      |
+| Database          | Supabase Postgres                     | Main relational database for the MVP                               |
+| Authentication    | Supabase Auth                         | Login, sessions, and MVP users                                     |
+| Authorization     | RLS + server-side logic               | Row Level Security in Supabase and additional server-side controls |
+| Storage           | Supabase Storage                      | Files, vouchers, receipts, or attachments for the MVP              |
+| Validations       | Zod                                   | Form validation, DTOs, and input data                              |
+| Styles/UI         | Tailwind CSS or custom CSS            | Define before implementing large-scale screens                     |
+| Testing           | Vitest / Playwright                   | Unit tests and end-to-end tests when applicable                    |
+| Local development | Supabase CLI + Docker                 | Reproducible local stack                                           |
+| CI/CD             | GitHub Actions                        | Automated checks per PR/push                                       |
+| Local security    | Gitleaks / ESLint / TypeScript checks | Prevention of basic errors and secrets                             |
 
 ---
 
@@ -619,19 +619,19 @@ RDS PostgreSQL
 
 ### Expected Post-MVP Stack
 
-| Area | Target Technology |
-|---|---|
-| Web/PWA | SvelteKit + TypeScript |
-| API | Custom API in Node.js/TypeScript initially, unless decided otherwise |
-| Database | Amazon RDS PostgreSQL |
-| Files | Amazon S3 |
-| Authentication | Amazon Cognito or defined OIDC/SAML integration |
-| Authorization | Custom API + roles/permissions + IAM where appropriate |
-| Secrets | AWS Secrets Manager |
-| Logs/monitoring | CloudWatch |
-| Infrastructure | Terraform |
-| CI/CD | GitHub Actions |
-| Security | IAM least privilege, WAF if applicable, backups, auditing |
+| Area            | Target Technology                                                    |
+| --------------- | -------------------------------------------------------------------- |
+| Web/PWA         | SvelteKit + TypeScript                                               |
+| API             | Custom API in Node.js/TypeScript initially, unless decided otherwise |
+| Database        | Amazon RDS PostgreSQL                                                |
+| Files           | Amazon S3                                                            |
+| Authentication  | Amazon Cognito or defined OIDC/SAML integration                      |
+| Authorization   | Custom API + roles/permissions + IAM where appropriate               |
+| Secrets         | AWS Secrets Manager                                                  |
+| Logs/monitoring | CloudWatch                                                           |
+| Infrastructure  | Terraform                                                            |
+| CI/CD           | GitHub Actions                                                       |
+| Security        | IAM least privilege, WAF if applicable, backups, auditing            |
 
 ### Rules to Facilitate Migration
 

@@ -127,17 +127,17 @@ Expected domain function:
 
 ```ts
 type CampaignNumbering = {
-  numberDigits: number;
-  maxNumber: number;
-  associatedNumberOffset: number;
+	numberDigits: number;
+	maxNumber: number;
+	associatedNumberOffset: number;
 };
 
 function calculateAssociatedNumber(baseNumber: number, config: CampaignNumbering): number {
-  return baseNumber + config.associatedNumberOffset;
+	return baseNumber + config.associatedNumberOffset;
 }
 
 function formatCampaignNumber(value: number, config: CampaignNumbering): string {
-  return String(value).padStart(config.numberDigits, '0');
+	return String(value).padStart(config.numberDigits, '0');
 }
 ```
 

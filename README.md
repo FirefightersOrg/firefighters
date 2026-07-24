@@ -27,25 +27,25 @@ The application will be web-based and should be designed to be accessible from d
 
 To avoid confusion, these terms should be standardized within the system.
 
-| Term | Meaning |
-|---|---|
-| Campaign | Annual period of the bond/raffle. Example: "Contribution Bond 2025-2026". |
-| Draw | Specific event within a campaign. It can be monthly, final, consolation, or extraordinary. |
-| Bond | Physical card sold to a buyer. It can be simple or pata. |
-| Simple bond | Individual bond with one visible base number and one calculated associated number. |
-| Pata | Bond with multiple base numbers. Sold as a larger commercial unit, usually to companies or businesses. |
-| Base number | Main number printed on the bond. |
-| Associated number | Number calculated from the base number by adding 4871. |
-| Participating number | Any number that participates in draws: base number or associated number. |
-| Buyer | Person, business, or company that purchases a bond. |
-| Collector / Seller | Person who receives bonds, sells them, collects installments, and settles with Firefighters. |
-| Bond delivery | Administrative act by which Firefighters delivers physical bonds to a collector. |
-| Sale | Act by which a bond becomes associated with a buyer. |
-| Payment | Record of money paid by a buyer. It can be cash or transfer. |
-| Settlement | Act by which a collector reports payments, delivers money, and their commission is calculated. |
-| Commission | Percentage or amount corresponding to the collector for the sale/collection. |
-| Commission settlement | Actual payment of accumulated commissions in favor of the collector. |
-| Draw roster | Frozen list of bonds/numbers eligible to participate in a draw. |
+| Term                  | Meaning                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| Campaign              | Annual period of the bond/raffle. Example: "Contribution Bond 2025-2026".                              |
+| Draw                  | Specific event within a campaign. It can be monthly, final, consolation, or extraordinary.             |
+| Bond                  | Physical card sold to a buyer. It can be simple or pata.                                               |
+| Simple bond           | Individual bond with one visible base number and one calculated associated number.                     |
+| Pata                  | Bond with multiple base numbers. Sold as a larger commercial unit, usually to companies or businesses. |
+| Base number           | Main number printed on the bond.                                                                       |
+| Associated number     | Number calculated from the base number by adding 4871.                                                 |
+| Participating number  | Any number that participates in draws: base number or associated number.                               |
+| Buyer                 | Person, business, or company that purchases a bond.                                                    |
+| Collector / Seller    | Person who receives bonds, sells them, collects installments, and settles with Firefighters.           |
+| Bond delivery         | Administrative act by which Firefighters delivers physical bonds to a collector.                       |
+| Sale                  | Act by which a bond becomes associated with a buyer.                                                   |
+| Payment               | Record of money paid by a buyer. It can be cash or transfer.                                           |
+| Settlement            | Act by which a collector reports payments, delivers money, and their commission is calculated.         |
+| Commission            | Percentage or amount corresponding to the collector for the sale/collection.                           |
+| Commission settlement | Actual payment of accumulated commissions in favor of the collector.                                   |
+| Draw roster           | Frozen list of bonds/numbers eligible to participate in a draw.                                        |
 
 ---
 
