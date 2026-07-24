@@ -1,137 +1,137 @@
-# Comisiones
+# Commissions
 
-## Objetivo
+## Objective
 
-Definir como calcular, confirmar, ajustar y auditar comisiones de cobradores.
+Define how to calculate, confirm, adjust, and audit collector commissions.
 
-## Regla principal
+## Main rule
 
-La comision se calcula de forma preliminar durante la rendicion abierta y se consolida al cerrar la rendicion.
+The commission is calculated provisionally during an open settlement and consolidated when the settlement is closed.
 
-## Tipos de reglas
+## Rule types
 
-### Regla general de campana
+### General campaign rule
 
-Aplica a todos los cobradores salvo que exista una regla especial.
+Applies to all collectors unless a special rule exists.
 
-Ejemplos:
+Examples:
 
-- Pago contado.
-- Primera cuota.
-- Cuotas intermedias.
-- Ultima cuota.
+- Cash payment.
+- First installment.
+- Intermediate installments.
+- Last installment.
 
-### Regla especial por cobrador
+### Special collector rule
 
-Permite que un cobrador tenga condiciones diferentes.
+Allows a collector to have different conditions.
 
-Ejemplos:
+Examples:
 
-- Mayor porcentaje por acuerdo especifico.
-- Menor porcentaje.
-- Monto fijo.
-- Regla valida solo por una fecha o campana.
+- Higher percentage by specific agreement.
+- Lower percentage.
+- Fixed amount.
+- Rule valid only for a specific date or campaign.
 
-### Ajuste manual
+### Manual adjustment
 
-Permite corregir o modificar una comision calculada.
+Allows correcting or modifying a calculated commission.
 
-Requisitos:
+Requirements:
 
-- Permiso `commission.adjust`.
-- Motivo obligatorio.
-- Auditoria obligatoria.
-- Movimiento de cuenta corriente asociado.
+- Permission `commission.adjust`.
+- Mandatory reason.
+- Mandatory audit.
+- Associated current account movement.
 
-## Prioridad de calculo
+## Calculation priority
 
 ```txt
-1. Regla especial activa del cobrador
-2. Regla general de campana
-3. Ajuste manual autorizado
+1. Active special collector rule
+2. General campaign rule
+3. Authorized manual adjustment
 ```
 
-El ajuste manual no reemplaza la regla original; debe quedar registrado como diferencia.
+The manual adjustment does not replace the original rule; it must be recorded as a difference.
 
-## Flujo normal
+## Normal flow
 
 ```txt
-Rendicion abierta
+Open settlement
 ↓
-Usuario agrega pagos
+User adds payments
 ↓
-Sistema calcula comision preliminar
+System calculates provisional commission
 ↓
-Usuario revisa
+User reviews
 ↓
-Cierre de rendicion
+Settlement closure
 ↓
-Sistema confirma comision
+System confirms commission
 ↓
-Sistema crea movimiento de cuenta corriente
+System creates current account movement
 ```
 
-## Flujo de ajuste manual en rendicion abierta
+## Manual adjustment flow during open settlement
 
 ```txt
-Usuario con permiso revisa comision
+User with permission reviews commission
 ↓
-Ingresa ajuste
+Enters adjustment
 ↓
-Sistema exige motivo
+System requires reason
 ↓
-Sistema recalcula resumen
+System recalculates summary
 ↓
-Al cerrar rendicion se confirma ajuste
+Adjustment is confirmed upon settlement closure
 ```
 
-## Flujo de ajuste posterior a rendicion cerrada
+## Adjustment flow after closed settlement
 
 ```txt
-Rendicion cerrada
+Closed settlement
 ↓
-Usuario detecta diferencia
+User detects difference
 ↓
-Registra ajuste de comision con motivo
+Records commission adjustment with reason
 ↓
-Sistema crea movimiento compensatorio
+System creates compensatory movement
 ↓
-Sistema audita accion
+System audits action
 ```
 
-## Cuenta corriente
+## Current account
 
-Toda comision confirmada genera un movimiento:
+Every confirmed commission generates a movement:
 
 ```txt
-entry_type = comision_generada
+entry_type = commission_generated
 direction = collector_credit
 ```
 
-Toda comision liquidada o pagada genera:
+Every settled or paid commission generates:
 
 ```txt
-entry_type = comision_liquidada
+entry_type = commission_settled
 direction = collector_debit
 ```
 
-## Datos minimos de una regla
+## Minimum rule data
 
-- Campana.
-- Tipo de regla.
-- Porcentaje o monto fijo.
-- Cobrador especifico si aplica.
-- Vigencia.
-- Usuario que la creo.
-- Estado.
+- Campaign.
+- Rule type.
+- Percentage or fixed amount.
+- Specific collector if applicable.
+- Validity period.
+- User who created it.
+- Status.
 
-## Datos minimos de un ajuste
+## Minimum adjustment data
 
-- Cobrador.
-- Rendicion si aplica.
-- Pago si aplica.
-- Monto del ajuste.
-- Direccion del ajuste.
-- Motivo.
-- Usuario.
-- Fecha.
+- Collector.
+- Settlement if applicable.
+- Payment if applicable.
+- Adjustment amount.
+- Adjustment direction.
+- Reason.
+- User.
+- Date.

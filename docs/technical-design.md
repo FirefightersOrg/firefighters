@@ -1,10 +1,10 @@
-# Diseno tecnico
+# Technical design
 
-## Objetivo
+## Objective
 
-Definir la arquitectura tecnica del MVP usando SvelteKit, TypeScript y Supabase, manteniendo una estructura que permita migrar a una API propia y AWS en una etapa posterior.
+Define the technical architecture of the MVP using SvelteKit, TypeScript, and Supabase, maintaining a structure that allows migration to a custom API and AWS in a later stage.
 
-## Arquitectura MVP
+## MVP architecture
 
 ```txt
 Browser / PWA
@@ -19,19 +19,19 @@ SvelteKit server actions / server routes
 Supabase Auth + Postgres + Storage
 ```
 
-## Principios
+## Principles
 
-- La logica de negocio no debe vivir en componentes de UI.
-- El acceso a Supabase debe estar encapsulado.
-- Las reglas criticas deben estar en servicios de dominio o constraints SQL documentadas.
-- RLS debe estar activo en tablas expuestas.
-- No usar `service_role` en cliente.
-- No borrar historicos economicos sin anulacion auditada.
-- No asumir que los numeros tienen siempre 4 cifras.
-- Usar permisos granulares para acciones sensibles.
-- Mantener importaciones y migraciones en staging hasta confirmacion.
+- Business logic must not live in UI components.
+- Supabase access must be encapsulated.
+- Critical rules must be in domain services or documented SQL constraints.
+- RLS must be active on exposed tables.
+- Do not use `service_role` on the client.
+- Do not delete financial history without audited annulment.
+- Do not assume numbers always have 4 digits.
+- Use granular permissions for sensitive actions.
+- Keep imports and migrations in staging until confirmation.
 
-## Estructura sugerida
+## Suggested structure
 
 ```txt
 src/
@@ -51,70 +51,70 @@ src/
 
 ### `src/lib/domain`
 
-Reglas puras sin dependencia de Supabase.
+Pure rules with no Supabase dependency.
 
-Ejemplos:
+Examples:
 
-- Calcular numero asociado.
-- Formatear numero visible.
-- Validar rango de numero.
-- Calcular valor de pata.
-- Calcular comision preliminar.
-- Evaluar elegibilidad de sorteo.
+- Calculate associated number.
+- Format visible number.
+- Validate number range.
+- Calculate pata value.
+- Calculate preliminary commission.
+- Evaluate draw eligibility.
 
 ### `src/lib/schemas`
 
-Schemas Zod para inputs de formularios y acciones.
+Zod schemas for form inputs and actions.
 
-Ejemplos:
+Examples:
 
-- Crear campana.
-- Crear bono.
-- Crear venta.
-- Registrar pago.
-- Cerrar rendicion.
-- Crear sorteo.
-- Cargar ganador.
+- Create campaign.
+- Create bond.
+- Create sale.
+- Register payment.
+- Close settlement.
+- Create draw.
+- Load winner.
 
 ### `src/lib/server/repositories`
 
-Capa de acceso a datos.
+Data access layer.
 
-Responsabilidades:
+Responsibilities:
 
-- Consultas a Supabase/Postgres.
-- Persistencia de entidades.
-- Mapeo de datos crudos a tipos de aplicacion.
-- Evitar queries dispersas en componentes.
+- Supabase/Postgres queries.
+- Entity persistence.
+- Mapping raw data to application types.
+- Avoid scattered queries in components.
 
 ### `src/lib/server/services`
 
-Casos de uso transaccionales.
+Transactional use cases.
 
-Ejemplos:
+Examples:
 
 - `createCampaign`
 - `createBond`
 - `assignBondsToCollector`
 - `registerSale`
-- `addPaymentToRendition`
-- `closeRendition`
+- `addPaymentToSettlement`
+- `closeSettlement`
 - `generateDrawRoster`
 - `loadWinningNumber`
 
 ### `src/lib/server/audit`
 
-Funciones para registrar auditoria de acciones sensibles.
+Functions to record audit of sensitive actions.
 
 ### `src/lib/server/documents`
 
-Generacion de HTML imprimible para remitos y constancias.
+Generation of printable HTML for delivery notes and certificates.
 
-## Numeracion
+## Numbering
 
-La configuracion de numeracion vive en `campaigns`.
+Numbering configuration lives in `campaigns`.
 
-Campos clave:
+Key fields:
 
 ```txt
 number_digits
@@ -123,261 +123,261 @@ associated_number_offset
 overflow_policy
 ```
 
-Funcion de dominio esperada:
+Expected domain function:
 
 ```ts
 type CampaignNumbering = {
-  numberDigits: number;
-  maxNumber: number;
-  associatedNumberOffset: number;
+	numberDigits: number;
+	maxNumber: number;
+	associatedNumberOffset: number;
 };
 
 function calculateAssociatedNumber(baseNumber: number, config: CampaignNumbering): number {
-  return baseNumber + config.associatedNumberOffset;
+	return baseNumber + config.associatedNumberOffset;
 }
 
 function formatCampaignNumber(value: number, config: CampaignNumbering): string {
-  return String(value).padStart(config.numberDigits, '0');
+	return String(value).padStart(config.numberDigits, '0');
 }
 ```
 
-Regla:
+Rule:
 
-- No usar `padStart(4)` fuera de una funcion centralizada.
-- No usar columnas `char(4)`.
-- Validar rango contra `campaign.max_number`.
+- Do not use `padStart(4)` outside a centralized function.
+- Do not use `char(4)` columns.
+- Validate range against `campaign.max_number`.
 
-## Codigo de barras e importaciones
+## Barcode and imports
 
-La lectura de codigo de barras debe implementarse como flujo configurable por campana.
+Barcode reading must be implemented as a configurable flow per campaign.
 
-Campo clave:
+Key field:
 
 ```txt
 barcode_mode
 ```
 
-Valores iniciales:
+Initial values:
 
 - `base_number`
 - `internal_code`
 - `external_legacy_code`
 - `manual_mapping`
 
-Regla:
+Rule:
 
-- Escanear no debe impactar datos definitivos hasta confirmar una sesion de importacion.
-- Toda carga masiva debe pasar por vista previa y validacion.
-- Las importaciones desde sistema viejo deben pasar por staging.
+- Scanning must not impact definitive data until an import session is confirmed.
+- All bulk loading must go through preview and validation.
+- Imports from the old system must go through staging.
 
-## Rendiciones y comisiones
+## Settlements and commissions
 
-El cierre de rendicion es una operacion critica.
+Settlement closing is a critical operation.
 
-Debe ejecutarse server-side.
+It must run server-side.
 
-Responsabilidades de `closeRendition`:
+Responsibilities of `closeSettlement`:
 
-- Verificar que la rendicion este abierta.
-- Verificar pagos incluidos.
-- Calcular totales definitivos.
-- Calcular comision definitiva.
-- Confirmar pagos.
-- Actualizar cuotas cubiertas.
-- Crear movimientos de cuenta corriente.
-- Guardar snapshots de totales.
-- Marcar rendicion como cerrada.
-- Registrar auditoria.
+- Verify the settlement is open.
+- Verify included payments.
+- Calculate definitive totals.
+- Calculate definitive commission.
+- Confirm payments.
+- Update covered installments.
+- Create current account entries.
+- Save totals snapshots.
+- Mark settlement as closed.
+- Record audit.
 
-Las comisiones pueden tener reglas especiales por cobrador y ajustes manuales con permiso `commission.adjust`.
+Commissions may have special rules per collector and manual adjustments with the `commission.adjust` permission.
 
-Regla:
-
-```txt
-Una rendicion cerrada no se reabre ni se edita directamente.
-```
-
-Correcciones posteriores:
-
-- Anular pago.
-- Generar ajuste.
-- Generar movimiento compensatorio.
-- Registrar motivo y usuario.
-
-Detalle de flujos: `docs/corrections.md`.
-
-## Cuenta corriente del cobrador
-
-El saldo no debe guardarse como valor editable.
-
-Se calcula desde `collector_ledger_entries`.
-
-Ejemplo:
+Rule:
 
 ```txt
-saldo = creditos_no_anulados - debitos_no_anulados
+A closed settlement is not reopened or edited directly.
 ```
 
-Movimientos esperados:
+Subsequent corrections:
 
-- Comision generada.
-- Comision liquidada.
-- Efectivo rendido.
-- Transferencia recibida por Bomberos.
-- Ajuste manual.
-- Anulacion.
+- Annul payment.
+- Generate adjustment.
+- Generate compensating entry.
+- Record reason and user.
 
-## Sorteos y padrones
+Flow details: `docs/corrections.md`.
 
-La generacion de padron debe ser server-side.
+## Collector current account
 
-Responsabilidades de `generateDrawRoster`:
+Balance must not be stored as an editable value.
 
-- Tomar sorteo y regla de elegibilidad.
-- Evaluar pagos confirmados antes del corte.
-- Crear entradas para numeros participantes.
-- Marcar habilitados y no habilitados.
-- Guardar snapshots de comprador y cobrador.
+It is calculated from `collector_ledger_entries`.
 
-Responsabilidades de `freezeDrawRoster`:
+Example:
 
-- Bloquear modificaciones normales al padron.
-- Registrar usuario y fecha.
-- Auditar congelamiento.
+```txt
+balance = non_annulled_credits - non_annulled_debits
+```
 
-Responsabilidades de `loadWinningNumber`:
+Expected entries:
 
-- Buscar numero ganador en padron congelado.
-- Determinar bono, comprador y cobrador.
-- Determinar si corresponde premio.
-- Registrar resultado.
+- Commission generated.
+- Commission settled.
+- Cash settled.
+- Transfer received by Firefighters.
+- Manual adjustment.
+- Annulment.
 
-Reglas confirmadas:
+## Draws and rosters
 
-- Final: requiere pago completo para ganar.
-- Consuelo: solo no ganadores y al dia.
-- Extraordinario: N numeros extra segun cantidad de numeros base.
+Roster generation must be server-side.
 
-## Supabase y RLS
+Responsibilities of `generateDrawRoster`:
 
-Reglas obligatorias:
+- Take draw and eligibility rule.
+- Evaluate confirmed payments before cutoff.
+- Create entries for participating numbers.
+- Mark eligible and ineligible.
+- Save buyer and collector snapshots.
 
-- RLS activo en tablas expuestas al cliente.
-- Politicas versionadas en migraciones.
-- Operaciones sensibles por server actions o routes.
-- `SUPABASE_SERVICE_ROLE_KEY` solo en entorno server-side.
-- Roles de aplicacion explicitos.
+Responsibilities of `freezeDrawRoster`:
 
-El modelo de permisos esta detallado en `docs/permissions.md`.
+- Block normal modifications to the roster.
+- Record user and date.
+- Audit freeze.
 
-Politicas iniciales sugeridas:
+Responsibilities of `loadWinningNumber`:
 
-- `admin`: acceso completo funcional.
-- `operador`: operaciones administrativas sin configuracion critica.
-- `tesorero`: rendiciones, reportes economicos y cuenta corriente.
-- `cobrador`: solo datos propios cuando se habilite acceso.
-- `consulta`: solo lectura.
+- Search winning number in frozen roster.
+- Determine bond, buyer, and collector.
+- Determine if prize applies.
+- Record result.
 
-## Auditoria
+Confirmed rules:
 
-Acciones obligatorias a auditar:
+- Final: requires full payment to win.
+- Consolation: only non-winners that are up to date.
+- Extraordinary: N extra numbers based on count of base numbers.
 
-- Cambios de configuracion de campana.
-- Carga de bonos.
-- Asignacion y devolucion de bonos.
-- Venta.
-- Carga, anulacion o ajuste de pagos.
-- Cierre de rendicion.
-- Correccion de rendicion cerrada.
-- Liquidacion de comisiones.
-- Generacion y congelamiento de padrones.
-- Carga de ganadores.
-- Entrega o rechazo de premios.
-- Ajustes manuales de cuenta corriente.
+## Supabase and RLS
+
+Mandatory rules:
+
+- RLS active on tables exposed to the client.
+- Policies versioned in migrations.
+- Sensitive operations via server actions or routes.
+- `SUPABASE_SERVICE_ROLE_KEY` only in server-side environment.
+- Explicit application roles.
+
+The permission model is detailed in `docs/permissions.md`.
+
+Initial suggested policies:
+
+- `admin`: full functional access.
+- `operator`: administrative operations without critical configuration.
+- `treasurer`: settlements, financial reports, and current account.
+- `collector`: only own data when access is enabled.
+- `read-only`: read-only.
+
+## Audit
+
+Mandatory actions to audit:
+
+- Campaign configuration changes.
+- Bond loading.
+- Bond assignment and return.
+- Sale.
+- Payment loading, annulment, or adjustment.
+- Settlement closing.
+- Closed settlement correction.
+- Commission settlement.
+- Roster generation and freezing.
+- Winner loading.
+- Prize delivery or rejection.
+- Manual current account adjustments.
 
 ## PWA
 
-Alcance MVP:
+MVP scope:
 
-- Instalacion desde navegador cuando sea compatible.
+- Installation from browser when compatible.
 - Responsive desktop/mobile/tablet.
-- Cache de assets estaticos.
-- Pantalla amigable sin conexion.
+- Static asset caching.
+- Friendly screen when offline.
 
-Fuera del MVP:
+Out of MVP scope:
 
-- Registro offline de pagos.
-- Sincronizacion offline de operaciones economicas.
-- Resolucion de conflictos offline.
+- Offline payment recording.
+- Offline synchronization of financial operations.
+- Offline conflict resolution.
 
-## Documentos imprimibles
+## Printable documents
 
 MVP:
 
-- HTML imprimible para remitos.
-- Persistir datos estructurados del remito.
+- Printable HTML for delivery notes.
+- Persist structured delivery note data.
 
-Futuro:
+Future:
 
-- PDF generado y almacenado.
-- QR o codigo de validacion.
+- Generated and stored PDF.
+- QR or validation code.
 
-Detalle de documentos: `docs/documents.md`.
+Document details: `docs/documents.md`.
 
-## Backups y operacion
+## Backups and operations
 
-Para el MVP productivo:
+For the production MVP:
 
-- Usar backups automaticos del plan Supabase contratado.
-- Exportar datos criticos antes de importaciones o correcciones masivas.
-- Mantener procedimiento de restauracion documentado.
-- Validar periodicamente que una restauracion funciona.
+- Use automatic backups from the hired Supabase plan.
+- Export critical data before imports or bulk corrections.
+- Maintain a documented restoration procedure.
+- Periodically validate that a restoration works.
 
-Objetivos iniciales:
+Initial objectives:
 
 ```txt
-RPO: maximo 24 horas
-RTO: restauracion durante el mismo dia
+RPO: maximum 24 hours
+RTO: restoration within the same day
 ```
 
-Detalle operativo: `docs/backup-operations.md`.
+Operational details: `docs/backup-operations.md`.
 
-## Plan de implementacion
+## Implementation plan
 
-El orden de construccion esta definido en `docs/implementation-plan.md`.
+The build order is defined in `docs/implementation-plan.md`.
 
-La implementacion debe avanzar por fases verificables, empezando por tooling, auth, permisos, campanas, bonos, importaciones, cobradores/compradores, ventas, rendiciones, ledger, sorteos y reportes.
+Implementation must advance through verifiable phases, starting with tooling, auth, permissions, campaigns, bonds, imports, collectors/buyers, sales, settlements, ledger, draws, and reports.
 
-## Testing minimo
+## Minimum testing
 
-Unit tests de dominio:
+Domain unit tests:
 
-- Calculo de numero asociado.
-- Formato de numeros por campana.
-- Validacion de rango.
-- Calculo de valor de pata.
-- Calculo de comisiones.
-- Elegibilidad de sorteo.
+- Associated number calculation.
+- Number formatting per campaign.
+- Range validation.
+- Pata value calculation.
+- Commission calculation.
+- Draw eligibility.
 
-Tests de servicios:
+Service tests:
 
-- Cierre de rendicion.
-- Anulacion de pago confirmado.
-- Generacion de padron.
-- Carga de ganador.
+- Settlement closing.
+- Confirmed payment annulment.
+- Roster generation.
+- Winner loading.
 
-E2E criticos:
+Critical E2E:
 
-- Crear campana, cargar bono, vender, pagar, rendir.
-- Generar padron y validar ganador.
+- Create campaign, load bond, sell, pay, settle.
+- Generate roster and validate winner.
 
-## Migracion futura a AWS
+## Future migration to AWS
 
-Para facilitar migracion posterior:
+To facilitate later migration:
 
-- Mantener dominio independiente del SDK de Supabase.
-- Encapsular repositorios.
-- Evitar Edge Functions salvo necesidad real.
-- Evitar triggers complejos sin documentacion.
-- Usar PostgreSQL estandar siempre que alcance.
-- Documentar RLS y permisos.
+- Keep domain independent of the Supabase SDK.
+- Encapsulate repositories.
+- Avoid Edge Functions unless truly needed.
+- Avoid complex triggers without documentation.
+- Use standard PostgreSQL wherever sufficient.
+- Document RLS and permissions.

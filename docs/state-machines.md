@@ -1,252 +1,252 @@
-# Maquinas de estado
+# State machines
 
-## Objetivo
+## Objective
 
-Definir estados y transiciones permitidas para las entidades principales. Las correcciones deben preservar trazabilidad y evitar perdida de historial.
+Define states and allowed transitions for the main entities. Corrections must preserve traceability and avoid loss of history.
 
-## Campana
+## Campaign
 
-Estados:
-
-```txt
-borrador
-activa
-en_cierre
-cerrada
-anulada
-```
-
-Transiciones:
+States:
 
 ```txt
-borrador -> activa
-activa -> en_cierre
-en_cierre -> cerrada
-activa -> anulada
+draft
+active
+closing
+closed
+annulled
 ```
 
-Reglas:
-
-- Una campana cerrada no permite operaciones normales.
-- Las correcciones posteriores requieren rol autorizado y auditoria.
-
-## Bono
-
-Estados comerciales:
+Transitions:
 
 ```txt
-creado
-disponible
-entregado_a_cobrador
-vendido
-devuelto
-extraviado
-anulado
-cerrado
+draft -> active
+active -> closing
+closing -> closed
+active -> annulled
 ```
 
-Transiciones principales:
+Rules:
+
+- A closed campaign does not allow normal operations.
+- Subsequent corrections require an authorized role and audit.
+
+## Bond
+
+Commercial states:
 
 ```txt
-creado -> disponible
-disponible -> entregado_a_cobrador
-entregado_a_cobrador -> vendido
-entregado_a_cobrador -> devuelto
-devuelto -> disponible
-disponible -> extraviado
-entregado_a_cobrador -> extraviado
-vendido -> anulado
-vendido -> cerrado
+created
+available
+delivered_to_collector
+sold
+returned
+lost
+annulled
+closed
 ```
 
-Reglas:
-
-- Un bono vendido no puede reasignarse directamente.
-- Un bono con pagos confirmados solo puede corregirse con anulacion auditada.
-- La perdida o extravio debe registrar responsable, fecha y motivo.
-
-## Estado financiero de bono
-
-Estados calculados:
+Main transitions:
 
 ```txt
-sin_pagos
-con_pagos_parciales
-al_dia
-atrasado
-pagado_completo
-incobrable
-anulado
+created -> available
+available -> delivered_to_collector
+delivered_to_collector -> sold
+delivered_to_collector -> returned
+returned -> available
+available -> lost
+delivered_to_collector -> lost
+sold -> annulled
+sold -> closed
 ```
 
-Reglas:
+Rules:
 
-- El estado financiero se calcula desde cuotas y pagos confirmados.
-- No debe reemplazar el estado comercial.
-- Un bono puede estar `vendido` y `atrasado` al mismo tiempo.
+- A sold bond cannot be reassigned directly.
+- A bond with confirmed payments can only be corrected with audited annulment.
+- Loss must record responsible party, date, and reason.
 
-## Cuota
+## Bond financial status
 
-Estados:
+Calculated states:
 
 ```txt
-pendiente
-pagada
-pagada_adelantada
-vencida
-anulada
+no_payments
+partial_payments
+up_to_date
+overdue
+fully_paid
+uncollectible
+annulled
 ```
 
-Transiciones:
+Rules:
+
+- Financial status is calculated from installments and confirmed payments.
+- It must not replace the commercial status.
+- A bond can be `sold` and `overdue` at the same time.
+
+## Installment
+
+States:
 
 ```txt
-pendiente -> pagada
-pendiente -> pagada_adelantada
-pendiente -> vencida
-vencida -> pagada
-pagada -> anulada
-pagada_adelantada -> anulada
+pending
+paid
+paid_advance
+overdue
+annulled
 ```
 
-Reglas:
-
-- Una cuota pagada por error no se borra; se anula el pago asociado.
-- El estado vencida puede ser calculado segun fecha de vencimiento y pagos confirmados.
-
-## Pago
-
-Estados:
+Transitions:
 
 ```txt
-borrador
-pendiente_en_rendicion
-confirmado
-anulado
-ajustado
+pending -> paid
+pending -> paid_advance
+pending -> overdue
+overdue -> paid
+paid -> annulled
+paid_advance -> annulled
 ```
 
-Transiciones:
+Rules:
+
+- An installment paid by mistake is not deleted; the associated payment is annulled.
+- The overdue state can be calculated based on due date and confirmed payments.
+
+## Payment
+
+States:
 
 ```txt
-borrador -> pendiente_en_rendicion
-pendiente_en_rendicion -> confirmado
-pendiente_en_rendicion -> anulado
-confirmado -> anulado
-confirmado -> ajustado
+draft
+pending_in_settlement
+confirmed
+annulled
+adjusted
 ```
 
-Reglas:
-
-- Un pago confirmado no se edita directamente.
-- Si cambia medio de pago, importe o cuota, se registra anulacion o ajuste.
-- Los pagos confirmados impactan elegibilidad de sorteos y reportes.
-
-## Rendicion
-
-Estados:
+Transitions:
 
 ```txt
-abierta
-cerrada
-anulada
-corregida
+draft -> pending_in_settlement
+pending_in_settlement -> confirmed
+pending_in_settlement -> annulled
+confirmed -> annulled
+confirmed -> adjusted
 ```
 
-Transiciones:
+Rules:
+
+- A confirmed payment is not edited directly.
+- If payment method, amount, or installment changes, an annulment or adjustment is recorded.
+- Confirmed payments impact draw eligibility and reports.
+
+## Settlement
+
+States:
 
 ```txt
-abierta -> cerrada
-abierta -> anulada
-cerrada -> corregida
+open
+closed
+annulled
+corrected
 ```
 
-Reglas:
-
-- Una rendicion abierta se puede editar.
-- Una rendicion cerrada no se reabre.
-- Una rendicion cerrada no se edita directamente.
-- Todo error posterior se corrige mediante anulacion o ajuste auditado.
-- El cierre confirma pagos, comisiones y movimientos de cuenta corriente.
-
-## Movimiento de cuenta corriente
-
-Estados:
+Transitions:
 
 ```txt
-registrado
-anulado
-compensado
+open -> closed
+open -> annulled
+closed -> corrected
 ```
 
-Tipos de movimiento:
+Rules:
+
+- An open settlement can be edited.
+- A closed settlement is not reopened.
+- A closed settlement is not edited directly.
+- Any subsequent error is corrected through annulment or audited adjustment.
+- Closing confirms payments, commissions, and current account entries.
+
+## Current account entry
+
+States:
 
 ```txt
-comision_generada
-comision_liquidada
-efectivo_rendido
-transferencia_recibida_por_bomberos
-ajuste_a_favor_cobrador
-ajuste_a_favor_bomberos
-anulacion
+recorded
+annulled
+compensated
 ```
 
-Reglas:
-
-- El saldo se calcula desde movimientos no anulados.
-- No deben editarse montos historicos directamente.
-
-## Sorteo
-
-Estados:
+Entry types:
 
 ```txt
-programado
-padron_generado
-padron_congelado
-realizado
-cerrado
-anulado
+commission_generated
+commission_settled
+cash_settled
+transfer_received_by_firefighters
+adjustment_in_favor_of_collector
+adjustment_in_favor_of_firefighters
+annulment
 ```
 
-Transiciones:
+Rules:
+
+- Balance is calculated from non-annulled entries.
+- Historical amounts must not be edited directly.
+
+## Draw
+
+States:
 
 ```txt
-programado -> padron_generado
-padron_generado -> padron_congelado
-padron_congelado -> realizado
-realizado -> cerrado
-programado -> anulado
+scheduled
+roster_generated
+roster_frozen
+completed
+closed
+annulled
 ```
 
-Reglas:
-
-- No se cargan ganadores sin padron congelado, salvo excepcion administrativa auditada.
-- El padron congelado no debe recalcularse dinamicamente.
-
-## Premio
-
-Estados:
+Transitions:
 
 ```txt
-pendiente_de_validacion
-adjudicado
-pendiente_de_entrega
-entregado
-no_adjudicado
-anulado
+scheduled -> roster_generated
+roster_generated -> roster_frozen
+roster_frozen -> completed
+completed -> closed
+scheduled -> annulled
 ```
 
-Transiciones:
+Rules:
+
+- Winners cannot be loaded without a frozen roster, except for audited administrative exception.
+- The frozen roster must not be dynamically recalculated.
+
+## Prize
+
+States:
 
 ```txt
-pendiente_de_validacion -> adjudicado
-pendiente_de_validacion -> no_adjudicado
-adjudicado -> pendiente_de_entrega
-pendiente_de_entrega -> entregado
-adjudicado -> anulado
+pending_validation
+awarded
+pending_delivery
+delivered
+unawarded
+annulled
 ```
 
-Reglas:
+Transitions:
 
-- Si el bono no estaba habilitado en el padron congelado, el premio queda no adjudicado.
-- La entrega del premio debe registrar fecha, usuario y observacion.
+```txt
+pending_validation -> awarded
+pending_validation -> unawarded
+awarded -> pending_delivery
+pending_delivery -> delivered
+awarded -> annulled
+```
+
+Rules:
+
+- If the bond was not eligible in the frozen roster, the prize remains unawarded.
+- Prize delivery must record date, user, and observations.

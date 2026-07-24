@@ -1,66 +1,66 @@
-# Stack tecnológico del proyecto
+# Project Technology Stack
 
-> Documento de referencia para desarrolladores humanos y agentes de IA.
+> Reference document for human developers and AI agents.
 >
-> Estado de decisión: **MVP WebApp/PWA con SvelteKit + TypeScript + Supabase**.
+> Decision status: **MVP WebApp/PWA with SvelteKit + TypeScript + Supabase**.
 >
-> Decisión explícita: **Tauri, Rust y un backend propio complejo quedan fuera del MVP**.
+> Explicit decision: **Tauri, Rust, and a complex custom backend are out of scope for the MVP**.
 
 ---
 
-## 1. Resumen ejecutivo
+## 1. Executive Summary
 
-El proyecto se desarrollará primero como una **webapp instalable tipo PWA**, accesible desde navegador en PC, celular y tablet. La prioridad del MVP es validar el flujo funcional del sistema, acelerar el desarrollo y evitar complejidad prematura.
+The project will initially be developed as an **installable PWA-style webapp**, accessible from a browser on PC, mobile, and tablet. The MVP priority is to validate the system's functional flow, accelerate development, and avoid premature complexity.
 
-### Stack elegido para el MVP
+### Stack Chosen for the MVP
 
 ```txt
 SvelteKit + TypeScript + PWA + Supabase
 ```
 
-### Stack descartado para el MVP
+### Stack Ruled Out for the MVP
 
 ```txt
 Tauri
 Rust
-Backend propio complejo desde el día 1
+Complex custom backend from day 1
 ```
 
-### Stack objetivo posterior al MVP
+### Target Stack Post-MVP
 
 ```txt
-SvelteKit + API propia + RDS PostgreSQL + S3 + Cognito/IAM + AWS
+SvelteKit + Custom API + RDS PostgreSQL + S3 + Cognito/IAM + AWS
 ```
 
-La estrategia es construir el MVP sobre una base que no bloquee una migración futura a AWS nativo. Supabase se usará para acelerar el desarrollo inicial, pero la lógica crítica del negocio debe mantenerse lo más desacoplada posible.
+The strategy is to build the MVP on a foundation that does not block a future migration to native AWS. Supabase will be used to accelerate initial development, but critical business logic should be kept as decoupled as possible.
 
 ---
 
-## 2. Contexto del proyecto
+## 2. Project Context
 
-El sistema estará orientado a la gestión operativa del cuartel de bomberos. Según los módulos conversados hasta el momento, el sistema puede incluir:
+The system will be oriented toward the operational management of the firefighters station. Based on the modules discussed so far, the system may include:
 
-- Gestión de socios.
-- Gestión de rifas.
-- Gestión de clientes.
-- Gestión de cobradores.
-- Registro de pagos.
-- Emisión de recibos.
-- Reportes económicos.
-- Control de usuarios y permisos.
-- Auditoría de movimientos.
-- Exportaciones e informes.
+- Member management.
+- Raffle management.
+- Buyer management.
+- Collector management.
+- Payment records.
+- Receipt issuance.
+- Financial reports.
+- User and permission control.
+- Transaction auditing.
+- Exports and reports.
 
-El sistema debe ser usable desde diferentes dispositivos y por diferentes perfiles de usuario. Por eso, la fuente de verdad debe estar centralizada y no en una instalación local de escritorio.
+The system must be usable from different devices and by different user profiles. Therefore, the source of truth must be centralized and not on a local desktop installation.
 
 ---
 
-## 3. Decisión principal de arquitectura
+## 3. Main Architecture Decision
 
-### Elegido para el MVP
+### Chosen for the MVP
 
 ```txt
-Cliente web / PWA
+Web client / PWA
         |
         v
 SvelteKit + TypeScript
@@ -69,91 +69,91 @@ SvelteKit + TypeScript
 Supabase Auth + Supabase Postgres + Supabase Storage
 ```
 
-### Motivo
+### Rationale
 
-Una PWA permite cubrir PC, celular y tablet sin construir una aplicación de escritorio separada. El usuario puede abrir la app desde el navegador o instalarla como acceso directo/aplicación desde el sistema operativo compatible.
+A PWA allows covering PC, mobile, and tablet without building a separate desktop application. The user can open the app from the browser or install it as a shortcut/application from the compatible operating system.
 
-Supabase permite acelerar el MVP porque ofrece Postgres, autenticación, APIs, storage, entorno local y herramientas de migración sin construir toda la infraestructura propia desde cero.
+Supabase accelerates the MVP because it provides Postgres, authentication, APIs, storage, local environment, and migration tools without building all the infrastructure from scratch.
 
-### Decisión importante
+### Important Decision
 
-El MVP no debe convertirse en una dependencia irreversible de Supabase. Las decisiones de código deben facilitar una migración futura hacia AWS nativo.
-
----
-
-## 4. Stack tecnológico del MVP
-
-| Área | Tecnología | Decisión |
-|---|---|---|
-| Framework web | SvelteKit | Framework principal de la aplicación |
-| Lenguaje | TypeScript | Obligatorio para frontend y lógica server-side mínima |
-| Tipo de app | PWA | Web instalable, responsive y usable en PC/celular/tablet |
-| Runtime | Node.js LTS | Para SvelteKit server-side cuando corresponda |
-| Package manager | pnpm | Único package manager permitido |
-| Backend inicial | SvelteKit server actions / API routes | Solo para lógica sensible o endpoints mínimos |
-| Base de datos | Supabase Postgres | Base relacional principal del MVP |
-| Autenticación | Supabase Auth | Login, sesiones y usuarios del MVP |
-| Autorización | RLS + lógica server-side | Row Level Security en Supabase y controles adicionales del lado servidor |
-| Storage | Supabase Storage | Archivos, comprobantes, recibos o adjuntos del MVP |
-| Validaciones | Zod | Validación de formularios, DTOs y datos de entrada |
-| Estilos/UI | Tailwind CSS o CSS propio | Definir antes de implementar pantallas masivas |
-| Testing | Vitest / Playwright | Unit tests y tests end-to-end cuando aplique |
-| Desarrollo local | Supabase CLI + Docker | Stack local reproducible |
-| CI/CD | GitHub Actions | Checks automáticos por PR/push |
-| Seguridad local | Gitleaks / ESLint / TypeScript checks | Prevención de errores básicos y secretos |
+The MVP must not become an irreversible dependency on Supabase. Code decisions should facilitate a future migration to native AWS.
 
 ---
 
-## 5. Tecnologías no utilizadas en el MVP
+## 4. MVP Technology Stack
+
+| Area              | Technology                            | Decision                                                           |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| Web framework     | SvelteKit                             | Main application framework                                         |
+| Language          | TypeScript                            | Mandatory for frontend and minimal server-side logic               |
+| App type          | PWA                                   | Installable web, responsive and usable on PC/mobile/tablet         |
+| Runtime           | Node.js LTS                           | For SvelteKit server-side when appropriate                         |
+| Package manager   | pnpm                                  | Only allowed package manager                                       |
+| Initial backend   | SvelteKit server actions / API routes | Only for sensitive logic or minimal endpoints                      |
+| Database          | Supabase Postgres                     | Main relational database for the MVP                               |
+| Authentication    | Supabase Auth                         | Login, sessions, and MVP users                                     |
+| Authorization     | RLS + server-side logic               | Row Level Security in Supabase and additional server-side controls |
+| Storage           | Supabase Storage                      | Files, vouchers, receipts, or attachments for the MVP              |
+| Validations       | Zod                                   | Form validation, DTOs, and input data                              |
+| Styles/UI         | Tailwind CSS or custom CSS            | Define before implementing large-scale screens                     |
+| Testing           | Vitest / Playwright                   | Unit tests and end-to-end tests when applicable                    |
+| Local development | Supabase CLI + Docker                 | Reproducible local stack                                           |
+| CI/CD             | GitHub Actions                        | Automated checks per PR/push                                       |
+| Local security    | Gitleaks / ESLint / TypeScript checks | Prevention of basic errors and secrets                             |
+
+---
+
+## 5. Technologies Not Used in the MVP
 
 ### Tauri
 
-No se usará en el MVP.
+Will not be used in the MVP.
 
-Motivo:
+Reason:
 
-- El objetivo actual es una webapp/PWA, no una aplicación desktop instalable.
-- Agrega builds por sistema operativo.
-- Agrega distribución de instaladores.
-- Agrega mantenimiento de actualizaciones desktop.
-- No elimina la necesidad de backend/base centralizada.
+- The current goal is a webapp/PWA, not an installable desktop application.
+- Adds per-OS builds.
+- Adds installer distribution.
+- Adds desktop update maintenance.
+- Does not eliminate the need for a backend/centralized database.
 
-Tauri solo se reconsiderará si aparece una necesidad concreta:
+Tauri will only be reconsidered if a concrete need arises:
 
-- Uso offline fuerte.
-- Acceso avanzado a impresoras locales.
-- Acceso a hardware local.
-- Integración nativa con Windows/Linux/macOS.
-- Instalador obligatorio para una PC del cuartel.
+- Strong offline usage.
+- Advanced access to local printers.
+- Access to local hardware.
+- Native integration with Windows/Linux/macOS.
+- Mandatory installer for a station PC.
 
 ### Rust
 
-No se usará como backend principal del MVP.
+Will not be used as the main backend for the MVP.
 
-Motivo:
+Reason:
 
-- El MVP necesita velocidad de desarrollo.
-- La app es principalmente administrativa y transaccional.
-- TypeScript permite compartir lenguaje entre frontend, validaciones y server-side mínimo.
-- Rust puede ser incorporado más adelante si aparece una necesidad técnica real.
+- The MVP needs development speed.
+- The app is primarily administrative and transactional.
+- TypeScript allows sharing language between frontend, validations, and minimal server-side.
+- Rust can be incorporated later if a real technical need arises.
 
-### Backend propio complejo
+### Complex Custom Backend
 
-No se construirá una API separada desde el día 1 salvo que el alcance cambie.
+A separate API will not be built from day 1 unless the scope changes.
 
-Motivo:
+Reason:
 
-- SvelteKit server actions/API routes son suficientes para encapsular operaciones sensibles del MVP.
-- Supabase ya aporta Auth, Postgres, APIs y Storage.
-- Crear una API propia completa antes de validar el producto aumentaría el costo inicial.
+- SvelteKit server actions/API routes are sufficient to encapsulate sensitive MVP operations.
+- Supabase already provides Auth, Postgres, APIs, and Storage.
+- Creating a full custom API before validating the product would increase initial cost.
 
 ---
 
-## 6. Uso previsto de Supabase en el MVP
+## 6. Intended Use of Supabase in the MVP
 
-Supabase debe usarse como acelerador del MVP, no como lugar para esconder lógica crítica sin documentación.
+Supabase should be used as an MVP accelerator, not as a place to hide critical logic without documentation.
 
-### Componentes permitidos
+### Allowed Components
 
 ```txt
 Supabase Auth
@@ -165,198 +165,198 @@ Supabase local development
 Row Level Security
 ```
 
-### Componentes permitidos con cautela
+### Allowed Components with Caution
 
 ```txt
 Supabase Edge Functions
 Supabase Realtime
-Triggers complejos en Postgres
-Funciones SQL con mucha lógica de negocio
+Complex Postgres triggers
+SQL functions with heavy business logic
 ```
 
-Usarlos solo si resuelven un problema concreto. Si se usan, deben estar documentados.
+Use them only if they solve a concrete problem. If used, they must be documented.
 
-### Componentes a evitar inicialmente
+### Components to Avoid Initially
 
 ```txt
-Lógica de negocio crítica distribuida entre frontend, RLS, triggers y Edge Functions sin documentación
-Uso de service_role key en el cliente
-Dependencias fuertes a APIs propietarias si hay alternativa simple
-Diseños que dificulten migrar a RDS PostgreSQL
+Critical business logic distributed across frontend, RLS, triggers, and Edge Functions without documentation
+Use of service_role key on the client
+Strong dependencies on proprietary APIs if a simple alternative exists
+Designs that make migration to RDS PostgreSQL difficult
 ```
 
 ---
 
-## 7. Reglas de seguridad para Supabase
+## 7. Security Rules for Supabase
 
-### Reglas obligatorias
+### Mandatory Rules
 
-- No exponer nunca `SUPABASE_SERVICE_ROLE_KEY` en el navegador.
-- La `service_role key` solo puede existir en entorno server-side seguro.
-- Todas las tablas expuestas desde cliente deben tener RLS habilitado.
-- Las políticas RLS deben estar versionadas como migraciones SQL.
-- Los roles de aplicación deben estar modelados explícitamente.
-- Los permisos no deben depender únicamente de ocultar botones en la UI.
-- Todo cambio sensible debe dejar rastro de auditoría.
-- Los pagos, recibos, movimientos y liquidaciones no deben eliminarse físicamente sin una decisión explícita de auditoría.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` in the browser.
+- The `service_role key` may only exist in a secure server-side environment.
+- All tables exposed from the client must have RLS enabled.
+- RLS policies must be versioned as SQL migrations.
+- Application roles must be explicitly modeled.
+- Permissions must not rely solely on hiding buttons in the UI.
+- Every sensitive change must leave an audit trail.
+- Payments, receipts, transactions, and settlements must not be physically deleted without an explicit audit decision.
 
-### Roles esperados inicialmente
+### Initially Expected Roles
 
-Los nombres exactos pueden cambiar, pero el modelo debe contemplar al menos:
+Exact names may change, but the model must contemplate at least:
 
 ```txt
 admin
-operador
-tesorero
-cobrador
-consulta
+operator
+treasurer
+collector
+read-only
 ```
 
-### Modelo sugerido de permisos
+### Suggested Permission Model
 
 ```txt
 admin:
-  acceso total funcional, excepto operaciones destructivas irreversibles si se decide restringirlas
+  full functional access, except irreversible destructive operations if decided to restrict them
 
-operador:
-  alta/edición operativa de socios, clientes, rifas y pagos según reglas definidas
+operator:
+  operational creation/editing of members, buyers, raffles, and payments according to defined rules
 
-tesorero:
-  reportes económicos, liquidaciones, conciliaciones, control de pagos
+treasurer:
+  financial reports, settlements, reconciliations, payment control
 
-cobrador:
-  acceso limitado a su cartera, pagos asignados y registros permitidos
+collector:
+  limited access to their portfolio, assigned payments, and permitted records
 
-consulta:
-  solo lectura, con alcance definido
+read-only:
+  read-only, with defined scope
 ```
 
-### Auditoría mínima
+### Minimum Audit
 
-Toda operación sensible debería guardar:
+Every sensitive operation should record:
 
 ```txt
-usuario
-fecha/hora
-acción
-entidad afectada
-id de entidad
-valor anterior cuando aplique
-valor nuevo cuando aplique
-origen de la operación
+user
+date/time
+action
+affected entity
+entity id
+previous value when applicable
+new value when applicable
+operation source
 ```
 
 ---
 
-## 8. Diseño de datos
+## 8. Data Design
 
-### Principios
+### Principles
 
-- Usar PostgreSQL relacional como fuente de verdad.
-- Versionar todos los cambios de esquema mediante migraciones.
-- Preferir integridad referencial real con foreign keys.
-- Usar constraints para reglas invariantes.
-- Evitar lógica crítica solamente en frontend.
-- Evitar borrados físicos en entidades económicas sin necesidad comprobada.
+- Use relational PostgreSQL as the source of truth.
+- Version all schema changes through migrations.
+- Prefer real referential integrity with foreign keys.
+- Use constraints for invariant rules.
+- Avoid critical logic only on the frontend.
+- Avoid physical deletes on economic entities without proven need.
 
-### Entidades esperadas
+### Expected Entities
 
-El modelo final puede cambiar, pero el dominio debería contemplar:
+The final model may change, but the domain should contemplate:
 
 ```txt
 users / profiles
 roles
 permissions
-socios
-clientes
-cobradores
-rifas
-bonos
-numeros
-ventas
-pagos
-recibos
-movimientos
-liquidaciones
-reportes
+members
+buyers
+collectors
+raffles
+bonds
+numbers
+sales
+payments
+receipts
+transactions
+settlements
+reports
 audit_log
-archivos / comprobantes
+files / vouchers
 ```
 
-### Criterios de modelado
+### Modeling Criteria
 
-- Los pagos deben ser trazables.
-- Los recibos deben tener numeración o identificador único.
-- Los cambios de estado deben quedar registrados.
-- Los reportes económicos deben poder reconstruirse desde datos transaccionales.
-- Las operaciones históricas no deben depender de valores actuales que puedan cambiar.
+- Payments must be traceable.
+- Receipts must have unique numbering or identifier.
+- State changes must be recorded.
+- Financial reports must be reconstructable from transactional data.
+- Historical operations must not depend on current values that may change.
 
-Ejemplo: si cambia el nombre de un cobrador, un recibo histórico no debería perder contexto.
+Example: if a collector's name changes, a historical receipt should not lose context.
 
 ---
 
 ## 9. PWA
 
-La app será una PWA desde el MVP.
+The app will be a PWA from the MVP.
 
-### Objetivos
+### Objectives
 
-- Instalable desde navegador cuando el dispositivo lo permita.
-- Responsive para PC, celular y tablet.
-- Carga rápida.
-- Experiencia similar a aplicación.
-- Offline parcial solo para assets y pantallas permitidas.
+- Installable from the browser when the device allows it.
+- Responsive for PC, mobile, and tablet.
+- Fast loading.
+- App-like experience.
+- Partial offline only for assets and permitted screens.
 
-### Alcance offline inicial
+### Initial Offline Scope
 
-Para el MVP, el offline debe ser limitado.
+For the MVP, offline should be limited.
 
-Permitido inicialmente:
-
-```txt
-cache de assets estáticos
-pantalla de error amigable sin conexión
-posible acceso a últimas vistas no sensibles si se decide implementar
-```
-
-No recomendado inicialmente:
+Initially allowed:
 
 ```txt
-carga de pagos offline
-sincronización offline de operaciones económicas
-resolución de conflictos offline
-base local transaccional compleja
+static asset caching
+friendly error screen without connection
+possible access to last non-sensitive views if decided to implement
 ```
 
-Motivo: las operaciones económicas y administrativas deben mantener consistencia fuerte. El offline real puede convertirse en uno de los problemas más complejos del sistema.
+Not recommended initially:
+
+```txt
+offline payment loading
+offline synchronization of economic operations
+offline conflict resolution
+complex local transactional database
+```
+
+Reason: economic and administrative operations must maintain strong consistency. Real offline can become one of the most complex problems in the system.
 
 ---
 
-## 10. Backend inicial con SvelteKit
+## 10. Initial Backend with SvelteKit
 
-El MVP puede usar SvelteKit como aplicación full-stack liviana.
+The MVP can use SvelteKit as a lightweight full-stack application.
 
-### Usar server-side para
+### Use Server-Side For
 
-- Validaciones sensibles.
-- Operaciones que requieren `service_role`.
-- Generación de recibos o documentos si corresponde.
-- Consultas que no deben exponerse directamente al cliente.
-- Agregaciones de reportes.
-- Integraciones externas.
-- Acciones administrativas.
+- Sensitive validations.
+- Operations requiring `service_role`.
+- Receipt or document generation if applicable.
+- Queries that should not be directly exposed to the client.
+- Report aggregations.
+- External integrations.
+- Administrative actions.
 
-### No usar server-side para
+### Do Not Use Server-Side For
 
-- Duplicar innecesariamente todo lo que Supabase puede resolver de forma segura con RLS.
-- Crear una API enorme antes de validar el MVP.
-- Mezclar lógica de negocio directamente en componentes visuales.
+- Unnecessarily duplicating everything Supabase can securely handle with RLS.
+- Creating a large API before validating the MVP.
+- Mixing business logic directly into visual components.
 
-### Regla de arquitectura
+### Architecture Rule
 
-La lógica de negocio debe quedar fuera de los componentes de UI.
+Business logic must stay out of UI components.
 
-Ubicaciones sugeridas:
+Suggested locations:
 
 ```txt
 src/lib/domain/
@@ -368,7 +368,7 @@ src/lib/server/auth/
 
 ---
 
-## 11. Estructura sugerida del repositorio
+## 11. Suggested Repository Structure
 
 ```txt
 repo/
@@ -427,13 +427,13 @@ repo/
 
 ---
 
-## 12. Archivos de entorno
+## 12. Environment Files
 
 ### `.env.example`
 
-Debe existir siempre y no debe contener secretos reales.
+Must always exist and must not contain real secrets.
 
-Variables esperadas para MVP:
+Expected variables for MVP:
 
 ```env
 PUBLIC_SUPABASE_URL=
@@ -442,18 +442,18 @@ SUPABASE_SERVICE_ROLE_KEY=
 APP_ENV=local
 ```
 
-Reglas:
+Rules:
 
-- `PUBLIC_*` puede estar disponible en cliente.
-- `SUPABASE_SERVICE_ROLE_KEY` nunca puede estar disponible en cliente.
-- `.env` real debe estar ignorado por Git.
-- Los agentes IA no deben inventar valores reales.
+- `PUBLIC_*` may be available on the client.
+- `SUPABASE_SERVICE_ROLE_KEY` must never be available on the client.
+- The real `.env` must be ignored by Git.
+- AI agents must not invent real values.
 
 ---
 
-## 13. Desarrollo local
+## 13. Local Development
 
-### Herramientas necesarias
+### Required Tools
 
 ```txt
 Git
@@ -461,10 +461,10 @@ Node.js LTS
 pnpm
 Docker
 Supabase CLI
-Editor compatible con TypeScript/Svelte
+TypeScript/Svelte-compatible editor
 ```
 
-### Flujo esperado
+### Expected Workflow
 
 ```bash
 pnpm install
@@ -472,7 +472,7 @@ supabase start
 pnpm dev
 ```
 
-### Validación local
+### Local Validation
 
 ```bash
 pnpm check
@@ -480,77 +480,77 @@ pnpm lint
 pnpm test
 ```
 
-### Diagnóstico
+### Diagnostics
 
-Debe existir un script de diagnóstico:
+A diagnostic script must exist:
 
 ```bash
 ./scripts/doctor.sh
 ```
 
-El script debería verificar, como mínimo:
+The script should verify at minimum:
 
 ```txt
 node
 pnpm
 docker
 supabase CLI
-variables de entorno esperadas
-conexión local a Supabase
+expected environment variables
+local Supabase connection
 ```
 
 ---
 
 ## 14. CI/CD
 
-### Validaciones mínimas en Pull Request
+### Minimum Validations on Pull Request
 
 ```txt
 pnpm install --frozen-lockfile
 pnpm check
 pnpm lint
 pnpm test
-validación de migraciones Supabase
-escaneo básico de secretos
+Supabase migration validation
+basic secret scanning
 ```
 
-### Reglas
+### Rules
 
-- No mergear cambios que rompan TypeScript.
-- No mergear migraciones no revisadas.
-- No mergear cambios con secretos.
-- No mergear cambios que alteren permisos/RLS sin explicación.
-- Toda modificación de arquitectura debe documentarse.
+- Do not merge changes that break TypeScript.
+- Do not merge unreviewed migrations.
+- Do not merge changes with secrets.
+- Do not merge changes that alter permissions/RLS without explanation.
+- All architecture modifications must be documented.
 
 ---
 
-## 15. Instrucciones para agentes IA
+## 15. Instructions for AI Agents
 
-Los agentes IA deben seguir estas reglas:
+AI agents must follow these rules:
 
-### Antes de modificar código
+### Before Modifying Code
 
-- Leer `README.md`.
-- Leer este documento.
-- Leer `AGENTS.md` si existe.
-- Inspeccionar archivos reales antes de proponer cambios.
-- No asumir que existen módulos, carpetas o scripts que no están en el repositorio.
+- Read `README.md`.
+- Read this document.
+- Read `AGENTS.md` if it exists.
+- Inspect real files before proposing changes.
+- Do not assume modules, folders, or scripts exist that are not in the repository.
 
-### Durante el desarrollo
+### During Development
 
-- Preferir cambios pequeños y revisables.
-- No introducir dependencias sin justificar.
-- No cambiar el stack tecnológico sin pedir confirmación.
-- No agregar Tauri.
-- No agregar Rust.
-- No crear backend separado salvo pedido explícito.
-- No eliminar Supabase del MVP.
-- No exponer claves privadas en cliente.
-- No debilitar RLS para “hacer funcionar rápido”.
+- Prefer small, reviewable changes.
+- Do not introduce dependencies without justification.
+- Do not change the technology stack without asking for confirmation.
+- Do not add Tauri.
+- Do not add Rust.
+- Do not create a separate backend unless explicitly requested.
+- Do not remove Supabase from the MVP.
+- Do not expose private keys on the client.
+- Do not weaken RLS to "make it work quickly".
 
-### Después de modificar código
+### After Modifying Code
 
-Ejecutar o indicar claramente si no pudo ejecutar:
+Run or clearly indicate if unable to run:
 
 ```bash
 pnpm check
@@ -558,55 +558,55 @@ pnpm lint
 pnpm test
 ```
 
-Si se modifican migraciones o políticas de seguridad, explicar:
+If migrations or security policies are modified, explain:
 
 ```txt
-qué cambió
-por qué cambió
-qué riesgo reduce
-qué riesgo nuevo introduce
-cómo se prueba
+what changed
+why it changed
+what risk it reduces
+what new risk it introduces
+how to test it
 ```
 
 ---
 
-## 16. Convenciones de código
+## 16. Code Conventions
 
 ### TypeScript
 
-- TypeScript estricto siempre que sea posible.
-- Evitar `any` salvo justificación puntual.
-- Validar inputs con Zod u otra herramienta definida.
-- Tipar respuestas de Supabase.
-- Centralizar tipos de dominio.
+- Strict TypeScript whenever possible.
+- Avoid `any` unless specifically justified.
+- Validate inputs with Zod or another defined tool.
+- Type Supabase responses.
+- Centralize domain types.
 
 ### SvelteKit
 
-- Componentes visuales simples.
-- Lógica reutilizable en `src/lib`.
-- Lógica server-side en `src/lib/server`.
-- No acceder a variables privadas desde cliente.
-- Separar formularios, validaciones y servicios.
+- Simple visual components.
+- Reusable logic in `src/lib`.
+- Server-side logic in `src/lib/server`.
+- Do not access private variables from the client.
+- Separate forms, validations, and services.
 
-### Base de datos
+### Database
 
-- Migraciones versionadas.
-- Constraints para reglas críticas.
-- Foreign keys cuando corresponda.
-- Índices para búsquedas frecuentes.
-- Auditoría para entidades sensibles.
+- Versioned migrations.
+- Constraints for critical rules.
+- Foreign keys where appropriate.
+- Indexes for frequent searches.
+- Auditing for sensitive entities.
 
 ---
 
-## 17. Estrategia post-MVP: migración a AWS nativo
+## 17. Post-MVP Strategy: Migration to Native AWS
 
-Cuando el MVP esté validado, la arquitectura objetivo será:
+Once the MVP is validated, the target architecture will be:
 
 ```txt
-PWA SvelteKit
+SvelteKit PWA
         |
         v
-API propia
+Custom API
         |
         v
 RDS PostgreSQL
@@ -617,137 +617,137 @@ RDS PostgreSQL
         +--> Secrets Manager
 ```
 
-### Stack post-MVP esperado
+### Expected Post-MVP Stack
 
-| Área | Tecnología objetivo |
-|---|---|
-| Web/PWA | SvelteKit + TypeScript |
-| API | API propia en Node.js/TypeScript inicialmente, salvo decisión contraria |
-| Base de datos | Amazon RDS PostgreSQL |
-| Archivos | Amazon S3 |
-| Autenticación | Amazon Cognito o integración OIDC/SAML definida |
-| Autorización | API propia + roles/permisos + IAM donde corresponda |
-| Secretos | AWS Secrets Manager |
-| Logs/monitoreo | CloudWatch |
-| Infraestructura | Terraform |
-| CI/CD | GitHub Actions |
-| Seguridad | IAM least privilege, WAF si aplica, backups, auditoría |
+| Area            | Target Technology                                                    |
+| --------------- | -------------------------------------------------------------------- |
+| Web/PWA         | SvelteKit + TypeScript                                               |
+| API             | Custom API in Node.js/TypeScript initially, unless decided otherwise |
+| Database        | Amazon RDS PostgreSQL                                                |
+| Files           | Amazon S3                                                            |
+| Authentication  | Amazon Cognito or defined OIDC/SAML integration                      |
+| Authorization   | Custom API + roles/permissions + IAM where appropriate               |
+| Secrets         | AWS Secrets Manager                                                  |
+| Logs/monitoring | CloudWatch                                                           |
+| Infrastructure  | Terraform                                                            |
+| CI/CD           | GitHub Actions                                                       |
+| Security        | IAM least privilege, WAF if applicable, backups, auditing            |
 
-### Reglas para facilitar la migración
+### Rules to Facilitate Migration
 
-Desde el MVP deben respetarse estas reglas:
+These rules must be respected from the MVP:
 
-- Mantener la lógica de negocio fuera de componentes UI.
-- Encapsular acceso a Supabase en módulos específicos.
-- No dispersar queries por toda la aplicación.
-- Mantener migraciones SQL claras.
-- Evitar Edge Functions salvo necesidad real.
-- Evitar triggers complejos como reemplazo de servicios de dominio.
-- No depender de features propietarias si PostgreSQL estándar alcanza.
-- Separar modelo de dominio de SDKs concretos.
-- Documentar todas las políticas RLS.
-- Mantener una capa de repositorios/servicios que pueda apuntar luego a API propia.
-
----
-
-## 18. Riesgos conocidos
-
-### Riesgo: Supabase como dependencia fuerte
-
-Mitigación:
-
-- Mantener dominio desacoplado.
-- No abusar de Edge Functions.
-- Versionar SQL.
-- Documentar RLS.
-- Diseñar pensando en PostgreSQL estándar.
-
-### Riesgo: RLS mal diseñado
-
-Mitigación:
-
-- Activar RLS desde el inicio.
-- Revisar políticas en PR.
-- Crear tests de permisos.
-- Usar roles explícitos.
-- No confiar solo en UI.
-
-### Riesgo: offline demasiado ambicioso
-
-Mitigación:
-
-- Offline parcial en MVP.
-- No registrar pagos offline inicialmente.
-- No sincronizar operaciones económicas hasta tener diseño formal.
-
-### Riesgo: reportes inconsistentes
-
-Mitigación:
-
-- Usar datos transaccionales.
-- No sobrescribir historial.
-- Auditar movimientos.
-- Diseñar estados y cierres mensuales con cuidado.
-
-### Riesgo: migración futura subestimada
-
-Mitigación:
-
-- Definir desde ahora límites de uso de Supabase.
-- Documentar qué parte reemplazaría AWS.
-- Evitar acoplamientos innecesarios.
+- Keep business logic out of UI components.
+- Encapsulate Supabase access in specific modules.
+- Do not scatter queries throughout the application.
+- Maintain clear SQL migrations.
+- Avoid Edge Functions unless there is a real need.
+- Avoid complex triggers as a replacement for domain services.
+- Do not depend on proprietary features if standard PostgreSQL suffices.
+- Separate domain model from specific SDKs.
+- Document all RLS policies.
+- Maintain a repository/service layer that can later point to a custom API.
 
 ---
 
-## 19. Decisiones explícitas registradas
+## 18. Known Risks
 
-### Decisión 1: MVP WebApp/PWA
+### Risk: Supabase as a Strong Dependency
 
-Se construirá una webapp/PWA para cubrir PC, celular y tablet sin una aplicación desktop separada.
+Mitigation:
 
-### Decisión 2: Supabase para acelerar MVP
+- Keep domain decoupled.
+- Do not overuse Edge Functions.
+- Version SQL.
+- Document RLS.
+- Design with standard PostgreSQL in mind.
 
-Supabase será usado para Auth, Postgres, Storage y entorno local durante el MVP.
+### Risk: Poorly Designed RLS
 
-### Decisión 3: No Tauri en MVP
+Mitigation:
 
-Tauri queda fuera hasta que exista una necesidad real de escritorio.
+- Enable RLS from the start.
+- Review policies in PRs.
+- Create permission tests.
+- Use explicit roles.
+- Do not rely solely on UI.
 
-### Decisión 4: No Rust en MVP
+### Risk: Overly Ambitious Offline
 
-Rust queda fuera del MVP para priorizar velocidad de desarrollo y simplicidad.
+Mitigation:
 
-### Decisión 5: No backend propio complejo desde el día 1
+- Partial offline in MVP.
+- Do not record payments offline initially.
+- Do not synchronize economic operations until there is a formal design.
 
-SvelteKit server-side y Supabase cubrirán las necesidades iniciales. Una API propia se evaluará luego del MVP.
+### Risk: Inconsistent Reports
 
-### Decisión 6: AWS como destino post-MVP
+Mitigation:
 
-La arquitectura posterior al MVP apunta a AWS con API propia, RDS PostgreSQL, S3, Cognito/IAM, Secrets Manager, CloudWatch y Terraform.
+- Use transactional data.
+- Do not overwrite history.
+- Audit transactions.
+- Design states and monthly closings carefully.
+
+### Risk: Underestimated Future Migration
+
+Mitigation:
+
+- Define Supabase usage limits from now.
+- Document which part AWS would replace.
+- Avoid unnecessary couplings.
 
 ---
 
-## 20. Relación con README actual del proyecto
+## 19. Recorded Explicit Decisions
 
-El README generado previamente estaba orientado a:
+### Decision 1: MVP WebApp/PWA
+
+A webapp/PWA will be built to cover PC, mobile, and tablet without a separate desktop application.
+
+### Decision 2: Supabase to Accelerate MVP
+
+Supabase will be used for Auth, Postgres, Storage, and local environment during the MVP.
+
+### Decision 3: No Tauri in MVP
+
+Tauri is ruled out until there is a real desktop need.
+
+### Decision 4: No Rust in MVP
+
+Rust is ruled out of the MVP to prioritize development speed and simplicity.
+
+### Decision 5: No Complex Custom Backend from Day 1
+
+SvelteKit server-side and Supabase will cover initial needs. A custom API will be evaluated after the MVP.
+
+### Decision 6: AWS as Post-MVP Destination
+
+The post-MVP architecture targets AWS with custom API, RDS PostgreSQL, S3, Cognito/IAM, Secrets Manager, CloudWatch, and Terraform.
+
+---
+
+## 20. Relationship with Current Project README
+
+The previously generated README was oriented toward:
 
 ```txt
 Svelte + Rust + Tauri v2 + AWS + LocalStack
 ```
 
-Esa orientación queda reemplazada para el MVP por:
+That orientation is replaced for the MVP by:
 
 ```txt
 SvelteKit + TypeScript + PWA + Supabase
 ```
 
-Se deben actualizar los archivos del repositorio para reflejar esta decisión:
+Repository files must be updated to reflect this decision:
 
 ```txt
 README.md
 AGENTS.md
 CLAUDE.md
-opencode.json si existe
+opencode.json if it exists
 Taskfile.yml
 mise.toml
 scripts/bootstrap-*
@@ -756,13 +756,13 @@ docker-compose.local.yml
 .github/workflows/ci.yml
 ```
 
-En particular, cualquier instrucción que asuma `src-tauri`, `cargo`, `rustfmt`, `clippy` o `pnpm tauri:dev` debe ser eliminada o movida a documentación histórica.
+In particular, any instruction assuming `src-tauri`, `cargo`, `rustfmt`, `clippy`, or `pnpm tauri:dev` must be removed or moved to historical documentation.
 
 ---
 
-## 21. Comandos objetivo del MVP
+## 21. Target MVP Commands
 
-Los comandos exactos pueden ajustarse al inicializar el proyecto, pero el contrato recomendado es:
+Exact commands may be adjusted when initializing the project, but the recommended contract is:
 
 ```bash
 pnpm install
@@ -775,7 +775,7 @@ pnpm format
 pnpm test
 ```
 
-Supabase local:
+Local Supabase:
 
 ```bash
 supabase init
@@ -784,10 +784,10 @@ supabase status
 supabase stop
 ```
 
-Migraciones:
+Migrations:
 
 ```bash
-supabase migration new <nombre>
+supabase migration new <name>
 supabase db reset
 ```
 
@@ -795,45 +795,45 @@ supabase db reset
 
 ## 22. Definition of Done
 
-Una tarea se considera terminada cuando:
+A task is considered done when:
 
-- El código compila.
-- TypeScript no reporta errores.
-- Los tests relevantes pasan.
-- No hay secretos nuevos.
-- Las migraciones están versionadas.
-- Las políticas RLS afectadas están documentadas.
-- La UI funciona en desktop y mobile cuando aplica.
-- La documentación fue actualizada si cambió arquitectura, comandos o variables.
-- El cambio no introduce Tauri, Rust ni backend propio complejo sin aprobación explícita.
-
----
-
-## 23. Preguntas pendientes
-
-Antes de cerrar completamente la arquitectura del MVP, falta definir:
-
-- Hosting inicial de SvelteKit: AWS, Vercel, Netlify u otro.
-- Si SvelteKit correrá con SSR o como app principalmente estática.
-- Plan de Supabase para producción.
-- Región de Supabase.
-- Modelo definitivo de roles.
-- Reglas exactas de auditoría.
-- Si los recibos serán HTML imprimible, PDF, ambos o storage persistente.
-- Si habrá integración con email/WhatsApp.
-- Estrategia de backups y recuperación.
-- Momento exacto para migrar a AWS nativo.
+- The code compiles.
+- TypeScript reports no errors.
+- Relevant tests pass.
+- There are no new secrets.
+- Migrations are versioned.
+- Affected RLS policies are documented.
+- The UI works on desktop and mobile when applicable.
+- Documentation was updated if architecture, commands, or variables changed.
+- The change does not introduce Tauri, Rust, or complex custom backend without explicit approval.
 
 ---
 
-## 24. Criterio rector
+## 23. Pending Questions
 
-La prioridad del MVP es construir una aplicación útil, segura y mantenible, sin sobreingeniería.
+Before fully closing the MVP architecture, the following remains to be defined:
 
-Regla práctica:
+- Initial hosting for SvelteKit: AWS, Vercel, Netlify, or other.
+- Whether SvelteKit will run with SSR or as a primarily static app.
+- Supabase plan for production.
+- Supabase region.
+- Definitive role model.
+- Exact audit rules.
+- Whether receipts will be printable HTML, PDF, both, or persistent storage.
+- Whether there will be email/WhatsApp integration.
+- Backup and recovery strategy.
+- Exact timing for migrating to native AWS.
+
+---
+
+## 24. Guiding Principle
+
+The MVP priority is to build a useful, secure, and maintainable application, without over-engineering.
+
+Practical rule:
 
 ```txt
-Primero validar el producto.
-Después endurecer arquitectura.
-Finalmente migrar o escalar infraestructura si el uso real lo justifica.
+First validate the product.
+Then harden the architecture.
+Finally migrate or scale infrastructure if real usage justifies it.
 ```

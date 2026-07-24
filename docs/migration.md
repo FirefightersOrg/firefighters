@@ -1,118 +1,118 @@
-# Migracion de datos
+# Data Migration
 
-## Objetivo
+## Objective
 
-Definir como incorporar datos del sistema antiguo o planillas existentes al nuevo sistema.
+Define how to incorporate data from the old system or existing spreadsheets into the new system.
 
-## Datos esperados desde sistema antiguo
+## Expected Data from Old System
 
-El sistema antiguo podria exportar:
+The old system could export:
 
-- Cobradores/vendedores.
-- Compradores.
-- Numeros correspondientes a cada comprador.
-- Relacion comprador-cobrador.
-- Campana anterior.
+- Collectors/sellers.
+- Buyers.
+- Numbers corresponding to each buyer.
+- Buyer-collector relationship.
+- Previous campaign.
 
-## Estrategia
+## Strategy
 
-La migracion debe pasar por staging antes de impactar tablas definitivas.
-
-```txt
-Exportar sistema viejo
-↓
-Normalizar archivo
-↓
-Cargar a staging
-↓
-Validar datos
-↓
-Resolver conflictos
-↓
-Confirmar migracion
-↓
-Generar datos historicos o reservas
-```
-
-## Datos minimos de staging
-
-### Cobradores
-
-- Nombre.
-- Telefono.
-- Email si existe.
-- Codigo externo si existe.
-
-### Compradores
-
-- Nombre o razon social.
-- Telefono.
-- Documento o CUIT si existe.
-- Domicilio si existe.
-- Codigo externo si existe.
-
-### Historico de numeros
-
-- Campana anterior.
-- Numero habitual.
-- Comprador.
-- Cobrador.
-- Tipo de bono si existe.
-
-## Validaciones
-
-- Compradores duplicados.
-- Cobradores duplicados.
-- Numeros repetidos en la misma campana historica.
-- Comprador sin cobrador.
-- Cobrador no encontrado.
-- Formato de numero invalido.
-- Telefonos o documentos inconsistentes.
-
-## Resultado de migracion
-
-La migracion puede crear:
-
-- Cobradores.
-- Compradores.
-- Historial de numeros.
-- Relacion comprador-cobrador habitual.
-- Reservas sugeridas para nueva campana.
-- Conflictos de renovacion.
-
-## Reservas historicas
-
-La migracion no debe vender automaticamente bonos nuevos.
-
-Debe generar sugerencias o reservas:
+Migration must go through staging before affecting definitive tables.
 
 ```txt
-Comprador historico
+Export old system
 ↓
-Numero habitual
+Normalize file
 ↓
-Cobrador habitual
+Load to staging
 ↓
-Sistema verifica disponibilidad en nueva campana
+Validate data
 ↓
-Reserva o conflicto
+Resolve conflicts
+↓
+Confirm migration
+↓
+Generate historical data or reservations
 ```
 
-## Conflictos
+## Minimum Staging Data
 
-Ejemplos:
+### Collectors
 
-- Numero historico no existe en nueva campana.
-- Numero historico pertenece a una pata.
-- Numero historico ya fue asignado a otro comprador.
-- Comprador duplicado.
-- Cobrador inexistente.
+- Name.
+- Phone.
+- Email if available.
+- External code if available.
 
-Cada conflicto debe poder resolverse manualmente.
+### Buyers
 
-## Reglas de seguridad
+- Name or business name.
+- Phone.
+- ID or CUIT if available.
+- Address if available.
+- External code if available.
 
-- No escribir datos definitivos sin vista previa.
-- No sobrescribir compradores existentes sin confirmacion.
-- No borrar datos migrados sin anulacion auditada.
-- Guardar archivo fuente o referencia a la importacion cuando sea posible.
+### Number History
+
+- Previous campaign.
+- Usual number.
+- Buyer.
+- Collector.
+- Bond type if available.
+
+## Validations
+
+- Duplicate buyers.
+- Duplicate collectors.
+- Repeated numbers in the same historical campaign.
+- Buyer without collector.
+- Collector not found.
+- Invalid number format.
+- Inconsistent phones or IDs.
+
+## Migration Result
+
+Migration can create:
+
+- Collectors.
+- Buyers.
+- Number history.
+- Usual buyer-collector relationship.
+- Suggested reservations for new campaign.
+- Renewal conflicts.
+
+## Historical Reservations
+
+Migration must not automatically sell new bonds.
+
+It should generate suggestions or reservations:
+
+```txt
+Historical buyer
+↓
+Usual number
+↓
+Usual collector
+↓
+System checks availability in new campaign
+↓
+Reservation or conflict
+```
+
+## Conflicts
+
+Examples:
+
+- Historical number does not exist in new campaign.
+- Historical number belongs to a pata.
+- Historical number was already assigned to another buyer.
+- Duplicate buyer.
+- Non-existent collector.
+
+Each conflict must be resolvable manually.
+
+## Security Rules
+
+- Do not write definitive data without preview.
+- Do not overwrite existing buyers without confirmation.
+- Do not delete migrated data without audited voiding.
+- Save source file or reference to the import when possible.

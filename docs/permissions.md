@@ -1,139 +1,139 @@
-# Permisos y roles
+# Permissions and roles
 
-## Objetivo
+## Objective
 
-Definir un modelo adaptable de permisos para el MVP y futuras etapas. El sistema no debe depender solo de nombres de roles fijos; debe usar roles como agrupadores de permisos granulares.
+Define an adaptable permission model for the MVP and future stages. The system must not depend solely on fixed role names; it must use roles as groupers of granular permissions.
 
-## Principio rector
+## Guiding principle
 
 ```txt
-Rol = conjunto de permisos
-Permiso = accion concreta del sistema
+Role = set of permissions
+Permission = concrete system action
 ```
 
-Esto permite cambiar permisos de un rol sin reescribir logica de negocio, pantallas o politicas RLS.
+This allows changing permissions of a role without rewriting business logic, screens, or RLS policies.
 
-## Roles iniciales
+## Initial roles
 
-| Rol | Proposito |
-|---|---|
-| `admin` | Configuracion total, usuarios, reglas y correcciones criticas. |
-| `operador` | Operacion diaria de bonos, compradores, ventas, pagos y rendiciones abiertas. |
-| `tesorero` | Rendiciones, comisiones, cuenta corriente, caja y reportes economicos. |
-| `cobrador` | Acceso futuro limitado a cartera propia. |
-| `consulta` | Solo lectura segun alcance definido. |
+| Role        | Purpose                                                                          |
+| ----------- | -------------------------------------------------------------------------------- |
+| `admin`     | Full configuration, users, rules, and critical corrections.                      |
+| `operator`  | Daily operations for bonds, buyers, sales, payments, and open settlements.       |
+| `treasurer` | Settlements, commissions, current account, cash register, and financial reports. |
+| `collector` | Future limited access to own portfolio.                                          |
+| `read-only` | Read-only within defined scope.                                                  |
 
-## Permisos granulares
+## Granular permissions
 
-### Campanas
+### Campaigns
 
-| Permiso | Descripcion |
-|---|---|
-| `campaign.view` | Ver campanas. |
-| `campaign.create` | Crear campanas. |
-| `campaign.update` | Editar datos generales. |
-| `campaign.update_rules` | Modificar reglas criticas de numeracion, cuotas, comisiones y sorteos. |
-| `campaign.close` | Cerrar campana. |
+| Permission              | Description                                                                |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `campaign.view`         | View campaigns.                                                            |
+| `campaign.create`       | Create campaigns.                                                          |
+| `campaign.update`       | Edit general data.                                                         |
+| `campaign.update_rules` | Modify critical rules for numbering, installments, commissions, and draws. |
+| `campaign.close`        | Close campaign.                                                            |
 
-### Bonos
+### Bonds
 
-| Permiso | Descripcion |
-|---|---|
-| `bond.view` | Ver bonos. |
-| `bond.create` | Crear bonos manualmente. |
-| `bond.import` | Importar o cargar bonos por lote. |
-| `bond.scan` | Cargar o buscar bonos por codigo de barras. |
-| `bond.assign` | Asignar bonos a cobradores. |
-| `bond.return` | Registrar devoluciones. |
-| `bond.mark_lost` | Registrar extravio. |
-| `bond.annul` | Anular bonos. |
+| Permission       | Description                      |
+| ---------------- | -------------------------------- |
+| `bond.view`      | View bonds.                      |
+| `bond.create`    | Create bonds manually.           |
+| `bond.import`    | Import or load bonds in batch.   |
+| `bond.scan`      | Load or search bonds by barcode. |
+| `bond.assign`    | Assign bonds to collectors.      |
+| `bond.return`    | Record returns.                  |
+| `bond.mark_lost` | Record loss.                     |
+| `bond.annul`     | Annul bonds.                     |
 
-### Compradores y cobradores
+### Buyers and collectors
 
-| Permiso | Descripcion |
-|---|---|
-| `buyer.view` | Ver compradores. |
-| `buyer.manage` | Crear y editar compradores. |
-| `collector.view` | Ver cobradores. |
-| `collector.manage` | Crear y editar cobradores. |
-| `collector.ledger.view` | Ver cuenta corriente. |
-| `collector.ledger.adjust` | Registrar ajustes manuales. |
+| Permission                | Description                 |
+| ------------------------- | --------------------------- |
+| `buyer.view`              | View buyers.                |
+| `buyer.manage`            | Create and edit buyers.     |
+| `collector.view`          | View collectors.            |
+| `collector.manage`        | Create and edit collectors. |
+| `collector.ledger.view`   | View current account.       |
+| `collector.ledger.adjust` | Record manual adjustments.  |
 
-### Ventas, pagos y rendiciones
+### Sales, payments, and settlements
 
-| Permiso | Descripcion |
-|---|---|
-| `sale.create` | Registrar ventas. |
-| `sale.correct` | Corregir ventas con auditoria. |
-| `payment.create` | Registrar pagos. |
-| `payment.annul` | Anular pagos confirmados. |
-| `rendition.create` | Crear rendiciones. |
-| `rendition.update_open` | Editar rendiciones abiertas. |
-| `rendition.close` | Cerrar rendiciones. |
-| `rendition.correct` | Corregir rendiciones cerradas mediante ajustes. |
+| Permission               | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| `sale.create`            | Register sales.                                 |
+| `sale.correct`           | Correct sales with audit.                       |
+| `payment.create`         | Register payments.                              |
+| `payment.annul`          | Annul confirmed payments.                       |
+| `settlement.create`      | Create settlements.                             |
+| `settlement.update_open` | Edit open settlements.                          |
+| `settlement.close`       | Close settlements.                              |
+| `settlement.correct`     | Correct closed settlements through adjustments. |
 
-### Comisiones
+### Commissions
 
-| Permiso | Descripcion |
-|---|---|
-| `commission.view` | Ver comisiones. |
-| `commission.rule_manage` | Gestionar reglas de comision. |
-| `commission.adjust` | Ajustar comision manualmente con motivo. |
-| `commission.settle` | Liquidar/pagar comisiones. |
+| Permission               | Description                             |
+| ------------------------ | --------------------------------------- |
+| `commission.view`        | View commissions.                       |
+| `commission.rule_manage` | Manage commission rules.                |
+| `commission.adjust`      | Manually adjust commission with reason. |
+| `commission.settle`      | Settle/pay commissions.                 |
 
-### Sorteos y premios
+### Draws and prizes
 
-| Permiso | Descripcion |
-|---|---|
-| `draw.view` | Ver sorteos. |
-| `draw.create` | Crear sorteos. |
-| `draw.update` | Editar sorteos programados. |
-| `draw.generate_roster` | Generar padron. |
-| `draw.freeze_roster` | Congelar padron. |
-| `draw.load_winner` | Cargar numero ganador. |
-| `prize.resolve` | Resolver adjudicacion o no adjudicacion. |
-| `prize.deliver` | Registrar entrega de premio. |
+| Permission             | Description                 |
+| ---------------------- | --------------------------- |
+| `draw.view`            | View draws.                 |
+| `draw.create`          | Create draws.               |
+| `draw.update`          | Edit scheduled draws.       |
+| `draw.generate_roster` | Generate roster.            |
+| `draw.freeze_roster`   | Freeze roster.              |
+| `draw.load_winner`     | Load winning number.        |
+| `prize.resolve`        | Resolve award or non-award. |
+| `prize.deliver`        | Record prize delivery.      |
 
-### Reportes, auditoria y usuarios
+### Reports, audit, and users
 
-| Permiso | Descripcion |
-|---|---|
-| `report.view_operational` | Ver reportes operativos. |
-| `report.view_financial` | Ver reportes economicos. |
-| `report.export` | Exportar reportes. |
-| `audit.view` | Ver auditoria. |
-| `user.manage` | Gestionar usuarios y roles. |
+| Permission                | Description               |
+| ------------------------- | ------------------------- |
+| `report.view_operational` | View operational reports. |
+| `report.view_financial`   | View financial reports.   |
+| `report.export`           | Export reports.           |
+| `audit.view`              | View audit log.           |
+| `user.manage`             | Manage users and roles.   |
 
-## Matriz inicial sugerida
+## Initial suggested matrix
 
-| Permiso | admin | operador | tesorero | cobrador | consulta |
-|---|---:|---:|---:|---:|---:|
-| `campaign.view` | si | si | si | no | si |
-| `campaign.create` | si | no | no | no | no |
-| `campaign.update_rules` | si | no | no | no | no |
-| `bond.view` | si | si | si | propio | si |
-| `bond.create` | si | si | no | no | no |
-| `bond.import` | si | si | no | no | no |
-| `bond.assign` | si | si | no | no | no |
-| `buyer.manage` | si | si | no | no | no |
-| `collector.manage` | si | no | no | no | no |
-| `sale.create` | si | si | no | no | no |
-| `payment.create` | si | si | si | futuro | no |
-| `payment.annul` | si | no | si | no | no |
-| `rendition.create` | si | si | si | no | no |
-| `rendition.close` | si | no | si | no | no |
-| `rendition.correct` | si | no | si | no | no |
-| `commission.rule_manage` | si | no | no | no | no |
-| `commission.adjust` | si | no | si | no | no |
-| `draw.freeze_roster` | si | no | si | no | no |
-| `draw.load_winner` | si | si | si | no | no |
-| `report.view_financial` | si | no | si | no | si |
-| `audit.view` | si | no | si | no | no |
-| `user.manage` | si | no | no | no | no |
+| Permission               | admin | operator | treasurer | collector | read-only |
+| ------------------------ | ----: | -------: | --------: | --------: | --------: |
+| `campaign.view`          |   yes |      yes |       yes |        no |       yes |
+| `campaign.create`        |   yes |       no |        no |        no |        no |
+| `campaign.update_rules`  |   yes |       no |        no |        no |        no |
+| `bond.view`              |   yes |      yes |       yes |       own |       yes |
+| `bond.create`            |   yes |      yes |        no |        no |        no |
+| `bond.import`            |   yes |      yes |        no |        no |        no |
+| `bond.assign`            |   yes |      yes |        no |        no |        no |
+| `buyer.manage`           |   yes |      yes |        no |        no |        no |
+| `collector.manage`       |   yes |       no |        no |        no |        no |
+| `sale.create`            |   yes |      yes |        no |        no |        no |
+| `payment.create`         |   yes |      yes |       yes |    future |        no |
+| `payment.annul`          |   yes |       no |       yes |        no |        no |
+| `settlement.create`      |   yes |      yes |       yes |        no |        no |
+| `settlement.close`       |   yes |       no |       yes |        no |        no |
+| `settlement.correct`     |   yes |       no |       yes |        no |        no |
+| `commission.rule_manage` |   yes |       no |        no |        no |        no |
+| `commission.adjust`      |   yes |       no |       yes |        no |        no |
+| `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
+| `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
+| `report.view_financial`  |   yes |       no |       yes |        no |       yes |
+| `audit.view`             |   yes |       no |       yes |        no |        no |
+| `user.manage`            |   yes |       no |        no |        no |        no |
 
-## Reglas tecnicas
+## Technical rules
 
-- La UI puede ocultar acciones, pero la seguridad real debe estar en server-side y RLS.
-- Cada accion sensible debe validar permisos explicitamente.
-- Los permisos deben estar versionados en base de datos o migraciones iniciales.
-- Si se habilita acceso de cobradores, sus consultas deben limitarse a su cartera propia.
+- The UI may hide actions, but the real security must be on the server-side and RLS.
+- Every sensitive action must validate permissions explicitly.
+- Permissions must be versioned in the database or initial migrations.
+- If collector access is enabled, their queries must be limited to their own portfolio.

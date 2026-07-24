@@ -1,1411 +1,1411 @@
-# Funcionalidades y flujos de valor agregado — Sistema de Gestión de Rifas / Bonos de Bomberos
+# Features and Value-Added Flows — Firefighters Bonds / Raffle Management System
 
-## 1. Objetivo del documento
+## 1. Document Objective
 
-Este documento registra funcionalidades, procesos y mejoras propuestas para que el nuevo sistema de rifas no sea solamente un reemplazo del sistema actual, sino una mejora integral del flujo operativo, administrativo y financiero de Bomberos.
+This document records features, processes, and proposed improvements so that the new raffle system is not merely a replacement of the current system, but a comprehensive improvement of the operational, administrative, and financial workflow of the Firefighters.
 
-La idea es que este documento sirva como base para:
+The idea is for this document to serve as a basis for:
 
-1. Diseñar módulos funcionales.
-2. Diseñar pantallas y flujos de usuario.
-3. Definir el alcance del MVP.
-4. Priorizar funcionalidades.
-5. Armar una tasklist técnica de implementación.
-6. Mejorar procesos actuales que hoy se realizan manualmente o en Excel.
-
----
-
-## 2. Enfoque general
-
-El sistema no debería limitarse a cargar bonos, compradores y pagos.
-
-El valor real está en permitir que Bomberos pueda saber en todo momento:
-
-```text
-Quién tiene cada bono.
-Quién lo compró.
-Qué números participan.
-Qué pagó.
-Qué debe.
-Qué cobrador intervino.
-Qué comisión corresponde.
-Qué dinero entró.
-Qué dinero falta.
-Quién puede participar en el próximo sorteo.
-Quién no puede participar por deuda.
-Qué premios fueron entregados.
-Qué rendiciones están pendientes.
-Qué transferencias están sin identificar.
-```
-
-El sistema debería convertirse en una herramienta de gestión y control, no solamente en una base de datos.
+1. Designing functional modules.
+2. Designing screens and user flows.
+3. Defining the MVP scope.
+4. Prioritizing features.
+5. Building a technical implementation task list.
+6. Improving current processes that are currently done manually or in Excel.
 
 ---
 
-# 3. Flujo de preventa con reservas históricas
+## 2. General Approach
 
-Actualmente se intenta asignar a cada cobrador los mismos números que el año anterior, porque muchos compradores quieren conservar su número habitual.
+The system should not be limited to loading bonds, buyers, and payments.
 
-Esto debería transformarse en un flujo formal del sistema.
-
-## 3.1. Flujo propuesto
+The real value lies in enabling the Firefighters to know at all times:
 
 ```text
-Campaña anterior cerrada
-↓
-Sistema detecta compradores históricos
-↓
-Sistema propone reservar los mismos números
-↓
-Administrador revisa disponibilidad y conflictos
-↓
-Sistema asigna números/bonos al cobrador correspondiente
+Who holds each bond.
+Who bought it.
+Which numbers are participating.
+What was paid.
+What is owed.
+Which collector was involved.
+What commission is due.
+What money came in.
+What money is missing.
+Who can participate in the next draw.
+Who cannot participate due to debt.
+What prizes were delivered.
+What settlements are pending.
+What transfers are unidentified.
 ```
 
-## 3.2. Caso exitoso
-
-```text
-Comprador: Diego Fernández
-Número habitual: 0068
-Cobrador habitual: Juan Pérez
-
-Nueva campaña:
-Número 0068 disponible
-
-Acción:
-Reservar/asignar número al mismo cobrador
-```
-
-## 3.3. Caso con conflicto
-
-```text
-Comprador: Diego Fernández
-Número habitual: 0068
-Cobrador habitual: Juan Pérez
-
-Nueva campaña:
-Número 0068 pertenece a una pata
-
-Acción:
-Marcar conflicto y sugerir número alternativo
-```
-
-## 3.4. Valor agregado
-
-- Reduce trabajo manual.
-- Reduce errores de asignación.
-- Mejora la continuidad comercial.
-- Evita discusiones con compradores.
-- Le da al cobrador una cartera inicial de compradores esperados.
-- Permite medir renovación de compradores año a año.
+The system should become a management and control tool, not just a database.
 
 ---
 
-# 4. Gestión de conflictos de números
+# 3. Pre-Sale Flow with Historical Reservations
 
-Cuando un número histórico ya no está disponible, el sistema debería registrar el conflicto formalmente.
+Currently, the attempt is made to assign each collector the same numbers as the previous year, because many buyers want to keep their usual number.
 
-## 4.1. Ejemplo de conflicto
+This should be transformed into a formal system flow.
+
+## 3.1. Proposed Flow
 
 ```text
-Conflicto N° 00034
-
-Comprador histórico: Diego Fernández
-Número solicitado: 0068
-Motivo: el número está incluido en una pata
-Cobrador habitual: Juan Pérez
-Campaña: 2025-2026
+Previous campaign closed
+↓
+System detects historical buyers
+↓
+System proposes reserving the same numbers
+↓
+Administrator reviews availability and conflicts
+↓
+System assigns numbers/bonds to the corresponding collector
 ```
 
-## 4.2. Acciones posibles
+## 3.2. Successful Case
 
-- Asignar número alternativo.
-- Mantener comprador en lista de espera.
-- Ofrecerle comprar la pata completa.
-- Marcar comprador como no renovado.
-- Registrar observación administrativa.
+```text
+Buyer: Diego Fernández
+Usual number: 0068
+Usual collector: Juan Pérez
 
-## 4.3. Valor agregado
+New campaign:
+Number 0068 available
 
-- Permite trazabilidad.
-- Evita decisiones informales sin registro.
-- Permite medir cuántas ventas se pierden o cambian por conflictos.
-- Ayuda a planificar mejor la impresión de bonos/patas en campañas futuras.
+Action:
+Reserve/assign number to the same collector
+```
+
+## 3.3. Case with Conflict
+
+```text
+Buyer: Diego Fernández
+Usual number: 0068
+Usual collector: Juan Pérez
+
+New campaign:
+Number 0068 belongs to a pata
+
+Action:
+Flag conflict and suggest alternative number
+```
+
+## 3.4. Added Value
+
+- Reduces manual work.
+- Reduces assignment errors.
+- Improves commercial continuity.
+- Prevents disputes with buyers.
+- Gives the collector an initial portfolio of expected buyers.
+- Allows measuring buyer renewal year over year.
 
 ---
 
-# 5. Lista de renovación de compradores
+# 4. Number Conflict Management
 
-Cada cobrador debería tener una lista de compradores históricos a contactar.
+When a historical number is no longer available, the system should formally register the conflict.
 
-## 5.1. Ejemplo
-
-```text
-Cobrador: Juan Pérez
-
-Clientes a renovar:
-1. Diego Fernández - Número 0068 - Pendiente de contacto
-2. María López - Número 0120 - Confirmó renovación
-3. Ferretería Mitre - Pata 1200 - Pendiente
-```
-
-## 5.2. Estados sugeridos
+## 4.1. Conflict Example
 
 ```text
-Pendiente de contactar
-Contactado
-Acepta renovar
-No renueva
-Pidió cambio de número
-Pidió pagar contado
-Pendiente de pago
-Vendido
+Conflict No. 00034
+
+Historical buyer: Diego Fernández
+Requested number: 0068
+Reason: the number is included in a pata
+Usual collector: Juan Pérez
+Campaign: 2025-2026
 ```
 
-## 5.3. Valor agregado
+## 4.2. Possible Actions
 
-- Ordena la preventa.
-- Permite medir tasa de renovación.
-- Permite saber qué cobrador está gestionando mejor su cartera.
-- Reduce pérdida de compradores habituales.
-- Permite anticipar demanda antes de entregar todos los bonos.
+- Assign alternative number.
+- Keep buyer on waiting list.
+- Offer to buy the complete pata.
+- Mark buyer as not renewed.
+- Register administrative observation.
+
+## 4.3. Added Value
+
+- Enables traceability.
+- Prevents informal decisions without records.
+- Allows measuring how many sales are lost or changed due to conflicts.
+- Helps better plan bond/pata printing for future campaigns.
 
 ---
 
-# 6. Panel de cobrador
+# 5. Buyer Renewal List
 
-Aunque inicialmente todo podría ser operado por administración, a futuro cada cobrador podría tener acceso a su propio panel.
+Each collector should have a list of historical buyers to contact.
 
-## 6.1. Información disponible para el cobrador
+## 5.1. Example
 
-- Bonos asignados.
-- Bonos vendidos.
-- Bonos pendientes de venta.
-- Compradores históricos.
-- Compradores con cuotas vencidas.
-- Cuotas pendientes.
-- Cuotas próximas a vencer.
-- Pagos por transferencia registrados.
-- Rendiciones realizadas.
-- Comisión generada.
-- Comisión liquidada.
-- Saldo a favor o en contra.
+```text
+Collector: Juan Pérez
 
-## 6.2. Valor agregado
+Buyers to renew:
+1. Diego Fernández - Number 0068 - Pending contact
+2. María López - Number 0120 - Confirmed renewal
+3. Ferretería Mitre - Pata 1200 - Pending
+```
 
-- Reduce consultas a administración.
-- Ordena el trabajo del cobrador.
-- Mejora el seguimiento de deuda.
-- Permite detectar cuotas vencidas antes de los sorteos.
-- Mejora la transparencia de comisiones.
+## 5.2. Suggested States
+
+```text
+Pending contact
+Contacted
+Accepts renewal
+Does not renew
+Requested number change
+Requested cash payment
+Pending payment
+Sold
+```
+
+## 5.3. Added Value
+
+- Organizes the pre-sale.
+- Allows measuring renewal rate.
+- Allows knowing which collector is managing their portfolio best.
+- Reduces loss of regular buyers.
+- Allows anticipating demand before all bonds are distributed.
 
 ---
 
-# 7. Carga rápida por escaneo
+# 6. Collector Panel
 
-El sistema debería aprovechar código de barras o QR para acelerar la operatoria.
+Although initially everything could be operated by administration, in the future each collector could have access to their own panel.
 
-Actualmente el código de barras existe en el bono, pero no está confirmado qué dato contiene ni funciona correctamente en el sistema viejo.
+## 6.1. Information Available to the Collector
 
-## 7.1. Flujo ideal
+- Assigned bonds.
+- Sold bonds.
+- Bonds pending sale.
+- Historical buyers.
+- Buyers with overdue installments.
+- Pending installments.
+- Installments about to expire.
+- Registered transfer payments.
+- Completed settlements.
+- Generated commission.
+- Settled commission.
+- Balance in favor or against.
 
-```text
-Administrador escanea bono
-↓
-Sistema abre la ficha del bono
-↓
-Permite registrar venta, pago o rendición
-```
+## 6.2. Added Value
 
-## 7.2. Flujo para rendición
-
-```text
-Crear rendición
-↓
-Escanear bono
-↓
-Seleccionar cuota pagada
-↓
-Elegir medio de pago
-↓
-Agregar pago a la rendición
-```
-
-## 7.3. Recomendación
-
-El sistema nuevo debería guardar:
-
-- número base,
-- número asociado calculado,
-- código de barras impreso, si existe,
-- identificador interno propio del sistema.
-
-Para futuras campañas se recomienda generar un QR propio del sistema.
-
-## 7.4. Valor agregado
-
-- Menos tipeo.
-- Menos errores de carga.
-- Mayor velocidad en rendiciones.
-- Mejor experiencia para administración.
-- Base para automatizar futuras campañas.
+- Reduces inquiries to administration.
+- Organizes the collector's work.
+- Improves debt tracking.
+- Allows detecting overdue installments before draws.
+- Improves commission transparency.
 
 ---
 
-# 8. Rendición asistida
+# 7. Quick Entry by Scanning
 
-La rendición del cobrador debería ser un flujo central del sistema, no una simple carga de pagos.
+The system should leverage barcodes or QR codes to speed up operations.
 
-## 8.1. Flujo propuesto
+Currently the barcode exists on the bond, but it is not confirmed what data it contains or whether it works correctly in the old system.
 
-```text
-Crear rendición
-↓
-Seleccionar cobrador
-↓
-Escanear o buscar bonos
-↓
-Agregar cuotas/pagos
-↓
-Separar efectivo y transferencia
-↓
-Calcular comisión automáticamente
-↓
-Calcular neto para Bomberos
-↓
-Calcular saldo a favor del cobrador
-↓
-Confirmar rendición
-↓
-Imprimir remito
-```
-
-## 8.2. Resumen en tiempo real
-
-Durante la carga, la pantalla debería mostrar:
+## 7.1. Ideal Flow
 
 ```text
-Total efectivo: $...
-Total transferencia: $...
-Total cobrado: $...
-Comisión generada: $...
-Comisión liquidada ahora: $...
-Saldo a favor del cobrador: $...
-Neto para Bomberos: $...
+Administrator scans bond
+↓
+System opens the bond record
+↓
+Allows registering sale, payment, or settlement
 ```
 
-## 8.3. Valor agregado
+## 7.2. Settlement Flow
 
-- Reemplaza el Excel actual.
-- Reduce errores de cálculo.
-- Ordena la relación con el cobrador.
-- Permite emitir remitos claros.
-- Permite cerrar caja con mayor precisión.
+```text
+Create settlement
+↓
+Scan bond
+↓
+Select paid installment
+↓
+Choose payment method
+↓
+Add payment to settlement
+```
+
+## 7.3. Recommendation
+
+The new system should store:
+
+- base number,
+- calculated associated number,
+- printed barcode, if it exists,
+- system's own internal identifier.
+
+For future campaigns, it is recommended to generate a system-specific QR code.
+
+## 7.4. Added Value
+
+- Less typing.
+- Fewer data entry errors.
+- Faster settlements.
+- Better experience for administration.
+- Foundation for automating future campaigns.
 
 ---
 
-# 9. Cuenta corriente del cobrador
+# 8. Assisted Settlement
 
-Cada cobrador debería tener una cuenta corriente administrativa interna.
+The collector's settlement should be a central flow of the system, not a simple payment entry.
 
-No representa necesariamente una cuenta bancaria. Representa el saldo entre Bomberos y el cobrador.
-
-## 9.1. Movimientos posibles
-
-- Comisión generada por pago en efectivo.
-- Comisión generada por transferencia.
-- Comisión liquidada/pagada.
-- Efectivo entregado por el cobrador.
-- Ajustes manuales autorizados.
-- Anulaciones.
-- Correcciones auditadas.
-- Saldo a favor del cobrador.
-- Saldo a favor de Bomberos.
-
-## 9.2. Ejemplo con transferencia
+## 8.1. Proposed Flow
 
 ```text
-Comprador paga por transferencia: $6.000
-Bomberos recibe: $6.000
-Comisión generada para cobrador: $1.500
-
-Movimiento:
-Saldo a favor del cobrador +$1.500
+Create settlement
+↓
+Select collector
+↓
+Scan or search bonds
+↓
+Add installments/payments
+↓
+Separate cash and transfers
+↓
+Calculate commission automatically
+↓
+Calculate net amount for Firefighters
+↓
+Calculate balance in favor of collector
+↓
+Confirm settlement
+↓
+Print delivery note
 ```
 
-## 9.3. Ejemplo con efectivo
+## 8.2. Real-Time Summary
+
+During data entry, the screen should display:
 
 ```text
-Comprador paga en efectivo: $6.000
-Comisión generada: $1.500
-Neto Bomberos: $4.500
+Total cash: $...
+Total transfers: $...
+Total collected: $...
+Generated commission: $...
+Commission settled now: $...
+Balance in favor of collector: $...
+Net for Firefighters: $...
 ```
 
-## 9.4. Valor agregado
+## 8.3. Added Value
 
-- Evita discusiones sobre comisiones.
-- Permite acumular comisiones.
-- Permite liquidarlas posteriormente.
-- Permite controlar transferencias.
-- Da transparencia al cobrador y a administración.
+- Replaces the current Excel.
+- Reduces calculation errors.
+- Organizes the relationship with the collector.
+- Allows issuing clear delivery notes.
+- Allows closing the daily cash register with greater precision.
 
 ---
 
-# 10. Control de pagos por transferencia
+# 9. Collector Current Account
 
-Como los pagos por transferencia van directo a Bomberos, el sistema debe tener un flujo específico.
+Each collector should have an internal administrative current account.
 
-## 10.1. Flujo propuesto
+It does not necessarily represent a bank account. It represents the balance between the Firefighters and the collector.
 
-```text
-Comprador transfiere a Bomberos
-↓
-Administración registra la transferencia
-↓
-Sistema la asocia a comprador, bono y cuota
-↓
-Sistema marca la cuota como pagada
-↓
-Sistema genera comisión a favor del cobrador
-```
+## 9.1. Possible Movements
 
-## 10.2. Problema habitual
+- Commission generated by cash payment.
+- Commission generated by transfer.
+- Settled/paid commission.
+- Cash delivered by the collector.
+- Authorized manual adjustments.
+- Annulments.
+- Audited corrections.
+- Balance in favor of the collector.
+- Balance in favor of the Firefighters.
 
-Puede ocurrir que una transferencia llegue sin información clara.
-
-Ejemplo:
+## 9.2. Transfer Example
 
 ```text
-Fecha: 10/11/2025
-Importe: $6.000
-Referencia: Diego F.
-Estado: sin identificar
+Buyer pays by transfer: $6,000
+Firefighters receive: $6,000
+Commission generated for collector: $1,500
+
+Movement:
+Balance in favor of collector +$1,500
 ```
 
-## 10.3. Bandeja de transferencias sin identificar
-
-El sistema debería tener una sección específica para transferencias pendientes.
-
-El sistema podría sugerir coincidencias:
+## 9.3. Cash Example
 
 ```text
-Sugerencias:
-1. Diego Fernández - Bono 0068 - Cuota 2
-2. Diego Fernández - Bono 1658 - Cuota 2
+Buyer pays in cash: $6,000
+Commission generated: $1,500
+Net for Firefighters: $4,500
 ```
 
-## 10.4. Valor agregado
+## 9.4. Added Value
 
-- Evita pagos perdidos.
-- Mejora conciliación.
-- Ordena el saldo de los cobradores.
-- Reduce errores al marcar cuotas como pagadas.
-- Permite preparar conciliación bancaria futura.
+- Prevents disputes over commissions.
+- Allows accumulating commissions.
+- Allows settling them later.
+- Allows controlling transfers.
+- Provides transparency to the collector and administration.
 
 ---
 
-# 11. Conciliación bancaria semi-automática
+# 10. Transfer Payment Control
 
-Funcionalidad avanzada, no necesariamente para el MVP inicial.
+Since transfer payments go directly to the Firefighters, the system must have a specific flow for them.
 
-## 11.1. Flujo propuesto
+## 10.1. Proposed Flow
 
 ```text
-Administración descarga movimientos bancarios
+Buyer transfers to Firefighters
 ↓
-Importa archivo al sistema
+Administration registers the transfer
 ↓
-Sistema detecta posibles coincidencias
+System associates it to buyer, bond, and installment
 ↓
-Administrador confirma o corrige
+System marks the installment as paid
 ↓
-Pagos quedan asociados a cuotas
+System generates commission in favor of the collector
 ```
 
-## 11.2. Criterios de coincidencia
+## 10.2. Common Problem
 
-- Importe exacto.
-- Nombre o referencia.
-- Fecha.
-- Comprador.
-- Teléfono.
-- Bono asociado.
-- Cuota esperada.
-- Cobrador asignado.
+A transfer may arrive without clear information.
 
-## 11.3. Valor agregado
+Example:
 
-- Ahorra tiempo administrativo.
-- Reduce transferencias sin identificar.
-- Mejora control financiero.
-- Permite escalar si aumenta el uso de transferencias.
+```text
+Date: 10/11/2025
+Amount: $6,000
+Reference: Diego F.
+Status: unidentified
+```
+
+## 10.3. Unidentified Transfers Tray
+
+The system should have a specific section for pending transfers.
+
+The system could suggest matches:
+
+```text
+Suggestions:
+1. Diego Fernández - Bond 0068 - Installment 2
+2. Diego Fernández - Bond 1658 - Installment 2
+```
+
+## 10.4. Added Value
+
+- Prevents lost payments.
+- Improves reconciliation.
+- Organizes collector balances.
+- Reduces errors when marking installments as paid.
+- Allows preparing for future bank reconciliation.
 
 ---
 
-# 12. Alertas de cuotas vencidas
+# 11. Semi-Automatic Bank Reconciliation
 
-El sistema debería detectar automáticamente cuotas vencidas.
+Advanced functionality, not necessarily for the initial MVP.
 
-## 12.1. Ejemplo
+## 11.1. Proposed Flow
 
 ```text
-Bono: 1658
-Comprador: Diego Fernández
-Cobrador: Juan Pérez
-Cuota vencida: cuota 3
-Días de atraso: 12
+Administration downloads bank statements
+↓
+Imports file into the system
+↓
+System detects possible matches
+↓
+Administrator confirms or corrects
+↓
+Payments are associated with installments
 ```
 
-## 12.2. Vistas útiles
+## 11.2. Matching Criteria
 
-- Cuotas vencidas por cobrador.
-- Cuotas vencidas por comprador.
-- Bonos en riesgo de no participar en el próximo sorteo.
-- Bonos con varias cuotas vencidas.
-- Compradores reincidentes.
+- Exact amount.
+- Name or reference.
+- Date.
+- Buyer.
+- Phone.
+- Associated bond.
+- Expected installment.
+- Assigned collector.
 
-## 12.3. Valor agregado
+## 11.3. Added Value
 
-- Permite accionar antes del sorteo.
-- Reduce morosidad.
-- Mejora la recaudación.
-- Ayuda al cobrador a priorizar visitas/contactos.
+- Saves administrative time.
+- Reduces unidentified transfers.
+- Improves financial control.
+- Allows scaling if transfer usage increases.
 
 ---
 
-# 13. Alertas antes de cada sorteo
+# 12. Overdue Installment Alerts
 
-Antes de cada sorteo mensual, el sistema debería mostrar una alerta operativa.
+The system should automatically detect overdue installments.
 
-## 13.1. Ejemplo
-
-```text
-Sorteo: Diciembre 2025
-Cuota requerida: 3
-Fecha de corte: 26/12/2025
-
-Bonos habilitados: 1340
-Bonos no habilitados: 210
-Bonos con deuda salvable: 95
-```
-
-## 13.2. Concepto de deuda salvable
-
-Bonos que no están habilitados actualmente, pero podrían quedar habilitados si pagan antes del corte.
-
-Ejemplo:
+## 12.1. Example
 
 ```text
-Bono 1658
-Debe cuota 3
-Si paga antes del corte, participa del sorteo.
+Bond: 1658
+Buyer: Diego Fernández
+Collector: Juan Pérez
+Overdue installment: installment 3
+Days overdue: 12
 ```
 
-## 13.3. Valor agregado
+## 12.2. Useful Views
 
-- Permite avisar a compradores.
-- Permite priorizar cobranzas.
-- Reduce reclamos posteriores.
-- Mejora la recaudación antes de sorteos.
+- Overdue installments by collector.
+- Overdue installments by buyer.
+- Bonds at risk of not participating in the next draw.
+- Bonds with multiple overdue installments.
+- Repeat offenders.
+
+## 12.3. Added Value
+
+- Allows action before the draw.
+- Reduces delinquency.
+- Improves revenue collection.
+- Helps the collector prioritize visits/contacts.
 
 ---
 
-# 14. Padrón congelado de sorteos
+# 13. Pre-Draw Alerts
 
-El padrón de participantes habilitados debe generarse antes de cada sorteo y quedar congelado.
+Before each monthly draw, the system should display an operational alert.
 
-## 14.1. Flujo propuesto
+## 13.1. Example
 
 ```text
-Generar padrón
-↓
-Sistema calcula habilitados/no habilitados
-↓
-Administrador revisa
-↓
-Se congela padrón
-↓
-Se realiza sorteo
-↓
-Se cargan ganadores
+Draw: December 2025
+Required installment: 3
+Cutoff date: 12/26/2025
+
+Enabled bonds: 1340
+Disabled bonds: 210
+Bonds with recoverable debt: 95
 ```
 
-## 14.2. Por qué debe congelarse
+## 13.2. Concept of Recoverable Debt
 
-No debe recalcularse dinámicamente después del sorteo, porque alguien podría pagar tarde y parecer habilitado en el sistema aunque no lo estuviera al momento del sorteo.
+Bonds that are not currently enabled but could become enabled if paid before the cutoff.
 
-## 14.3. Valor agregado
+Example:
 
-- Transparencia.
-- Trazabilidad.
-- Evita reclamos.
-- Permite justificar premios no adjudicados.
-- Mejora control legal/administrativo.
+```text
+Bond 1658
+Owes installment 3
+If paid before the cutoff, participates in the draw.
+```
+
+## 13.3. Added Value
+
+- Allows notifying buyers.
+- Allows prioritizing collections.
+- Reduces subsequent complaints.
+- Improves revenue collection before draws.
 
 ---
 
-# 15. Simulador / validador de ganador
+# 14. Frozen Draw Roster
 
-Cuando se carga un número ganador, el sistema debería explicar claramente el resultado.
+The roster of eligible participants must be generated before each draw and frozen.
 
-## 15.1. Ejemplo
+## 14.1. Proposed Flow
 
 ```text
-Número ganador: 6529
-
-Coincide con:
-Bono: 1658
-Número ganador: asociado
-Número base: 1658
-Comprador: Diego Fernández
-Cobrador: Juan Pérez
-
-Estado en padrón:
-No habilitado
-
-Motivo:
-Cuota 3 impaga al momento del corte
-
-Resultado:
-Premio no adjudicado
+Generate roster
+↓
+System calculates enabled/disabled
+↓
+Administrator reviews
+↓
+Roster is frozen
+↓
+Draw is conducted
+↓
+Winners are entered
 ```
 
-## 15.2. Valor agregado
+## 14.2. Why It Must Be Frozen
 
-- Evita interpretaciones manuales.
-- Reduce errores al asignar premios.
-- Facilita explicar decisiones.
-- Permite auditar resultados.
+It should not be dynamically recalculated after the draw, because someone could pay late and appear enabled in the system even though they were not at the time of the draw.
+
+## 14.3. Added Value
+
+- Transparency.
+- Traceability.
+- Prevents complaints.
+- Allows justifying unawarded prizes.
+- Improves legal/administrative control.
 
 ---
 
-# 16. Control de premios entregados
+# 15. Winner Simulator / Validator
 
-No alcanza con registrar el número ganador. Hay que registrar el ciclo completo del premio.
+When a winning number is entered, the system should clearly explain the result.
 
-## 16.1. Flujo de premio entregado
-
-```text
-Premio sorteado
-↓
-Ganador identificado
-↓
-Ganador habilitado
-↓
-Premio pendiente de entrega
-↓
-Premio entregado
-```
-
-## 16.2. Flujo de premio no adjudicado
+## 15.1. Example
 
 ```text
-Premio sorteado
-↓
-Ganador identificado
-↓
-Ganador no habilitado
-↓
-Premio no adjudicado
-↓
-Observación administrativa
+Winning number: 6529
+
+Matches:
+Bond: 1658
+Winning number: associated
+Base number: 1658
+Buyer: Diego Fernández
+Collector: Juan Pérez
+
+Roster status:
+Not enabled
+
+Reason:
+Installment 3 unpaid at time of cutoff
+
+Result:
+Prize not awarded
 ```
 
-## 16.3. Datos a registrar
+## 15.2. Added Value
 
-- sorteo,
-- premio,
-- número ganador,
-- bono asociado,
-- comprador,
-- cobrador,
-- estado de habilitación,
-- fecha de entrega,
-- usuario que registra,
-- comprobante o constancia,
-- observaciones.
-
-## 16.4. Valor agregado
-
-- Controla premios pendientes.
-- Evita olvidos.
-- Permite reportes de premios entregados/no entregados.
-- Mejora transparencia institucional.
+- Prevents manual interpretations.
+- Reduces errors when assigning prizes.
+- Makes it easier to explain decisions.
+- Allows auditing results.
 
 ---
 
-# 17. Ficha única del bono
+# 16. Prize Delivery Control
 
-Cada bono debería tener una ficha central, como un expediente completo.
+Recording the winning number is not enough. The complete prize cycle must be recorded.
 
-## 17.1. Información sugerida
+## 16.1. Prize Delivered Flow
 
 ```text
-Bono 1658
-
-Campaña: 2025-2026
-Tipo: Simple
-Número base: 1658
-Número asociado: 6529
-Estado comercial: Vendido
-Estado financiero: Al día
-Cobrador: Juan Pérez
-Comprador: Diego Fernández
+Prize drawn
+↓
+Winner identified
+↓
+Winner enabled
+↓
+Prize pending delivery
+↓
+Prize delivered
 ```
 
-## 17.2. Secciones de la ficha
+## 16.2. Unawarded Prize Flow
 
-- Datos generales.
-- Números participantes.
-- Cobrador asignado.
-- Comprador.
-- Cuotas.
-- Pagos.
-- Rendiciones.
-- Comisiones generadas.
-- Sorteos en los que participó.
-- Estado de habilitación por sorteo.
-- Premios.
-- Historial/auditoría.
+```text
+Prize drawn
+↓
+Winner identified
+↓
+Winner not enabled
+↓
+Prize not awarded
+↓
+Administrative observation
+```
 
-## 17.3. Valor agregado
+## 16.3. Data to Record
 
-- Ahorra tiempo de búsqueda.
-- Centraliza toda la información.
-- Permite resolver reclamos rápidamente.
-- Facilita auditoría.
+- draw,
+- prize,
+- winning number,
+- associated bond,
+- buyer,
+- collector,
+- eligibility status,
+- delivery date,
+- registering user,
+- receipt or proof,
+- observations.
+
+## 16.4. Added Value
+
+- Controls pending prizes.
+- Prevents oversights.
+- Allows reports of delivered/not delivered prizes.
+- Improves institutional transparency.
 
 ---
 
-# 18. Ficha única del comprador
+# 17. Single Bond Record
 
-El comprador debería tener historial completo.
+Each bond should have a central record, like a complete file.
 
-## 18.1. Información sugerida
+## 17.1. Suggested Information
 
 ```text
-Comprador: Diego Fernández
+Bond 1658
 
-Campañas:
-2023-2024: Bono 0068
-2024-2025: Bono 0068
-2025-2026: Bono 1658
+Campaign: 2025-2026
+Type: Simple
+Base number: 1658
+Associated number: 6529
+Commercial status: Sold
+Financial status: Up to date
+Collector: Juan Pérez
+Buyer: Diego Fernández
+```
 
-Cobrador habitual:
+## 17.2. Record Sections
+
+- General data.
+- Participating numbers.
+- Assigned collector.
+- Buyer.
+- Installments.
+- Payments.
+- Settlements.
+- Generated commissions.
+- Draws participated in.
+- Eligibility status per draw.
+- Prizes.
+- History/audit log.
+
+## 17.3. Added Value
+
+- Saves search time.
+- Centralizes all information.
+- Allows quickly resolving complaints.
+- Facilitates auditing.
+
+---
+
+# 18. Single Buyer Record
+
+The buyer should have a complete history.
+
+## 18.1. Suggested Information
+
+```text
+Buyer: Diego Fernández
+
+Campaigns:
+2023-2024: Bond 0068
+2024-2025: Bond 0068
+2025-2026: Bond 1658
+
+Usual collector:
 Juan Pérez
 
-Estado actual:
-Cuota 1 paga
-Cuota 2 paga
-Cuota 3 pendiente
+Current status:
+Installment 1 paid
+Installment 2 paid
+Installment 3 pending
 ```
 
-## 18.2. Valor agregado
+## 18.2. Added Value
 
-- Permite saber si es comprador recurrente.
-- Permite ver números habituales.
-- Permite detectar deudas.
-- Permite mejorar la atención.
-- Ayuda en la renovación anual.
+- Allows knowing if they are a recurring buyer.
+- Allows seeing usual numbers.
+- Allows detecting debts.
+- Allows improving service.
+- Helps with annual renewal.
 
 ---
 
-# 19. Ficha única del cobrador
+# 19. Single Collector Record
 
-El cobrador debería tener una vista integral.
+The collector should have a comprehensive view.
 
-## 19.1. Información sugerida
+## 19.1. Suggested Information
 
 ```text
-Cobrador: Juan Pérez
+Collector: Juan Pérez
 
-Bonos asignados: 120
-Vendidos: 85
-Pendientes de venta: 35
-Cuotas al día: 60
-Cuotas atrasadas: 25
-Total cobrado: $...
-Total rendido: $...
-Comisión generada: $...
-Comisión liquidada: $...
-Saldo actual: $...
+Assigned bonds: 120
+Sold: 85
+Pending sale: 35
+Installments up to date: 60
+Overdue installments: 25
+Total collected: $...
+Total settled: $...
+Generated commission: $...
+Settled commission: $...
+Current balance: $...
 ```
 
-## 19.2. Indicadores útiles
+## 19.2. Useful Indicators
 
-- porcentaje de venta,
-- porcentaje de cobranza,
-- deuda total de su cartera,
-- cantidad de compradores atrasados,
-- bonos no vendidos,
-- comisiones pendientes,
-- transferencias asociadas.
+- sales percentage,
+- collection percentage,
+- total debt in their portfolio,
+- number of overdue buyers,
+- unsold bonds,
+- pending commissions,
+- associated transfers.
 
-## 19.3. Valor agregado
+## 19.3. Added Value
 
-- Permite gestionar mejor cobradores.
-- Reduce incertidumbre sobre saldos.
-- Permite detectar bajo desempeño o problemas operativos.
-- Mejora la planificación de cobranzas.
-
----
-
-# 20. Ranking y seguimiento de cobradores
-
-El sistema podría generar rankings operativos.
-
-## 20.1. Indicadores posibles
-
-- Cobradores con mayor venta.
-- Cobradores con mayor cobranza al día.
-- Cobradores con más deuda vencida.
-- Cobradores con más bonos sin vender.
-- Cobradores con mayor cantidad de transferencias.
-- Cobradores con saldo pendiente de comisión.
-
-## 20.2. Uso recomendado
-
-No debería utilizarse como herramienta punitiva, sino como control operativo y apoyo a la gestión.
-
-## 20.3. Valor agregado
-
-- Detecta cobradores que necesitan ayuda.
-- Identifica zonas o carteras con baja cobranza.
-- Permite tomar decisiones antes del cierre de campaña.
+- Allows better collector management.
+- Reduces uncertainty about balances.
+- Allows detecting underperformance or operational issues.
+- Improves collection planning.
 
 ---
 
-# 21. Workflow de devolución de bonos
+# 20. Collector Ranking and Tracking
 
-No todos los bonos asignados se venden. Debe existir un flujo claro para devolución.
+The system could generate operational rankings.
 
-## 21.1. Flujo simple
+## 20.1. Possible Indicators
+
+- Collectors with highest sales.
+- Collectors with highest up-to-date collection.
+- Collectors with the most overdue debt.
+- Collectors with the most unsold bonds.
+- Collectors with the highest number of transfers.
+- Collectors with pending commission balance.
+
+## 20.2. Recommended Use
+
+It should not be used as a punitive tool, but as operational control and management support.
+
+## 20.3. Added Value
+
+- Detects collectors who need help.
+- Identifies areas or portfolios with low collection.
+- Allows making decisions before campaign close.
+
+---
+
+# 21. Bond Return Workflow
+
+Not all assigned bonds are sold. There must be a clear flow for returns.
+
+## 21.1. Simple Flow
 
 ```text
-Cobrador devuelve bono
+Collector returns bond
 ↓
-Administración recibe
+Administration receives
 ↓
-Bono vuelve a disponible
+Bond becomes available again
 ```
 
-## 21.2. Flujo con reasignación
+## 21.2. Flow with Reassignment
 
 ```text
-Cobrador devuelve bono
+Collector returns bond
 ↓
-Administración recibe
+Administration receives
 ↓
-Bono se reasigna a otro cobrador
+Bond is reassigned to another collector
 ```
 
-## 21.3. Estados posibles
+## 21.3. Possible States
 
 ```text
-Disponible
-Asignado a cobrador
-Vendido
-Devuelto
-Reasignado
-Extraviado
-Anulado
+Available
+Assigned to collector
+Sold
+Returned
+Reassigned
+Lost
+Annulled
 ```
 
-## 21.4. Valor agregado
+## 21.4. Added Value
 
-- Control físico de bonos.
-- Evita perder cartones.
-- Permite reasignar rápidamente bonos no vendidos.
-- Mantiene trazabilidad.
+- Physical bond control.
+- Prevents losing cards.
+- Allows quickly reassigning unsold bonds.
+- Maintains traceability.
 
 ---
 
-# 22. Control de bonos extraviados
+# 22. Lost Bond Control
 
-Debe existir un proceso para bonos perdidos o extraviados.
+There must be a process for lost or missing bonds.
 
-## 22.1. Datos a registrar
+## 22.1. Data to Record
 
-- bono,
-- cobrador responsable,
-- fecha,
-- motivo,
-- observación,
-- usuario que registra,
-- estado posterior,
-- si se anula,
-- si se reemplaza,
-- si se informa formalmente.
+- bond,
+- responsible collector,
+- date,
+- reason,
+- observation,
+- registering user,
+- subsequent status,
+- if it is annulled,
+- if it is replaced,
+- if it is formally reported.
 
-## 22.2. Valor agregado
+## 22.2. Added Value
 
-- Mejora control físico.
-- Evita que bonos extraviados sigan circulando sin control.
-- Deja responsabilidad y trazabilidad.
-- Ayuda ante reclamos.
+- Improves physical control.
+- Prevents lost bonds from continuing to circulate uncontrolled.
+- Establishes responsibility and traceability.
+- Helps with complaints.
 
 ---
 
-# 23. Armado inteligente de patas
+# 23. Smart Pata Assembly
 
-Cuando no quedan patas impresas y se quieren agrupar bonos simples, el sistema debería asistir la creación.
+When there are no printed patas left and simple bonds need to be grouped, the system should assist in creation.
 
-## 23.1. Flujo propuesto
+## 23.1. Proposed Flow
 
 ```text
-Crear nueva pata
+Create new pata
 ↓
-Definir cantidad de unidades
+Define number of units
 ↓
-Sistema busca bonos disponibles
+System searches for available bonds
 ↓
-Sistema advierte conflictos
+System warns of conflicts
 ↓
-Administrador confirma agrupación
+Administrator confirms grouping
 ```
 
-## 23.2. Criterios de sugerencia
+## 23.2. Suggestion Criteria
 
-El sistema debería sugerir bonos que:
+The system should suggest bonds that:
 
-- estén disponibles,
-- no estén vendidos,
-- no estén asignados,
-- no tengan reserva histórica activa,
-- no estén comprometidos con un cobrador,
-- no tengan conflictos de número.
+- are available,
+- are not sold,
+- are not assigned,
+- do not have an active historical reservation,
+- are not committed to a collector,
+- do not have number conflicts.
 
-## 23.3. Valor agregado
+## 23.3. Added Value
 
-- Evita romper reservas históricas.
-- Evita agrupar bonos comprometidos.
-- Reduce errores administrativos.
-- Facilita ventas grandes a empresas.
+- Prevents breaking historical reservations.
+- Prevents grouping committed bonds.
+- Reduces administrative errors.
+- Facilitates large sales to businesses.
 
 ---
 
-# 24. Trazabilidad de patas
+# 24. Pata Traceability
 
-Cada pata debería mostrar claramente su composición.
+Each pata should clearly show its composition.
 
-## 24.1. Ejemplo
+## 24.1. Example
 
 ```text
 Pata 1200
 
-Números base:
+Base numbers:
 1200, 1315, 2200, 3100, 4500
 
-Números asociados:
+Associated numbers:
 6071, 6186, 7071, 7971, 9371
 
-Origen:
-Impresa
+Origin:
+Printed
 
-Comprador:
-Empresa X
+Buyer:
+Company X
 
-Cobrador:
+Collector:
 Juan Pérez
 ```
 
-## 24.2. Si fue armada manualmente
+## 24.2. If Assembled Manually
 
 ```text
-Origen:
-Armada manualmente
+Origin:
+Assembled manually
 
-Bonos simples que la componen:
-- Bono 1200
-- Bono 1315
-- Bono 2200
-- Bono 3100
-- Bono 4500
+Simple bonds that compose it:
+- Bond 1200
+- Bond 1315
+- Bond 2200
+- Bond 3100
+- Bond 4500
 ```
 
-## 24.3. Valor agregado
+## 24.3. Added Value
 
-- Claridad comercial.
-- Claridad en sorteos.
-- Mejor trazabilidad.
-- Menos confusión al vender varios números.
+- Commercial clarity.
+- Clarity in draws.
+- Better traceability.
+- Less confusion when selling multiple numbers.
 
 ---
 
-# 25. Dashboard general de campaña
+# 25. General Campaign Dashboard
 
-La administración debería tener una pantalla principal con indicadores.
+Administration should have a main screen with indicators.
 
-## 25.1. Indicadores sugeridos
+## 25.1. Suggested Indicators
 
 ```text
-Campaña 2025-2026
+Campaign 2025-2026
 
-Bonos totales: 3000
-Bonos vendidos: 1850
-Bonos disponibles: 600
-Bonos en cobradores sin vender: 550
+Total bonds: 3000
+Bonds sold: 1850
+Bonds available: 600
+Bonds with collectors unsold: 550
 
-Recaudación esperada: $...
-Recaudado real: $...
-Pendiente: $...
+Expected revenue: $...
+Actual revenue: $...
+Pending: $...
 
-Efectivo: $...
-Transferencia: $...
+Cash: $...
+Transfers: $...
 
-Comisiones generadas: $...
-Comisiones liquidadas: $...
-Saldo pendiente cobradores: $...
+Generated commissions: $...
+Settled commissions: $...
+Pending collector balances: $...
 
-Próximo sorteo:
-Diciembre 2025
-Bonos habilitados: 1430
-Bonos en riesgo: 220
+Next draw:
+December 2025
+Enabled bonds: 1430
+At-risk bonds: 220
 ```
 
-## 25.2. Valor agregado
+## 25.2. Added Value
 
-- Permite tener una visión global.
-- Ayuda a tomar decisiones.
-- Muestra problemas antes de que sean graves.
-- Convierte el sistema en herramienta de gestión.
+- Provides a global overview.
+- Helps make decisions.
+- Shows problems before they become serious.
+- Turns the system into a management tool.
 
 ---
 
-# 26. Flujo de cierre mensual
+# 26. Monthly Close Flow
 
-Cada mes debería poder cerrarse operativamente.
+Each month should be closable operationally.
 
-## 26.1. Flujo propuesto
+## 26.1. Proposed Flow
 
 ```text
-Cierre mensual
+Monthly close
 ↓
-Validar rendiciones pendientes
+Validate pending settlements
 ↓
-Validar transferencias sin asociar
+Validate unassociated transfers
 ↓
-Validar cuotas vencidas
+Validate overdue installments
 ↓
-Generar padrón del sorteo
+Generate draw roster
 ↓
-Emitir reportes
+Issue reports
 ↓
-Cerrar mes
+Close month
 ```
 
-## 26.2. Validaciones previas
+## 26.2. Prior Validations
 
-Antes de cerrar el mes, el sistema debería advertir:
+Before closing the month, the system should warn about:
 
-- rendiciones abiertas,
-- transferencias sin identificar,
-- pagos sin asociar,
-- cuotas vencidas,
-- bonos vendidos sin comprador completo,
-- cobradores con saldo inconsistente,
-- premios pendientes de registro.
+- open settlements,
+- unidentified transfers,
+- unassociated payments,
+- overdue installments,
+- sold bonds without complete buyer information,
+- collectors with inconsistent balances,
+- prizes pending registration.
 
-## 26.3. Valor agregado
+## 26.3. Added Value
 
-- Orden administrativo.
-- Evita llegar al sorteo con información incompleta.
-- Permite auditar cada mes.
-- Mejora la disciplina operativa.
+- Administrative order.
+- Prevents reaching the draw with incomplete information.
+- Allows auditing each month.
+- Improves operational discipline.
 
 ---
 
-# 27. Reporte de riesgo antes del sorteo
+# 27. Pre-Draw Risk Report
 
-Antes de cada sorteo, el sistema debería generar un reporte de bonos en riesgo.
+Before each draw, the system should generate a report of at-risk bonds.
 
-## 27.1. Criterio
+## 27.1. Criteria
 
-Bonos vendidos que tienen cuotas pendientes necesarias para participar del próximo sorteo.
+Sold bonds that have pending installments required to participate in the next draw.
 
-## 27.2. Ejemplo
+## 27.2. Example
 
 ```text
-Próximo sorteo: Diciembre 2025
-Cuota requerida: 3
+Next draw: December 2025
+Required installment: 3
 
-Cobrador Juan Pérez:
-- Diego Fernández - Bono 1658 - debe cuota 3
-- María López - Bono 0100 - debe cuotas 2 y 3
+Collector Juan Pérez:
+- Diego Fernández - Bond 1658 - owes installment 3
+- María López - Bond 0100 - owes installments 2 and 3
 ```
 
-## 27.3. Valor agregado
+## 27.3. Added Value
 
-- Permite accionar antes del corte.
-- Ayuda al cobrador a priorizar.
-- Reduce premios no adjudicados por falta de pago.
-- Mejora la recaudación.
+- Allows action before the cutoff.
+- Helps the collector prioritize.
+- Reduces unawarded prizes due to non-payment.
+- Improves revenue collection.
 
 ---
 
-# 28. Notificaciones
+# 28. Notifications
 
-Funcionalidad futura con mucho valor.
+Future functionality with high value.
 
-## 28.1. Notificaciones a compradores
+## 28.1. Notifications to Buyers
 
-Ejemplo:
-
-```text
-Hola Diego, te recordamos que la cuota 3 del Bono 1658 vence el 25/12.
-Para participar del sorteo de diciembre tenés que tener las cuotas al día.
-```
-
-## 28.2. Notificaciones a cobradores
-
-Ejemplo:
+Example:
 
 ```text
-Tenés 18 compradores con cuotas pendientes antes del sorteo de diciembre.
+Hi Diego, we remind you that installment 3 of Bond 1658 is due on 12/25.
+To participate in the December draw you need to have your installments up to date.
 ```
 
-## 28.3. Notificaciones a administración
+## 28.2. Notifications to Collectors
 
-Ejemplo:
+Example:
 
 ```text
-Hay 12 transferencias sin identificar.
+You have 18 buyers with pending installments before the December draw.
 ```
 
-## 28.4. Canales posibles
+## 28.3. Notifications to Administration
+
+Example:
+
+```text
+There are 12 unidentified transfers.
+```
+
+## 28.4. Possible Channels
 
 - WhatsApp.
 - Email.
 - SMS.
-- Notificación interna del sistema.
+- Internal system notification.
 
-## 28.5. Valor agregado
+## 28.5. Added Value
 
-- Reduce morosidad.
-- Automatiza recordatorios.
-- Mejora comunicación.
-- Ayuda a prevenir reclamos.
+- Reduces delinquency.
+- Automates reminders.
+- Improves communication.
+- Helps prevent complaints.
 
 ---
 
-# 29. Portal o consulta para comprador
+# 29. Buyer Portal or Inquiry
 
-A futuro, el comprador podría consultar su bono.
+In the future, the buyer could check their bond.
 
-## 29.1. Opción simple
+## 29.1. Simple Option
 
 ```text
-Consultar bono
-Ingresar número de bono + teléfono o DNI
+Check bond
+Enter bond number + phone or ID
 ```
 
-## 29.2. Información visible
+## 29.2. Visible Information
 
-- datos del bono,
-- números participantes,
-- cuotas pagas,
-- cuotas pendientes,
-- próximos sorteos,
-- estado de participación,
-- comprobantes,
-- medios de pago.
+- bond details,
+- participating numbers,
+- paid installments,
+- pending installments,
+- upcoming draws,
+- participation status,
+- receipts,
+- payment methods.
 
-## 29.3. Valor agregado
+## 29.3. Added Value
 
-- Reduce consultas a administración.
-- Aumenta transparencia.
-- Mejora experiencia del comprador.
-- Permite comprobar pagos.
-
----
-
-# 30. Recibos digitales
-
-Además del recibo físico, el sistema debería poder emitir recibos digitales.
-
-## 30.1. Datos mínimos
-
-- campaña,
-- bono,
-- número base,
-- número asociado,
-- comprador,
-- cobrador,
-- cuota,
-- importe,
-- fecha,
-- medio de pago,
-- número de operación,
-- usuario que registró,
-- código de validación o QR.
-
-## 30.2. Valor agregado
-
-- Reduce reclamos.
-- Permite reenviar comprobantes.
-- Deja historial claro.
-- Moderniza la operatoria.
+- Reduces inquiries to administration.
+- Increases transparency.
+- Improves buyer experience.
+- Allows verifying payments.
 
 ---
 
-# 31. QR en futuros bonos
+# 30. Digital Receipts
 
-Para futuras campañas, se recomienda imprimir QR propios generados por el sistema.
+In addition to the physical receipt, the system should be able to issue digital receipts.
 
-## 31.1. Ejemplo de contenido
+## 30.1. Minimum Data
+
+- campaign,
+- bond,
+- base number,
+- associated number,
+- buyer,
+- collector,
+- installment,
+- amount,
+- date,
+- payment method,
+- transaction number,
+- registering user,
+- validation code or QR.
+
+## 30.2. Added Value
+
+- Reduces complaints.
+- Allows resending receipts.
+- Leaves a clear history.
+- Modernizes operations.
+
+---
+
+# 31. QR on Future Bonds
+
+For future campaigns, it is recommended to print system-generated QR codes.
+
+## 31.1. Example Content
 
 ```text
-BONO-2025-2026-1658
+BOND-2025-2026-1658
 ```
 
-O un identificador interno seguro.
+Or a secure internal identifier.
 
-## 31.2. Usos del QR
+## 31.2. QR Uses
 
-- abrir ficha del bono,
-- registrar venta,
-- registrar pago,
-- incluir en rendición,
-- permitir consulta del comprador,
-- validar recibos digitales.
+- open bond record,
+- register sale,
+- register payment,
+- include in settlement,
+- allow buyer inquiry,
+- validate digital receipts.
 
-## 31.3. Valor agregado
+## 31.3. Added Value
 
-- Independencia del código de barras viejo.
-- Mejor integración con la app.
-- Mayor velocidad operativa.
-- Base para portal de compradores/cobradores.
+- Independence from the old barcode.
+- Better integration with the app.
+- Greater operational speed.
+- Foundation for buyer/collector portals.
 
 ---
 
-# 32. Gestión de anulaciones y correcciones
+# 32. Annulment and Correction Management
 
-El sistema debe asumir que habrá errores, pero no debe permitir borrar información histórica sin registro.
+The system must assume there will be errors, but it should not allow deleting historical information without a record.
 
-## 32.1. Ejemplo de anulación de pago
+## 32.1. Payment Annulment Example
 
 ```text
-Pago registrado por error
+Payment registered by mistake
 ↓
-Usuario solicita anulación
+User requests annulment
 ↓
-Sistema exige motivo
+System requires a reason
 ↓
-Sistema revierte cuota, comisión y rendición
+System reverses installment, commission, and settlement
 ↓
-Queda todo auditado
+Everything is audited
 ```
 
-## 32.2. Casos a contemplar
+## 32.2. Cases to Cover
 
-- pago mal cargado,
-- venta mal cargada,
-- comprador incorrecto,
-- cobrador incorrecto,
-- bono asignado por error,
-- transferencia mal asociada,
-- premio mal cargado,
-- pata mal agrupada.
+- incorrectly entered payment,
+- incorrectly entered sale,
+- incorrect buyer,
+- incorrect collector,
+- bond assigned by mistake,
+- incorrectly associated transfer,
+- incorrectly entered prize,
+- incorrectly grouped pata.
 
-## 32.3. Valor agregado
+## 32.3. Added Value
 
-- Evita pérdida de historial.
-- Mejora auditoría.
-- Permite corregir sin romper datos.
-- Da confianza al sistema.
+- Prevents loss of history.
+- Improves auditing.
+- Allows corrections without breaking data.
+- Builds trust in the system.
 
 ---
 
-# 33. Modo “jornada de rendición”
+# 33. "Settlement Day" Mode
 
-Cuando varios cobradores van a rendir el mismo día, administración podría abrir una jornada de rendiciones.
+When multiple collectors are settling on the same day, administration could open a settlement day session.
 
-## 33.1. Flujo propuesto
-
-```text
-Nueva jornada de rendiciones
-Fecha: 10/10/2025
-↓
-Rendición Juan Pérez
-Rendición María Gómez
-Rendición Carlos Díaz
-↓
-Cierre de jornada
-```
-
-## 33.2. Resumen de jornada
+## 33.1. Proposed Flow
 
 ```text
-Total efectivo recibido
-Total transferencias registradas
-Comisiones generadas
-Comisiones liquidadas
-Neto Bomberos
-Diferencias de caja
-Cantidad de rendiciones
+New settlement day
+Date: 10/10/2025
+↓
+Settlement Juan Pérez
+Settlement María Gómez
+Settlement Carlos Díaz
+↓
+Day close
 ```
 
-## 33.3. Valor agregado
+## 33.2. Day Summary
 
-- Ordena días de alta carga administrativa.
-- Permite cierre diario.
-- Facilita conciliación con caja.
-- Reemplaza controles manuales.
+```text
+Total cash received
+Total transfers registered
+Generated commissions
+Settled commissions
+Net for Firefighters
+Cash register discrepancies
+Number of settlements
+```
+
+## 33.3. Added Value
+
+- Organizes high administrative workload days.
+- Allows daily close.
+- Facilitates reconciliation with the daily cash register.
+- Replaces manual controls.
 
 ---
 
-# 34. Caja diaria de Bomberos
+# 34. Firefighters Daily Cash Register
 
-Además de rendiciones individuales, conviene manejar una caja diaria.
+In addition to individual settlements, it is advisable to manage a daily cash register.
 
-## 34.1. Ingresos
+## 34.1. Income
 
-- efectivo por rendiciones,
-- transferencias,
-- otros ingresos vinculados.
+- cash from settlements,
+- transfers,
+- other related income.
 
-## 34.2. Egresos
+## 34.2. Expenses
 
-- comisiones pagadas,
-- ajustes,
-- otros egresos autorizados.
+- paid commissions,
+- adjustments,
+- other authorized expenses.
 
-## 34.3. Cierre de caja
+## 34.3. Cash Register Close
 
 ```text
-Saldo esperado
-Saldo contado
-Diferencia
-Observaciones
-Usuario responsable
+Expected balance
+Counted balance
+Difference
+Observations
+Responsible user
 ```
 
-## 34.4. Valor agregado
+## 34.4. Added Value
 
-- Mayor control financiero.
-- Mejor trazabilidad del efectivo.
-- Permite detectar diferencias.
-- Facilita reportes administrativos.
+- Greater financial control.
+- Better cash traceability.
+- Allows detecting discrepancies.
+- Facilitates administrative reports.
 
 ---
 
-# 35. Indicadores de campaña
+# 35. Campaign Indicators
 
-El sistema debería generar indicadores para gestión.
+The system should generate management indicators.
 
-## 35.1. Indicadores sugeridos
+## 35.1. Suggested Indicators
 
 ```text
-% de bonos vendidos
-% de recaudación real vs esperada
-% de morosidad
-% de renovación de compradores
-% de pagos por transferencia
-% de pagos en efectivo
-Comisión total generada
-Comisión total liquidada
-Saldo pendiente de comisiones
-Bonos con riesgo para próximo sorteo
-Cobradores con mayor deuda pendiente
-Patas vendidas
-Bonos no vendidos
-Compradores perdidos respecto al año anterior
+% of bonds sold
+% of actual vs expected revenue
+% delinquency rate
+% buyer renewal rate
+% payments by transfer
+% payments in cash
+Total generated commission
+Total settled commission
+Pending commission balance
+Bonds at risk for next draw
+Collectors with highest pending debt
+Patass sold
+Unsold bonds
+Buyers lost compared to previous year
 ```
 
-## 35.2. Valor agregado
+## 35.2. Added Value
 
-- Permite tomar decisiones basadas en datos.
-- Ayuda a mejorar futuras campañas.
-- Permite informar a la comisión directiva.
-- Mejora planificación.
+- Allows data-driven decisions.
+- Helps improve future campaigns.
+- Allows reporting to the board of directors.
+- Improves planning.
 
 ---
 
-# 36. Flujo de cierre de campaña
+# 36. Campaign Close Flow
 
-Al finalizar la campaña, debería existir un cierre formal.
+At the end of the campaign, there should be a formal close.
 
-## 36.1. Flujo propuesto
+## 36.1. Proposed Flow
 
 ```text
-Cerrar campaña
+Close campaign
 ↓
-Validar sorteos finalizados
+Validate completed draws
 ↓
-Validar premios pendientes
+Validate pending prizes
 ↓
-Validar rendiciones abiertas
+Validate open settlements
 ↓
-Validar bonos no devueltos
+Validate unreturned bonds
 ↓
-Validar saldos de cobradores
+Validate collector balances
 ↓
-Generar reporte final
+Generate final report
 ↓
-Bloquear modificaciones
+Block modifications
 ```
 
-## 36.2. Reglas posteriores al cierre
+## 36.2. Post-Close Rules
 
-Después del cierre:
+After closing:
 
-- no se deberían permitir cambios normales,
-- solo administradores podrían hacer correcciones auditadas,
-- los datos deberían quedar disponibles como histórico,
-- deberían servir como base para la nueva campaña.
+- normal changes should not be allowed,
+- only administrators could make audited corrections,
+- data should remain available as historical record,
+- it should serve as a basis for the new campaign.
 
-## 36.3. Valor agregado
+## 36.3. Added Value
 
-- Ordena el final del período.
-- Evita modificaciones tardías sin control.
-- Permite iniciar mejor la próxima campaña.
-- Genera trazabilidad institucional.
+- Organizes the end of the period.
+- Prevents uncontrolled late modifications.
+- Allows better start of the next campaign.
+- Generates institutional traceability.
 
 ---
 
-# 37. Reporte final de campaña
+# 37. Final Campaign Report
 
-Al cerrar la campaña, el sistema debería generar un reporte final.
+Upon closing the campaign, the system should generate a final report.
 
-## 37.1. Contenido sugerido
+## 37.1. Suggested Content
 
 ```text
-Campaña 2025-2026
+Campaign 2025-2026
 
-Bonos emitidos
-Bonos vendidos
-Bonos no vendidos
-Patas vendidas
-Recaudación bruta
-Recaudación neta
-Comisiones generadas
-Comisiones liquidadas
-Saldos pendientes
-Premios entregados
-Premios no adjudicados
-Deuda pendiente
-Compradores renovados
-Compradores perdidos
-Cobradores destacados
+Bonds issued
+Bonds sold
+Unsold bonds
+Patass sold
+Gross revenue
+Net revenue
+Generated commissions
+Settled commissions
+Pending balances
+Prizes delivered
+Unawarded prizes
+Pending debt
+Renewed buyers
+Lost buyers
+Top collectors
 ```
 
-## 37.2. Valor agregado
+## 37.2. Added Value
 
-- Útil para administración.
-- Útil para comisión directiva.
-- Útil para planificación futura.
-- Permite comparar campañas.
+- Useful for administration.
+- Useful for the board of directors.
+- Useful for future planning.
+- Allows comparing campaigns.
 
 ---
 
-# 38. Importación masiva de bonos
+# 38. Bulk Bond Import
 
-Cuando llegan los bonos impresos, no deberían cargarse uno por uno.
+When printed bonds arrive, they should not be entered one by one.
 
-## 38.1. Archivo de ejemplo
+## 38.1. Example File
 
 ```csv
-tipo_bono,grupo_pata,numero_base,barcode
+bond_type,pata_group,base_number,barcode
 simple,,1658,1658
 simple,,0068,0068
 pata,PATA1200,1200,PATA1200
@@ -1413,293 +1413,295 @@ pata,PATA1200,1315,PATA1200
 pata,PATA1200,2200,PATA1200
 ```
 
-## 38.2. Validaciones
+## 38.2. Validations
 
-El sistema debe validar:
+The system must validate:
 
-- números duplicados,
-- números asociados duplicados,
-- números fuera de rango,
-- patas incompletas,
-- códigos de barra repetidos,
-- conflictos con reservas históricas,
-- formato inválido.
+- duplicate numbers,
+- duplicate associated numbers,
+- out-of-range numbers,
+- incomplete patas,
+- repeated barcodes,
+- conflicts with historical reservations,
+- invalid format.
 
-## 38.3. Vista previa antes de confirmar
+## 38.3. Preview Before Confirming
 
 ```text
-Bonos simples a crear: 3000
-Patas a crear: 120
-Conflictos detectados: 8
-Duplicados detectados: 2
+Simple bonds to create: 3000
+Patass to create: 120
+Conflicts detected: 8
+Duplicates detected: 2
 ```
 
-## 38.4. Valor agregado
+## 38.4. Added Value
 
-- Ahorra tiempo de carga.
-- Reduce errores.
-- Permite validar antes de impactar datos.
-- Escala mejor con campañas grandes.
+- Saves data entry time.
+- Reduces errors.
+- Allows validation before impacting data.
+- Scales better with large campaigns.
 
 ---
 
-# 39. Importación desde campaña anterior
+# 39. Import from Previous Campaign
 
-Al crear una campaña nueva, el sistema debería poder usar la anterior como base.
+When creating a new campaign, the system should be able to use the previous one as a basis.
 
-## 39.1. Datos que puede copiar o sugerir
+## 39.1. Data It Can Copy or Suggest
 
-- cobradores,
-- compradores históricos,
-- números habituales,
-- configuración de cuotas,
-- configuración de comisiones,
-- tipos de sorteos,
-- estructura de premios,
-- reglas de elegibilidad.
+- collectors,
+- historical buyers,
+- usual numbers,
+- installment configuration,
+- commission configuration,
+- draw types,
+- prize structure,
+- eligibility rules.
 
-## 39.2. Flujo propuesto
+## 39.2. Proposed Flow
 
 ```text
-Crear campaña 2026-2027 desde campaña 2025-2026
+Create campaign 2026-2027 from campaign 2025-2026
 ↓
-Copiar configuración
+Copy configuration
 ↓
-Importar nuevos bonos
+Import new bonds
 ↓
-Cruzar números con historial
+Cross-reference numbers with history
 ↓
-Generar reservas y conflictos
+Generate reservations and conflicts
 ```
 
-## 39.3. Valor agregado
+## 39.3. Added Value
 
-- Acelera el inicio anual.
-- Reduce carga repetitiva.
-- Mejora continuidad comercial.
-- Permite detectar conflictos automáticamente.
+- Speeds up annual startup.
+- Reduces repetitive work.
+- Improves commercial continuity.
+- Allows automatic conflict detection.
 
 ---
 
-# 40. Validaciones anti-error
+# 40. Anti-Error Validations
 
-El sistema debería prevenir acciones peligrosas o inconsistentes.
+The system should prevent dangerous or inconsistent actions.
 
-## 40.1. Ejemplos
-
-```text
-Este bono ya fue vendido. No puede reasignarse.
-```
+## 40.1. Examples
 
 ```text
-Este número participante ya existe en otro bono.
+This bond has already been sold. It cannot be reassigned.
 ```
 
 ```text
-Está intentando registrar la cuota 4, pero la cuota 3 sigue impaga.
-¿Desea registrarla como pago adelantado o corregir?
+This participating number already exists on another bond.
 ```
 
 ```text
-Este comprador tiene deuda anterior.
+You are trying to register installment 4, but installment 3 is still unpaid.
+Do you want to register it as an advance payment or correct it?
 ```
 
 ```text
-Este pago por transferencia todavía no fue conciliado.
+This buyer has previous debt.
 ```
 
 ```text
-Este bono no entra al sorteo extraordinario porque pagó completo después de la fecha límite.
+This transfer payment has not been reconciled yet.
 ```
-
-## 40.2. Valor agregado
-
-- Reduce errores humanos.
-- Protege la consistencia del sistema.
-- Mejora la confianza en los datos.
-- Evita reclamos futuros.
-
----
-
-# 41. Módulos funcionales sugeridos
-
-A partir de las mejoras anteriores, los módulos funcionales podrían ser:
-
-1. Campañas.
-2. Bonos y patas.
-3. Importaciones.
-4. Compradores.
-5. Cobradores.
-6. Reservas históricas.
-7. Entregas de bonos.
-8. Ventas.
-9. Pagos.
-10. Rendiciones.
-11. Comisiones.
-12. Cuenta corriente de cobradores.
-13. Transferencias.
-14. Caja diaria.
-15. Sorteos.
-16. Padrones.
-17. Premios.
-18. Reportes.
-19. Auditoría.
-20. Usuarios y permisos.
-21. Notificaciones.
-22. Portal de cobrador.
-23. Portal de comprador.
-
----
-
-# 42. Priorización por MVP
-
-No conviene implementar todo desde el inicio. Se propone dividir en etapas.
-
----
-
-## MVP 1 — Control operativo básico real
-
-Objetivo: reemplazar el sistema actual y el Excel principal.
-
-Funcionalidades:
-
-- Campañas.
-- Bonos simples y patas.
-- Número base + número asociado.
-- Cobradores.
-- Compradores.
-- Asignación de bonos a cobradores.
-- Remito de entrega.
-- Venta de bonos.
-- Cuotas.
-- Pagos.
-- Rendiciones.
-- Comisiones básicas.
-- Cuenta corriente simple del cobrador.
-- Reporte por cobrador.
-- Remito de rendición.
-- Auditoría básica.
-
----
-
-## MVP 2 — Sorteos y elegibilidad
-
-Objetivo: controlar participación y premios.
-
-Funcionalidades:
-
-- Sorteos mensuales.
-- Sorteo extraordinario.
-- Sorteos consuelo.
-- Sorteo final.
-- Padrón congelado.
-- Validación de habilitados.
-- Carga de números ganadores.
-- Validación de premio.
-- Registro de premios entregados/no adjudicados.
-- Reporte de habilitados/no habilitados.
-
----
-
-## MVP 3 — Optimización operativa
-
-Objetivo: reducir carga manual y mejorar seguimiento.
-
-Funcionalidades:
-
-- Escaneo de código de barras.
-- QR interno.
-- Importación masiva de bonos.
-- Importación desde campaña anterior.
-- Reservas históricas.
-- Gestión de conflictos de números.
-- Alertas de vencimiento.
-- Dashboard de campaña.
-- Reporte de riesgo antes del sorteo.
-- Transferencias sin identificar.
-
----
-
-## MVP 4 — Digitalización avanzada
-
-Objetivo: mejorar comunicación y autoservicio.
-
-Funcionalidades:
-
-- Portal del cobrador.
-- Portal del comprador.
-- Recibos digitales.
-- Notificaciones por WhatsApp/email/SMS.
-- Conciliación bancaria semi-automática.
-- Caja diaria avanzada.
-- Indicadores comparativos entre campañas.
-
----
-
-# 43. Flujos críticos para comenzar el diseño
-
-Antes de diseñar pantallas CRUD, conviene diseñar estos flujos completos:
-
-1. Crear campaña.
-2. Importar/cargar bonos.
-3. Calcular números asociados.
-4. Detectar duplicados/conflictos.
-5. Asignar bonos a cobradores.
-6. Emitir remito de entrega.
-7. Registrar venta.
-8. Registrar comprador.
-9. Registrar pago.
-10. Crear rendición.
-11. Calcular comisión.
-12. Actualizar cuenta corriente del cobrador.
-13. Emitir remito de rendición.
-14. Generar resumen mensual por cobrador.
-15. Generar padrón de sorteo.
-16. Cargar número ganador.
-17. Validar premio.
-18. Cerrar mes.
-19. Cerrar campaña.
-
----
-
-# 44. Recomendación final
-
-La mejora más importante no está en digitalizar exactamente el proceso viejo, sino en rediseñarlo para tener trazabilidad, control y automatización.
-
-El sistema debería evitar convertirse en un conjunto de pantallas aisladas.
-
-El corazón del sistema debería ser:
 
 ```text
-Campaña
-↓
-Bonos
-↓
-Cobradores
-↓
-Compradores
-↓
-Pagos
-↓
-Rendiciones
-↓
-Comisiones
-↓
-Sorteos
-↓
-Premios
+This bond does not enter the extraordinary draw because it was paid in full after the deadline.
 ```
 
-Cada movimiento relevante debe quedar registrado.
+## 40.2. Added Value
 
-Cada decisión importante debe ser auditable.
+- Reduces human errors.
+- Protects system consistency.
+- Improves data trust.
+- Prevents future complaints.
 
-Cada sorteo debe poder justificarse con un padrón congelado.
+---
 
-Cada cobrador debe tener una cuenta corriente clara.
+# 41. Suggested Functional Modules
 
-Cada bono debe tener una ficha única.
+Based on the improvements above, the functional modules could be:
 
-Cada comprador debe tener historial.
+1. Campaigns.
+2. Bonds and Patas.
+3. Imports.
+4. Buyers.
+5. Collectors.
+6. Historical Reservations.
+7. Bond Deliveries.
+8. Sales.
+9. Payments.
+10. Settlements.
+11. Commissions.
+12. Collector Current Accounts.
+13. Transfers.
+14. Daily Cash Register.
+15. Draws.
+16. Rosters.
+17. Prizes.
+18. Reports.
+19. Audit.
+20. Users and Permissions.
+21. Notifications.
+22. Collector Portal.
+23. Buyer Portal.
 
-Ese es el valor agregado principal frente al sistema actual.
+---
+
+# 42. Implementation Phases
+
+The MVP scope is defined in `docs/mvp.md` as a single delivery. To avoid context overload and segment the work, implementation is divided into internal phases. These are NOT separate MVP deliveries — they are all part of the same MVP.
+
+The authoritative MVP scope is `docs/mvp.md`. The implementation plan in `docs/implementation-plan.md` defines the detailed phase breakdown.
+
+---
+
+## Phase 1 — Core Operations
+
+Objective: replace the current system and the main Excel.
+
+Features:
+
+- Campaigns.
+- Simple bonds and patas.
+- Base number + associated number.
+- Collectors.
+- Buyers.
+- Bond assignment to collectors.
+- Delivery note.
+- Bond sales.
+- Installments.
+- Payments.
+- Settlements.
+- Basic commissions.
+- Simple collector current account.
+- Collector report.
+- Settlement delivery note.
+- Basic audit.
+
+---
+
+## Phase 2 — Draws and Eligibility
+
+Objective: control participation and prizes.
+
+Features:
+
+- Monthly draws.
+- Extraordinary draw.
+- Consolation draws.
+- Final draw.
+- Frozen roster.
+- Eligibility validation.
+- Winning number entry.
+- Prize validation.
+- Registration of delivered/unawarded prizes.
+- Enabled/disabled report.
+
+---
+
+## Phase 3 — Operational Optimization (Post-MVP)
+
+Objective: reduce manual workload and improve tracking.
+
+Features:
+
+- Barcode scanning (included in MVP).
+- Bulk bond import (included in MVP).
+- Import from previous campaign (included in MVP).
+- Internal QR (post-MVP).
+- Historical reservations (post-MVP).
+- Number conflict management (post-MVP).
+- Expiry alerts (post-MVP).
+- Campaign dashboard (post-MVP).
+- Pre-draw risk report (post-MVP).
+- Unidentified transfers (post-MVP).
+
+---
+
+## Phase 4 — Advanced Digitalization (Post-MVP)
+
+Objective: improve communication and self-service.
+
+Features:
+
+- Collector portal.
+- Buyer portal.
+- Digital receipts.
+- WhatsApp/email/SMS notifications.
+- Semi-automatic bank reconciliation.
+- Advanced daily cash register.
+- Comparative indicators between campaigns.
+
+---
+
+# 43. Critical Flows to Start Design
+
+Before designing CRUD screens, it is advisable to design these complete flows:
+
+1. Create campaign.
+2. Import/enter bonds.
+3. Calculate associated numbers.
+4. Detect duplicates/conflicts.
+5. Assign bonds to collectors.
+6. Issue delivery note.
+7. Register sale.
+8. Register buyer.
+9. Register payment.
+10. Create settlement.
+11. Calculate commission.
+12. Update collector current account.
+13. Issue settlement delivery note.
+14. Generate monthly summary per collector.
+15. Generate draw roster.
+16. Enter winning number.
+17. Validate prize.
+18. Close month.
+19. Close campaign.
+
+---
+
+# 44. Final Recommendation
+
+The most important improvement is not about digitizing the old process exactly, but about redesigning it to have traceability, control, and automation.
+
+The system should avoid becoming a collection of isolated screens.
+
+The heart of the system should be:
+
+```text
+Campaign
+↓
+Bonds
+↓
+Collectors
+↓
+Buyers
+↓
+Payments
+↓
+Settlements
+↓
+Commissions
+↓
+Draws
+↓
+Prizes
+```
+
+Every relevant movement must be recorded.
+
+Every important decision must be auditable.
+
+Every draw must be justifiable with a frozen roster.
+
+Every collector must have a clear current account.
+
+Every bond must have a single record.
+
+Every buyer must have a history.
+
+That is the main added value compared to the current system.
