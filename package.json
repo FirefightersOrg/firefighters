@@ -50,5 +50,9 @@
 	"engines": {
 		"node": ">=22",
 		"pnpm": ">=11"
+	},
+	"dependencies": {
+		"@supabase/ssr": "^0.12.7",
+		"@supabase/supabase-js": "^2.118.0"
 	}
 }
