@@ -5,13 +5,13 @@
 Prerequisites: Node 22+, [pnpm](https://pnpm.io), Docker (running), and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started).
 
 ```bash
-pnpm install
+pnpm install            # first run may ask "Ok to proceed? (y)" to fetch the only-allow package guard
 cp .env.example .env   # then paste the keys printed by `supabase start` / `supabase status`
 supabase start         # Studio: http://127.0.0.1:54323
 pnpm dev
 ```
 
-Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `pnpm format`. Stop Supabase with `supabase stop`.
+Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `pnpm format`, `pnpm format:check`. Stop Supabase with `supabase stop`.
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
