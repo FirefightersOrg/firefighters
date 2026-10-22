@@ -5,7 +5,7 @@
 Prerequisites: Node 22+, [pnpm](https://pnpm.io), Docker (running), and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started).
 
 ```bash
-pnpm install            # first run may ask "Ok to proceed? (y)" to fetch the only-allow package guard
+pnpm install
 cp .env.example .env   # then paste the keys printed by `supabase start` / `supabase status`
 supabase start         # Studio: http://127.0.0.1:54323
 pnpm dev
