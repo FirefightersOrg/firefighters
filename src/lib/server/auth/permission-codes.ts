@@ -1,0 +1,52 @@
+/**
+ * Canonical list of all 44 granular permission codes defined in docs/permissions.md
+ * and seeded in the database.
+ */
+export const PERMISSIONS = [
+	'campaign.view',
+	'campaign.create',
+	'campaign.update',
+	'campaign.update_rules',
+	'campaign.close',
+	'bond.view',
+	'bond.create',
+	'bond.import',
+	'bond.scan',
+	'bond.assign',
+	'bond.return',
+	'bond.mark_lost',
+	'bond.annul',
+	'buyer.view',
+	'buyer.manage',
+	'collector.view',
+	'collector.manage',
+	'collector.ledger.view',
+	'collector.ledger.adjust',
+	'sale.create',
+	'sale.correct',
+	'payment.create',
+	'payment.annul',
+	'settlement.create',
+	'settlement.update_open',
+	'settlement.close',
+	'settlement.correct',
+	'commission.view',
+	'commission.rule_manage',
+	'commission.adjust',
+	'commission.settle',
+	'draw.view',
+	'draw.create',
+	'draw.update',
+	'draw.generate_roster',
+	'draw.freeze_roster',
+	'draw.load_winner',
+	'prize.resolve',
+	'prize.deliver',
+	'report.view_operational',
+	'report.view_financial',
+	'report.export',
+	'audit.view',
+	'user.manage'
+] as const;
+
+export type PermissionCode = (typeof PERMISSIONS)[number];
