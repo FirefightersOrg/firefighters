@@ -4,6 +4,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfile } from '../../../../app';
 import * as userAdminService from '$lib/server/services/user-admin';
+import { UserAdminError } from '$lib/server/services/user-admin';
 import * as adminSupabase from '$lib/server/supabase/admin';
 
 describe('POST /api/admin/users', () => {
@@ -12,16 +13,22 @@ describe('POST /api/admin/users', () => {
 
 	beforeEach(() => {
 		vi.restoreAllMocks();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
 	function createMockEvent(options: {
 		body?: unknown;
 		hasPermission?: boolean;
+		permissionRpcError?: boolean;
 		profile?: Partial<UserProfile> | null;
+		user?: { id: string } | null;
 		requestId?: string;
 	}): RequestEvent {
 		const rpcMock = vi.fn().mockImplementation((fn: string) => {
 			if (fn === 'has_permission') {
+				if (options.permissionRpcError) {
+					return Promise.resolve({ data: null, error: { message: 'rpc failed' } });
+				}
 				return Promise.resolve({
 					data: options.hasPermission ?? true,
 					error: null
@@ -43,6 +50,7 @@ describe('POST /api/admin/users', () => {
 			request: requestMock,
 			locals: {
 				supabase: { rpc: rpcMock } as unknown as SupabaseClient,
+				user: options.user === null ? null : (options.user ?? { id: validUserId }),
 				profile:
 					options.profile === null
 						? null
@@ -51,6 +59,23 @@ describe('POST /api/admin/users', () => {
 			}
 		} as unknown as RequestEvent;
 	}
+
+	it('returns 401 when there is no authenticated user with an active profile', async () => {
+		await expect(POST(createMockEvent({ user: null, profile: null }))).rejects.toMatchObject({
+			status: 401,
+			body: expect.objectContaining({ code: 'unauthenticated' })
+		});
+		await expect(POST(createMockEvent({ profile: null }))).rejects.toMatchObject({
+			status: 401
+		});
+	});
+
+	it('returns 500 when the permission check itself fails', async () => {
+		await expect(POST(createMockEvent({ permissionRpcError: true }))).rejects.toMatchObject({
+			status: 500,
+			body: expect.objectContaining({ code: 'permission_check_failed' })
+		});
+	});
 
 	it('returns 403 Forbidden when caller lacks user.manage permission', async () => {
 		const event = createMockEvent({ hasPermission: false });
@@ -149,28 +174,62 @@ describe('POST /api/admin/users', () => {
 		);
 	});
 
-	it('returns 400 when user creation service throws', async () => {
+	const validBody = {
+		email: 'existing@firefighters.local',
+		password: 'StrongPassword123!',
+		fullName: 'Existing User',
+		roleNames: ['operator']
+	};
+
+	function mockServiceFailure(err: unknown) {
 		vi.spyOn(adminSupabase, 'createSupabaseAdminClient').mockReturnValue(
 			{} as unknown as SupabaseClient
 		);
-		vi.spyOn(userAdminService, 'createAdminManagedUser').mockRejectedValue(
-			new Error('A user with this email address has already been registered')
-		);
+		vi.spyOn(userAdminService, 'createAdminManagedUser').mockRejectedValue(err);
+	}
 
-		const event = createMockEvent({
-			hasPermission: true,
-			body: {
-				email: 'existing@firefighters.local',
-				password: 'StrongPassword123!',
-				fullName: 'Existing User',
-				roleNames: ['operator']
-			}
+	it('returns 409 when the email already exists', async () => {
+		mockServiceFailure(new UserAdminError('conflict', 'raw upstream message'));
+
+		const response = await POST(createMockEvent({ body: validBody }));
+		expect(response.status).toBe(409);
+		expect(await response.json()).toEqual({
+			message: 'A user with this email already exists',
+			code: 'email_exists'
 		});
+	});
 
-		const response = await POST(event);
+	it('returns 400 for service-level validation errors (e.g. unknown role)', async () => {
+		mockServiceFailure(new UserAdminError('validation', 'Unknown role(s): ghost'));
+
+		const response = await POST(createMockEvent({ body: validBody }));
 		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			message: 'Unknown role(s): ghost',
+			code: 'validation_failed'
+		});
+	});
 
+	it('returns a generic 500 for internal errors and logs the details', async () => {
+		mockServiceFailure(new UserAdminError('internal', 'Failed to query roles: secret pg detail'));
+
+		const response = await POST(createMockEvent({ body: validBody, requestId: 'req-500' }));
+		expect(response.status).toBe(500);
 		const data = await response.json();
-		expect(data.message).toBe('A user with this email address has already been registered');
+		expect(data).toEqual({
+			message: 'Failed to create user',
+			code: 'internal_error',
+			requestId: 'req-500'
+		});
+		expect(JSON.stringify(data)).not.toContain('secret');
+		expect(console.error).toHaveBeenCalled();
+	});
+
+	it('returns a generic 500 for unexpected exceptions', async () => {
+		mockServiceFailure(new Error('boom'));
+
+		const response = await POST(createMockEvent({ body: validBody }));
+		expect(response.status).toBe(500);
+		expect((await response.json()).message).toBe('Failed to create user');
 	});
 });
