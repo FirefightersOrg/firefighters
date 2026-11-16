@@ -1,12 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+	checkPermission,
 	hasPermission,
 	hasPermissionForUser,
+	hasPermissionIn,
 	getUserPermissions,
-	requirePermission
+	requirePermission,
+	requirePermissionIn
 } from './permissions';
-import { PERMISSIONS } from './permission-codes';
+import { PERMISSIONS, type PermissionCode } from './permission-codes';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+	consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	consoleErrorSpy.mockRestore();
+});
 
 function createMockSupabase(
 	rpcHandler?: (
@@ -52,6 +67,10 @@ describe('hasPermission', () => {
 
 		const result = await hasPermission(client, 'campaign.view');
 		expect(result).toBe(false);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.stringContaining('has_permission RPC failed'),
+			expect.objectContaining({ permission_code: 'campaign.view' })
+		);
 	});
 
 	it('fails closed (returns false) when RPC throws', async () => {
@@ -61,11 +80,12 @@ describe('hasPermission', () => {
 
 		const result = await hasPermission(client, 'campaign.view');
 		expect(result).toBe(false);
+		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 
 	it('fails closed (returns false) when permissionCode is empty', async () => {
 		const client = createMockSupabase();
-		const result = await hasPermission(client, '');
+		const result = await hasPermission(client, '' as PermissionCode);
 		expect(result).toBe(false);
 		expect(client.rpc).not.toHaveBeenCalled();
 	});
@@ -104,6 +124,10 @@ describe('hasPermissionForUser', () => {
 
 		const result = await hasPermissionForUser(client, testUserId, 'user.manage');
 		expect(result).toBe(false);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.stringContaining('has_permission_for_user RPC failed'),
+			expect.objectContaining({ p_auth_user_id: testUserId })
+		);
 	});
 
 	it('fails closed when authUserId is missing', async () => {
@@ -133,6 +157,7 @@ describe('getUserPermissions', () => {
 
 		const permissions = await getUserPermissions(client);
 		expect(permissions).toEqual([]);
+		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 
 	it('fails closed (returns empty array) when RPC response is not an array', async () => {
@@ -181,22 +206,79 @@ describe('requirePermission', () => {
 		}
 	});
 
-	it('throws HttpError 403 when RPC errors (fail-closed requirement)', async () => {
+	it('throws HttpError 500 (not 403) when the RPC errors, still failing closed', async () => {
 		const client = createMockSupabase(async () => ({
 			data: null,
 			error: { message: 'network error' }
 		}));
 
+		await expect(requirePermission(client, 'user.manage')).rejects.toMatchObject({
+			status: 500,
+			body: {
+				message: 'Permission check failed',
+				code: 'permission_check_failed',
+				permission: 'user.manage'
+			}
+		});
+		expect(consoleErrorSpy).toHaveBeenCalled();
+	});
+
+	it('throws HttpError 500 when the RPC throws', async () => {
+		const client = createMockSupabase(async () => {
+			throw new Error('ECONNREFUSED');
+		});
+
+		await expect(requirePermission(client, 'user.manage')).rejects.toMatchObject({ status: 500 });
+	});
+});
+
+describe('checkPermission', () => {
+	it('distinguishes granted, denied and error', async () => {
+		expect(
+			await checkPermission(
+				createMockSupabase(async () => ({ data: true, error: null })),
+				'bond.view'
+			)
+		).toBe('granted');
+		expect(
+			await checkPermission(
+				createMockSupabase(async () => ({ data: false, error: null })),
+				'bond.view'
+			)
+		).toBe('denied');
+		expect(
+			await checkPermission(
+				createMockSupabase(async () => ({ data: null, error: { message: 'boom' } })),
+				'bond.view'
+			)
+		).toBe('error');
+	});
+});
+
+describe('request-scoped checks (hasPermissionIn / requirePermissionIn)', () => {
+	const permissions = ['campaign.view', 'bond.view'];
+
+	it('checks membership without any RPC', () => {
+		expect(hasPermissionIn(permissions, 'campaign.view')).toBe(true);
+		expect(hasPermissionIn(permissions, 'user.manage')).toBe(false);
+	});
+
+	it('fails closed on a missing list', () => {
+		expect(hasPermissionIn(undefined, 'campaign.view')).toBe(false);
+		expect(hasPermissionIn(null, 'campaign.view')).toBe(false);
+		expect(hasPermissionIn([], 'campaign.view')).toBe(false);
+	});
+
+	it('requirePermissionIn throws 403 with structured body when absent', () => {
+		expect(() => requirePermissionIn(permissions, 'campaign.view')).not.toThrow();
 		try {
-			await requirePermission(client, 'user.manage');
+			requirePermissionIn(permissions, 'user.manage');
 			expect.fail('Should have thrown');
 		} catch (err) {
-			const httpError = err as {
-				status?: number;
-				body?: { message?: string; code?: string; permission?: string };
-			};
-			expect(httpError.status).toBe(403);
-			expect(httpError.body?.code).toBe('permission_denied');
+			expect(err).toMatchObject({
+				status: 403,
+				body: { message: 'Forbidden', code: 'permission_denied', permission: 'user.manage' }
+			});
 		}
 	});
 });
@@ -216,5 +298,32 @@ describe('canonical permission codes', () => {
 		expect(PERMISSIONS).toContain('draw.freeze_roster');
 		expect(PERMISSIONS).toContain('settlement.close');
 		expect(PERMISSIONS).not.toContain('role.manage'); // D1: no role.manage
+	});
+
+	it('matches the permission codes seeded by the SQL migrations (drift check)', () => {
+		// Parses every `insert into public.permissions (...) values (...)` statement in
+		// supabase/migrations, so adding/renaming a permission in SQL without updating
+		// PERMISSIONS (or vice versa) fails `pnpm test` without needing a database.
+		// If a future migration deletes or renames a code, extend this parser accordingly.
+		const migrationsDir = fileURLToPath(
+			new URL('../../../../supabase/migrations/', import.meta.url)
+		);
+		const seeded = new Set<string>();
+		for (const file of readdirSync(migrationsDir)
+			.filter((f) => f.endsWith('.sql'))
+			.sort()) {
+			const sql = readFileSync(`${migrationsDir}${file}`, 'utf8');
+			const inserts = sql.matchAll(
+				/insert\s+into\s+public\.permissions\s*\(\s*code\b[^)]*\)\s*values([\s\S]*?);/gi
+			);
+			for (const [, values] of inserts) {
+				for (const [, code] of values.matchAll(/\(\s*'([^']+)'/g)) {
+					seeded.add(code);
+				}
+			}
+		}
+
+		expect(seeded.size).toBeGreaterThan(0);
+		expect([...PERMISSIONS].sort()).toEqual([...seeded].sort());
 	});
 });

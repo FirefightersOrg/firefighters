@@ -93,6 +93,17 @@ describe('recordAuditLog', () => {
 		).rejects.toThrow(/Failed to record audit log: relation audit_log does not exist/);
 	});
 
+	it('explains the actor rule when RLS rejects the insert (42501)', async () => {
+		const client = createMockSupabase(async () => ({
+			data: null,
+			error: { message: 'new row violates row-level security policy', code: '42501' }
+		}));
+
+		await expect(
+			recordAuditLog(client, { actorUserId: null, action: 'system.job', entityType: 'system' })
+		).rejects.toThrow(/service-role admin client/);
+	});
+
 	describe('Zod validation', () => {
 		it('rejects missing action', async () => {
 			const client = createMockSupabase();
@@ -149,6 +160,22 @@ describe('recordAuditLog', () => {
 					entityType: 'ent'
 				}).success
 			).toBe(true);
+		});
+
+		it('accepts non-v4 Postgres UUIDs (e.g. fixture profile ids)', async () => {
+			const nonV4 = '10000000-0000-0000-0000-000000000001';
+			expect(
+				auditLogEntrySchema.safeParse({ actorUserId: nonV4, action: 'act', entityType: 'ent' })
+					.success
+			).toBe(true);
+
+			let insertedRow: Record<string, unknown> | null = null;
+			const client = createMockSupabase(async (row) => {
+				insertedRow = row;
+				return { data: null, error: null };
+			});
+			await recordAuditLog(client, { actorUserId: nonV4, action: 'act', entityType: 'ent' });
+			expect(insertedRow).toMatchObject({ actor_user_id: nonV4 });
 		});
 	});
 });
