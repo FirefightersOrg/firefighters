@@ -22,7 +22,7 @@ export default defineConfig({
 	// Vitest reads this file (no separate vitest.config.ts) so the sveltekit() plugin
 	// resolves $lib, $env/* and $app/* in tests exactly as in the app.
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}'],
+		include: ['src/**/*.{test,spec}.{js,ts}', 'scripts/**/*.{test,spec}.{js,ts}'],
 		environment: 'node'
 	}
 });
