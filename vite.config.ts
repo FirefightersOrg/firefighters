@@ -21,6 +21,8 @@ export default defineConfig({
 	],
 	// Vitest reads this file (no separate vitest.config.ts) so the sveltekit() plugin
 	// resolves $lib, $env/* and $app/* in tests exactly as in the app.
+	// Unit tests only: `pnpm test` must not need Supabase or the network. The live-Supabase
+	// suite in tests/integration runs via `pnpm test:integration` (vitest.integration.config.ts).
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}', 'scripts/**/*.{test,spec}.{js,ts}'],
 		environment: 'node'

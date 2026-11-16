@@ -26,6 +26,8 @@ Until that is fixed, write the audit row **after** the business write succeeds, 
 
 Intended direction for sensitive mutations (bonds, payments, settlements, draws, users): implement each one as a SQL function/RPC that performs the domain change **and** inserts the `audit_log` row in the same transaction. This helper then remains for actions with no DB write of their own and as a fallback.
 
+First example of this pattern: user creation. `admin_provision_profile` (and `admin_grant_roles`, migration `20261023002000_admin_provision_profile.sql`, `service_role` only) writes the profile, its role assignments and the `user.create` / `user.roles.grant` audit row in one transaction; `createAdminManagedUser` no longer calls `recordAuditLog`. Follow it for new sensitive mutations.
+
 ## Available Functions
 
 ### `recordAuditLog(supabase, entry): Promise<void>`
