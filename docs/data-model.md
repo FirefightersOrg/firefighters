@@ -56,6 +56,15 @@ Rules (enforced by triggers for every role, including `service_role`):
 
 Access: `authenticated` can only `SELECT`, and RLS limits it to `campaign.view`. Writes go through permission-checked SQL functions that record the change and its audit row in one transaction (SAN-17). `service_role` has `SELECT`, `INSERT` and `UPDATE`.
 
+Write functions (`20261117000000_campaign_rpcs.sql`, SECURITY DEFINER, executable by `authenticated` only; they act as `auth.uid()`'s active profile):
+
+- `campaign_create(p_name, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_starts_at, p_ends_at, p_request_id, p_reason) returns uuid` (`campaign.create`).
+- `campaign_update(p_id, p_name, p_starts_at, p_ends_at, p_request_id, p_reason) returns boolean` (`campaign.update`).
+- `campaign_update_rules(p_id, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_request_id, p_reason) returns boolean` (`campaign.update_rules`; draft only).
+- `campaign_transition(p_id, p_to_status, p_reason, p_request_id)`: `active` needs `campaign.update_rules`; `closing`, `closed` and `annulled` need `campaign.close`; annulling needs a reason.
+
+`installment_value` is always computed by these functions (`simple_bond_value / installment_count`, rejected with `22023` unless exact to the cent). Updates are full replacements of their fields; a call that changes nothing returns `false` and writes no audit row. Audit actions: `campaign.create` (new value: full snapshot), `campaign.update` / `campaign.update_rules` (old and new value: only the changed fields), `campaign.transition` (old and new `status`). Errors: `42501` no active profile or permission, `22023` invalid input, `P0002` not found, `23514` / `55000` from the constraints and the write guard above.
+
 ### profiles
 
 Represents application users linked to Supabase Auth.
