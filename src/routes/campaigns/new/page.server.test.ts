@@ -127,6 +127,38 @@ describe('/campaigns/new', () => {
 			);
 		});
 
+		it('accepts Argentine money input (no-JS post) and sends canonical money to SQL', async () => {
+			const { supabase, rpc } = mockSupabase({ rpc: { data: CAMPAIGN_ID, error: null } });
+			await expect(
+				actions.default(
+					actionEvent(makeLocals({ supabase }), { ...validForm, simpleBondValue: '60.000,50' })
+				)
+			).rejects.toMatchObject({ status: 303 });
+			expect(rpc).toHaveBeenCalledWith(
+				'campaign_create',
+				expect.objectContaining({ p_simple_bond_value: '60000.50', p_installment_count: 10 })
+			);
+		});
+
+		it('rejects 60.000,00 in 7 installments with the es-AR amount in the message', async () => {
+			const { supabase, rpc } = mockSupabase();
+			const result = (await actions.default(
+				actionEvent(makeLocals({ supabase }), {
+					...validForm,
+					simpleBondValue: '60.000,00',
+					installmentCount: '7'
+				})
+			)) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data.errors).toEqual({
+				installmentCount: [
+					'$ 60.000,00 cannot be split into 7 equal installments. ' +
+						'Choose a value and a number of installments that divide exactly (to the cent).'
+				]
+			});
+			expect(rpc).not.toHaveBeenCalled();
+		});
+
 		it('maps a database permission denial to 403 (server-side enforcement)', async () => {
 			const { supabase } = mockSupabase({
 				rpc: {

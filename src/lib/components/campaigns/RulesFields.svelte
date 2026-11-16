@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { BARCODE_MODE_LABELS, BARCODE_MODES } from '$lib/domain/campaigns';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
 	import FieldError from './FieldError.svelte';
@@ -9,17 +8,15 @@
 	import type { CampaignRulesValues } from './types';
 
 	/**
-	 * Every rule a campaign freezes on activation: installments, numbering and barcode mode.
-	 * `numberingPreview` is passed through to `NumberingFields` (SAN-19 extension point).
+	 * Every rule a campaign freezes on activation: installments, numbering and barcode mode, with
+	 * the live installment summary and numbering preview.
 	 */
 	let {
 		values = $bindable(),
-		errors = {},
-		numberingPreview
+		errors = {}
 	}: {
 		values: CampaignRulesValues;
 		errors?: CampaignFieldErrors;
-		numberingPreview?: Snippet;
 	} = $props();
 </script>
 
@@ -39,7 +36,6 @@
 		bind:associatedNumberOffset={values.associatedNumberOffset}
 		bind:overflowPolicy={values.overflowPolicy}
 		{errors}
-		preview={numberingPreview}
 	/>
 
 	<div>

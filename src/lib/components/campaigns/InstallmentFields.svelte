@@ -6,9 +6,11 @@
 	import { hintClass, inputClass, labelClass } from './styles';
 
 	/**
-	 * Simple bond value + number of installments, with the derived installment value shown
-	 * read-only (it is never submitted: the database computes it). Shows an inline error while the
-	 * value does not divide exactly; the server rejects it too.
+	 * Simple bond value (Argentine format, `60.000,50`) + number of installments, with the derived
+	 * installment value shown read-only (it is never submitted: the database computes it) and a
+	 * live summary ("10 installments of $ 6.000,00"). Shows an inline error while the value does
+	 * not divide exactly to the cent; the server rejects it too (same `previewInstallmentValue`
+	 * rules as the form schema).
 	 */
 	let {
 		simpleBondValue = $bindable(''),
@@ -22,7 +24,10 @@
 
 	const preview = $derived(previewInstallmentValue(simpleBondValue, installmentCount));
 	const countErrors = $derived(errors.installmentCount);
-	const countInvalid = $derived(!!countErrors?.length || preview.state === 'error');
+	const valueErrors = $derived(errors.simpleBondValue);
+	const previewErrorField = $derived(preview.state === 'error' ? preview.field : null);
+	const valueInvalid = $derived(!!valueErrors?.length || previewErrorField === 'simpleBondValue');
+	const countInvalid = $derived(!!countErrors?.length || previewErrorField === 'installmentCount');
 </script>
 
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -35,13 +40,17 @@
 			inputmode="decimal"
 			autocomplete="off"
 			required
-			placeholder="60000"
+			placeholder="60.000"
 			bind:value={simpleBondValue}
-			aria-invalid={errors.simpleBondValue ? 'true' : undefined}
-			aria-describedby={errors.simpleBondValue ? 'simpleBondValue-error' : 'simpleBondValue-hint'}
+			aria-invalid={valueInvalid ? 'true' : undefined}
+			aria-describedby={valueErrors?.length
+				? 'simpleBondValue-hint simpleBondValue-error'
+				: 'simpleBondValue-hint installment-preview'}
 			class={inputClass}
 		/>
-		<p id="simpleBondValue-hint" class={hintClass}>Up to 2 decimals, no thousands separators.</p>
+		<p id="simpleBondValue-hint" class={hintClass}>
+			In pesos, e.g. 60.000 or 60.000,50 (comma for decimals).
+		</p>
 		<FieldError id="simpleBondValue-error" errors={errors.simpleBondValue} />
 	</div>
 
@@ -76,8 +85,15 @@
 		<p class={hintClass}>Calculated: value ÷ installments.</p>
 	</div>
 
-	<div id="installment-preview" aria-live="polite" class="sm:col-span-3">
-		{#if preview.state === 'error' && !countErrors?.length}
+	<div id="installment-preview" aria-live="polite" class="text-sm sm:col-span-3">
+		{#if preview.state === 'ok'}
+			<p class="text-slate-700">
+				<strong class="tabular-nums">{preview.installmentCount}</strong>
+				{preview.installmentCount === 1 ? 'installment' : 'installments'} of
+				<strong class="tabular-nums">{formatMoney(preview.installmentValue)}</strong>
+				= <span class="tabular-nums">{formatMoney(preview.simpleBondValue)}</span> (simple bond value).
+			</p>
+		{:else if preview.state === 'error' && !countErrors?.length && !valueErrors?.length}
 			<p class="text-xs text-red-600">{preview.message}</p>
 		{/if}
 	</div>

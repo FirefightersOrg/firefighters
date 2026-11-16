@@ -5,10 +5,17 @@ import {
 	campaignGeneralSchema,
 	campaignNumberingSchema,
 	campaignRulesSchema,
+	campaignRulesUpdateSchema,
 	campaignTransitionSchema,
+	previewNumberingInput,
 	readFormFields,
-	CAMPAIGN_CREATE_FIELDS
+	CAMPAIGN_CREATE_FIELDS,
+	CAMPAIGN_RULES_UPDATE_FIELDS
 } from './campaign';
+
+const NBSP = '\u00a0';
+const MONEY_FORMAT_ERROR =
+	'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)';
 
 const rules = {
 	simpleBondValue: '60000',
@@ -61,12 +68,37 @@ describe('campaignCreateSchema', () => {
 		expect(result.installmentValue).toBe('50.01');
 	});
 
+	it.each([
+		['60.000,00', '60000.00', '6000.00'],
+		['60.000', '60000.00', '6000.00'],
+		['60000,50', '60000.50', '6000.05'],
+		['60.000,5', '60000.50', '6000.05'],
+		['60000.50', '60000.50', '6000.05'],
+		[`$${NBSP}60.000,00`, '60000.00', '6000.00']
+	])('accepts Argentine money input %j (canonical %s, installment %s)', (input, total, each) => {
+		const result = campaignCreateSchema.parse({ ...general, ...rules, simpleBondValue: input });
+		expect(result.simpleBondValue).toBe(total);
+		expect(result.installmentValue).toBe(each);
+	});
+
+	it('rejects 60.000,00 in 7 installments (not exact to the cent)', () => {
+		const errors = errorsOf(
+			campaignCreateSchema.safeParse({
+				...general,
+				...rules,
+				simpleBondValue: '60.000,00',
+				installmentCount: '7'
+			})
+		);
+		expect(errors.installmentCount?.[0]).toMatch(/^\$\u00a060\.000,00 cannot be split into 7/);
+	});
+
 	it('rejects a value that does not divide exactly into the installments', () => {
 		const errors = errorsOf(
 			campaignCreateSchema.safeParse({ ...general, ...rules, installmentCount: '7' })
 		);
 		expect(errors.installmentCount).toEqual([
-			'60,000.00 cannot be split into 7 equal installments. ' +
+			`$${NBSP}60.000,00 cannot be split into 7 equal installments. ` +
 				'Choose a value and a number of installments that divide exactly (to the cent).'
 		]);
 	});
@@ -85,16 +117,11 @@ describe('campaignCreateSchema', () => {
 
 	it.each([
 		['simpleBondValue', '0', 'Simple bond value must be greater than 0'],
-		[
-			'simpleBondValue',
-			'60000.001',
-			'Enter an amount with at most 2 decimals, e.g. 60000 or 60000.50'
-		],
-		[
-			'simpleBondValue',
-			'60.000',
-			'Enter an amount with at most 2 decimals, e.g. 60000 or 60000.50'
-		],
+		['simpleBondValue', '60000.001', MONEY_FORMAT_ERROR],
+		['simpleBondValue', '60,000', MONEY_FORMAT_ERROR],
+		['simpleBondValue', '60.000,505', MONEY_FORMAT_ERROR],
+		['simpleBondValue', '1,234.56', MONEY_FORMAT_ERROR],
+		['simpleBondValue', '0,00', 'Simple bond value must be greater than 0'],
 		['simpleBondValue', '', 'Simple bond value is required'],
 		['installmentCount', '0', 'Number of installments must be at least 1'],
 		['installmentCount', '2.5', 'Number of installments must be a whole number'],
@@ -187,6 +214,18 @@ describe('campaignRulesSchema / campaignNumberingSchema', () => {
 		expect(result.installmentValue).toBe('5000.00');
 	});
 
+	it('parses Argentine money input like the create schema', () => {
+		const result = campaignRulesSchema.parse({
+			...rules,
+			simpleBondValue: '72.000,00',
+			installmentCount: '12'
+		});
+		expect(result.simpleBondValue).toBe('72000.00');
+		expect(result.installmentValue).toBe('6000.00');
+		const errors = errorsOf(campaignRulesSchema.safeParse({ ...rules, simpleBondValue: '72,000' }));
+		expect(errors.simpleBondValue).toEqual([MONEY_FORMAT_ERROR]);
+	});
+
 	it('validates the numbering inputs on their own (for previews)', () => {
 		expect(
 			campaignNumberingSchema.parse({
@@ -209,6 +248,105 @@ describe('campaignRulesSchema / campaignNumberingSchema', () => {
 				overflowPolicy: 'reject'
 			}).success
 		).toBe(false);
+	});
+});
+
+describe('campaignRulesUpdateSchema (existing campaign)', () => {
+	const confirmed = { ...rules, simpleBondValue: '60.000,00', confirmRulesChange: 'yes' };
+
+	it('requires the explicit confirmation', () => {
+		expect(campaignRulesUpdateSchema.parse(confirmed)).toEqual(campaignRulesSchema.parse(rules));
+		for (const confirmRulesChange of ['', 'on', 'no', 'YES']) {
+			const errors = errorsOf(
+				campaignRulesUpdateSchema.safeParse({ ...confirmed, confirmRulesChange })
+			);
+			expect(errors).toEqual({
+				confirmRulesChange: ['Confirm that you reviewed the rule changes']
+			});
+		}
+	});
+
+	it('reports field errors and the missing confirmation together', () => {
+		const errors = errorsOf(
+			campaignRulesUpdateSchema.safeParse({
+				...confirmed,
+				installmentCount: '7',
+				confirmRulesChange: ''
+			})
+		);
+		expect(Object.keys(errors).sort()).toEqual(['confirmRulesChange', 'installmentCount']);
+	});
+
+	it('reads the confirmation field from the form', () => {
+		expect(CAMPAIGN_RULES_UPDATE_FIELDS).toContain('confirmRulesChange');
+	});
+});
+
+describe('previewNumberingInput (live preview)', () => {
+	const numbering = {
+		numberDigits: '4',
+		maxNumber: '9999',
+		associatedNumberOffset: '4871',
+		overflowPolicy: 'reject'
+	};
+
+	it('is incomplete while a numeric field is empty', () => {
+		expect(previewNumberingInput({ ...numbering, maxNumber: ' ' })).toEqual({
+			state: 'incomplete'
+		});
+		expect(previewNumberingInput({ ...numbering, numberDigits: '' })).toEqual({
+			state: 'incomplete'
+		});
+	});
+
+	it('builds the 4-digit preview (0068 → 4939)', () => {
+		const result = previewNumberingInput(numbering);
+		expect(result.state).toBe('ok');
+		if (result.state !== 'ok') return;
+		expect(result.preview.examples[1]).toMatchObject({
+			baseFormatted: '0068',
+			associatedFormatted: '4939'
+		});
+		expect(result.preview.maxValidBase.base).toBe(5128);
+		expect(result.preview.usableBaseCount).toBe(5129);
+		expect(result.preview.overflowExample).toMatchObject({ base: 5129, associated: 10000 });
+	});
+
+	it('builds the 5-digit preview (00068 → 04939)', () => {
+		const result = previewNumberingInput({ ...numbering, numberDigits: '5', maxNumber: '99999' });
+		expect(result.state === 'ok' && result.preview.examples[1]).toMatchObject({
+			baseFormatted: '00068',
+			associatedFormatted: '04939'
+		});
+	});
+
+	it('lists the same problems the server reports, one per field', () => {
+		expect(previewNumberingInput({ ...numbering, maxNumber: '10000' })).toEqual({
+			state: 'invalid',
+			issues: [
+				{ field: 'maxNumber', message: 'Maximum number must fit in 4 digits (at most 9999)' }
+			]
+		});
+		expect(
+			previewNumberingInput({ ...numbering, numberDigits: '11', associatedNumberOffset: 'x' })
+		).toEqual({
+			state: 'invalid',
+			issues: [
+				{ field: 'numberDigits', message: 'Number of digits must be at most 10' },
+				{
+					field: 'associatedNumberOffset',
+					message: 'Associated number offset must be a whole number'
+				}
+			]
+		});
+		expect(previewNumberingInput({ ...numbering, associatedNumberOffset: '10000' })).toMatchObject({
+			state: 'invalid',
+			issues: [{ field: 'associatedNumberOffset' }]
+		});
+		expect(previewNumberingInput({ ...numbering, overflowPolicy: 'wrap' })).toEqual({
+			state: 'invalid',
+			issues: [{ field: 'overflowPolicy', message: 'Overflow policy must be one of: reject' }]
+		});
 	});
 });
 
