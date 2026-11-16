@@ -45,6 +45,7 @@ const rulesForm = {
 	associatedNumberOffset: '4871',
 	overflowPolicy: 'reject',
 	barcodeMode: 'internal_code',
+	changeReason: '',
 	confirmRulesChange: 'yes'
 };
 
@@ -292,8 +293,34 @@ describe('/campaigns/[id]', () => {
 				p_associated_number_offset: 4871,
 				p_overflow_policy: 'reject',
 				p_barcode_mode: 'internal_code',
-				p_request_id: 'req-test'
+				p_request_id: 'req-test',
+				p_reason: null
 			});
+		});
+
+		it('passes the optional reason (trimmed) to the audited SQL function', async () => {
+			const { supabase, rpc } = mockSupabase({ rpc: { data: true, error: null } });
+			await runAction('rules', makeLocals({ supabase }), {
+				...rulesForm,
+				changeReason: '  Board meeting 2026-11-16 '
+			});
+			expect(rpc).toHaveBeenCalledWith(
+				'campaign_update_rules',
+				expect.objectContaining({ p_reason: 'Board meeting 2026-11-16' })
+			);
+		});
+
+		it('rejects a reason longer than 500 characters', async () => {
+			const { supabase, rpc } = mockSupabase();
+			const result = (await runAction('rules', makeLocals({ supabase }), {
+				...rulesForm,
+				changeReason: 'x'.repeat(501)
+			})) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data.errors).toEqual({
+				changeReason: ['Reason must be at most 500 characters']
+			});
+			expect(rpc).not.toHaveBeenCalled();
 		});
 
 		it('requires the explicit confirmation and does not call the database without it', async () => {

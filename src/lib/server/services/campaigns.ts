@@ -5,6 +5,7 @@ import type {
 	CampaignFormField,
 	CampaignGeneralInput,
 	CampaignRulesInput,
+	CampaignRulesUpdateInput,
 	CampaignTransitionInput
 } from '$lib/schemas/campaign';
 
@@ -325,12 +326,13 @@ export async function updateCampaignGeneral(
 
 /**
  * Updates the rules of a draft campaign (`campaign.update_rules`). The installment value is
- * recomputed by the database. Returns false when nothing changed (no audit row).
+ * recomputed by the database; the optional `reason` is stored in the audit row. Returns false
+ * when nothing changed (no audit row).
  */
 export async function updateCampaignRules(
 	supabase: SupabaseClient,
 	id: string,
-	input: CampaignRulesInput,
+	input: CampaignRulesInput & { reason?: CampaignRulesUpdateInput['reason'] },
 	ctx: CampaignRequestContext = {}
 ): Promise<boolean> {
 	const data = await callCampaignRpc(
@@ -345,7 +347,8 @@ export async function updateCampaignRules(
 			p_associated_number_offset: input.associatedNumberOffset,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
-			p_request_id: ctx.requestId ?? null
+			p_request_id: ctx.requestId ?? null,
+			p_reason: input.reason ?? null
 		},
 		ctx
 	);

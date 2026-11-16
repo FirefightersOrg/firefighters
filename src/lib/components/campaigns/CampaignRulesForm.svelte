@@ -5,13 +5,15 @@
 	import {
 		CAMPAIGN_RULES_CONFIRM_FIELD,
 		CAMPAIGN_RULES_CONFIRM_VALUE,
+		CAMPAIGN_RULES_REASON_FIELD,
+		CAMPAIGN_RULES_REASON_MAX_LENGTH,
 		type CampaignFieldErrors
 	} from '$lib/schemas/campaign';
 	import FieldError from './FieldError.svelte';
 	import FormAlert from './FormAlert.svelte';
 	import RulesFields from './RulesFields.svelte';
 	import { diffCampaignRules } from './rules-diff';
-	import { cardClass, primaryButtonClass } from './styles';
+	import { cardClass, hintClass, inputClass, labelClass, primaryButtonClass } from './styles';
 	import { rulesValuesOf, withSubmitted } from './types';
 
 	/**
@@ -22,7 +24,8 @@
 	 * summary of the changed fields (old → new) and a required confirmation checkbox. The checkbox
 	 * is a plain `required` input, so it works without JavaScript, and the server rejects a
 	 * submit without it. Without JavaScript the summary appears after the first submit (it is
-	 * rendered from the submitted values the server sends back).
+	 * rendered from the submitted values the server sends back). An optional reason is stored in
+	 * the audit row with the change.
 	 */
 	let {
 		campaign,
@@ -52,6 +55,12 @@
 	const changesKey = $derived(JSON.stringify(changes));
 	let confirmedFor = $state<string | null>(null);
 	const confirmErrors = $derived(result?.errors[CAMPAIGN_RULES_CONFIRM_FIELD]);
+	const reasonErrors = $derived(result?.errors[CAMPAIGN_RULES_REASON_FIELD]);
+	// Refilled from the submitted values when JavaScript is off; cleared after a successful save.
+	function initialReason() {
+		return result?.values?.[CAMPAIGN_RULES_REASON_FIELD] ?? '';
+	}
+	let changeReason = $state(initialReason());
 </script>
 
 <section class="{cardClass} space-y-4" aria-labelledby="rules-title">
@@ -70,9 +79,10 @@
 		class="space-y-4"
 		use:enhance={() => {
 			submitting = true;
-			return async ({ update }) => {
+			return async ({ update, result: actionResult }) => {
 				try {
 					await update({ reset: false });
+					if (actionResult.type === 'success') changeReason = '';
 				} finally {
 					submitting = false;
 				}
@@ -106,6 +116,26 @@
 					{/each}
 				</ul>
 			{/if}
+		</div>
+
+		<div>
+			<label for={CAMPAIGN_RULES_REASON_FIELD} class={labelClass}>Reason (optional)</label>
+			<textarea
+				id={CAMPAIGN_RULES_REASON_FIELD}
+				name={CAMPAIGN_RULES_REASON_FIELD}
+				rows="2"
+				maxlength={CAMPAIGN_RULES_REASON_MAX_LENGTH}
+				bind:value={changeReason}
+				aria-invalid={reasonErrors?.length ? 'true' : undefined}
+				aria-describedby={reasonErrors?.length
+					? `${CAMPAIGN_RULES_REASON_FIELD}-hint ${CAMPAIGN_RULES_REASON_FIELD}-error`
+					: `${CAMPAIGN_RULES_REASON_FIELD}-hint`}
+				class={inputClass}></textarea>
+			<p id="{CAMPAIGN_RULES_REASON_FIELD}-hint" class={hintClass}>
+				Why the rules change, e.g. a board decision. Saved in the audit log with the change (up to
+				{CAMPAIGN_RULES_REASON_MAX_LENGTH} characters).
+			</p>
+			<FieldError id="{CAMPAIGN_RULES_REASON_FIELD}-error" errors={reasonErrors} />
 		</div>
 
 		<div>
