@@ -61,7 +61,7 @@ Suggested fields:
 Rules:
 
 - Profiles are never hard-deleted. A user is removed by setting `status = 'inactive'` (and banning the Supabase Auth user), so role assignments and audit actors are preserved.
-- `auth_user_id` references `auth.users` with `on delete restrict`: deleting an auth user that has a profile (dashboard or `auth.admin.deleteUser`) fails until the profile is handled. The only expected hard delete is the compensation path when user creation fails before the profile is used.
+- `auth_user_id` references `auth.users` with `on delete restrict`: deleting an auth user that has a profile (dashboard or `auth.admin.deleteUser`) fails until the profile is handled. User creation does not hard-delete profiles: `admin_provision_profile` creates the profile, roles and audit row atomically, so when provisioning fails nothing is written and the compensation path only deletes the just-created auth user (which has no profile).
 - `email` mirrors `auth.users.email` and is kept in sync by a trigger on `auth.users`; uniqueness is case-insensitive (`lower(email)`).
 
 ### roles
