@@ -128,15 +128,9 @@ Included rules:
 - Audit sensitive actions.
 - Record user, date, action, entity, previous data, and new data when applicable.
 
-### Initial migration
-
-- Import collectors from old system if export is available.
-- Import buyers from old system if export is available.
-- Import historical numbers to generate reservations and conflicts.
-- Validate data in staging before confirming.
-
 ## Out of MVP scope
 
+- Legacy system migration and historical number reservation/conflict staging.
 - Public buyer portal.
 - Full collector portal.
 - Notifications via WhatsApp, email, or SMS.

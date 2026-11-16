@@ -24,16 +24,16 @@ Acceptance criteria:
 
 Deliverables:
 
-- Supabase Auth.
-- Tables `profiles`, `roles`, `permissions`, `role_permissions`, `user_roles`.
+- Supabase Auth (admin-managed user creation; no public self-signup).
+- Tables `profiles`, `roles`, `permissions`, `role_permissions`, `user_roles`, and `audit_log`.
 - Base RLS.
-- Server-side permission helpers.
+- Server-side permission and audit helpers.
 - Basic login and session screens.
 
 Acceptance criteria:
 
 - An authenticated user has roles.
-- A sensitive action validates permission server-side.
+- A sensitive action validates permission server-side and records an audit log entry.
 
 ## Phase 2: Campaigns and Configuration
 
@@ -203,24 +203,11 @@ Acceptance criteria:
 
 - Administration can operate without Excel as the source of truth.
 
-## Phase 14: Migration from Old System
+## Phase 14: Production Hardening
 
 Deliverables:
 
-- Migration staging.
-- Import collectors.
-- Import buyers.
-- Import historical numbers.
-- Generate reservations/conflicts.
-
-Acceptance criteria:
-
-- Historical data is imported with preview and conflict resolution.
-
-## Phase 15: Production Hardening
-
-Deliverables:
-
+- PWA manifest, static caching, and friendly offline screen.
 - Verified backups.
 - Operational exports.
 - RLS review.
@@ -230,3 +217,17 @@ Deliverables:
 Acceptance criteria:
 
 - The system can be used in production with defined recovery procedures.
+
+## Post-MVP: Migration from Old System
+
+Deliverables:
+
+- Migration staging (`legacy_migration_staging`).
+- Import collectors.
+- Import buyers.
+- Import historical numbers.
+- Generate reservations/conflicts.
+
+Acceptance criteria:
+
+- Historical data is imported with preview and conflict resolution.
