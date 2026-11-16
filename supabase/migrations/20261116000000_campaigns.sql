@@ -76,7 +76,8 @@ create index campaigns_created_by_idx on public.campaigns (created_by);
 -- Closed and annulled campaigns are therefore fully immutable.
 --
 -- Errors (SQLSTATE):
---   23514 check_violation                  insert with status <> 'draft'; invalid status transition
+--   23514 check_violation                  insert with status <> 'draft'; invalid status transition;
+--                                          activation without both dates; clearing a date after activation
 --   55000 object_not_in_prerequisite_state edit outside its window (rules / dates / name)
 --   23001 restrict_violation               change to id, created_at or created_by; delete/truncate
 
@@ -106,16 +107,35 @@ begin
       using errcode = 'restrict_violation';
   end if;
 
-  -- Allowed transitions: docs/state-machines.md (Campaign).
+  -- Allowed transitions: docs/state-machines.md (Campaign). A draft created by mistake is
+  -- annulled (draft -> annulled), never deleted.
   if new.status is distinct from old.status
     and (old.status, new.status) not in (
       ('draft', 'active'),
+      ('draft', 'annulled'),
       ('active', 'closing'),
       ('closing', 'closed'),
       ('active', 'annulled')
     )
   then
     raise exception 'invalid campaign status transition: % -> %', old.status, new.status
+      using errcode = 'check_violation';
+  end if;
+
+  -- An active campaign always has both dates: they are required to activate and, once set,
+  -- cannot be cleared (dates stay editable while active, but never back to null).
+  if old.status = 'draft' and new.status = 'active'
+    and (new.starts_at is null or new.ends_at is null)
+  then
+    raise exception 'campaign cannot be activated without starts_at and ends_at'
+      using errcode = 'check_violation';
+  end if;
+
+  if old.status <> 'draft'
+    and ((old.starts_at is not null and new.starts_at is null)
+      or (old.ends_at is not null and new.ends_at is null))
+  then
+    raise exception 'campaign starts_at and ends_at cannot be cleared once the campaign was activated (status: %)', old.status
       using errcode = 'check_violation';
   end if;
 

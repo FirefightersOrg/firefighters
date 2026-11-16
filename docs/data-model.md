@@ -47,7 +47,8 @@ Constraints:
 Rules (enforced by triggers for every role, including `service_role`):
 
 - New campaigns start in `draft`.
-- Status changes only follow `docs/state-machines.md` (`draft -> active -> closing -> closed`, `active -> annulled`). Anything else fails with `23514`.
+- Status changes only follow `docs/state-machines.md` (`draft -> active -> closing -> closed`, `draft -> annulled`, `active -> annulled`). Anything else fails with `23514`.
+- Activating requires both `starts_at` and `ends_at`; once activated, neither date can be cleared (`23514`).
 - Edit windows depend on the status before the update: numbering, installment and `barcode_mode` rules only while `draft`; dates while `draft` or `active`; name until `closed`/`annulled`. Closed and annulled campaigns are immutable. Edits outside the window fail with `55000`.
 - `id`, `created_at` and `created_by` never change. `updated_at` is set on every update.
 - Several campaigns can be `active` at the same time.

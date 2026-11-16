@@ -1,5 +1,5 @@
 begin;
-select plan(136);
+select plan(147);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner, which bypasses RLS and privileges; triggers still fire)
@@ -24,11 +24,19 @@ from (values
 ) as v (profile_id, role_name)
 join public.roles r on r.name = v.role_name;
 
--- Campaigns f02..f06 start as drafts; the transition tests move them through the state machine.
--- f01 is inserted by the defaults test below.
-insert into public.campaigns (id, name, simple_bond_value, installment_count, installment_value, barcode_mode)
-select ('f0000000-0000-0000-0000-00000000000' || n)::uuid, 'Fixture ' || n, 60000, 10, 6000, 'base_number'
+-- Campaigns f02..f06 start as drafts with dates; the transition tests move them through the
+-- state machine. f09 and f10 are drafts without dates (activation-requires-dates and
+-- draft -> annulled tests). f01 is inserted by the defaults test below.
+insert into public.campaigns
+  (id, name, simple_bond_value, installment_count, installment_value, barcode_mode, starts_at, ends_at)
+select ('f0000000-0000-0000-0000-00000000000' || n)::uuid, 'Fixture ' || n, 60000, 10, 6000, 'base_number',
+  '2026-03-01', '2026-12-31'
 from generate_series(2, 6) as n;
+
+insert into public.campaigns (id, name, simple_bond_value, installment_count, installment_value, barcode_mode)
+values
+  ('f0000000-0000-0000-0000-000000000009', 'Fixture 9 (no dates)', 60000, 10, 6000, 'base_number'),
+  ('f0000000-0000-0000-0000-000000000010', 'Fixture 10 (draft to annul)', 60000, 10, 6000, 'base_number');
 
 -- Returns the DETAIL of the error raised by p_sql (null when it succeeds).
 create function pg_temp.error_detail(p_sql text) returns text language plpgsql as $$
@@ -366,6 +374,51 @@ select lives_ok(
   $$update public.campaigns set status = 'closing' where id = 'f0000000-0000-0000-0000-000000000005'$$,
   'active -> closing (campaign left in closing)'
 );
+select lives_ok(
+  $$update public.campaigns set status = 'annulled' where id = 'f0000000-0000-0000-0000-000000000010'$$,
+  'draft -> annulled (a draft created by mistake is annulled, not deleted)'
+);
+
+-- ---------------------------------------------------------------------------
+-- Activation requires both dates (f09 is a draft without dates)
+-- ---------------------------------------------------------------------------
+select throws_ok(
+  $$update public.campaigns set status = 'active' where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign cannot be activated without starts_at and ends_at',
+  'draft -> active without dates is rejected'
+);
+select throws_ok(
+  $$update public.campaigns set status = 'active', starts_at = '2026-03-01'
+    where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign cannot be activated without starts_at and ends_at',
+  'draft -> active without ends_at is rejected'
+);
+select throws_ok(
+  $$update public.campaigns set status = 'active', ends_at = '2026-12-31'
+    where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign cannot be activated without starts_at and ends_at',
+  'draft -> active without starts_at is rejected'
+);
+select lives_ok(
+  $$update public.campaigns set status = 'active', starts_at = '2026-03-01', ends_at = '2026-12-31'
+    where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  'draft -> active with both dates set in the same statement'
+);
+select throws_ok(
+  $$update public.campaigns set ends_at = null where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign starts_at and ends_at cannot be cleared once the campaign was activated (status: active)',
+  'active: ends_at cannot be cleared'
+);
+select throws_ok(
+  $$update public.campaigns set starts_at = null where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign starts_at and ends_at cannot be cleared once the campaign was activated (status: active)',
+  'active: starts_at cannot be cleared'
+);
+select throws_ok(
+  $$update public.campaigns set status = 'annulled', ends_at = null where id = 'f0000000-0000-0000-0000-000000000009'$$,
+  '23514', 'campaign starts_at and ends_at cannot be cleared once the campaign was activated (status: active)',
+  'active: a date cannot be cleared while annulling'
+);
 
 -- ---------------------------------------------------------------------------
 -- Disallowed status transitions
@@ -378,10 +431,6 @@ select throws_ok(
 select throws_ok(
   $$update public.campaigns set status = 'closed' where id = 'f0000000-0000-0000-0000-000000000006'$$,
   '23514', 'invalid campaign status transition: draft -> closed', 'draft -> closed is rejected'
-);
-select throws_ok(
-  $$update public.campaigns set status = 'annulled' where id = 'f0000000-0000-0000-0000-000000000006'$$,
-  '23514', 'invalid campaign status transition: draft -> annulled', 'draft -> annulled is rejected'
 );
 select throws_ok(
   $$update public.campaigns set status = 'paused' where id = 'f0000000-0000-0000-0000-000000000006'$$,
@@ -422,6 +471,22 @@ select throws_ok(
 select throws_ok(
   $$update public.campaigns set status = 'draft' where id = 'f0000000-0000-0000-0000-000000000003'$$,
   '23514', 'invalid campaign status transition: annulled -> draft', 'annulled -> draft is rejected'
+);
+select throws_ok(
+  $$update public.campaigns set status = 'active', starts_at = '2026-03-01', ends_at = '2026-12-31'
+    where id = 'f0000000-0000-0000-0000-000000000010'$$,
+  '23514', 'invalid campaign status transition: annulled -> active',
+  'annulled (from draft) -> active is rejected'
+);
+select throws_ok(
+  $$update public.campaigns set status = 'draft' where id = 'f0000000-0000-0000-0000-000000000010'$$,
+  '23514', 'invalid campaign status transition: annulled -> draft',
+  'annulled (from draft) -> draft is rejected'
+);
+select throws_ok(
+  $$update public.campaigns set name = 'Annulled draft renamed' where id = 'f0000000-0000-0000-0000-000000000010'$$,
+  '55000', 'campaign name cannot be changed once the campaign is annulled',
+  'annulled (from draft): name is frozen'
 );
 
 -- ---------------------------------------------------------------------------
@@ -501,6 +566,11 @@ select lives_ok(
   'closing: name can be changed'
 );
 select throws_ok(
+  $$update public.campaigns set ends_at = null where id = 'f0000000-0000-0000-0000-000000000005'$$,
+  '23514', 'campaign starts_at and ends_at cannot be cleared once the campaign was activated (status: closing)',
+  'closing: dates cannot be cleared'
+);
+select throws_ok(
   $$update public.campaigns set ends_at = '2027-01-31' where id = 'f0000000-0000-0000-0000-000000000005'$$,
   '55000', 'campaign dates can only be changed while the campaign is draft or active (status: closing)',
   'closing: dates are frozen'
@@ -549,7 +619,9 @@ select results_eq(
     ('f0000000-0000-0000-0000-000000000004', 'active'),
     ('f0000000-0000-0000-0000-000000000005', 'closing'),
     ('f0000000-0000-0000-0000-000000000006', 'active'),
-    ('f0000000-0000-0000-0000-000000000007', 'draft')$$,
+    ('f0000000-0000-0000-0000-000000000007', 'draft'),
+    ('f0000000-0000-0000-0000-000000000009', 'active'),
+    ('f0000000-0000-0000-0000-000000000010', 'annulled')$$,
   'fixture campaigns end in the expected statuses'
 );
 
@@ -590,7 +662,8 @@ select set_eq(
     'f0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000002',
     'f0000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000004',
     'f0000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000006',
-    'f0000000-0000-0000-0000-000000000007'
+    'f0000000-0000-0000-0000-000000000007', 'f0000000-0000-0000-0000-000000000009',
+    'f0000000-0000-0000-0000-000000000010'
   ],
   'admin (campaign.view) reads campaigns in every status'
 );
@@ -621,7 +694,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"d0000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 select is(
   (select count(*)::int from public.campaigns where id::text like 'f0000000-%'),
-  7, 'operator (campaign.view) reads campaigns'
+  9, 'operator (campaign.view) reads campaigns'
 );
 select throws_ok(
   $$update public.campaigns set name = 'Operator update' where id = 'f0000000-0000-0000-0000-000000000004'$$,
@@ -654,9 +727,9 @@ set local role service_role;
 select isnt_empty($$select 1 from public.campaigns$$, 'service_role reads campaigns');
 select lives_ok(
   $$insert into public.campaigns
-      (id, name, simple_bond_value, installment_count, installment_value, barcode_mode, created_by)
+      (id, name, simple_bond_value, installment_count, installment_value, barcode_mode, created_by, starts_at, ends_at)
     values ('f0000000-0000-0000-0000-000000000008', 'Service campaign', 60000, 10, 6000, 'base_number',
-      'e0000000-0000-0000-0000-000000000001')$$,
+      'e0000000-0000-0000-0000-000000000001', '2026-03-01', '2026-12-31')$$,
   'service_role can insert a draft campaign'
 );
 select lives_ok(
