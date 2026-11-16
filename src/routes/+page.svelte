@@ -34,7 +34,11 @@
 						<div class="sm:col-span-2">
 							<dt class="text-xs font-medium text-slate-500 mb-1.5">Roles</dt>
 							<dd class="flex flex-wrap gap-2">
-								{#if data.roles && data.roles.length > 0}
+								{#if data.rolesError}
+									<span role="alert" class="text-sm text-red-700">
+										Could not load roles. Please refresh the page.
+									</span>
+								{:else if data.roles.length > 0}
 									{#each data.roles as role (role)}
 										<span
 											class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
@@ -51,7 +55,7 @@
 				</div>
 
 				<div class="pt-2 flex justify-end">
-					<form method="POST" action="?/logout">
+					<form method="POST" action={resolve('/logout')}>
 						<button
 							type="submit"
 							class="inline-flex justify-center items-center px-4 py-2 border border-slate-300 shadow-xs text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors"

@@ -58,6 +58,12 @@ Suggested fields:
 - `status`
 - `created_at`
 
+Rules:
+
+- Profiles are never hard-deleted. A user is removed by setting `status = 'inactive'` (and banning the Supabase Auth user), so role assignments and audit actors are preserved.
+- `auth_user_id` references `auth.users` with `on delete restrict`: deleting an auth user that has a profile (dashboard or `auth.admin.deleteUser`) fails until the profile is handled. The only expected hard delete is the compensation path when user creation fails before the profile is used.
+- `email` mirrors `auth.users.email` and is kept in sync by a trigger on `auth.users`; uniqueness is case-insensitive (`lower(email)`).
+
 ### roles
 
 Application roles.
@@ -104,6 +110,10 @@ Suggested fields:
 
 - `user_id`
 - `role_id`
+
+Rules:
+
+- `user_id` references `profiles` with `on delete restrict` (profiles are deactivated, not deleted).
 
 ### collectors
 
@@ -593,6 +603,12 @@ Suggested fields:
 - `reason`
 - `created_at`
 - `request_id`
+
+Rules:
+
+- Append-only: rows are never updated or deleted.
+- `actor_user_id` is nullable for system actions and references `profiles` with `on delete restrict`, so a profile that appears in the audit log cannot be deleted.
+- `created_at` is always set by the database (`now()`); `id` and `created_at` cannot be supplied by authenticated clients, and an authenticated insert must use the caller's own active profile as `actor_user_id`.
 
 ### import_sessions
 

@@ -16,6 +16,7 @@ describe('hooks.server handle', () => {
 		user?: Partial<User> | null;
 		getUserError?: AuthError | Error | null;
 		profile?: UserProfile | null;
+		profileError?: { message: string } | null;
 	}) {
 		const session = (options?.session ?? null) as Session | null;
 		const user = (options?.user ?? null) as User | null;
@@ -38,8 +39,8 @@ describe('hooks.server handle', () => {
 						select: vi.fn().mockReturnValue({
 							eq: vi.fn().mockReturnValue({
 								maybeSingle: vi.fn().mockResolvedValue({
-									data: options?.profile ?? null,
-									error: null
+									data: options?.profileError ? null : (options?.profile ?? null),
+									error: options?.profileError ?? null
 								})
 							})
 						})
@@ -132,7 +133,65 @@ describe('hooks.server handle', () => {
 		expect(event.locals.permissions).toEqual(['campaign.view', 'bond.view']);
 	});
 
-	it('rejects inactive profiles by clearing profile and permissions', async () => {
+	it('loads the profile and permissions in parallel', async () => {
+		let resolvePermissions!: (value: string[]) => void;
+		vi.spyOn(permissionsModule, 'getUserPermissions').mockImplementation(
+			() => new Promise((r) => (resolvePermissions = r))
+		);
+		const { event, resolve, mockSupabase } = createMockEvent({
+			session: { access_token: 'valid-token' },
+			user: { id: 'user-123' },
+			profile: {
+				id: 'prof-123',
+				auth_user_id: 'user-123',
+				full_name: 'John',
+				email: 'john@firefighters.local',
+				status: 'active',
+				created_at: new Date().toISOString()
+			}
+		});
+
+		const pending = handle({ event, resolve });
+		await vi.waitFor(() => expect(mockSupabase.from).toHaveBeenCalledWith('profiles'));
+		resolvePermissions(['user.manage']);
+		await pending;
+
+		expect(event.locals.permissions).toEqual(['user.manage']);
+	});
+
+	it('treats a user with no profile as anonymous', async () => {
+		vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+		const { event, resolve } = createMockEvent({
+			session: { access_token: 'valid-token' },
+			user: { id: 'user-404' },
+			profile: null
+		});
+
+		await handle({ event, resolve });
+
+		expect(event.locals.session).toBeNull();
+		expect(event.locals.user).toBeNull();
+		expect(event.locals.profile).toBeNull();
+		expect(event.locals.permissions).toEqual([]);
+	});
+
+	it('treats a profile lookup error as anonymous (fail closed) and logs it', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue(['user.manage']);
+		const { event, resolve } = createMockEvent({
+			session: { access_token: 'valid-token' },
+			user: { id: 'user-123' },
+			profileError: { message: 'db down' }
+		});
+
+		await handle({ event, resolve });
+
+		expect(event.locals.user).toBeNull();
+		expect(event.locals.permissions).toEqual([]);
+		expect(consoleError).toHaveBeenCalled();
+	});
+
+	it('rejects inactive profiles by clearing session, user, profile and permissions', async () => {
 		const inactiveProfile: UserProfile = {
 			id: 'prof-999',
 			auth_user_id: 'user-999',
@@ -148,8 +207,12 @@ describe('hooks.server handle', () => {
 			profile: inactiveProfile
 		});
 
+		vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+
 		await handle({ event, resolve });
 
+		expect(event.locals.session).toBeNull();
+		expect(event.locals.user).toBeNull();
 		expect(event.locals.profile).toBeNull();
 		expect(event.locals.permissions).toEqual([]);
 	});

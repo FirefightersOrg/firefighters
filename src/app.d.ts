@@ -33,7 +33,6 @@ declare global {
 			profile?: UserProfile | null;
 			permissions?: string[];
 			roles?: string[];
-			reason?: string | null;
 			redirectTo?: string | null;
 		}
 		// interface PageState {}

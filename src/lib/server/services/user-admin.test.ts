@@ -1,244 +1,278 @@
-import { describe, it, expect, vi } from 'vitest';
-import { createAdminManagedUser } from './user-admin';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createAdminManagedUser, grantRoles, provisionProfile, UserAdminError } from './user-admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+const authUserId = '11111111-1111-4111-8111-111111111111';
+const profileId = '22222222-2222-4222-8222-222222222222';
+const actorId = '44444444-4444-4444-8444-444444444444';
+
+const createdProfile = {
+	id: profileId,
+	auth_user_id: authUserId,
+	full_name: 'New Operator',
+	email: 'newuser@firefighters.local',
+	status: 'active',
+	created_at: '2026-11-16T00:00:00Z'
+};
+
+type Result = { data: unknown; error: unknown };
+
+function createMockAdminClient(overrides?: {
+	rolesResult?: Result;
+	createUserResult?: Result;
+	deleteUserResult?: Result | Error;
+	rpcResult?: Result | Error;
+}) {
+	const createUser = vi.fn().mockImplementation(async (params: { email: string }) => {
+		return (
+			overrides?.createUserResult ?? {
+				data: { user: { id: authUserId, email: params.email } },
+				error: null
+			}
+		);
+	});
+	const deleteUser = vi.fn().mockImplementation(async () => {
+		if (overrides?.deleteUserResult instanceof Error) throw overrides.deleteUserResult;
+		return overrides?.deleteUserResult ?? { data: {}, error: null };
+	});
+	const rpc = vi.fn().mockImplementation(async () => {
+		if (overrides?.rpcResult instanceof Error) throw overrides.rpcResult;
+		return overrides?.rpcResult ?? { data: createdProfile, error: null };
+	});
+	const rolesIn = vi.fn().mockResolvedValue(
+		overrides?.rolesResult ?? {
+			data: [{ name: 'operator' }, { name: 'collector' }],
+			error: null
+		}
+	);
+	const from = vi.fn().mockImplementation((table: string) => {
+		if (table === 'roles') {
+			return { select: vi.fn().mockReturnValue({ in: rolesIn }) };
+		}
+		throw new Error(`Unexpected table: ${table}`);
+	});
+
+	const client = {
+		from,
+		rpc,
+		auth: { admin: { createUser, deleteUser } }
+	} as unknown as SupabaseClient;
+
+	return { client, createUser, deleteUser, rpc, from, rolesIn };
+}
+
+const validInput = {
+	email: '  NewUser@Firefighters.local ',
+	password: 'StrongPassword123!',
+	fullName: 'New Operator',
+	roleNames: ['operator', 'collector', 'operator'],
+	actorUserId: actorId,
+	requestId: 'req-1'
+};
+
 describe('createAdminManagedUser', () => {
-	const validUserId = '11111111-1111-4111-8111-111111111111';
-	const validProfileId = '22222222-2222-4222-8222-222222222222';
-	const validRoleId = '33333333-3333-4333-8333-333333333333';
-	const validActorId = '44444444-4444-4444-8444-444444444444';
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
 
-	function createMockAdminClient(overrides?: {
-		rolesSelectResult?: { data: unknown; error: unknown };
-		createUserResult?: { data: unknown; error: unknown };
-		deleteUserResult?: { data: unknown; error: unknown };
-		profileInsertResult?: { data: unknown; error: unknown };
-		userRolesInsertResult?: { data: unknown; error: unknown };
-		auditInsertResult?: { data: unknown; error: unknown };
-	}) {
-		const deleteUserMock = vi
-			.fn()
-			.mockResolvedValue(overrides?.deleteUserResult ?? { data: {}, error: null });
-		const createUserMock = vi
-			.fn()
-			.mockImplementation((params: { email: string; user_metadata?: { full_name?: string } }) => {
-				if (overrides?.createUserResult) return overrides.createUserResult;
-				return Promise.resolve({
-					data: {
-						user: {
-							id: validUserId,
-							email: params.email
-						}
-					},
-					error: null
-				});
-			});
+	it('creates the auth user, then provisions profile/roles/audit in one RPC', async () => {
+		const { client, createUser, rpc, deleteUser } = createMockAdminClient();
 
-		const profileDeleteEqMock = vi.fn().mockResolvedValue({ data: null, error: null });
-		const profileDeleteMock = vi.fn().mockReturnValue({
-			eq: profileDeleteEqMock
-		});
+		const result = await createAdminManagedUser(client, validInput);
 
-		const fromMock = vi.fn().mockImplementation((table: string) => {
-			if (table === 'roles') {
-				return {
-					select: vi.fn().mockReturnValue({
-						in: vi.fn().mockResolvedValue(
-							overrides?.rolesSelectResult ?? {
-								data: [{ id: validRoleId, name: 'operator' }],
-								error: null
-							}
-						)
-					})
-				};
-			}
-
-			if (table === 'profiles') {
-				return {
-					insert: vi.fn().mockImplementation((insertedRow: Record<string, unknown>) => ({
-						select: vi.fn().mockReturnValue({
-							single: vi.fn().mockResolvedValue(
-								overrides?.profileInsertResult ?? {
-									data: {
-										id: validProfileId,
-										auth_user_id: validUserId,
-										full_name: (insertedRow.full_name as string) ?? 'New Operator',
-										email: (insertedRow.email as string) ?? 'newuser@firefighters.local',
-										status: 'active',
-										created_at: new Date().toISOString()
-									},
-									error: null
-								}
-							)
-						})
-					})),
-					delete: profileDeleteMock
-				};
-			}
-
-			if (table === 'user_roles') {
-				return {
-					insert: vi
-						.fn()
-						.mockResolvedValue(overrides?.userRolesInsertResult ?? { data: null, error: null })
-				};
-			}
-
-			if (table === 'audit_log') {
-				return {
-					insert: vi
-						.fn()
-						.mockResolvedValue(overrides?.auditInsertResult ?? { data: null, error: null })
-				};
-			}
-
-			throw new Error(`Unexpected table: ${table}`);
-		});
-
-		return {
-			client: {
-				auth: {
-					admin: {
-						createUser: createUserMock,
-						deleteUser: deleteUserMock
-					}
-				},
-				from: fromMock
-			} as unknown as SupabaseClient,
-			createUserMock,
-			deleteUserMock,
-			profileDeleteMock,
-			profileDeleteEqMock,
-			fromMock
-		};
-	}
-
-	it('successfully creates an auth user, profile, assigns roles, and records audit log', async () => {
-		const { client, createUserMock, deleteUserMock } = createMockAdminClient();
-
-		const result = await createAdminManagedUser(client, {
-			email: '  NewUser@Firefighters.Local  ',
-			password: 'StrongPassword123!',
-			fullName: 'New Operator',
-			roleNames: ['operator'],
-			actorUserId: validActorId,
-			requestId: 'req-001'
-		});
-
-		expect(result).toEqual({
-			user: {
-				id: validUserId,
-				email: 'newuser@firefighters.local'
-			},
-			profile: expect.objectContaining({
-				id: validProfileId,
-				auth_user_id: validUserId,
-				email: 'newuser@firefighters.local',
-				full_name: 'New Operator',
-				status: 'active'
-			}),
-			roles: ['operator']
-		});
-
-		expect(createUserMock).toHaveBeenCalledWith({
+		expect(createUser).toHaveBeenCalledWith({
 			email: 'newuser@firefighters.local',
 			password: 'StrongPassword123!',
 			email_confirm: true,
-			user_metadata: {
-				full_name: 'New Operator'
-			}
+			user_metadata: { full_name: 'New Operator' }
 		});
-
-		expect(deleteUserMock).not.toHaveBeenCalled();
+		expect(rpc).toHaveBeenCalledTimes(1);
+		expect(rpc).toHaveBeenCalledWith('admin_provision_profile', {
+			p_auth_user_id: authUserId,
+			p_full_name: 'New Operator',
+			p_role_names: ['collector', 'operator'],
+			p_actor_profile_id: actorId,
+			p_request_id: 'req-1',
+			p_reason: null
+		});
+		expect(deleteUser).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			user: { id: authUserId, email: 'newuser@firefighters.local' },
+			profile: createdProfile,
+			roles: ['collector', 'operator']
+		});
 	});
 
-	it('validates schema and rejects invalid email or weak password', async () => {
-		const { client } = createMockAdminClient();
-
-		await expect(
-			createAdminManagedUser(client, {
-				email: 'not-an-email',
-				password: 'short',
-				fullName: 'Test User',
-				roleNames: ['operator']
-			})
-		).rejects.toThrow();
-	});
-
-	it('throws and does NOT call createUser if requested role does not exist', async () => {
-		const { client, createUserMock } = createMockAdminClient({
-			rolesSelectResult: {
-				data: [{ id: validRoleId, name: 'operator' }],
-				error: null
-			}
+	it('rejects unknown roles as validation before creating the auth user', async () => {
+		const { client, createUser } = createMockAdminClient({
+			rolesResult: { data: [{ name: 'operator' }], error: null }
 		});
 
 		await expect(
-			createAdminManagedUser(client, {
-				email: 'user@firefighters.local',
-				password: 'ValidPassword123!',
-				fullName: 'Test User',
-				roleNames: ['operator', 'non-existent-role']
-			})
-		).rejects.toThrow(/One or more specified roles do not exist/);
-
-		expect(createUserMock).not.toHaveBeenCalled();
+			createAdminManagedUser(client, { ...validInput, roleNames: ['operator', 'ghost'] })
+		).rejects.toMatchObject({ kind: 'validation', message: 'Unknown role(s): ghost' });
+		expect(createUser).not.toHaveBeenCalled();
 	});
 
-	it('compensates by deleting the auth user if profile creation fails', async () => {
-		const { client, createUserMock, deleteUserMock } = createMockAdminClient({
-			profileInsertResult: {
-				data: null,
-				error: { message: 'duplicate key value violates unique constraint' }
+	it('reports a roles query error as internal', async () => {
+		const { client, createUser } = createMockAdminClient({
+			rolesResult: { data: null, error: { message: 'db down' } }
+		});
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'internal'
+		});
+		expect(createUser).not.toHaveBeenCalled();
+	});
+
+	it('rejects invalid input as validation', async () => {
+		const { client, createUser } = createMockAdminClient();
+
+		await expect(
+			createAdminManagedUser(client, { ...validInput, email: 'nope', password: '1' })
+		).rejects.toMatchObject({ kind: 'validation' });
+		expect(createUser).not.toHaveBeenCalled();
+	});
+
+	it('maps an already registered email to conflict', async () => {
+		const { client, rpc } = createMockAdminClient({
+			createUserResult: {
+				data: { user: null },
+				error: {
+					code: 'email_exists',
+					message: 'A user with this email address has already been registered'
+				}
 			}
 		});
 
-		await expect(
-			createAdminManagedUser(client, {
-				email: 'user@firefighters.local',
-				password: 'ValidPassword123!',
-				fullName: 'Test User',
-				roleNames: ['operator']
-			})
-		).rejects.toThrow(/Failed to create user profile/);
-
-		expect(createUserMock).toHaveBeenCalled();
-		expect(deleteUserMock).toHaveBeenCalledWith(validUserId);
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'conflict'
+		});
+		expect(rpc).not.toHaveBeenCalled();
 	});
 
-	it('compensates by deleting profile and auth user if role assignment fails', async () => {
-		const { client, createUserMock, deleteUserMock, profileDeleteEqMock } = createMockAdminClient({
-			userRolesInsertResult: {
-				data: null,
-				error: { message: 'foreign key constraint violation' }
-			}
+	it('maps a weak password to validation', async () => {
+		const { client } = createMockAdminClient({
+			createUserResult: { data: { user: null }, error: { code: 'weak_password', message: 'weak' } }
+		});
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'validation'
+		});
+	});
+
+	it('maps other auth errors to internal', async () => {
+		const { client } = createMockAdminClient({
+			createUserResult: { data: { user: null }, error: { message: 'auth down' } }
+		});
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'internal'
+		});
+	});
+
+	it('deletes the auth user when the provisioning RPC fails', async () => {
+		const { client, deleteUser } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: 'XX000', message: 'boom' } }
+		});
+
+		const err = await createAdminManagedUser(client, validInput).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(UserAdminError);
+		expect(err).toMatchObject({ kind: 'internal', orphanedAuthUserId: undefined });
+		expect(deleteUser).toHaveBeenCalledWith(authUserId);
+	});
+
+	it('deletes the auth user when the provisioning RPC throws', async () => {
+		const { client, deleteUser } = createMockAdminClient({ rpcResult: new Error('network') });
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'internal'
+		});
+		expect(deleteUser).toHaveBeenCalledWith(authUserId);
+	});
+
+	it('maps a unique violation from the RPC to conflict (after compensating)', async () => {
+		const { client, deleteUser } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: '23505', message: 'duplicate key' } }
+		});
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'conflict'
+		});
+		expect(deleteUser).toHaveBeenCalledWith(authUserId);
+	});
+
+	it('detects a compensation failure returned as { error } and reports the orphan', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { client } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: 'XX000', message: 'boom' } },
+			deleteUserResult: { data: null, error: { message: 'delete failed' } }
+		});
+
+		const err = await createAdminManagedUser(client, validInput).catch((e: unknown) => e);
+		expect(err).toMatchObject({ kind: 'internal', orphanedAuthUserId: authUserId });
+		expect((err as Error).message).toContain('could not be deleted');
+		expect(consoleError).toHaveBeenCalledWith(
+			expect.stringContaining('compensation failed'),
+			expect.objectContaining({ authUserId })
+		);
+	});
+
+	it('detects a compensation failure thrown by deleteUser', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { client } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: '22023', message: 'unknown role(s): x' } },
+			deleteUserResult: new Error('network')
+		});
+
+		await expect(createAdminManagedUser(client, validInput)).rejects.toMatchObject({
+			kind: 'validation',
+			orphanedAuthUserId: authUserId
+		});
+	});
+});
+
+describe('provisionProfile / grantRoles', () => {
+	it('provisionProfile maps 22023 to validation', async () => {
+		const { client } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: '22023', message: 'unknown role(s): x' } }
 		});
 
 		await expect(
-			createAdminManagedUser(client, {
-				email: 'user@firefighters.local',
-				password: 'ValidPassword123!',
-				fullName: 'Test User',
-				roleNames: ['operator']
-			})
-		).rejects.toThrow(/Failed to assign user roles/);
-
-		expect(createUserMock).toHaveBeenCalled();
-		expect(profileDeleteEqMock).toHaveBeenCalledWith('id', validProfileId);
-		expect(deleteUserMock).toHaveBeenCalledWith(validUserId);
+			provisionProfile(client, { authUserId, fullName: 'X', roleNames: ['x'] })
+		).rejects.toMatchObject({ kind: 'validation', message: 'unknown role(s): x' });
 	});
 
-	it('supports creating a user without any initial roles', async () => {
-		const { client } = createMockAdminClient();
+	it('provisionProfile treats an empty result as internal', async () => {
+		const { client } = createMockAdminClient({ rpcResult: { data: null, error: null } });
 
-		const result = await createAdminManagedUser(client, {
-			email: 'noroles@firefighters.local',
-			password: 'ValidPassword123!',
-			fullName: 'No Roles User',
-			roleNames: []
+		await expect(
+			provisionProfile(client, { authUserId, fullName: 'X', roleNames: [] })
+		).rejects.toMatchObject({ kind: 'internal' });
+	});
+
+	it('grantRoles returns the newly granted role names', async () => {
+		const { client, rpc } = createMockAdminClient({ rpcResult: { data: ['admin'], error: null } });
+
+		await expect(
+			grantRoles(client, { profileId, roleNames: ['admin'], requestId: 'r' })
+		).resolves.toEqual(['admin']);
+		expect(rpc).toHaveBeenCalledWith('admin_grant_roles', {
+			p_profile_id: profileId,
+			p_role_names: ['admin'],
+			p_actor_profile_id: null,
+			p_request_id: 'r',
+			p_reason: null
+		});
+	});
+
+	it('grantRoles surfaces RPC errors', async () => {
+		const { client } = createMockAdminClient({
+			rpcResult: { data: null, error: { code: 'P0002', message: 'profile not found' } }
 		});
 
-		expect(result.roles).toEqual([]);
-		expect(result.profile.email).toBe('noroles@firefighters.local');
+		await expect(grantRoles(client, { profileId, roleNames: ['admin'] })).rejects.toMatchObject({
+			kind: 'internal'
+		});
 	});
 });

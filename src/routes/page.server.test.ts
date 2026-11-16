@@ -1,125 +1,75 @@
-import { describe, it, expect, vi } from 'vitest';
-import { load, actions } from './+page.server';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as actionsModule from './+page.server';
+import { load } from './+page.server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { UserProfile } from '../app';
 
+const user: User = { id: 'u-1', email: 'admin@firefighters.local' } as User;
+const profile: UserProfile = {
+	id: 'p-1',
+	auth_user_id: 'u-1',
+	full_name: 'Admin User',
+	email: 'admin@firefighters.local',
+	status: 'active',
+	created_at: new Date().toISOString()
+};
+
+function supabaseReturning(result: { data: unknown; error: unknown }) {
+	const eq = vi.fn().mockReturnValue({ overrideTypes: vi.fn().mockResolvedValue(result) });
+	const from = vi.fn().mockImplementation((table: string) => {
+		if (table !== 'user_roles') throw new Error(`Unexpected table: ${table}`);
+		return { select: vi.fn().mockReturnValue({ eq }) };
+	});
+	return { from } as unknown as SupabaseClient;
+}
+
+function loadEvent(locals: Record<string, unknown>) {
+	return { locals } as unknown as Parameters<typeof load>[0];
+}
+
 describe('/ +page.server', () => {
-	describe('load function', () => {
-		it('returns empty user, profile, and roles when unauthenticated', async () => {
-			const mockEvent = {
-				locals: {
-					user: null,
-					profile: null
-				}
-			} as unknown as Parameters<typeof load>[0];
-
-			const result = (await load(mockEvent))!;
-			expect(result).toEqual({
-				user: null,
-				profile: null,
-				roles: []
-			});
-		});
-
-		it('fetches and returns roles when user and profile exist', async () => {
-			const user: User = { id: 'u-1', email: 'admin@firefighters.local' } as User;
-			const profile: UserProfile = {
-				id: 'p-1',
-				auth_user_id: 'u-1',
-				full_name: 'Admin User',
-				email: 'admin@firefighters.local',
-				status: 'active',
-				created_at: new Date().toISOString()
-			};
-
-			const mockSupabase = {
-				from: vi.fn().mockImplementation((table: string) => {
-					if (table === 'user_roles') {
-						return {
-							select: vi.fn().mockReturnValue({
-								eq: vi.fn().mockResolvedValue({
-									data: [{ roles: { name: 'admin' } }, { roles: { name: 'operator' } }],
-									error: null
-								})
-							})
-						};
-					}
-					throw new Error(`Unexpected table: ${table}`);
-				})
-			};
-
-			const mockEvent = {
-				locals: {
-					user,
-					profile,
-					supabase: mockSupabase as unknown as SupabaseClient
-				}
-			} as unknown as Parameters<typeof load>[0];
-
-			const result = (await load(mockEvent))!;
-			expect(result.user).toEqual(user);
-			expect(result.profile).toEqual(profile);
-			expect(result.roles).toEqual(['admin', 'operator']);
-		});
-
-		it('handles user with no roles assigned', async () => {
-			const user: User = { id: 'u-2', email: 'norole@firefighters.local' } as User;
-			const profile: UserProfile = {
-				id: 'p-2',
-				auth_user_id: 'u-2',
-				full_name: 'No Role User',
-				email: 'norole@firefighters.local',
-				status: 'active',
-				created_at: new Date().toISOString()
-			};
-
-			const mockSupabase = {
-				from: vi.fn().mockImplementation((table: string) => {
-					if (table === 'user_roles') {
-						return {
-							select: vi.fn().mockReturnValue({
-								eq: vi.fn().mockResolvedValue({
-									data: [],
-									error: null
-								})
-							})
-						};
-					}
-					throw new Error(`Unexpected table: ${table}`);
-				})
-			};
-
-			const mockEvent = {
-				locals: {
-					user,
-					profile,
-					supabase: mockSupabase as unknown as SupabaseClient
-				}
-			} as unknown as Parameters<typeof load>[0];
-
-			const result = (await load(mockEvent))!;
-			expect(result.roles).toEqual([]);
-		});
+	beforeEach(() => {
+		vi.restoreAllMocks();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
-	describe('logout action', () => {
-		it('calls signOut and redirects (303) to /login', async () => {
-			const signOutMock = vi.fn().mockResolvedValue({ error: null });
-			const mockEvent = {
-				locals: {
-					supabase: {
-						auth: {
-							signOut: signOutMock
-						}
-					} as unknown as SupabaseClient
-				}
-			} as unknown as Parameters<typeof actions.logout>[0];
+	it('returns empty user, profile, and roles when unauthenticated', async () => {
+		const result = await load(loadEvent({ user: null, profile: null }));
+		expect(result).toEqual({ user: null, profile: null, roles: [], rolesError: false });
+	});
 
-			await expect(actions.logout(mockEvent)).rejects.toMatchObject({
-				status: 303,
-				location: '/login'
-			});
-			expect(signOutMock).toHaveBeenCalledTimes(1);
+	it('returns roles when user and profile exist', async () => {
+		const supabase = supabaseReturning({
+			data: [{ roles: { name: 'operator' } }, { roles: { name: 'admin' } }],
+			error: null
 		});
+
+		const result = (await load(loadEvent({ user, profile, supabase })))!;
+		expect(result.user).toEqual(user);
+		expect(result.profile).toEqual(profile);
+		expect(result.roles).toEqual(['admin', 'operator']);
+		expect(result.rolesError).toBe(false);
+	});
+
+	it('handles user with no roles assigned', async () => {
+		const supabase = supabaseReturning({ data: [], error: null });
+		const result = (await load(loadEvent({ user, profile, supabase })))!;
+		expect(result.roles).toEqual([]);
+		expect(result.rolesError).toBe(false);
+	});
+
+	it('flags rolesError (instead of "no roles") when the roles query fails', async () => {
+		const supabase = supabaseReturning({
+			data: null,
+			error: { message: 'permission denied', code: '42501', details: '', hint: '' }
+		});
+		const result = (await load(loadEvent({ user, profile, supabase })))!;
+		expect(result.roles).toEqual([]);
+		expect(result.rolesError).toBe(true);
+		expect(console.error).toHaveBeenCalled();
+	});
+
+	it('does not define its own logout action (the page posts to /logout)', () => {
+		expect('actions' in actionsModule).toBe(false);
 	});
 });
