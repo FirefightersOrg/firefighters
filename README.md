@@ -15,6 +15,8 @@ Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `p
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
+**Hosted Supabase Auth settings:** `supabase/config.toml` only configures the local stack. In the hosted project (Dashboard → Authentication), set the minimum password length to 8 to match the app's Zod schema and `minimum_password_length` in `config.toml`.
+
 ## 1. System objective
 
 The system's objective is to replace the current obsolete system and manual Excel controls with a modern, efficient, and intuitive web application to comprehensively manage the raffles/bonds of the Volunteer Firefighters.
