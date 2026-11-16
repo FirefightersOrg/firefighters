@@ -608,6 +608,7 @@ Rules:
 
 - Append-only: rows are never updated or deleted.
 - `actor_user_id` is nullable for system actions and references `profiles` with `on delete restrict`, so a profile that appears in the audit log cannot be deleted.
+- `created_at` is always set by the database (`now()`); `id` and `created_at` cannot be supplied by authenticated clients, and an authenticated insert must use the caller's own active profile as `actor_user_id`.
 
 ### import_sessions
 

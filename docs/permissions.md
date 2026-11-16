@@ -136,4 +136,6 @@ This allows changing permissions of a role without rewriting business logic, scr
 - The UI may hide actions, but the real security must be on the server-side and RLS.
 - Every sensitive action must validate permissions explicitly.
 - Permissions must be versioned in the database or initial migrations.
+- The catalog (`roles`, `permissions`, `role_permissions`) is read-only at runtime; it changes only through migrations. `user.manage` covers profiles and role assignments (`user_roles`).
+- At least one active profile must keep `user.manage`: the database rejects removing the last holder's role, deactivating them, or removing `user.manage` from their role.
 - If collector access is enabled, their queries must be limited to their own portfolio.
