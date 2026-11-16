@@ -1,7 +1,7 @@
 import adapter from '@sveltejs/adapter-auto';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	plugins: [
@@ -18,5 +18,11 @@ export default defineConfig({
 			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
 			adapter: adapter()
 		})
-	]
+	],
+	// Vitest reads this file (no separate vitest.config.ts) so the sveltekit() plugin
+	// resolves $lib, $env/* and $app/* in tests exactly as in the app.
+	test: {
+		include: ['src/**/*.{test,spec}.{js,ts}'],
+		environment: 'node'
+	}
 });
