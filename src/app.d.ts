@@ -32,6 +32,8 @@ declare global {
 			user?: User | null;
 			profile?: UserProfile | null;
 			permissions?: string[];
+			roles?: string[];
+			redirectTo?: string | null;
 		}
 		// interface PageState {}
 		// interface Platform {}
