@@ -327,11 +327,21 @@ reset role;
 -- ---------------------------------------------------------------------------
 -- Owner (bypasses privileges and RLS): triggers are the backstop
 -- ---------------------------------------------------------------------------
-select throws_ok($$update public.audit_log set action = 'tampered'$$, '23001', null, 'owner cannot update audit_log (trigger)');
-select throws_ok($$delete from public.audit_log$$, '23001', null, 'owner cannot delete audit_log (trigger)');
-select throws_ok($$truncate public.audit_log$$, '23001', null, 'owner cannot truncate audit_log (trigger)');
 select throws_ok(
-  $$update public.audit_log set actor_user_id = null$$, '23001', null,
+  $$update public.audit_log set action = 'tampered'$$, '23001',
+  'audit_log is append-only: UPDATE is not allowed', 'owner cannot update audit_log (trigger)'
+);
+select throws_ok(
+  $$delete from public.audit_log$$, '23001',
+  'audit_log is append-only: DELETE is not allowed', 'owner cannot delete audit_log (trigger)'
+);
+select throws_ok(
+  $$truncate public.audit_log$$, '23001',
+  'audit_log is append-only: TRUNCATE is not allowed', 'owner cannot truncate audit_log (trigger)'
+);
+select throws_ok(
+  $$update public.audit_log set actor_user_id = null$$, '23001',
+  'audit_log is append-only: UPDATE is not allowed',
   'owner cannot null out actor_user_id directly'
 );
 
