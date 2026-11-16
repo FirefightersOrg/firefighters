@@ -66,9 +66,11 @@ on conflict do nothing;
 
 -- Other roles: only the "yes" cells of the docs matrix. "own"/"future" cells are not granted
 -- yet and the collector role has no permissions in Phase 1.
-insert into public.role_permissions (role_id, permission_id)
-select r.id, p.id
-from (values
+-- The matrix is staged in a temp table so an unknown role or permission name fails the
+-- migration instead of being silently dropped by the join.
+create temporary table _role_permission_matrix (role_name text not null, permission_code text not null);
+
+insert into _role_permission_matrix (role_name, permission_code) values
   ('operator', 'campaign.view'),
   ('treasurer', 'campaign.view'),
   ('read-only', 'campaign.view'),
@@ -93,8 +95,30 @@ from (values
   ('treasurer', 'draw.load_winner'),
   ('treasurer', 'report.view_financial'),
   ('read-only', 'report.view_financial'),
-  ('treasurer', 'audit.view')
-) as m (role_name, permission_code)
+  ('treasurer', 'audit.view');
+
+do $$
+declare
+  v_unknown text;
+begin
+  select string_agg(format('(%s, %s)', m.role_name, m.permission_code), ', ')
+  into v_unknown
+  from _role_permission_matrix m
+  left join public.roles r on r.name = m.role_name
+  left join public.permissions p on p.code = m.permission_code
+  where r.id is null or p.id is null;
+
+  if v_unknown is not null then
+    raise exception 'role_permissions seed references unknown roles/permissions: %', v_unknown;
+  end if;
+end;
+$$;
+
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id
+from _role_permission_matrix m
 join public.roles r on r.name = m.role_name
 join public.permissions p on p.code = m.permission_code
 on conflict do nothing;
+
+drop table _role_permission_matrix;
