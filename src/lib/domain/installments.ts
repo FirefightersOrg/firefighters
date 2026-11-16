@@ -6,7 +6,12 @@
  * rounded (product decision, enforced again by `campaign_installment_value()` and the
  * `campaigns_installment_value_exact` CHECK in the database).
  */
-import { centsToDecimalString, formatMoney, parseMoneyToCents } from './money';
+import {
+	centsToDecimalString,
+	formatMoney,
+	MONEY_INPUT_FORMAT_MESSAGE,
+	parseMoneyInput
+} from './money';
 
 export type InstallmentSplit =
 	| { ok: true; installmentValueCents: number }
@@ -29,7 +34,10 @@ export function splitIntoInstallments(
 	return { ok: true, installmentValueCents: totalCents / installmentCount };
 }
 
-/** User-facing message for a value that cannot be split exactly. */
+/**
+ * User-facing message for a value that cannot be split exactly. `simpleBondValue` is a canonical
+ * amount (`"60000.00"`); it is shown in es-AR format (`$ 60.000,00`).
+ */
 export function notExactInstallmentsMessage(simpleBondValue: string, installmentCount: number) {
 	return (
 		`${formatMoney(simpleBondValue)} cannot be split into ${installmentCount} equal installments. ` +
@@ -39,12 +47,25 @@ export function notExactInstallmentsMessage(simpleBondValue: string, installment
 
 export type InstallmentPreview =
 	| { state: 'incomplete' }
-	| { state: 'ok'; installmentValue: string }
-	| { state: 'error'; message: string };
+	| {
+			state: 'ok';
+			/** Canonical amounts (`"60000.00"`, `"6000.00"`); format them with `formatMoney`. */
+			simpleBondValue: string;
+			installmentCount: number;
+			installmentValue: string;
+	  }
+	| {
+			state: 'error';
+			/** Input the problem belongs to. */
+			field: 'simpleBondValue' | 'installmentCount';
+			message: string;
+	  };
 
 /**
- * Live preview for raw form input (strings). Used by the campaign forms to show the computed,
- * read-only installment value or an inline error while the user types.
+ * Live preview for raw form input (strings, money in Argentine format, see `parseMoneyInput`).
+ * Used by the campaign forms to show the computed, read-only installment value or an inline
+ * error while the user types. Same rules as the form schemas, so the preview never accepts a
+ * value the server rejects.
  */
 export function previewInstallmentValue(
 	simpleBondValue: string,
@@ -54,12 +75,23 @@ export function previewInstallmentValue(
 	const countRaw = installmentCount.trim();
 	if (totalRaw === '' || countRaw === '') return { state: 'incomplete' };
 
-	const totalCents = parseMoneyToCents(totalRaw);
-	if (totalCents === null || totalCents <= 0) {
-		return { state: 'error', message: 'Enter a simple bond value greater than 0.' };
+	const totalCents = parseMoneyInput(totalRaw);
+	if (totalCents === null) {
+		return { state: 'error', field: 'simpleBondValue', message: `${MONEY_INPUT_FORMAT_MESSAGE}.` };
+	}
+	if (totalCents <= 0) {
+		return {
+			state: 'error',
+			field: 'simpleBondValue',
+			message: 'Enter a simple bond value greater than 0.'
+		};
 	}
 	if (!/^\d+$/.test(countRaw) || Number(countRaw) <= 0) {
-		return { state: 'error', message: 'Enter a whole number of installments greater than 0.' };
+		return {
+			state: 'error',
+			field: 'installmentCount',
+			message: 'Enter a whole number of installments greater than 0.'
+		};
 	}
 
 	const count = Number(countRaw);
@@ -67,8 +99,17 @@ export function previewInstallmentValue(
 	if (!split.ok) {
 		return {
 			state: 'error',
-			message: notExactInstallmentsMessage(centsToDecimalString(totalCents), count)
+			field: 'installmentCount',
+			message:
+				split.reason === 'not_exact'
+					? notExactInstallmentsMessage(centsToDecimalString(totalCents), count)
+					: 'Enter a whole number of installments greater than 0.'
 		};
 	}
-	return { state: 'ok', installmentValue: centsToDecimalString(split.installmentValueCents) };
+	return {
+		state: 'ok',
+		simpleBondValue: centsToDecimalString(totalCents),
+		installmentCount: count,
+		installmentValue: centsToDecimalString(split.installmentValueCents)
+	};
 }
