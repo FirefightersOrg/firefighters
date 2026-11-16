@@ -31,6 +31,7 @@ Rules:
 - A closed campaign does not allow normal operations.
 - A draft created by mistake is annulled, not deleted.
 - A campaign can only be activated with both start and end dates set.
+- Activating requires `campaign.update_rules` (it freezes the rules); starting to close, closing and annulling require `campaign.close`. Annulling requires a reason.
 - Subsequent corrections require an authorized role and audit.
 
 ## Bond
