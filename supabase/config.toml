@@ -180,6 +180,7 @@ enable_anonymous_sign_ins = false
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
 # Mirrors the app's Zod minimum (createAdminManagedUserSchema, 8 chars); configure the hosted project the same way.
+# GoTrue skips this check on admin create-user (POST /admin/users), so the Zod schema guards that path.
 minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`

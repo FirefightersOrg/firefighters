@@ -15,7 +15,7 @@ Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `p
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
-**Hosted Supabase Auth settings:** `supabase/config.toml` only configures the local stack. In the hosted project (Dashboard → Authentication), set the minimum password length to 8 to match the app's Zod schema and `minimum_password_length` in `config.toml`.
+**Hosted Supabase Auth settings:** `supabase/config.toml` only configures the local stack. In the hosted project (Dashboard → Authentication), set the minimum password length to 8 to match the app's Zod schema and `minimum_password_length` in `config.toml`. Auth enforces it on password updates but not on admin user creation, which relies on the Zod check.
 
 ## 1. System objective
 
