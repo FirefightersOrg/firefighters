@@ -54,6 +54,18 @@
 					</dl>
 				</div>
 
+				{#if data.permissions?.includes('campaign.view')}
+					<nav aria-label="Sections">
+						<a
+							href={resolve('/campaigns')}
+							class="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+						>
+							<span>Campaigns</span>
+							<span aria-hidden="true" class="text-slate-400">→</span>
+						</a>
+					</nav>
+				{/if}
+
 				<div class="pt-2 flex justify-end">
 					<form method="POST" action={resolve('/logout')}>
 						<button
