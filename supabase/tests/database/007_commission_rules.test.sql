@@ -650,22 +650,22 @@ select is(
 select throws_ok(
   $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
       '2026-01-01', null, '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
-  '40001', 'commission rule was modified by someone else', 'version: update with a stale version is rejected (40001)'
+  'PT409', 'commission rule was modified by someone else', 'version: update with a stale version is rejected (PT409)'
 );
 select throws_ok(
   $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 6, null,
       '2026-01-01', null, '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
-  '40001', 'commission rule was modified by someone else', 'version: a stale no-op is rejected too'
+  'PT409', 'commission rule was modified by someone else', 'version: a stale no-op is rejected too'
 );
 select throws_ok(
   $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
       '2026-01-01', null, pg_temp.rule_version('r-ver') - interval '1 microsecond', 'req-ver-stale')$$,
-  '40001', 'commission rule was modified by someone else', 'version: the comparison is exact (1 microsecond off is stale)'
+  'PT409', 'commission rule was modified by someone else', 'version: the comparison is exact (1 microsecond off is stale)'
 );
 select throws_ok(
   $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
       '2026-01-01', null, null, 'req-ver-stale')$$,
-  '40001', 'commission rule was modified by someone else', 'version: a null version is never current'
+  'PT409', 'commission rule was modified by someone else', 'version: a null version is never current'
 );
 select pg_temp.act_as(2);
 select throws_ok(

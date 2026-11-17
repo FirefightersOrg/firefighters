@@ -174,7 +174,7 @@ describe('mapCommissionRuleRpcError', () => {
 		],
 		[
 			{
-				code: '40001',
+				code: 'PT409',
 				message: 'commission rule was modified by someone else',
 				details: `commission rule ${RULE_ID}: expected updated_at …`
 			},
@@ -261,9 +261,9 @@ describe('commission rule service', () => {
 		);
 	});
 
-	it('maps a stale version (40001) to a 409 conflict asking to reload', async () => {
+	it('maps a stale version (PT409) to a 409 conflict asking to reload', async () => {
 		const { supabase } = rpcClient({
-			error: { code: '40001', message: 'commission rule was modified by someone else' }
+			error: { code: 'PT409', message: 'commission rule was modified by someone else' }
 		});
 		const err = await updateCommissionRule(supabase, {
 			...input,

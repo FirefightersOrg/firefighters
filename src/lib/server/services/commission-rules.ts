@@ -119,7 +119,8 @@ export function mapCommissionRuleRpcError(
 			return err('conflict', COMMISSION_RULE_MESSAGES.overlap);
 
 		// Optimistic concurrency: the rule changed after the form was loaded (nothing written).
-		case '40001':
+		// PT409 (not 40001, which PostgREST would retry forever); PostgREST answers HTTP 409.
+		case 'PT409':
 			return err('conflict', COMMISSION_RULE_MESSAGES.staleVersion);
 
 		case '22023': {

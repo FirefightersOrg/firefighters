@@ -27,10 +27,14 @@
 --                                           barcode mode, ...) and status-machine violations
 --                                           raised by campaigns_guard_write
 --   55000 object_not_in_prerequisite_state  edit outside its window (campaigns_guard_write)
---   40001 serialization_failure             optimistic concurrency: campaign_update and
+--   PT409 (PostgREST: HTTP 409)             optimistic concurrency: campaign_update and
 --                                           campaign_update_rules require the updated_at the
 --                                           caller loaded (p_expected_updated_at); if the row
 --                                           changed since, nothing is written (no audit row)
+--
+-- Why PT409 and not 40001 (serialization_failure): PostgREST retries a transaction that fails with
+-- 40001 automatically and without limit, so a stale save would never return. A 'PTxyz' SQLSTATE is
+-- PostgREST's custom-status convention: it answers HTTP 409 with code 'PT409' and never retries.
 --
 -- Optimistic concurrency uses updated_at as the row version (set to now() by
 -- campaigns_guard_write on every write). It is compared exactly: timestamptz has microsecond
@@ -212,7 +216,7 @@ end;
 $$;
 
 -- Optimistic concurrency check, run after the row was locked (select ... for update) and before
--- any write. Raises 40001 when the row changed since the caller loaded it.
+-- any write. Raises PT409 when the row changed since the caller loaded it.
 create function public.campaign_require_version(
   p_campaign public.campaigns,
   p_expected_updated_at timestamptz
@@ -225,7 +229,7 @@ as $$
 begin
   if p_campaign.updated_at is distinct from p_expected_updated_at then
     raise exception 'campaign was modified by someone else'
-      using errcode = 'serialization_failure',
+      using errcode = 'PT409',
         detail = format('campaign %s: expected updated_at %s, current %s', p_campaign.id,
           coalesce(p_expected_updated_at::text, 'null'), p_campaign.updated_at),
         hint = 'reload the campaign and apply the change again';
@@ -236,7 +240,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- campaign_update: general data (name, starts_at, ends_at). Full replacement: a null date clears
 -- it (the write guard rejects clearing dates once the campaign was activated).
--- p_expected_updated_at is the updated_at the caller loaded (40001 if the row changed since).
+-- p_expected_updated_at is the updated_at the caller loaded (PT409 if the row changed since).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
 create function public.campaign_update(
@@ -301,7 +305,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- campaign_update_rules: numbering, installments, overflow policy and barcode mode. Full
 -- replacement; installment_value is recomputed here. Only while draft (enforced by the trigger).
--- p_expected_updated_at is the updated_at the caller loaded (40001 if the row changed since).
+-- p_expected_updated_at is the updated_at the caller loaded (PT409 if the row changed since).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
 create function public.campaign_update_rules(
