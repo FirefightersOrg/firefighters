@@ -9,10 +9,13 @@
 	import { campaignEditFormKey } from '$lib/components/campaigns/types';
 	import {
 		BARCODE_MODE_LABELS,
+		campaignNumberingConfig,
 		canEditCampaignRules,
+		CAMPAIGN_STATUS_LABELS,
 		formatCampaignDate
 	} from '$lib/domain/campaigns';
-	import { formatMoney } from '$lib/domain/money';
+	import { formatInteger, formatMoney } from '$lib/domain/money';
+	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -25,6 +28,8 @@
 		Object.values(transitionResult?.errors ?? {}).flat()[0] ?? transitionResult?.message
 	);
 	const missingDates = $derived(!campaign.startsAt || !campaign.endsAt);
+	const rulesFrozen = $derived(!canEditCampaignRules(campaign.status));
+	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
 </script>
 
 <svelte:head>
@@ -85,10 +90,33 @@
 				<dt class="text-xs font-medium text-slate-500">Associated number offset</dt>
 				<dd class="mt-0.5 tabular-nums">+{campaign.associatedNumberOffset}</dd>
 			</div>
+			{#if numbering.ok}
+				<div class="sm:col-span-2">
+					<dt class="text-xs font-medium text-slate-500">Usable base numbers</dt>
+					<dd class="mt-0.5 tabular-nums">
+						<span class="font-mono"
+							>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
+						>
+						({formatInteger(numbering.usableBaseCount)}); the highest gives associated number
+						<span class="font-mono">{numbering.maxValidBase.associatedFormatted}</span>
+					</dd>
+				</div>
+			{/if}
 		</dl>
-		{#if !canEditCampaignRules(campaign.status)}
+		{#if rulesFrozen}
+			<div class="mt-4">
+				<FormAlert kind="warning">
+					<p>
+						<strong>Rules are frozen.</strong> This campaign is {CAMPAIGN_STATUS_LABELS[
+							campaign.status
+						].toLowerCase()}, and rules (price, installments, numbering, overflow policy and barcode
+						mode) can only be changed while a campaign is a draft. They are shown read-only above.
+					</p>
+				</FormAlert>
+			</div>
+		{:else if !data.can.editRules}
 			<p class="mt-4 text-xs text-slate-500">
-				Rules are frozen: they can only be changed while the campaign is a draft.
+				Rules can be changed while the campaign is a draft, by users allowed to change rules.
 			</p>
 		{/if}
 	</section>

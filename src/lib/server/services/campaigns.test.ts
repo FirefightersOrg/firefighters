@@ -9,7 +9,11 @@ import {
 	updateCampaignGeneral,
 	updateCampaignRules
 } from './campaigns';
-import { campaignCreateSchema, campaignRulesSchema } from '$lib/schemas/campaign';
+import {
+	campaignCreateSchema,
+	campaignRulesSchema,
+	campaignRulesUpdateSchema
+} from '$lib/schemas/campaign';
 
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';
 /** updated_at as PostgREST returns it; forwarded to the RPC unchanged. */
@@ -390,8 +394,34 @@ describe('campaign service', () => {
 			p_overflow_policy: 'reject',
 			p_barcode_mode: 'manual_mapping',
 			p_expected_updated_at: VERSION,
-			p_request_id: null
+			p_request_id: null,
+			p_reason: null
 		});
+	});
+
+	it('updateCampaignRules passes the audit reason', async () => {
+		const { supabase, rpc } = rpcClient({ data: true });
+		const input = campaignRulesUpdateSchema.parse({
+			simpleBondValue: '60.000',
+			installmentCount: '12',
+			numberDigits: '4',
+			maxNumber: '9999',
+			associatedNumberOffset: '4871',
+			overflowPolicy: 'reject',
+			barcodeMode: 'base_number',
+			changeReason: '  Board decision ',
+			confirmRulesChange: 'yes',
+			expectedUpdatedAt: VERSION
+		});
+		await updateCampaignRules(supabase, CAMPAIGN_ID, input, { requestId: 'req-r' });
+		expect(rpc).toHaveBeenCalledWith(
+			'campaign_update_rules',
+			expect.objectContaining({
+				p_reason: 'Board decision',
+				p_expected_updated_at: VERSION,
+				p_request_id: 'req-r'
+			})
+		);
 	});
 
 	it.each([

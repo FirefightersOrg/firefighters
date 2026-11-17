@@ -30,7 +30,7 @@ import {
 	CAMPAIGN_RULES_UPDATE_FIELDS,
 	CAMPAIGN_TRANSITION_FIELDS,
 	campaignGeneralSchema,
-	campaignRulesSchema,
+	campaignRulesUpdateSchema,
 	campaignTransitionSchema,
 	readFormFields
 } from '$lib/schemas/campaign';
@@ -115,8 +115,12 @@ export const actions: Actions = {
 		if (denied) return denied;
 		if (!isUuid(params.id)) return campaignFormFailure('rules', 404, CAMPAIGN_MESSAGES.notFound);
 
+		// The rules form must be explicitly confirmed (`confirmRulesChange=yes`): every saved change
+		// is audited (old and new values) by `campaign_update_rules`, which also enforces
+		// `campaign.update_rules` and the draft-only edit window. It also carries the version it was
+		// loaded at (`expectedUpdatedAt`): a stale form is rejected with a 409, nothing written.
 		const values = readFormFields(await request.formData(), CAMPAIGN_RULES_UPDATE_FIELDS);
-		const parsed = campaignRulesSchema.safeParse(values);
+		const parsed = campaignRulesUpdateSchema.safeParse(values);
 		if (!parsed.success) return campaignValidationFailure('rules', parsed.error, values);
 
 		try {

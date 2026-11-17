@@ -44,13 +44,15 @@ const STALE_MESSAGE =
 	'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.';
 
 const rulesForm = {
-	simpleBondValue: '60000',
+	simpleBondValue: '60.000,00',
 	installmentCount: '12',
 	numberDigits: '4',
 	maxNumber: '9999',
 	associatedNumberOffset: '4871',
 	overflowPolicy: 'reject',
 	barcodeMode: 'internal_code',
+	changeReason: '',
+	confirmRulesChange: 'yes',
 	expectedUpdatedAt: VERSION
 };
 
@@ -325,21 +327,88 @@ describe('/campaigns/[id]', () => {
 			expect(Object.keys(result.data.errors as object)).toEqual(['installmentCount']);
 		});
 
-		it('saves the rules', async () => {
+		it('saves the rules, sending canonical money to SQL', async () => {
 			const { supabase, rpc } = mockSupabase({ rpc: { data: true, error: null } });
 			await expect(runAction('rules', makeLocals({ supabase }), rulesForm)).resolves.toMatchObject({
 				form: 'rules',
 				success: true,
 				message: 'Rules saved.'
 			});
+			expect(rpc).toHaveBeenCalledWith('campaign_update_rules', {
+				p_id: CAMPAIGN_ID,
+				p_simple_bond_value: '60000.00',
+				p_installment_count: 12,
+				p_number_digits: 4,
+				p_max_number: 9999,
+				p_associated_number_offset: 4871,
+				p_overflow_policy: 'reject',
+				p_barcode_mode: 'internal_code',
+				p_expected_updated_at: VERSION,
+				p_request_id: 'req-test',
+				p_reason: null
+			});
+		});
+
+		it('passes the optional reason (trimmed) to the audited SQL function', async () => {
+			const { supabase, rpc } = mockSupabase({ rpc: { data: true, error: null } });
+			await runAction('rules', makeLocals({ supabase }), {
+				...rulesForm,
+				changeReason: '  Board meeting 2026-11-16 '
+			});
 			expect(rpc).toHaveBeenCalledWith(
 				'campaign_update_rules',
 				expect.objectContaining({
-					p_installment_count: 12,
-					p_barcode_mode: 'internal_code',
+					p_reason: 'Board meeting 2026-11-16',
 					p_expected_updated_at: VERSION
 				})
 			);
+		});
+
+		it('rejects a reason longer than 500 characters', async () => {
+			const { supabase, rpc } = mockSupabase();
+			const result = (await runAction('rules', makeLocals({ supabase }), {
+				...rulesForm,
+				changeReason: 'x'.repeat(501)
+			})) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data.errors).toEqual({
+				changeReason: ['Reason must be at most 500 characters']
+			});
+			expect(rpc).not.toHaveBeenCalled();
+		});
+
+		it('requires the explicit confirmation and does not call the database without it', async () => {
+			const { supabase, rpc } = mockSupabase({ rpc: { data: true, error: null } });
+			for (const confirmRulesChange of [undefined, '', 'on']) {
+				const fields: Record<string, string> = { ...rulesForm };
+				if (confirmRulesChange === undefined) delete fields.confirmRulesChange;
+				else fields.confirmRulesChange = confirmRulesChange;
+				const result = (await runAction(
+					'rules',
+					makeLocals({ supabase }),
+					fields
+				)) as ActionFailure;
+				expect(result.status).toBe(400);
+				expect(result.data.errors).toEqual({
+					confirmRulesChange: ['Confirm that you reviewed the rule changes']
+				});
+				// Submitted values come back so the form (and its change summary) can be refilled.
+				expect(result.data.values).toMatchObject({ simpleBondValue: '60.000,00' });
+			}
+			expect(rpc).not.toHaveBeenCalled();
+		});
+
+		it('rejects malformed money with the format message', async () => {
+			const result = (await runAction('rules', makeLocals({}), {
+				...rulesForm,
+				simpleBondValue: '60,000'
+			})) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data.errors).toEqual({
+				simpleBondValue: [
+					'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)'
+				]
+			});
 		});
 
 		it('maps a stale version to 409 with a reload message', async () => {

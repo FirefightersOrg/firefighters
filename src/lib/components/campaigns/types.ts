@@ -1,5 +1,6 @@
 import type { Campaign } from '$lib/domain/campaigns';
 import { toCampaignDay } from '$lib/domain/campaigns';
+import { formatMoneyInput } from '$lib/domain/money';
 import { DEFAULT_NUMBERING_CONFIG } from '$lib/domain/numbering';
 import { CAMPAIGN_VERSION_FIELD } from '$lib/schemas/campaign';
 
@@ -47,9 +48,10 @@ export function generalValuesOf(campaign: Campaign): CampaignGeneralValues {
 	};
 }
 
+/** Form values of a saved campaign; money in the Argentine input format (`"60.000,00"`). */
 export function rulesValuesOf(campaign: Campaign): CampaignRulesValues {
 	return {
-		simpleBondValue: campaign.simpleBondValue,
+		simpleBondValue: formatMoneyInput(campaign.simpleBondValue),
 		installmentCount: String(campaign.installmentCount),
 		numberDigits: String(campaign.numberDigits),
 		maxNumber: String(campaign.maxNumber),

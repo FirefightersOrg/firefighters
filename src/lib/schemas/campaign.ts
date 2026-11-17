@@ -6,7 +6,8 @@
  *   table constraints).
  * - The installment value is derived (`simpleBondValue / installmentCount`) and must divide
  *   exactly to the cent; otherwise the form is rejected with a friendly message.
- * - Money comes out as a two-decimal string (`"60000.00"`), never a float.
+ * - Money is typed in Argentine format (`60.000,50`, see `parseMoneyInput`) and comes out as a
+ *   canonical two-decimal string (`"60000.50"`), never a float.
  * - Dates are calendar days (`YYYY-MM-DD`) turned into timestamps in the campaign time zone.
  * - Edits of an existing campaign carry `expectedUpdatedAt`: the campaign's `updated_at` as loaded
  *   (optimistic concurrency). It is kept as the exact string PostgREST returned (microseconds), never
@@ -23,8 +24,8 @@ import { notExactInstallmentsMessage, splitIntoInstallments } from '$lib/domain/
 import {
 	centsToDecimalString,
 	MAX_MONEY_CENTS,
-	MONEY_INPUT_PATTERN,
-	parseMoneyToCents
+	MONEY_INPUT_FORMAT_MESSAGE,
+	parseMoneyInput
 } from '$lib/domain/money';
 import {
 	MAX_CAMPAIGN_NUMBER,
@@ -33,6 +34,7 @@ import {
 	type CampaignNumberingConfig,
 	type OverflowPolicy
 } from '$lib/domain/numbering';
+import { buildNumberingPreview, type NumberingPreview } from '$lib/domain/numbering-preview';
 
 /** Re-exported for the form components; defined (and enforced) by the numbering domain. */
 export { MAX_CAMPAIGN_NUMBER, MAX_NUMBER_DIGITS };
@@ -63,24 +65,36 @@ export const CAMPAIGN_CREATE_FIELDS = [
 	...CAMPAIGN_GENERAL_FIELDS,
 	...CAMPAIGN_RULES_FIELDS
 ] as const;
-export const CAMPAIGN_TRANSITION_FIELDS = ['toStatus', 'reason'] as const;
-
+/**
+ * Editing the rules of an existing campaign also needs an explicit confirmation (a checkbox the
+ * form only submits when ticked), so a rule change is never saved by accident.
+ */
+export const CAMPAIGN_RULES_CONFIRM_FIELD = 'confirmRulesChange';
+export const CAMPAIGN_RULES_CONFIRM_VALUE = 'yes';
+/** Optional reason for a rule change, stored in the audit row (`audit_log.reason`). */
+export const CAMPAIGN_RULES_REASON_FIELD = 'changeReason';
+export const CAMPAIGN_RULES_REASON_MAX_LENGTH = 500;
 /** Hidden field of the edit forms: the campaign's `updated_at` as loaded (its version). */
 export const CAMPAIGN_VERSION_FIELD = 'expectedUpdatedAt';
+/** Fields posted by the rules edit form (`?/rules`). */
+export const CAMPAIGN_RULES_UPDATE_FIELDS = [
+	...CAMPAIGN_RULES_FIELDS,
+	CAMPAIGN_RULES_REASON_FIELD,
+	CAMPAIGN_RULES_CONFIRM_FIELD,
+	CAMPAIGN_VERSION_FIELD
+] as const;
 /** Fields posted by the general-data edit form (`?/update`). */
 export const CAMPAIGN_GENERAL_UPDATE_FIELDS = [
 	...CAMPAIGN_GENERAL_FIELDS,
 	CAMPAIGN_VERSION_FIELD
 ] as const;
-/** Fields posted by the rules edit form (`?/rules`). */
-export const CAMPAIGN_RULES_UPDATE_FIELDS = [
-	...CAMPAIGN_RULES_FIELDS,
-	CAMPAIGN_VERSION_FIELD
-] as const;
+export const CAMPAIGN_TRANSITION_FIELDS = ['toStatus', 'reason'] as const;
 
 export type CampaignFormField =
 	| (typeof CAMPAIGN_CREATE_FIELDS)[number]
 	| (typeof CAMPAIGN_TRANSITION_FIELDS)[number]
+	| typeof CAMPAIGN_RULES_REASON_FIELD
+	| typeof CAMPAIGN_RULES_CONFIRM_FIELD
 	| typeof CAMPAIGN_VERSION_FIELD;
 
 /** Raw string values of a form (what the inputs hold). */
@@ -174,9 +188,15 @@ const rulesShape = {
 		.string()
 		.trim()
 		.min(1, { message: 'Simple bond value is required', abort: true })
-		.regex(MONEY_INPUT_PATTERN, 'Enter an amount with at most 2 decimals, e.g. 60000 or 60000.50')
-		// Safe: the regex above guarantees parseMoneyToCents succeeds.
-		.transform((value) => parseMoneyToCents(value) as number)
+		// Argentine format (`60.000,50`), parsed exactly like the live preview in the browser.
+		.transform((value, ctx) => {
+			const cents = parseMoneyInput(value);
+			if (cents === null) {
+				ctx.addIssue({ code: 'custom', message: MONEY_INPUT_FORMAT_MESSAGE });
+				return z.NEVER;
+			}
+			return cents;
+		})
 		.pipe(
 			z
 				.number()
@@ -346,6 +366,41 @@ export const campaignRulesSchema = z
 		expectedUpdatedAt: value.expectedUpdatedAt
 	}));
 
+/**
+ * Rules of an existing (draft) campaign: the rules, an optional reason for the audit log (trimmed,
+ * blank → null), the explicit confirmation and the version the edit is based on
+ * (`expectedUpdatedAt`).
+ */
+export const campaignRulesUpdateSchema = z
+	.object({
+		...rulesShape,
+		...versionShape,
+		[CAMPAIGN_RULES_REASON_FIELD]: z
+			.string()
+			.trim()
+			.max(
+				CAMPAIGN_RULES_REASON_MAX_LENGTH,
+				`Reason must be at most ${CAMPAIGN_RULES_REASON_MAX_LENGTH} characters`
+			)
+			.transform((value) => (value === '' ? null : value)),
+		// A non-fatal check (not z.literal), so the rule errors are still reported with it.
+		[CAMPAIGN_RULES_CONFIRM_FIELD]: z
+			.string()
+			.refine((value) => value === CAMPAIGN_RULES_CONFIRM_VALUE, {
+				message: 'Confirm that you reviewed the rule changes'
+			})
+	})
+	.superRefine((value, ctx) => {
+		refineNumbering(value, ctx);
+		refineInstallments(value, ctx);
+	})
+	.transform((value) => ({
+		...toRulesOutput(value),
+		expectedUpdatedAt: value.expectedUpdatedAt,
+		/** Audit reason (`campaign_update_rules(p_reason)`), or null. */
+		reason: value[CAMPAIGN_RULES_REASON_FIELD]
+	}));
+
 /** New campaign: general data + rules. */
 export const campaignCreateSchema = z
 	.object({ ...generalShape, ...rulesShape })
@@ -379,7 +434,54 @@ export const campaignTransitionSchema = z
 		}
 	});
 
+// ---------------------------------------------------------------------------
+// Live numbering preview
+// ---------------------------------------------------------------------------
+
+export type CampaignNumberingInputPreview =
+	| { state: 'incomplete' }
+	| { state: 'invalid'; issues: { field: string; message: string }[] }
+	| { state: 'ok'; preview: Extract<NumberingPreview, { ok: true }> };
+
+/**
+ * Live preview of the raw numbering inputs. Parses them with {@link campaignNumberingSchema}, so
+ * the problems listed are exactly the messages the server returns on submit; a valid config is
+ * turned into examples by `buildNumberingPreview`. Never throws. Returns `incomplete` while a
+ * numeric field is still empty (no "required" noise while typing).
+ */
+export function previewNumberingInput(
+	values: Record<(typeof CAMPAIGN_NUMBERING_FIELDS)[number], string>
+): CampaignNumberingInputPreview {
+	if (
+		[values.numberDigits, values.maxNumber, values.associatedNumberOffset].some((v) => !v.trim())
+	) {
+		return { state: 'incomplete' };
+	}
+	const parsed = campaignNumberingSchema.safeParse(values);
+	if (!parsed.success) {
+		// First message per field, like the field errors shown after a submit.
+		const issues = Object.entries(campaignFieldErrors(parsed.error)).map(([field, messages]) => ({
+			field,
+			message: messages?.[0] ?? ''
+		}));
+		return { state: 'invalid', issues };
+	}
+	const preview = buildNumberingPreview(parsed.data);
+	// Unreachable in practice: the schema already applied validateNumberingConfig.
+	if (!preview.ok) {
+		return {
+			state: 'invalid',
+			issues: preview.issues.map((issue) => ({
+				field: issue.field,
+				message: humanizeNumberingMessage(issue.message)
+			}))
+		};
+	}
+	return { state: 'ok', preview };
+}
+
 export type CampaignGeneralInput = z.output<typeof campaignGeneralSchema>;
 export type CampaignRulesInput = z.output<typeof campaignRulesSchema>;
+export type CampaignRulesUpdateInput = z.output<typeof campaignRulesUpdateSchema>;
 export type CampaignCreateInput = z.output<typeof campaignCreateSchema>;
 export type CampaignTransitionInput = z.output<typeof campaignTransitionSchema>;
