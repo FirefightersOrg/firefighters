@@ -18,32 +18,44 @@ Define the conceptual relational model for the MVP. Names are preliminary and mu
 
 ### campaigns
 
-Represents an annual campaign.
+Represents an annual campaign. Implemented in `20261116000000_campaigns.sql` (SAN-16).
 
-Suggested fields:
+Fields:
 
-- `id`
-- `name`
-- `status`
-- `starts_at`
-- `ends_at`
-- `simple_bond_value`
-- `installment_count`
-- `installment_value`
-- `number_digits`
-- `max_number`
-- `associated_number_offset`
-- `overflow_policy`
-- `barcode_mode`
-- `created_at`
-- `updated_at`
+- `id` (uuid)
+- `name` (text, not blank)
+- `status` (text): `draft` (default), `active`, `closing`, `closed`, `annulled`
+- `starts_at`, `ends_at` (timestamptz, optional; `ends_at > starts_at` when both are set)
+- `simple_bond_value` (numeric(14,2), > 0, not `NaN`)
+- `installment_count` (integer, > 0)
+- `installment_value` (numeric(14,2), > 0, not `NaN`): derived, see rules
+- `number_digits` (integer, 1 to 10, default 4)
+- `max_number` (integer, default 9999)
+- `associated_number_offset` (integer, default 4871)
+- `overflow_policy` (text, default `reject`; only `reject` for now)
+- `barcode_mode` (text, required, no default): `base_number`, `internal_code`, `external_legacy_code`, `manual_mapping`
+- `created_by` (profile, nullable for system actions, `on delete restrict`)
+- `created_at`, `updated_at` (set by the database)
 
-Suggested constraints:
+Constraints:
 
-- `number_digits > 0`
-- `max_number > 0`
-- `associated_number_offset >= 0`
-- `overflow_policy in ('reject')` initially
+- `number_digits` between 1 and 10 (`max_number` is an integer, so at most 2147483647: 10 digits), `max_number > 0`, `associated_number_offset >= 0`.
+- `simple_bond_value` and `installment_value` are not `NaN`. Postgres `numeric` accepts `'NaN'` and treats it as greater than every number and equal to itself, so it would otherwise pass `> 0` and the exact-installment check; `±Infinity` is already rejected by `numeric(14,2)`.
+- `max_number` fits in `number_digits` (`max_number < 10^number_digits`); 5-digit campaigns use `number_digits = 5`, `max_number = 99999`.
+- `associated_number_offset <= max_number` (otherwise no base number is valid).
+- `installment_value * installment_count = simple_bond_value` exactly. `installment_value` is a stored column, not generated: a price that does not divide evenly (60000 in 7 installments) is rejected instead of rounded.
+
+Rules (enforced by triggers for every role, including `service_role`):
+
+- New campaigns start in `draft`.
+- Status changes only follow `docs/state-machines.md` (`draft -> active -> closing -> closed`, `draft -> annulled`, `active -> annulled`). Anything else fails with `23514`.
+- Activating requires both `starts_at` and `ends_at`; once activated, neither date can be cleared (`23514`).
+- Edit windows depend on the status before the update: numbering, installment and `barcode_mode` rules only while `draft`; dates while `draft` or `active`; name until `closed`/`annulled`. Closed and annulled campaigns are immutable. Edits outside the window fail with `55000`.
+- `id`, `created_at` and `created_by` never change. `updated_at` is set on every update.
+- Several campaigns can be `active` at the same time.
+- Campaigns are never deleted (annul instead): no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner too.
+
+Access: `authenticated` can only `SELECT`, and RLS limits it to `campaign.view`. Writes go through permission-checked SQL functions that record the change and its audit row in one transaction (SAN-17). `service_role` has `SELECT`, `INSERT` and `UPDATE`.
 
 ### profiles
 

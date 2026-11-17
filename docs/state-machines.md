@@ -20,6 +20,7 @@ Transitions:
 
 ```txt
 draft -> active
+draft -> annulled
 active -> closing
 closing -> closed
 active -> annulled
@@ -28,6 +29,8 @@ active -> annulled
 Rules:
 
 - A closed campaign does not allow normal operations.
+- A draft created by mistake is annulled, not deleted.
+- A campaign can only be activated with both start and end dates set.
 - Subsequent corrections require an authorized role and audit.
 
 ## Bond
