@@ -633,8 +633,10 @@ select throws_ok(
   '23001', 'campaigns cannot be deleted: DELETE is not allowed (annul the campaign instead)',
   'owner cannot delete a campaign (trigger)'
 );
+-- CASCADE: tables referencing campaigns (commission_rules, SAN-20) would otherwise make a plain
+-- TRUNCATE fail on the foreign key (0A000) before the trigger runs.
 select throws_ok(
-  $$truncate public.campaigns$$,
+  $$truncate public.campaigns cascade$$,
   '23001', 'campaigns cannot be deleted: TRUNCATE is not allowed (annul the campaign instead)',
   'owner cannot truncate campaigns (trigger)'
 );
