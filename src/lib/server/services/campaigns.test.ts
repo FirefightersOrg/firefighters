@@ -218,6 +218,17 @@ describe('mapCampaignRpcError', () => {
 		],
 		[
 			{
+				code: '55000',
+				message:
+					'installment count cannot be lowered below 5 while an active commission rule applies to installment 5'
+			},
+			'validation',
+			400,
+			'A commission rule applies to installment 5. Use at least 5 installments, or edit or annul that commission rule first.',
+			'installmentCount'
+		],
+		[
+			{
 				code: '23502',
 				message:
 					'null value in column "barcode_mode" of relation "campaigns" violates not-null constraint'
