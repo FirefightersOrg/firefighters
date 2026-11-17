@@ -42,6 +42,14 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
+		{#if data.can.viewCommissions}
+			<nav aria-label="Campaign sections" class="mt-3 text-sm">
+				<a
+					href={resolve('/campaigns/[id]/commissions', { id: campaign.id })}
+					class="font-medium text-blue-700 hover:underline">Commission rules →</a
+				>
+			</nav>
+		{/if}
 	</div>
 
 	{#if transitionResult}

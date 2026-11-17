@@ -76,7 +76,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			editRules:
 				hasPermissionIn(permissions, 'campaign.update_rules') &&
 				canEditCampaignRules(campaign.status),
-			transitions: availableCampaignTransitions(campaign.status, permissions)
+			transitions: availableCampaignTransitions(campaign.status, permissions),
+			viewCommissions: hasPermissionIn(permissions, 'commission.view')
 		}
 	};
 };
