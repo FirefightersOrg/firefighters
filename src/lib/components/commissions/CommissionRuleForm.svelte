@@ -22,6 +22,7 @@
 	import { formatPercentInput } from '$lib/domain/percent';
 	import {
 		COMMISSION_REASON_MAX_LENGTH,
+		COMMISSION_RULE_VERSION_FIELD,
 		type CommissionRuleFieldErrors
 	} from '$lib/schemas/commission-rule';
 
@@ -58,6 +59,10 @@
 	const errors = $derived(result?.errors ?? {});
 
 	// Initial values: the submitted ones after a failed submit, else the rule's, else defaults.
+	// Values and version (`updated_at`) always come from the same load: the page re-mounts this
+	// form whenever the edited rule's version changes, and submitted edit values are refilled only
+	// when they were based on the loaded version. Values based on an older version are dropped:
+	// sending them with the newer version would silently overwrite the newer change.
 	const initial = $derived.by(() => {
 		const base = rule
 			? {
@@ -80,7 +85,11 @@
 					validTo: '',
 					reason: ''
 				};
-		const submitted = result && !result.success ? result.values : undefined;
+		const failed = result && !result.success ? result.values : undefined;
+		const submitted =
+			failed && (!rule || failed[COMMISSION_RULE_VERSION_FIELD] === rule.updatedAt)
+				? failed
+				: undefined;
 		if (!submitted) return base;
 		const merged: Record<string, string> = { ...base };
 		for (const key of Object.keys(base)) {
@@ -89,12 +98,10 @@
 		return merged as typeof base;
 	});
 
-	// The rule version (`updated_at`, exact string) this edit is based on: the submitted one after
-	// a failed submit (a stale form keeps failing with a conflict until the page is reloaded),
-	// else the loaded rule's.
-	const expectedVersion = $derived(
-		(result && !result.success ? result.values?.expectedUpdatedAt : undefined) ?? rule?.updatedAt
-	);
+	// The rule version (`updated_at`, exact string) this edit is based on: the loaded rule's, the
+	// same load the values above come from. A failed submit does not reload the rule, so a stale
+	// form keeps failing with a conflict until the page is reloaded.
+	const expectedVersion = $derived(rule?.updatedAt);
 
 	let submitting = $state(false);
 	const fieldId = (name: string) => `${prefix}-${name}`;

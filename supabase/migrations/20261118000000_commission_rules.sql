@@ -102,7 +102,7 @@ create table public.commission_rules (
   constraint commission_rules_validity_order check (valid_to >= valid_from),
   constraint commission_rules_annulment_consistent check (
     case
-      when status = 'annulled' then annulled_at is not null
+      when status = 'annulled' then annulled_at is not null and annulled_by is not null
         and annul_reason is not null and btrim(annul_reason) <> ''
       else annulled_at is null and annulled_by is null and annul_reason is null
     end

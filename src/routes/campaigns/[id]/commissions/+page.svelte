@@ -174,8 +174,9 @@
 	</section>
 
 	{#if data.can.manage}
-		<!-- Re-mount when switching between create and edit (or between rules). -->
-		{#key editRule?.id ?? 'new'}
+		<!-- Re-mount when switching between create and edit, between rules, or when a load brings a
+		     new version of the edited rule: its values and version must come from the same load. -->
+		{#key editRule ? `${editRule.id}@${editRule.updatedAt}` : 'new'}
 			<CommissionRuleForm
 				rule={editRule}
 				installmentCount={campaign.installmentCount}

@@ -448,7 +448,9 @@ Rules:
 
 - Active general rules of the same campaign + `rule_type` (+ `installment_number`) cannot overlap
   in validity (EXCLUDE constraint `commission_rules_no_overlap`, extension `btree_gist`).
-- Never deleted: annulled with a reason. Annulled rules are immutable.
+- Never deleted: annulled with a reason. An annulled rule always records `annulled_at`,
+  `annulled_by` and a non-blank `annul_reason`, an active one none of them (CHECK
+  `commission_rules_annulment_consistent`). Annulled rules are immutable.
 - Writable only while the campaign is `draft` or `active`, only through the audited
   `commission_rule_*` functions (`commission.rule_manage`); readable with `commission.view`.
 - The functions reject `NaN` and `±Infinity` values with `22023` (their parameters are
