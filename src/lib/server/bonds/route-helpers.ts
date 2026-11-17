@@ -15,9 +15,10 @@ import {
 export type BondFormName = 'create';
 
 /**
- * A bond that already uses a number or code of the submitted form, to link to its record
- * (`/campaigns/[id]/bonds/[bondId]`). `numbers` are padded like the campaign shows them; empty
- * for a duplicate internal code or barcode.
+ * A bond that already uses a number or code of the submitted form. `numbers` are padded like the
+ * campaign shows them; empty for a duplicate internal code or barcode. The page shows the numbers
+ * as text for now; `bondId` is kept so the form can link to the bond's record
+ * (`/campaigns/[id]/bonds/[bondId]`) once that route exists (SAN-25).
  */
 export interface BondConflictLink {
 	field: string;
@@ -116,7 +117,7 @@ export function conflictLinks(
 
 /**
  * "Number 0068 is already used by another bond in this campaign." The bond is not named by its id
- * (meaningless to people): the form links to it instead.
+ * (meaningless to people).
  */
 export function duplicateNumbersFieldMessage(conflicts: readonly BondNumberConflict[]): string {
 	const numbers = conflicts.map((c) => c.formatted);
@@ -129,8 +130,8 @@ export function duplicateNumbersFieldMessage(conflicts: readonly BondNumberConfl
 const BOND_ID_REFERENCE = / by bond [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**
- * Maps an error thrown by the bond service to a `fail()` result: field errors (with links to the
- * bonds that already use a number or code) or a form message. Other errors are rethrown.
+ * Maps an error thrown by the bond service to a `fail()` result: field errors (with the bonds that
+ * already use a number or code, as `conflicts`) or a form message. Other errors are rethrown.
  */
 export function bondServiceFailure(
 	form: BondFormName,
