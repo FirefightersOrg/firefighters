@@ -28,6 +28,8 @@ Intended direction for sensitive mutations (bonds, payments, settlements, draws,
 
 First example of this pattern: user creation. `admin_provision_profile` (and `admin_grant_roles`, migration `20261023002000_admin_provision_profile.sql`, `service_role` only) writes the profile, its role assignments and the `user.create` / `user.roles.grant` audit row in one transaction; `createAdminManagedUser` no longer calls `recordAuditLog`. Follow it for new sensitive mutations.
 
+End-user example: campaigns. `campaign_create` / `campaign_update` / `campaign_update_rules` / `campaign_transition` (migration `20261117000000_campaign_rpcs.sql`) are SECURITY DEFINER functions executable by `authenticated`: they resolve the actor with `current_profile_id()`, check `has_permission()`, write the change and the `campaign.*` audit row in one transaction. `src/lib/server/services/campaigns.ts` calls them with the user-scoped client (`locals.supabase`).
+
 ## Available Functions
 
 ### `recordAuditLog(supabase, entry): Promise<void>`

@@ -35,6 +35,18 @@ This allows changing permissions of a role without rewriting business logic, scr
 | `campaign.update_rules` | Modify critical rules for numbering, installments, commissions, and draws. |
 | `campaign.close`        | Close campaign.                                                            |
 
+Campaign actions and the permission each one requires (enforced by the `campaign_*` SQL functions, see `docs/data-model.md`):
+
+| Action                                                                  | Permission              |
+| ----------------------------------------------------------------------- | ----------------------- |
+| View list and detail                                                    | `campaign.view`         |
+| Create (as draft)                                                       | `campaign.create`       |
+| Edit name and dates                                                     | `campaign.update`       |
+| Edit rules (numbering, installments, values, overflow, barcode); draft  | `campaign.update_rules` |
+| Activate (`draft -> active`); activation freezes the rules              | `campaign.update_rules` |
+| Start closing, close (`active -> closing`, `closing -> closed`)         | `campaign.close`        |
+| Annul (`draft -> annulled`, `active -> annulled`); a reason is required | `campaign.close`        |
+
 ### Bonds
 
 | Permission       | Description                      |
