@@ -147,7 +147,8 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			return err('not_found', CAMPAIGN_MESSAGES.notFound);
 
 		// Optimistic concurrency: the campaign changed after the form was loaded (nothing written).
-		case '40001':
+		// PT409 (not 40001, which PostgREST would retry forever); PostgREST answers HTTP 409.
+		case 'PT409':
 			return err('conflict', CAMPAIGN_MESSAGES.staleVersion);
 
 		case '22023': {

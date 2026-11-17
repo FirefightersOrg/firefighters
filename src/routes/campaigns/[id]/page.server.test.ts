@@ -39,7 +39,7 @@ function runAction(
 
 /** The campaign's updated_at as loaded (hidden `expectedUpdatedAt` field of the edit forms). */
 const VERSION = '2026-11-16T12:00:00.123456+00:00';
-const STALE_ERROR = { code: '40001', message: 'campaign was modified by someone else' };
+const STALE_ERROR = { code: 'PT409', message: 'campaign was modified by someone else' };
 const STALE_MESSAGE =
 	'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.';
 

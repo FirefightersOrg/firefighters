@@ -14,7 +14,7 @@ import { campaignCreateSchema, campaignRulesSchema } from '$lib/schemas/campaign
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';
 /** updated_at as PostgREST returns it; forwarded to the RPC unchanged. */
 const VERSION = '2026-11-17T01:02:03.123456+00:00';
-const STALE_ERROR = { code: '40001', message: 'campaign was modified by someone else' };
+const STALE_ERROR = { code: 'PT409', message: 'campaign was modified by someone else' };
 
 function rpcClient(result: { data?: unknown; error?: unknown } | Error) {
 	const rpc = vi
@@ -217,7 +217,7 @@ describe('mapCampaignRpcError', () => {
 		],
 		[
 			{
-				code: '40001',
+				code: 'PT409',
 				message: 'campaign was modified by someone else',
 				details: 'campaign f0000000-0000-0000-0000-000000000001: expected updated_at …',
 				hint: 'reload the campaign and apply the change again'
@@ -423,7 +423,7 @@ describe('campaign service', () => {
 					})
 				)
 		]
-	])('%s maps a stale version (40001) to a 409 conflict asking to reload', async (_name, call) => {
+	])('%s maps a stale version (PT409) to a 409 conflict asking to reload', async (_name, call) => {
 		const err = await call().catch((e) => e);
 		expect(err).toBeInstanceOf(CampaignServiceError);
 		expect(err).toMatchObject({
