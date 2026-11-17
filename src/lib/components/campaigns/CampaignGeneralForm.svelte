@@ -33,6 +33,12 @@
 	}
 	let values = $state(initialValues());
 	let submitting = $state(false);
+
+	// The campaign version (`updated_at`, exact string) this edit is based on. It follows the
+	// loaded campaign, so a successful save of any form on the page (which reloads it) moves it
+	// forward. After a failed submit it stays at the submitted version: a stale form keeps
+	// failing with a conflict until the page is reloaded, instead of overwriting newer changes.
+	const expectedVersion = $derived(result?.values?.expectedUpdatedAt ?? campaign.updatedAt);
 </script>
 
 <section class={cardClass} aria-labelledby="general-title">
@@ -55,6 +61,8 @@
 		{#if result}
 			<FormAlert kind={result.success ? 'success' : 'error'} message={result.message} />
 		{/if}
+		<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
+		<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
 		<GeneralFields
 			bind:name={values.name}
 			bind:startsOn={values.startsOn}

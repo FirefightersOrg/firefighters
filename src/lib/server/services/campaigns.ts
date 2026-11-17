@@ -68,6 +68,8 @@ export const CAMPAIGN_MESSAGES = {
 		'Start and end dates cannot be removed once the campaign has been activated.',
 	rulesFrozen:
 		'Rules can only be changed while the campaign is a draft. They were frozen when the campaign was activated.',
+	staleVersion:
+		'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.',
 	datesFrozen: 'Dates can only be changed while the campaign is a draft or active.',
 	nameFrozen: 'The name of a closed or annulled campaign cannot be changed.',
 	reasonRequired: 'A reason is required to annul a campaign.'
@@ -93,9 +95,9 @@ const CONSTRAINT_MESSAGES: Record<string, { field: CampaignFormField; message: s
 		field: 'installmentCount',
 		message: 'The simple bond value must divide exactly into the installments.'
 	},
-	campaigns_number_digits_positive: {
+	campaigns_number_digits_range: {
 		field: 'numberDigits',
-		message: 'Number of digits must be greater than 0.'
+		message: 'Number of digits must be between 1 and 10.'
 	},
 	campaigns_max_number_positive: {
 		field: 'maxNumber',
@@ -144,6 +146,10 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 
 		case 'P0002':
 			return err('not_found', CAMPAIGN_MESSAGES.notFound);
+
+		// Optimistic concurrency: the campaign changed after the form was loaded (nothing written).
+		case '40001':
+			return err('conflict', CAMPAIGN_MESSAGES.staleVersion);
 
 		case '22023': {
 			const split = /cannot be split into (\d+) equal installments/.exec(message);
@@ -302,6 +308,8 @@ export async function createCampaign(
 
 /**
  * Updates name and dates (`campaign.update`). Returns false when nothing changed (no audit row).
+ * `input.expectedUpdatedAt` is the version the edit is based on: if the campaign changed since, the
+ * database writes nothing and this throws a `conflict` (409) with `CAMPAIGN_MESSAGES.staleVersion`.
  */
 export async function updateCampaignGeneral(
 	supabase: SupabaseClient,
@@ -317,6 +325,8 @@ export async function updateCampaignGeneral(
 			p_name: input.name,
 			p_starts_at: input.startsAt,
 			p_ends_at: input.endsAt,
+			// The exact string as loaded (microseconds); the database compares it with updated_at.
+			p_expected_updated_at: input.expectedUpdatedAt,
 			p_request_id: ctx.requestId ?? null
 		},
 		ctx
@@ -327,7 +337,8 @@ export async function updateCampaignGeneral(
 /**
  * Updates the rules of a draft campaign (`campaign.update_rules`). The installment value is
  * recomputed by the database; the optional `reason` is stored in the audit row. Returns false
- * when nothing changed (no audit row).
+ * when nothing changed (no audit row). Throws a `conflict` (409) when the campaign changed since
+ * `input.expectedUpdatedAt` (nothing written).
  */
 export async function updateCampaignRules(
 	supabase: SupabaseClient,
@@ -347,6 +358,7 @@ export async function updateCampaignRules(
 			p_associated_number_offset: input.associatedNumberOffset,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
+			p_expected_updated_at: input.expectedUpdatedAt,
 			p_request_id: ctx.requestId ?? null,
 			p_reason: input.reason ?? null
 		},
