@@ -1,5 +1,5 @@
 begin;
-select plan(199);
+select plan(200);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -907,6 +907,11 @@ select throws_ok(
 select is(
   (select commercial_status from public.bonds where id = pg_temp.id('m1')), 'available',
   'groups: members keep their commercial status'
+);
+select throws_ok(
+  $$select pg_temp.annul('mp')$$,
+  '55000', format('manually grouped pata %s has 2 active members and must be ungrouped before annulment', pg_temp.id('mp')),
+  'groups: a manual pata with active members cannot be annulled directly'
 );
 
 -- Ungrouping (reason and who are required; the row stays as history).
