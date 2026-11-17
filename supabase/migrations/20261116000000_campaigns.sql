@@ -40,13 +40,20 @@ create table public.campaigns (
     check (status in ('draft', 'active', 'closing', 'closed', 'annulled')),
   constraint campaigns_dates_order check (ends_at > starts_at),
 
-  constraint campaigns_simple_bond_value_positive check (simple_bond_value > 0),
+  -- numeric accepts 'NaN', and Postgres orders NaN above every number (NaN > 0 and NaN = NaN
+  -- are true), so NaN would pass both "> 0" and the exact-installment CHECK: reject it explicitly.
+  -- ±Infinity is already rejected by the numeric(14,2) typmod.
+  constraint campaigns_simple_bond_value_positive
+    check (simple_bond_value <> 'NaN' and simple_bond_value > 0),
   constraint campaigns_installment_count_positive check (installment_count > 0),
-  constraint campaigns_installment_value_positive check (installment_value > 0),
+  constraint campaigns_installment_value_positive
+    check (installment_value <> 'NaN' and installment_value > 0),
   constraint campaigns_installment_value_exact
     check (installment_value * installment_count = simple_bond_value),
 
-  constraint campaigns_number_digits_positive check (number_digits > 0),
+  -- At most 10 digits: max_number is an integer (max 2147483647, 10 digits), so a wider
+  -- format could never be filled and only misleads the numbering preview.
+  constraint campaigns_number_digits_range check (number_digits between 1 and 10),
   constraint campaigns_max_number_positive check (max_number > 0),
   constraint campaigns_associated_number_offset_nonnegative check (associated_number_offset >= 0),
   -- max_number < 10^number_digits, written without exponentiation so it cannot overflow.

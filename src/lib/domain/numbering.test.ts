@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DomainError } from './errors';
 import {
 	DEFAULT_NUMBERING_CONFIG,
+	MAX_NUMBER_DIGITS,
 	NumberingError,
 	assertValidNumberingConfig,
 	calculateAssociatedNumber,
@@ -310,6 +311,32 @@ describe('validateNumberingConfig', () => {
 
 	it.each([0, -1, 4.5, Number.NaN])('rejects numberDigits = %s', (numberDigits) => {
 		expect(fieldsOf({ ...FOUR_DIGITS, numberDigits })).toContain('numberDigits');
+	});
+
+	it('caps numberDigits at MAX_NUMBER_DIGITS (10: max_number is a Postgres integer)', () => {
+		expect(MAX_NUMBER_DIGITS).toBe(10);
+		const tenDigits: CampaignNumberingConfig = {
+			numberDigits: 10,
+			maxNumber: 2147483647,
+			associatedNumberOffset: 0,
+			overflowPolicy: 'reject'
+		};
+		expect(validateNumberingConfig(tenDigits)).toEqual([]);
+		expect(fieldsOf({ ...tenDigits, numberDigits: 11 })).toEqual(['numberDigits']);
+		expect(validateNumberingConfig({ ...tenDigits, numberDigits: 11 })).toEqual([
+			{ field: 'numberDigits', message: 'numberDigits must not exceed 10' }
+		]);
+	});
+
+	it('rejects a huge numberDigits instead of accepting any maxNumber (reviewer case)', () => {
+		const config: CampaignNumberingConfig = {
+			numberDigits: 2147483647,
+			maxNumber: 1,
+			associatedNumberOffset: 0,
+			overflowPolicy: 'reject'
+		};
+		expect(fieldsOf(config)).toEqual(['numberDigits']);
+		expectNumberingError(() => formatCampaignNumber(1, config), 'invalid_config');
 	});
 
 	it.each([0, -1, 99.5, Number.NaN])('rejects maxNumber = %s', (maxNumber) => {
