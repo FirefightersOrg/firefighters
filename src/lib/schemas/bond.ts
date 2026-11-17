@@ -30,6 +30,21 @@ export const BOND_CREATE_SIMPLE_FIELDS = [
 	'barcode',
 	'reason'
 ] as const;
+/**
+ * Fields of the manual simple bond entry form (`/campaigns/[id]/bonds/new`). The campaign comes
+ * from the URL; the reason is not asked for.
+ */
+export const BOND_ENTRY_FIELDS = ['baseNumber', 'internalCode', 'barcode'] as const;
+/** Submit button name: "Save" (`save`) or "Save & add another" (`another`). */
+export const BOND_ENTRY_INTENT_FIELD = 'intent';
+export const BOND_ENTRY_INTENTS = ['save', 'another'] as const;
+export type BondEntryIntent = (typeof BOND_ENTRY_INTENTS)[number];
+
+/** The submitted intent; anything else (a plain Enter without JavaScript included) is `save`. */
+export function bondEntryIntent(value: FormDataEntryValue | null): BondEntryIntent {
+	return value === 'another' ? 'another' : 'save';
+}
+
 export const BOND_CREATE_PATA_FIELDS = [
 	'campaignId',
 	'baseNumbers',

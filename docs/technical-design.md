@@ -165,6 +165,16 @@ form data
 
 The database is the authority: the app never sends associated numbers or values, and duplicates against other bonds are only detected by the database (the unique index on live numbers), which names the number and the bond that already uses it. Duplicate details arrive as JSON in the error `details` and are exposed as `BondServiceError.conflicts` so the UI can link to that bond.
 
+### Manual simple bond entry (SAN-24)
+
+`/campaigns/[id]/bonds/new` (requires `campaign.view` and `bond.create`; linked from the campaign page while the campaign is draft or active):
+
+- One base number per bond, typed with or without leading zeros, plus optional internal code and barcode. A live preview (`previewBaseNumber`, `src/lib/domain/bond-preview.ts`) shows the padded base and associated numbers, or the same range/overflow message the server would return.
+- "Save & add another" (the default button, so Enter uses it) keeps the operator on the form: the fields are cleared, the base number keeps focus and the bond just saved is confirmed and listed. "Save" opens the new bond's record (`/campaigns/[id]/bonds/[bondId]`).
+- Duplicates are shown on the field with the formatted numbers and a link to the bond that already uses them (`BondFormResult.conflicts`, `src/lib/server/bonds/route-helpers.ts`); the bond id is never shown as text.
+- Outside draft/active the page explains why instead of showing the form; the action refuses with 409 before calling the database.
+- Once a campaign has any bond (`campaignHasBonds`), the campaign page shows its rules frozen, even in draft, and hides the rules form; `campaign_update_rules` refuses the change anyway (55000).
+
 ## Barcode and imports
 
 Barcode reading must be implemented as a configurable flow per campaign.

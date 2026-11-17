@@ -105,7 +105,8 @@ describe('/campaigns/[id]', () => {
 				editDates: true,
 				editRules: true,
 				transitions: ['active', 'annulled'],
-				viewCommissions: false
+				viewCommissions: false,
+				loadBonds: false
 			});
 		});
 
@@ -119,7 +120,8 @@ describe('/campaigns/[id]', () => {
 				editDates: true,
 				editRules: false,
 				transitions: ['closing', 'annulled'],
-				viewCommissions: false
+				viewCommissions: false,
+				loadBonds: false
 			});
 		});
 
@@ -133,7 +135,8 @@ describe('/campaigns/[id]', () => {
 				editDates: false,
 				editRules: false,
 				transitions: ['closed'],
-				viewCommissions: false
+				viewCommissions: false,
+				loadBonds: false
 			});
 		});
 
@@ -155,8 +158,61 @@ describe('/campaigns/[id]', () => {
 				editDates: false,
 				editRules: false,
 				transitions: [],
-				viewCommissions: false
+				viewCommissions: false,
+				loadBonds: false
 			});
+		});
+
+		it('freezes the rules of a draft that already has bonds', async () => {
+			const { supabase, from } = mockSupabase({
+				tables: {
+					campaigns: { data: campaignRow(), error: null },
+					bonds: { data: [{ id: 'b1' }], error: null }
+				}
+			});
+			const data = (await load(loadEvent(makeLocals({ supabase }))))!;
+			expect(from).toHaveBeenCalledWith('bonds');
+			expect(data.hasBonds).toBe(true);
+			expect(data.can.editRules).toBe(false);
+			// Name and dates stay editable; activating is still possible.
+			expect(data.can).toMatchObject({ editName: true, editDates: true });
+			expect(data.can.transitions).toEqual(['active', 'annulled']);
+		});
+
+		it('keeps the rules editable when the bond lookup fails (the database still guards)', async () => {
+			const { supabase } = mockSupabase({
+				tables: {
+					campaigns: { data: campaignRow(), error: null },
+					bonds: { data: null, error: { message: 'boom' } }
+				}
+			});
+			const data = (await load(loadEvent(makeLocals({ supabase }))))!;
+			expect(data.hasBonds).toBe(false);
+			expect(data.can.editRules).toBe(true);
+		});
+
+		it('offers to load bonds with bond.create while the campaign is a draft or active', async () => {
+			const permissions = ['campaign.view', 'bond.view', 'bond.create'];
+			for (const [status, expected] of [
+				['draft', true],
+				['active', true],
+				['closing', false],
+				['closed', false],
+				['annulled', false]
+			] as const) {
+				const { supabase } = mockSupabase({
+					tables: { campaigns: { data: campaignRow({ status }), error: null } }
+				});
+				const data = (await load(loadEvent(makeLocals({ permissions, supabase }))))!;
+				expect(data.can.loadBonds, status).toBe(expected);
+			}
+			const { supabase } = mockSupabase({
+				tables: { campaigns: { data: campaignRow(), error: null } }
+			});
+			const viewer = (await load(
+				loadEvent(makeLocals({ permissions: ['campaign.view', 'bond.view'], supabase }))
+			))!;
+			expect(viewer.can.loadBonds).toBe(false);
 		});
 
 		it('campaign.close without campaign.update_rules: may annul a draft but not activate it', async () => {
@@ -467,6 +523,29 @@ describe('/campaigns/[id]', () => {
 			)) as ActionFailure;
 			expect(result.status).toBe(409);
 			expect(result.data.message).toMatch(/only be changed while the campaign is a draft/);
+		});
+
+		it('maps "rules frozen by bonds" (draft with bonds) to 409 with the reason', async () => {
+			const { supabase } = mockSupabase({
+				rpc: {
+					data: null,
+					error: {
+						code: '55000',
+						message: 'campaign rules cannot be changed once the campaign has bonds'
+					}
+				}
+			});
+			const result = (await runAction(
+				'rules',
+				makeLocals({ supabase }),
+				rulesForm
+			)) as ActionFailure;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({
+				form: 'rules',
+				message:
+					'Rules can no longer be changed: this campaign already has bonds, and their numbers and values depend on the rules.'
+			});
 		});
 	});
 

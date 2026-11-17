@@ -28,7 +28,8 @@
 		Object.values(transitionResult?.errors ?? {}).flat()[0] ?? transitionResult?.message
 	);
 	const missingDates = $derived(!campaign.startsAt || !campaign.endsAt);
-	const rulesFrozen = $derived(!canEditCampaignRules(campaign.status));
+	const frozenByStatus = $derived(!canEditCampaignRules(campaign.status));
+	const rulesFrozen = $derived(frozenByStatus || data.hasBonds);
 	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
 </script>
 
@@ -43,12 +44,20 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions}
-			<nav aria-label="Campaign sections" class="mt-3 text-sm">
-				<a
-					href={resolve('/campaigns/[id]/commissions', { id: campaign.id })}
-					class="font-medium text-blue-700 hover:underline">Commission rules →</a
-				>
+		{#if data.can.viewCommissions || data.can.loadBonds}
+			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+				{#if data.can.loadBonds}
+					<a
+						href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Load bonds →</a
+					>
+				{/if}
+				{#if data.can.viewCommissions}
+					<a
+						href={resolve('/campaigns/[id]/commissions', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Commission rules →</a
+					>
+				{/if}
 			</nav>
 		{/if}
 	</div>
@@ -114,12 +123,22 @@
 		{#if rulesFrozen}
 			<div class="mt-4">
 				<FormAlert kind="warning">
-					<p>
-						<strong>Rules are frozen.</strong> This campaign is {CAMPAIGN_STATUS_LABELS[
-							campaign.status
-						].toLowerCase()}, and rules (price, installments, numbering, overflow policy and barcode
-						mode) can only be changed while a campaign is a draft. They are shown read-only above.
-					</p>
+					{#if frozenByStatus}
+						<p>
+							<strong>Rules are frozen.</strong> This campaign is {CAMPAIGN_STATUS_LABELS[
+								campaign.status
+							].toLowerCase()}, and rules (price, installments, numbering, overflow policy and
+							barcode mode) can only be changed while a campaign is a draft. They are shown
+							read-only above.
+						</p>
+					{:else}
+						<p>
+							<strong>Rules are frozen.</strong> This campaign already has bonds, and their numbers and
+							values depend on the rules (price, installments, numbering, overflow policy and barcode
+							mode), so they can no longer be changed, even though the campaign is still a draft. They
+							are shown read-only above.
+						</p>
+					{/if}
 				</FormAlert>
 			</div>
 		{:else if !data.can.editRules}

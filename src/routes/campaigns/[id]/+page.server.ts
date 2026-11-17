@@ -6,6 +6,7 @@ import {
 	canEditCampaignDates,
 	canEditCampaignName,
 	canEditCampaignRules,
+	canLoadBonds,
 	CAMPAIGN_TRANSITION_PERMISSIONS,
 	keepTimestampIfSameDay
 } from '$lib/domain/campaigns';
@@ -18,6 +19,7 @@ import {
 	checkCampaignActionPermission,
 	requireCampaignViewer
 } from '$lib/server/campaigns/route-helpers';
+import { campaignHasBonds } from '$lib/server/repositories/bonds';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
 	CAMPAIGN_MESSAGES,
@@ -50,7 +52,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	}
 
-	const result = await getCampaignById(locals.supabase, params.id);
+	const [result, bondsResult] = await Promise.all([
+		getCampaignById(locals.supabase, params.id),
+		campaignHasBonds(locals.supabase, params.id)
+	]);
 	if (result.error) {
 		console.error('[campaigns] load failed', {
 			requestId: locals.requestId,
@@ -62,22 +67,36 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!result.data) {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	}
+	// UI hint only (the database rejects a rules change once a bond exists): if the lookup fails
+	// the page still renders, as if there were no bonds.
+	if (bondsResult.error) {
+		console.error('[campaigns] bond lookup failed', {
+			requestId: locals.requestId,
+			campaignId: params.id,
+			error: bondsResult.error
+		});
+	}
 
 	const campaign = result.data;
+	const hasBonds = bondsResult.data ?? false;
 	const permissions = locals.permissions ?? [];
 	const canUpdate = hasPermissionIn(permissions, 'campaign.update');
 
 	// UI hints only: the SQL functions enforce permissions and edit windows.
 	return {
 		campaign,
+		/** Once a campaign has a bond (annulled ones included) its rules are frozen, even in draft. */
+		hasBonds,
 		can: {
 			editName: canUpdate && canEditCampaignName(campaign.status),
 			editDates: canUpdate && canEditCampaignDates(campaign.status),
 			editRules:
 				hasPermissionIn(permissions, 'campaign.update_rules') &&
-				canEditCampaignRules(campaign.status),
+				canEditCampaignRules(campaign.status) &&
+				!hasBonds,
 			transitions: availableCampaignTransitions(campaign.status, permissions),
-			viewCommissions: hasPermissionIn(permissions, 'commission.view')
+			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
+			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status)
 		}
 	};
 };

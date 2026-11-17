@@ -48,26 +48,44 @@ export function campaignRow(overrides: Partial<CampaignRow> = {}): CampaignRow {
 type QueryResult = { data: unknown; error: unknown };
 
 /**
- * Minimal Supabase mock: `from('campaigns')` select chains resolve to `query`, `rpc()` resolves
- * to `rpc` (both overridable per test through the returned spies).
+ * Minimal Supabase mock: `from(table)` select chains resolve to `tables[table]` when given, else
+ * to `query`; `rpc()` resolves to `rpc` (all overridable per test through the returned spies).
+ * `chain` is the chain of the last `from()` call.
  */
-export function mockSupabase(options: { query?: QueryResult; rpc?: QueryResult } = {}) {
+export function mockSupabase(
+	options: { query?: QueryResult; rpc?: QueryResult; tables?: Record<string, QueryResult> } = {}
+) {
 	const query = options.query ?? { data: null, error: null };
-	const overrideTypes = vi.fn().mockResolvedValue(query);
-	const chain = {
-		select: vi.fn(),
-		order: vi.fn(),
-		eq: vi.fn(),
-		maybeSingle: vi.fn(),
-		overrideTypes
+	const makeChain = (result: QueryResult) => {
+		const chain = {
+			select: vi.fn(),
+			order: vi.fn(),
+			eq: vi.fn(),
+			limit: vi.fn(),
+			maybeSingle: vi.fn(),
+			overrideTypes: vi.fn().mockResolvedValue(result)
+		};
+		chain.select.mockReturnValue(chain);
+		chain.order.mockReturnValue(chain);
+		chain.eq.mockReturnValue(chain);
+		chain.limit.mockReturnValue(chain);
+		chain.maybeSingle.mockReturnValue(chain);
+		return chain;
 	};
-	chain.select.mockReturnValue(chain);
-	chain.order.mockReturnValue(chain);
-	chain.eq.mockReturnValue(chain);
-	chain.maybeSingle.mockReturnValue(chain);
-	const from = vi.fn().mockReturnValue(chain);
+	let chain = makeChain(query);
+	const from = vi.fn((table: string) => {
+		chain = makeChain(options.tables?.[table] ?? query);
+		return chain;
+	});
 	const rpc = vi.fn().mockResolvedValue(options.rpc ?? { data: null, error: null });
-	return { supabase: { from, rpc } as unknown as SupabaseClient, from, rpc, chain };
+	return {
+		supabase: { from, rpc } as unknown as SupabaseClient,
+		from,
+		rpc,
+		get chain() {
+			return chain;
+		}
+	};
 }
 
 export function makeLocals(options: {

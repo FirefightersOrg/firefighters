@@ -327,3 +327,23 @@ export async function listBondNumbersByCampaign(
 		return { data: null, error: err as Error };
 	}
 }
+
+/**
+ * Whether the campaign has at least one bond (annulled ones included, like the
+ * `campaigns_rules_frozen_with_bonds` trigger): once it does, its rules are frozen even in draft.
+ * Reads one id at most. Under RLS this needs `bond.view`; without it the answer is `false` and the
+ * database still rejects a rules change.
+ */
+export async function campaignHasBonds(
+	supabase: SupabaseClient,
+	campaignId: string
+): Promise<RepositoryResult<boolean>> {
+	const { data, error } = await supabase
+		.from('bonds')
+		.select('id')
+		.eq('campaign_id', campaignId)
+		.limit(1)
+		.overrideTypes<{ id: string }[], { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: (data ?? []).length > 0, error: null };
+}

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	BOND_COLUMNS,
 	BOND_NUMBERS_PAGE_SIZE,
+	campaignHasBonds,
 	getBondById,
 	listBondNumbersByCampaign,
 	mapBondRow,
@@ -63,7 +64,7 @@ const groupRow: BondGroupRow = {
 function queryMock(results: Array<{ data: unknown; error: unknown }>) {
 	const calls: Array<[string, unknown[]]> = [];
 	const builder: Record<string, unknown> = {};
-	for (const method of ['select', 'eq', 'is', 'or', 'order', 'range', 'maybeSingle']) {
+	for (const method of ['select', 'eq', 'is', 'or', 'order', 'range', 'limit', 'maybeSingle']) {
 		builder[method] = (...args: unknown[]) => {
 			calls.push([method, args]);
 			return builder;
@@ -78,6 +79,30 @@ function queryMock(results: Array<{ data: unknown; error: unknown }>) {
 }
 
 describe('bonds repository', () => {
+	it('tells whether a campaign has any bond, reading one id at most', async () => {
+		const withBonds = queryMock([{ data: [{ id: BOND_ID }], error: null }]);
+		await expect(campaignHasBonds(withBonds.supabase, CAMPAIGN_ID)).resolves.toEqual({
+			data: true,
+			error: null
+		});
+		expect(withBonds.calls).toEqual([
+			['from', ['bonds']],
+			['select', ['id']],
+			['eq', ['campaign_id', CAMPAIGN_ID]],
+			['limit', [1]]
+		]);
+
+		await expect(
+			campaignHasBonds(queryMock([{ data: [], error: null }]).supabase, CAMPAIGN_ID)
+		).resolves.toEqual({ data: false, error: null });
+		await expect(
+			campaignHasBonds(
+				queryMock([{ data: null, error: { message: 'boom' } }]).supabase,
+				CAMPAIGN_ID
+			)
+		).resolves.toEqual({ data: null, error: { message: 'boom' } });
+	});
+
 	it('selects money as text and maps rows', () => {
 		expect(BOND_COLUMNS).toContain('total_value::text');
 		expect(mapBondRow({ ...bondRow, total_value: 60000 }).totalValue).toBe('60000.00');
