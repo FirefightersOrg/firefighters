@@ -221,6 +221,17 @@ describe('mapCampaignRpcError', () => {
 		],
 		[
 			{
+				code: '55000',
+				message:
+					'installment count cannot be lowered below 5 while an active commission rule applies to installment 5'
+			},
+			'validation',
+			400,
+			'A commission rule applies to installment 5. Use at least 5 installments, or edit or annul that commission rule first.',
+			'installmentCount'
+		],
+		[
+			{
 				code: 'PT409',
 				message: 'campaign was modified by someone else',
 				details: 'campaign f0000000-0000-0000-0000-000000000001: expected updated_at …',

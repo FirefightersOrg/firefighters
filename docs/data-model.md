@@ -428,19 +428,39 @@ Rule:
 
 ### commission_rules
 
-Commission rules per campaign.
+Commission rules per campaign. Implemented in SAN-20
+(`20261118000000_commission_rules.sql`; decisions in `docs/commissions.md`).
 
-Suggested fields:
+Fields:
 
 - `id`
-- `campaign_id`
-- `rule_type`
-- `installment_number`
-- `percentage`
-- `fixed_amount`
-- `applies_to_collector_id`
-- `valid_from`
-- `valid_to`
+- `campaign_id` (FK `campaigns`)
+- `rule_type`: `cash_full_payment`, `installment_first`, `installment_middle`, `installment_last`,
+  `custom`
+- `installment_number`: required (1..`campaigns.installment_count`) for `custom`, null otherwise
+- `percentage` `numeric(5,2)` (0 < p <= 100) or `fixed_amount` `numeric(14,2)` (> 0, not `NaN`): exactly one
+- `applies_to_collector_id`: null for general rules; no FK until `collectors` exists (Phase 5)
+- `valid_from`, `valid_to`: calendar days, both inclusive; `valid_to` null = open-ended
+- `status` (`active`, `annulled`), `annulled_at`, `annulled_by`, `annul_reason`
+- `created_by`, `created_at`, `updated_at`
+
+Rules:
+
+- Active general rules of the same campaign + `rule_type` (+ `installment_number`) cannot overlap
+  in validity (EXCLUDE constraint `commission_rules_no_overlap`, extension `btree_gist`).
+- Never deleted: annulled with a reason. An annulled rule always records `annulled_at`,
+  `annulled_by` and a non-blank `annul_reason`, an active one none of them (CHECK
+  `commission_rules_annulment_consistent`). Annulled rules are immutable.
+- Writable only while the campaign is `draft` or `active`, only through the audited
+  `commission_rule_*` functions (`commission.rule_manage`); readable with `commission.view`.
+- The functions reject `NaN` and `±Infinity` values with `22023` (their parameters are
+  unconstrained `numeric`); the table CHECKs reject `NaN` too.
+- Optimistic concurrency, same as campaigns: `commission_rule_update(p_id, p_rule_type,
+p_installment_number, p_percentage, p_fixed_amount, p_valid_from, p_valid_to,
+p_expected_updated_at, p_request_id, p_reason)` requires the rule's `updated_at` as loaded and
+  raises `PT409` (HTTP 409 through PostgREST) without writing (no audit row) if the rule changed
+  since. `p_valid_to` has no
+  default (pass null for open-ended). `commission_rule_annul` takes no version.
 
 ### commission_adjustments
 

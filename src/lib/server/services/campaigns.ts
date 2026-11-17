@@ -209,7 +209,18 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			return err('internal', CAMPAIGN_MESSAGES.internal);
 		}
 
-		case '55000':
+		case '55000': {
+			// SAN-20: a draft's installment count cannot drop below an active commission rule
+			// for a specific installment (campaigns_guard_commission_installments).
+			const belowRule = /installment count cannot be lowered below (\d+)/.exec(message);
+			if (belowRule) {
+				return err(
+					'validation',
+					`A commission rule applies to installment ${belowRule[1]}. Use at least ${belowRule[1]} ` +
+						'installments, or edit or annul that commission rule first.',
+					'installmentCount'
+				);
+			}
 			if (message.includes('rules can only be changed')) {
 				return err('conflict', CAMPAIGN_MESSAGES.rulesFrozen);
 			}
@@ -220,6 +231,7 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 				return err('conflict', CAMPAIGN_MESSAGES.nameFrozen);
 			}
 			return err('conflict', 'This change is not allowed in the current campaign status.');
+		}
 
 		case '23502': {
 			const column = /null value in column "([^"]+)"/.exec(message)?.[1];

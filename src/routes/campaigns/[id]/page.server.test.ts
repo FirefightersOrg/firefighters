@@ -104,7 +104,8 @@ describe('/campaigns/[id]', () => {
 				editName: true,
 				editDates: true,
 				editRules: true,
-				transitions: ['active', 'annulled']
+				transitions: ['active', 'annulled'],
+				viewCommissions: false
 			});
 		});
 
@@ -117,7 +118,8 @@ describe('/campaigns/[id]', () => {
 				editName: true,
 				editDates: true,
 				editRules: false,
-				transitions: ['closing', 'annulled']
+				transitions: ['closing', 'annulled'],
+				viewCommissions: false
 			});
 		});
 
@@ -130,8 +132,17 @@ describe('/campaigns/[id]', () => {
 				editName: true,
 				editDates: false,
 				editRules: false,
-				transitions: ['closed']
+				transitions: ['closed'],
+				viewCommissions: false
 			});
+		});
+
+		it('links to the commission rules only with commission.view', async () => {
+			const { supabase } = mockSupabase({ query: { data: campaignRow(), error: null } });
+			const data = (await load(
+				loadEvent(makeLocals({ permissions: ['campaign.view', 'commission.view'], supabase }))
+			))!;
+			expect(data.can.viewCommissions).toBe(true);
 		});
 
 		it('viewer only (operator): no edit forms and no status actions', async () => {
@@ -143,7 +154,8 @@ describe('/campaigns/[id]', () => {
 				editName: false,
 				editDates: false,
 				editRules: false,
-				transitions: []
+				transitions: [],
+				viewCommissions: false
 			});
 		});
 
