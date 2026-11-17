@@ -607,6 +607,26 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			await expectNoAudit(dbRequestId);
 		});
 
+		it('caps max number at the Postgres integer maximum (2147483647 ok, 2147483648 rejected)', async () => {
+			const requestId = rid('create-max-number-too-big');
+			const result = await createCampaignViaAction(
+				users.admin,
+				createFields('Max number too big', { numberDigits: '10', maxNumber: '2147483648' }),
+				requestId
+			);
+			expect(result.failure).toMatchObject({
+				status: 400,
+				data: { errors: { maxNumber: ['Maximum number must be at most 2147483647'] } }
+			});
+			await expectNoAudit(requestId);
+
+			const id = await adminCreatesCampaign('Max number at the cap', {
+				numberDigits: '10',
+				maxNumber: '2147483647'
+			});
+			expect(await getCampaign(id)).toMatchObject({ numberDigits: 10, maxNumber: 2147483647 });
+		});
+
 		it('numbering domain on the stored configs: 0068 -> 4939, 5129 overflows, 5-digit zero padding', async () => {
 			const four = campaignNumberingConfig(await getCampaign(mainId));
 			expect(parseCampaignNumber('0068', four)).toBe(68);
@@ -922,6 +942,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 		});
 
 		it('active -> closing -> closed; a closed campaign is immutable', async () => {
+			// Only annulling requires a reason; the other transitions take an optional one.
+			const reasons = { closing: '  Season over  ', closed: '' } as const;
 			for (const toStatus of ['closing', 'closed'] as const) {
 				const from = (await getCampaign(mainId)).status;
 				const requestId = rid(`to-${toStatus}`);
@@ -930,7 +952,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 						'transition',
 						users.admin,
 						mainId,
-						{ toStatus, reason: '' },
+						{ toStatus, reason: reasons[toStatus] },
 						requestId
 					)
 				).toMatchObject({ success: true });
@@ -938,7 +960,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					action: 'campaign.transition',
 					entity_id: mainId,
 					old_value: { status: from },
-					new_value: { status: toStatus }
+					new_value: { status: toStatus },
+					reason: toStatus === 'closing' ? 'Season over' : null
 				});
 			}
 
@@ -1647,6 +1670,21 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				validFrom: '2027-01-01',
 				validTo: '2027-06-30'
 			});
+		});
+
+		it('an annulment always records who annulled (direct write without annulled_by -> 23514)', async () => {
+			const before = await getRule(campaignId, ruleIds.cashAgain!);
+			const { error } = await serviceClient
+				.from('commission_rules')
+				.update({
+					status: 'annulled',
+					annulled_at: new Date().toISOString(),
+					annul_reason: 'Direct write'
+				})
+				.eq('id', ruleIds.cashAgain!);
+			expect(error?.code).toBe('23514');
+			expect(error?.message).toContain('commission_rules_annulment_consistent');
+			expect(await getRule(campaignId, ruleIds.cashAgain!)).toEqual(before);
 		});
 
 		it('a draft cannot lower installment_count below an active custom rule (form 400, database 55000)', async () => {
