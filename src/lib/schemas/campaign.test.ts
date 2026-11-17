@@ -13,10 +13,15 @@ import {
 	CAMPAIGN_CREATE_FIELDS,
 	CAMPAIGN_GENERAL_UPDATE_FIELDS,
 	CAMPAIGN_RULES_UPDATE_FIELDS,
+	CAMPAIGN_REASON_MAX_LENGTH,
 	CAMPAIGN_VERSION_INVALID_MESSAGE,
+	MAX_CAMPAIGN_NUMBER,
 	MAX_NUMBER_DIGITS
 } from './campaign';
-import { MAX_NUMBER_DIGITS as DOMAIN_MAX_NUMBER_DIGITS } from '$lib/domain/numbering';
+import {
+	MAX_CAMPAIGN_NUMBER as DOMAIN_MAX_CAMPAIGN_NUMBER,
+	MAX_NUMBER_DIGITS as DOMAIN_MAX_NUMBER_DIGITS
+} from '$lib/domain/numbering';
 
 const NBSP = '\u00a0';
 const MONEY_FORMAT_ERROR =
@@ -470,6 +475,33 @@ describe('MAX_NUMBER_DIGITS', () => {
 	});
 });
 
+describe('MAX_CAMPAIGN_NUMBER', () => {
+	const tenDigits = {
+		numberDigits: '10',
+		maxNumber: '2147483647',
+		associatedNumberOffset: '0',
+		overflowPolicy: 'reject'
+	};
+
+	it('comes from the numbering domain (single source of truth)', () => {
+		expect(MAX_CAMPAIGN_NUMBER).toBe(DOMAIN_MAX_CAMPAIGN_NUMBER);
+	});
+
+	it('caps maxNumber and the offset at the Postgres integer maximum, with one message each', () => {
+		expect(campaignNumberingSchema.safeParse(tenDigits).success).toBe(true);
+		for (const maxNumber of ['2147483648', '9999999999']) {
+			const errors = errorsOf(campaignNumberingSchema.safeParse({ ...tenDigits, maxNumber }));
+			expect(errors.maxNumber).toEqual([`Maximum number must be at most ${MAX_CAMPAIGN_NUMBER}`]);
+		}
+		const errors = errorsOf(
+			campaignNumberingSchema.safeParse({ ...tenDigits, associatedNumberOffset: '2147483648' })
+		);
+		expect(errors.associatedNumberOffset).toContain(
+			`Associated number offset must be at most ${MAX_CAMPAIGN_NUMBER}`
+		);
+	});
+});
+
 describe('campaignTransitionSchema', () => {
 	it('accepts the four target statuses', () => {
 		for (const toStatus of ['active', 'closing', 'closed']) {
@@ -482,6 +514,25 @@ describe('campaignTransitionSchema', () => {
 			toStatus: 'annulled',
 			reason: 'Mistake'
 		});
+	});
+
+	it('keeps an optional reason for the other transitions', () => {
+		for (const toStatus of ['active', 'closing', 'closed']) {
+			expect(campaignTransitionSchema.parse({ toStatus, reason: ' Season over ' })).toEqual({
+				toStatus,
+				reason: 'Season over'
+			});
+		}
+	});
+
+	it('limits the reason length for every transition', () => {
+		const reason = 'x'.repeat(CAMPAIGN_REASON_MAX_LENGTH + 1);
+		for (const toStatus of ['active', 'annulled']) {
+			const errors = errorsOf(campaignTransitionSchema.safeParse({ toStatus, reason }));
+			expect(errors.reason).toEqual([
+				`Reason must be at most ${CAMPAIGN_REASON_MAX_LENGTH} characters`
+			]);
+		}
 	});
 
 	it('requires a reason to annul', () => {

@@ -13,7 +13,8 @@
 	/**
 	 * A status-change button with a confirmation dialog. The dialog is an HTML popover
 	 * (`popovertarget`), so it opens without JavaScript; with JavaScript the form is enhanced.
-	 * Posts `toStatus` (and `reason`, required to annul) to the page's `?/transition` action.
+	 * Posts `toStatus` and `reason` to the page's `?/transition` action. Every transition takes a
+	 * reason (stored in the audit log); only annulment requires one.
 	 */
 	let {
 		toStatus,
@@ -62,6 +63,7 @@
 
 	const config = $derived(CONFIG[toStatus]);
 	const popoverId = $derived(`confirm-${toStatus}`);
+	const reasonRequired = $derived(toStatus === 'annulled');
 	let popover = $state<HTMLElement>();
 	let submitting = $state(false);
 </script>
@@ -109,18 +111,18 @@
 		}}
 	>
 		<input type="hidden" name="toStatus" value={toStatus} />
-		{#if toStatus === 'annulled'}
-			<div>
-				<label for="{popoverId}-reason" class={labelClass}>Reason (required)</label>
-				<textarea
-					id="{popoverId}-reason"
-					name="reason"
-					required
-					rows="3"
-					maxlength={CAMPAIGN_REASON_MAX_LENGTH}
-					class={inputClass}></textarea>
-			</div>
-		{/if}
+		<div>
+			<label for="{popoverId}-reason" class={labelClass}>
+				Reason ({reasonRequired ? 'required' : 'optional'})
+			</label>
+			<textarea
+				id="{popoverId}-reason"
+				name="reason"
+				required={reasonRequired}
+				rows="3"
+				maxlength={CAMPAIGN_REASON_MAX_LENGTH}
+				class={inputClass}></textarea>
+		</div>
 		<div class="flex flex-wrap justify-end gap-2">
 			<button
 				type="button"
