@@ -202,6 +202,13 @@ describe('mapCampaignRpcError', () => {
 			undefined
 		],
 		[
+			{ code: '55000', message: 'campaign rules cannot be changed once the campaign has bonds' },
+			'conflict',
+			409,
+			CAMPAIGN_MESSAGES.rulesFrozenByBonds,
+			undefined
+		],
+		[
 			{
 				code: '55000',
 				message:

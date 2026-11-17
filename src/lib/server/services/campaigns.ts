@@ -68,6 +68,8 @@ export const CAMPAIGN_MESSAGES = {
 		'Start and end dates cannot be removed once the campaign has been activated.',
 	rulesFrozen:
 		'Rules can only be changed while the campaign is a draft. They were frozen when the campaign was activated.',
+	rulesFrozenByBonds:
+		'Rules can no longer be changed: this campaign already has bonds, and their numbers and values depend on the rules.',
 	staleVersion:
 		'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.',
 	datesFrozen: 'Dates can only be changed while the campaign is a draft or active.',
@@ -220,6 +222,11 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 						'installments, or edit or annul that commission rule first.',
 					'installmentCount'
 				);
+			}
+			// SAN-22: once a campaign has bonds its rules are frozen, even in draft
+			// (campaigns_rules_frozen_with_bonds).
+			if (message.includes('cannot be changed once the campaign has bonds')) {
+				return err('conflict', CAMPAIGN_MESSAGES.rulesFrozenByBonds);
 			}
 			if (message.includes('rules can only be changed')) {
 				return err('conflict', CAMPAIGN_MESSAGES.rulesFrozen);
