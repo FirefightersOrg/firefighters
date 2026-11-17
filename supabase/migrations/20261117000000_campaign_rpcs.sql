@@ -27,6 +27,17 @@
 --                                           barcode mode, ...) and status-machine violations
 --                                           raised by campaigns_guard_write
 --   55000 object_not_in_prerequisite_state  edit outside its window (campaigns_guard_write)
+--   40001 serialization_failure             optimistic concurrency: campaign_update and
+--                                           campaign_update_rules require the updated_at the
+--                                           caller loaded (p_expected_updated_at); if the row
+--                                           changed since, nothing is written (no audit row)
+--
+-- Optimistic concurrency uses updated_at as the row version (set to now() by
+-- campaigns_guard_write on every write). It is compared exactly: timestamptz has microsecond
+-- precision and PostgREST serializes it with all six fractional digits, so the value the app
+-- read round-trips unchanged as long as it is passed back as the original string (never through
+-- a JavaScript Date, which keeps only milliseconds). campaign_transition does not take a
+-- version: it validates the from-status under the row lock instead.
 --
 -- No-op updates (every value equal to the stored one) write nothing, not even an audit row, and
 -- return false.
@@ -200,9 +211,32 @@ begin
 end;
 $$;
 
+-- Optimistic concurrency check, run after the row was locked (select ... for update) and before
+-- any write. Raises 40001 when the row changed since the caller loaded it.
+create function public.campaign_require_version(
+  p_campaign public.campaigns,
+  p_expected_updated_at timestamptz
+)
+returns void
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if p_campaign.updated_at is distinct from p_expected_updated_at then
+    raise exception 'campaign was modified by someone else'
+      using errcode = 'serialization_failure',
+        detail = format('campaign %s: expected updated_at %s, current %s', p_campaign.id,
+          coalesce(p_expected_updated_at::text, 'null'), p_campaign.updated_at),
+        hint = 'reload the campaign and apply the change again';
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- campaign_update: general data (name, starts_at, ends_at). Full replacement: a null date clears
 -- it (the write guard rejects clearing dates once the campaign was activated).
+-- p_expected_updated_at is the updated_at the caller loaded (40001 if the row changed since).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
 create function public.campaign_update(
@@ -210,6 +244,7 @@ create function public.campaign_update(
   p_name text,
   p_starts_at timestamptz,
   p_ends_at timestamptz,
+  p_expected_updated_at timestamptz,
   p_request_id text default null,
   p_reason text default null
 )
@@ -234,6 +269,7 @@ begin
   if not found then
     raise exception 'campaign % not found', p_id using errcode = 'no_data_found';
   end if;
+  perform public.campaign_require_version(v_old, p_expected_updated_at);
 
   if (v_old.name, v_old.starts_at, v_old.ends_at)
     is not distinct from (btrim(p_name), p_starts_at, p_ends_at)
@@ -265,6 +301,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- campaign_update_rules: numbering, installments, overflow policy and barcode mode. Full
 -- replacement; installment_value is recomputed here. Only while draft (enforced by the trigger).
+-- p_expected_updated_at is the updated_at the caller loaded (40001 if the row changed since).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
 create function public.campaign_update_rules(
@@ -276,6 +313,7 @@ create function public.campaign_update_rules(
   p_associated_number_offset integer,
   p_overflow_policy text,
   p_barcode_mode text,
+  p_expected_updated_at timestamptz,
   p_request_id text default null,
   p_reason text default null
 )
@@ -298,6 +336,7 @@ begin
   if not found then
     raise exception 'campaign % not found', p_id using errcode = 'no_data_found';
   end if;
+  perform public.campaign_require_version(v_old, p_expected_updated_at);
 
   if (
     v_old.simple_bond_value, v_old.installment_count, v_old.installment_value,
@@ -417,6 +456,8 @@ revoke all on function public.campaign_audit_snapshot(public.campaigns)
   from public, anon, authenticated, service_role;
 revoke all on function public.campaign_audit_changes(jsonb, jsonb)
   from public, anon, authenticated, service_role;
+revoke all on function public.campaign_require_version(public.campaigns, timestamptz)
+  from public, anon, authenticated, service_role;
 
 revoke all on function public.campaign_create(
   text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text
@@ -425,16 +466,18 @@ grant execute on function public.campaign_create(
   text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text
 ) to authenticated;
 
-revoke all on function public.campaign_update(uuid, text, timestamptz, timestamptz, text, text)
-  from public, anon, service_role;
-grant execute on function public.campaign_update(uuid, text, timestamptz, timestamptz, text, text)
-  to authenticated;
+revoke all on function public.campaign_update(
+  uuid, text, timestamptz, timestamptz, timestamptz, text, text
+) from public, anon, service_role;
+grant execute on function public.campaign_update(
+  uuid, text, timestamptz, timestamptz, timestamptz, text, text
+) to authenticated;
 
 revoke all on function public.campaign_update_rules(
-  uuid, numeric, integer, integer, integer, integer, text, text, text, text
+  uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text
 ) from public, anon, service_role;
 grant execute on function public.campaign_update_rules(
-  uuid, numeric, integer, integer, integer, integer, text, text, text, text
+  uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text
 ) to authenticated;
 
 revoke all on function public.campaign_transition(uuid, text, text, text)

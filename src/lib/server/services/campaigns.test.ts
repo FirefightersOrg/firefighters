@@ -16,6 +16,9 @@ import {
 } from '$lib/schemas/campaign';
 
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';
+/** updated_at as PostgREST returns it; forwarded to the RPC unchanged. */
+const VERSION = '2026-11-17T01:02:03.123456+00:00';
+const STALE_ERROR = { code: '40001', message: 'campaign was modified by someone else' };
 
 function rpcClient(result: { data?: unknown; error?: unknown } | Error) {
 	const rpc = vi
@@ -229,6 +232,29 @@ describe('mapCampaignRpcError', () => {
 		],
 		[
 			{
+				code: '40001',
+				message: 'campaign was modified by someone else',
+				details: 'campaign f0000000-0000-0000-0000-000000000001: expected updated_at …',
+				hint: 'reload the campaign and apply the change again'
+			},
+			'conflict',
+			409,
+			CAMPAIGN_MESSAGES.staleVersion,
+			undefined
+		],
+		[
+			{
+				code: '23514',
+				message:
+					'new row for relation "campaigns" violates check constraint "campaigns_number_digits_range"'
+			},
+			'validation',
+			400,
+			'Number of digits must be between 1 and 10.',
+			'numberDigits'
+		],
+		[
+			{
 				code: '23502',
 				message:
 					'null value in column "barcode_mode" of relation "campaigns" violates not-null constraint'
@@ -337,7 +363,12 @@ describe('campaign service', () => {
 			updateCampaignGeneral(
 				supabase,
 				CAMPAIGN_ID,
-				{ name: 'Renamed', startsAt: null, endsAt: '2027-12-31T23:59:59-03:00' },
+				{
+					name: 'Renamed',
+					startsAt: null,
+					endsAt: '2027-12-31T23:59:59-03:00',
+					expectedUpdatedAt: VERSION
+				},
 				{ requestId: 'req-2' }
 			)
 		).resolves.toBe(false);
@@ -346,6 +377,7 @@ describe('campaign service', () => {
 			p_name: 'Renamed',
 			p_starts_at: null,
 			p_ends_at: '2027-12-31T23:59:59-03:00',
+			p_expected_updated_at: VERSION,
 			p_request_id: 'req-2'
 		});
 	});
@@ -359,7 +391,8 @@ describe('campaign service', () => {
 			maxNumber: '99999',
 			associatedNumberOffset: '4871',
 			overflowPolicy: 'reject',
-			barcodeMode: 'manual_mapping'
+			barcodeMode: 'manual_mapping',
+			expectedUpdatedAt: VERSION
 		});
 		await expect(updateCampaignRules(supabase, CAMPAIGN_ID, input)).resolves.toBe(true);
 		expect(rpc).toHaveBeenCalledWith('campaign_update_rules', {
@@ -371,6 +404,7 @@ describe('campaign service', () => {
 			p_associated_number_offset: 4871,
 			p_overflow_policy: 'reject',
 			p_barcode_mode: 'manual_mapping',
+			p_expected_updated_at: VERSION,
 			p_request_id: null,
 			p_reason: null
 		});
@@ -387,13 +421,59 @@ describe('campaign service', () => {
 			overflowPolicy: 'reject',
 			barcodeMode: 'base_number',
 			changeReason: '  Board decision ',
-			confirmRulesChange: 'yes'
+			confirmRulesChange: 'yes',
+			expectedUpdatedAt: VERSION
 		});
 		await updateCampaignRules(supabase, CAMPAIGN_ID, input, { requestId: 'req-r' });
 		expect(rpc).toHaveBeenCalledWith(
 			'campaign_update_rules',
-			expect.objectContaining({ p_reason: 'Board decision', p_request_id: 'req-r' })
+			expect.objectContaining({
+				p_reason: 'Board decision',
+				p_expected_updated_at: VERSION,
+				p_request_id: 'req-r'
+			})
 		);
+	});
+
+	it.each([
+		[
+			'updateCampaignGeneral',
+			() =>
+				updateCampaignGeneral(rpcClient({ error: STALE_ERROR }).supabase, CAMPAIGN_ID, {
+					name: 'Renamed',
+					startsAt: null,
+					endsAt: null,
+					expectedUpdatedAt: VERSION
+				})
+		],
+		[
+			'updateCampaignRules',
+			() =>
+				updateCampaignRules(
+					rpcClient({ error: STALE_ERROR }).supabase,
+					CAMPAIGN_ID,
+					campaignRulesSchema.parse({
+						simpleBondValue: '60000',
+						installmentCount: '10',
+						numberDigits: '4',
+						maxNumber: '9999',
+						associatedNumberOffset: '4871',
+						overflowPolicy: 'reject',
+						barcodeMode: 'base_number',
+						expectedUpdatedAt: VERSION
+					})
+				)
+		]
+	])('%s maps a stale version (40001) to a 409 conflict asking to reload', async (_name, call) => {
+		const err = await call().catch((e) => e);
+		expect(err).toBeInstanceOf(CampaignServiceError);
+		expect(err).toMatchObject({
+			kind: 'conflict',
+			status: 409,
+			message: CAMPAIGN_MESSAGES.staleVersion
+		});
+		expect(err.message).toMatch(/changed by someone else.*Reload the page/);
+		expect(console.error).not.toHaveBeenCalled();
 	});
 
 	it('transitionCampaign passes the target status and reason', async () => {

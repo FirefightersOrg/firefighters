@@ -12,6 +12,8 @@ import { commissionRuleSchema } from '$lib/schemas/commission-rule';
 
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';
 const RULE_ID = 'a0000000-0000-0000-0000-000000000001';
+/** updated_at as PostgREST returns it; forwarded to the RPC unchanged. */
+const VERSION = '2026-11-17T01:02:03.123456+00:00';
 
 function rpcClient(result: { data?: unknown; error?: unknown } | Error) {
 	const rpc = vi
@@ -171,6 +173,31 @@ describe('mapCommissionRuleRpcError', () => {
 			undefined
 		],
 		[
+			{
+				code: '40001',
+				message: 'commission rule was modified by someone else',
+				details: `commission rule ${RULE_ID}: expected updated_at …`
+			},
+			'conflict',
+			409,
+			COMMISSION_RULE_MESSAGES.staleVersion,
+			undefined
+		],
+		[
+			{ code: '22023', message: 'fixed amount must be a finite number' },
+			'validation',
+			400,
+			'Fixed amount must be a finite number.',
+			'fixedAmount'
+		],
+		[
+			{ code: '22023', message: 'percentage must be a finite number' },
+			'validation',
+			400,
+			'Percentage must be a finite number.',
+			'percentage'
+		],
+		[
 			{ code: 'XX000', message: 'boom' },
 			'internal',
 			500,
@@ -220,13 +247,37 @@ describe('commission rule service', () => {
 
 	it('updates a rule and reports whether something changed', async () => {
 		const { supabase, rpc } = rpcClient({ data: false });
-		await expect(updateCommissionRule(supabase, { ...input, ruleId: RULE_ID })).resolves.toBe(
-			false
-		);
+		await expect(
+			updateCommissionRule(supabase, { ...input, ruleId: RULE_ID, expectedUpdatedAt: VERSION })
+		).resolves.toBe(false);
 		expect(rpc).toHaveBeenCalledWith(
 			'commission_rule_update',
-			expect.objectContaining({ p_id: RULE_ID, p_percentage: '12.50', p_request_id: null })
+			expect.objectContaining({
+				p_id: RULE_ID,
+				p_percentage: '12.50',
+				p_expected_updated_at: VERSION,
+				p_request_id: null
+			})
 		);
+	});
+
+	it('maps a stale version (40001) to a 409 conflict asking to reload', async () => {
+		const { supabase } = rpcClient({
+			error: { code: '40001', message: 'commission rule was modified by someone else' }
+		});
+		const err = await updateCommissionRule(supabase, {
+			...input,
+			ruleId: RULE_ID,
+			expectedUpdatedAt: VERSION
+		}).catch((e) => e);
+		expect(err).toBeInstanceOf(CommissionRuleServiceError);
+		expect(err).toMatchObject({
+			kind: 'conflict',
+			status: 409,
+			message: COMMISSION_RULE_MESSAGES.staleVersion
+		});
+		expect(err.message).toMatch(/changed by someone else.*Reload the page/);
+		expect(console.error).not.toHaveBeenCalled();
 	});
 
 	it('annuls a rule with its reason', async () => {

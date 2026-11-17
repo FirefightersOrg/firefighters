@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import {
+	COMMISSION_RULE_VERSION_FIELD,
 	commissionRuleFieldErrors,
 	type CommissionRuleFieldErrors
 } from '$lib/schemas/commission-rule';
@@ -73,18 +74,19 @@ export function commissionRuleFormSuccess(
 	return { form, success: true, message, errors: {}, ruleId };
 }
 
-/** 400 failure for a schema validation error. */
+/**
+ * 400 failure for a schema validation error. A missing or malformed version (the hidden
+ * `expectedUpdatedAt` field, which has no visible input) is reported as the form message.
+ */
 export function commissionRuleValidationFailure(
 	form: CommissionRuleFormName,
 	error: z.ZodError,
 	values: Record<string, string>,
 	ruleId?: string
 ) {
-	return commissionRuleFormFailure(form, 400, FIX_FIELDS_MESSAGE, {
-		errors: commissionRuleFieldErrors(error),
-		values,
-		ruleId
-	});
+	const errors = commissionRuleFieldErrors(error);
+	const message = errors[COMMISSION_RULE_VERSION_FIELD]?.[0] ?? FIX_FIELDS_MESSAGE;
+	return commissionRuleFormFailure(form, 400, message, { errors, values, ruleId });
 }
 
 /** Maps an error thrown by the commission rule service to a `fail()` result. Others rethrow. */

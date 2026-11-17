@@ -1,5 +1,5 @@
 begin;
-select plan(120);
+select plan(138);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -62,6 +62,17 @@ grant execute on function pg_temp.act_as(int) to authenticated, anon;
 create temporary table ids (k text primary key, id uuid not null);
 grant select, insert on ids to authenticated;
 
+-- Current versions (updated_at), as the app would have loaded them. They run as the caller, so
+-- they return null for users who cannot see the row (those are denied before the version check).
+create function pg_temp.rule_version(p_k text) returns timestamptz language sql stable as $$
+  select r.updated_at from public.commission_rules r join ids on ids.id = r.id where ids.k = p_k;
+$$;
+create function pg_temp.campaign_version(p_k text) returns timestamptz language sql stable as $$
+  select c.updated_at from public.campaigns c join ids on ids.id = c.id where ids.k = p_k;
+$$;
+grant execute on function pg_temp.rule_version(text) to authenticated;
+grant execute on function pg_temp.campaign_version(text) to authenticated;
+
 -- Campaigns (as the admin): 10 installments, with dates so they can be activated.
 set local role authenticated;
 select pg_temp.act_as(1);
@@ -114,16 +125,16 @@ select ok(
 );
 select ok(
   has_function_privilege('authenticated', 'public.commission_rule_create(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
-  and has_function_privilege('authenticated', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
+  and has_function_privilege('authenticated', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, timestamptz, text, text)', 'execute')
   and has_function_privilege('authenticated', 'public.commission_rule_annul(uuid, text, text)', 'execute'),
   'authenticated can execute the three commission rule functions'
 );
 select ok(
   not has_function_privilege('anon', 'public.commission_rule_create(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
-  and not has_function_privilege('anon', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
+  and not has_function_privilege('anon', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, timestamptz, text, text)', 'execute')
   and not has_function_privilege('anon', 'public.commission_rule_annul(uuid, text, text)', 'execute')
   and not has_function_privilege('service_role', 'public.commission_rule_create(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
-  and not has_function_privilege('service_role', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, text, text)', 'execute')
+  and not has_function_privilege('service_role', 'public.commission_rule_update(uuid, text, integer, numeric, numeric, date, date, timestamptz, text, text)', 'execute')
   and not has_function_privilege('service_role', 'public.commission_rule_annul(uuid, text, text)', 'execute'),
   'anon and service_role cannot execute the commission rule functions'
 );
@@ -205,6 +216,19 @@ select throws_ok(
     values ((select id from ids where k = 'c-draft'), 'cash_full_payment', 0, '2026-01-01')$$,
   '23514', 'new row for relation "commission_rules" violates check constraint "commission_rules_fixed_amount_positive"',
   'constraint: fixed amount must be positive'
+);
+-- numeric accepts 'NaN', which compares greater than every number (NaN > 0 is true).
+select throws_ok(
+  $$insert into public.commission_rules (campaign_id, rule_type, fixed_amount, valid_from)
+    values ((select id from ids where k = 'c-draft'), 'cash_full_payment', 'NaN', '2026-01-01')$$,
+  '23514', 'new row for relation "commission_rules" violates check constraint "commission_rules_fixed_amount_positive"',
+  'constraint: fixed amount NaN is rejected'
+);
+select throws_ok(
+  $$insert into public.commission_rules (campaign_id, rule_type, percentage, valid_from)
+    values ((select id from ids where k = 'c-draft'), 'cash_full_payment', 'NaN', '2026-01-01')$$,
+  '23514', 'new row for relation "commission_rules" violates check constraint "commission_rules_percentage_range"',
+  'constraint: percentage NaN is rejected (NaN <= 100 is false)'
 );
 select throws_ok(
   $$insert into public.commission_rules (campaign_id, rule_type, percentage, valid_from)
@@ -362,6 +386,22 @@ select throws_ok(
   '22023', 'fixed amount must have at most 2 decimal places', 'create: fixed amount with 3 decimals'
 );
 select throws_ok(
+  $$select public.commission_rule_create((select id from ids where k = 'c-draft'), 'installment_last', null, null, 'NaN', '2026-01-01', null, 'req-bad')$$,
+  '22023', 'fixed amount must be a finite number', 'create: fixed amount NaN is rejected'
+);
+select throws_ok(
+  $$select public.commission_rule_create((select id from ids where k = 'c-draft'), 'installment_last', null, null, 'Infinity', '2026-01-01', null, 'req-bad')$$,
+  '22023', 'fixed amount must be a finite number', 'create: fixed amount Infinity is rejected'
+);
+select throws_ok(
+  $$select public.commission_rule_create((select id from ids where k = 'c-draft'), 'installment_last', null, 'NaN', null, '2026-01-01', null, 'req-bad')$$,
+  '22023', 'percentage must be a finite number', 'create: percentage NaN is rejected'
+);
+select throws_ok(
+  $$select public.commission_rule_create((select id from ids where k = 'c-draft'), 'installment_last', null, '-Infinity', null, '2026-01-01', null, 'req-bad')$$,
+  '22023', 'percentage must be a finite number', 'create: percentage -Infinity is rejected'
+);
+select throws_ok(
   $$select public.commission_rule_create((select id from ids where k = 'c-draft'), 'custom', null, 10, null, '2026-01-01', null, 'req-bad')$$,
   '22023', 'installment number is required for custom rules', 'create: custom without installment'
 );
@@ -511,12 +551,12 @@ set local role authenticated;
 select pg_temp.act_as(1);
 select is(
   public.commission_rule_update((select id from ids where k = 'r-first'), 'installment_first', null, null, 1750.5,
-    '2026-01-01', null, 'req-update-1', 'New agreement'),
+    '2026-01-01', null, pg_temp.rule_version('r-first'), 'req-update-1', 'New agreement'),
   true, 'update: admin changes the fixed amount (returns true)'
 );
 select is(
   public.commission_rule_update((select id from ids where k = 'r-first'), 'installment_first', null, null, 1750.50,
-    '2026-01-01', null, 'req-update-noop'),
+    '2026-01-01', null, pg_temp.rule_version('r-first'), 'req-update-noop'),
   false, 'update: same values is a no-op (returns false)'
 );
 reset role;
@@ -540,36 +580,111 @@ set local role authenticated;
 select pg_temp.act_as(1);
 select is(
   public.commission_rule_update((select id from ids where k = 'r-first'), 'installment_first', null, 3, null,
-    '2026-01-01', '2026-12-31', 'req-update-2'),
+    '2026-01-01', '2026-12-31', pg_temp.rule_version('r-first'), 'req-update-2'),
   true, 'update: switch from fixed amount to percentage and set an end date'
 );
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 25, null, '2026-01-01', '2026-04-01', 'req-update-bad')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 25, null, '2026-01-01', '2026-04-01', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
   '23P01', 'conflicting key value violates exclusion constraint "commission_rules_no_overlap"',
   'update: extending into the next rule is rejected'
 );
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 25, 5, '2026-01-01', '2026-03-31', 'req-update-bad')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 25, 5, '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
   '22023', 'exactly one of percentage or fixed amount is required', 'update: input is validated'
 );
 select throws_ok(
-  $$select public.commission_rule_update('b7000000-0000-0000-0000-0000000000ff', 'cash_full_payment', null, 25, null, '2026-01-01', null, 'req-update-bad')$$,
+  $$select public.commission_rule_update('b7000000-0000-0000-0000-0000000000ff', 'cash_full_payment', null, 25, null, '2026-01-01', null, now(), 'req-update-bad')$$,
   'P0002', 'commission rule b7000000-0000-0000-0000-0000000000ff not found', 'update: unknown rule'
 );
 select pg_temp.act_as(2);
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', 'req-update-bad')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
   '42501', 'permission denied: commission.rule_manage is required', 'update: operator is denied'
 );
 select pg_temp.act_as(3);
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', 'req-update-bad')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
   '42501', 'permission denied: commission.rule_manage is required', 'update: treasurer is denied'
+);
+select pg_temp.act_as(1);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, null, 'NaN', '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
+  '22023', 'fixed amount must be a finite number', 'update: fixed amount NaN is rejected'
+);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 'NaN', null, '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-update-bad')$$,
+  '22023', 'percentage must be a finite number', 'update: percentage NaN is rejected'
 );
 reset role;
 select is(
   (select count(*)::int from public.audit_log where request_id = 'req-update-bad'),
   0, 'update: rejected calls write no audit row'
+);
+
+-- Optimistic concurrency (updated_at as version). All writes here share one transaction (so one
+-- now()): 'r-ver' first gets an older updated_at with microseconds, written with the guard
+-- trigger (which forces now()) disabled for that fixture update only.
+set local role authenticated;
+select pg_temp.act_as(1);
+insert into ids select 'r-ver', public.commission_rule_create(
+  (select id from ids where k = 'c-active'), 'installment_first', null, 5, null, '2026-01-01', null, 'req-ver-fixture');
+reset role;
+alter table public.commission_rules disable trigger commission_rules_guard_write;
+update public.commission_rules set updated_at = '2026-01-01 10:00:00.123456+00'
+where id = (select id from ids where k = 'r-ver');
+alter table public.commission_rules enable trigger commission_rules_guard_write;
+
+set local role authenticated;
+select pg_temp.act_as(1);
+select throws_ok(
+  $$select public.commission_rule_update(p_id => (select id from ids where k = 'r-ver'), p_rule_type => 'installment_first',
+      p_installment_number => null, p_percentage => 6, p_fixed_amount => null, p_valid_from => '2026-01-01',
+      p_valid_to => null, p_request_id => 'req-ver-bad')$$,
+  '42883', null, 'version: commission_rule_update without p_expected_updated_at does not resolve (required)'
+);
+select is(
+  public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 6, null,
+    '2026-01-01', null, (select to_json(pg_temp.rule_version('r-ver')) #>> '{}')::timestamptz, 'req-ver-fresh'),
+  true, 'version: update with the loaded version (sent back as its JSON text) succeeds'
+);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
+      '2026-01-01', null, '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
+  '40001', 'commission rule was modified by someone else', 'version: update with a stale version is rejected (40001)'
+);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 6, null,
+      '2026-01-01', null, '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
+  '40001', 'commission rule was modified by someone else', 'version: a stale no-op is rejected too'
+);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
+      '2026-01-01', null, pg_temp.rule_version('r-ver') - interval '1 microsecond', 'req-ver-stale')$$,
+  '40001', 'commission rule was modified by someone else', 'version: the comparison is exact (1 microsecond off is stale)'
+);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
+      '2026-01-01', null, null, 'req-ver-stale')$$,
+  '40001', 'commission rule was modified by someone else', 'version: a null version is never current'
+);
+select pg_temp.act_as(2);
+select throws_ok(
+  $$select public.commission_rule_update((select id from ids where k = 'r-ver'), 'installment_first', null, 7, null,
+      '2026-01-01', null, '2026-01-01 10:00:00.123456+00', 'req-ver-bad')$$,
+  '42501', 'permission denied: commission.rule_manage is required', 'version: permission is checked before the version'
+);
+reset role;
+select is(
+  (select percentage from public.commission_rules r join ids on ids.id = r.id and ids.k = 'r-ver'),
+  6.00::numeric, 'version: stale calls left the rule as the fresh save wrote it'
+);
+select is(
+  (select count(*)::int from public.audit_log where request_id in ('req-ver-stale', 'req-ver-bad')),
+  0, 'version: stale and rejected calls write no audit row'
+);
+select is(
+  (select count(*)::int from public.audit_log where request_id = 'req-ver-fresh' and action = 'commission_rule.update'),
+  1, 'version: the fresh save wrote exactly one audit row'
 );
 
 -- ---------------------------------------------------------------------------
@@ -622,7 +737,7 @@ select throws_ok(
   '55000', null, 'annul: annulling twice is rejected (no second audit row)'
 );
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', 'req-annul-2')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-cash-q1'), 'cash_full_payment', null, 30, null, '2026-01-01', '2026-03-31', pg_temp.rule_version('r-cash-q1'), 'req-annul-2')$$,
   '55000', null, 'annul: an annulled rule cannot be edited'
 );
 select lives_ok(
@@ -651,7 +766,7 @@ select throws_ok(
   'status: no new rules once the campaign is closing'
 );
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-closing'), 'installment_last', null, 15, null, '2026-01-01', null, 'req-closing')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-closing'), 'installment_last', null, 15, null, '2026-01-01', null, pg_temp.rule_version('r-closing'), 'req-closing')$$,
   '55000', 'commission rules can only be changed while the campaign is draft or active (status: closing)',
   'status: no edits once the campaign is closing'
 );
@@ -662,7 +777,7 @@ select throws_ok(
 );
 select is(
   public.commission_rule_update((select id from ids where k = 'r-active-campaign'), 'installment_last', null, 11, null,
-    '2026-01-01', null, 'req-active'),
+    '2026-01-01', null, pg_temp.rule_version('r-active-campaign'), 'req-active'),
   true, 'status: rules of an active campaign can still be edited'
 );
 reset role;
@@ -673,12 +788,12 @@ reset role;
 set local role authenticated;
 select pg_temp.act_as(1);
 select throws_ok(
-  $$select public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 4, 4, 9999, 4871, 'reject', 'base_number', 'req-shrink')$$,
+  $$select public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 4, 4, 9999, 4871, 'reject', 'base_number', pg_temp.campaign_version('c-draft'), 'req-shrink')$$,
   '55000', 'installment count cannot be lowered below 5 while an active commission rule applies to installment 5',
   'campaign: installments cannot drop below a custom rule installment'
 );
 select is(
-  public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 5, 4, 9999, 4871, 'reject', 'base_number', 'req-shrink'),
+  public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 5, 4, 9999, 4871, 'reject', 'base_number', pg_temp.campaign_version('c-draft'), 'req-shrink'),
   true, 'campaign: installments can drop down to the highest custom rule installment'
 );
 reset role;
@@ -756,7 +871,7 @@ select throws_ok(
   'P0001', 'audit rejected', 'atomicity: audit failure aborts create'
 );
 select throws_ok(
-  $$select public.commission_rule_update((select id from ids where k = 'r-half'), 'installment_middle', null, 13, null, '2026-01-01', null, 'req-atomic')$$,
+  $$select public.commission_rule_update((select id from ids where k = 'r-half'), 'installment_middle', null, 13, null, '2026-01-01', null, pg_temp.rule_version('r-half'), 'req-atomic')$$,
   'P0001', 'audit rejected', 'atomicity: audit failure aborts update'
 );
 select throws_ok(

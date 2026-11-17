@@ -3,12 +3,17 @@ import {
 	commissionRuleAnnulSchema,
 	commissionRuleFieldErrors,
 	commissionRuleSchema,
-	commissionRuleUpdateSchema
+	commissionRuleUpdateSchema,
+	COMMISSION_RULE_FIELDS,
+	COMMISSION_RULE_UPDATE_FIELDS,
+	COMMISSION_RULE_VERSION_INVALID_MESSAGE
 } from './commission-rule';
 import { MONEY_INPUT_FORMAT_MESSAGE } from '$lib/domain/money';
 import { PERCENT_INPUT_FORMAT_MESSAGE } from '$lib/domain/percent';
 
 const RULE_ID = 'a0000000-0000-0000-0000-000000000001';
+/** updated_at as PostgREST returns it (microseconds, explicit offset). */
+const VERSION = '2026-11-17T01:02:03.123456+00:00';
 
 const base = {
 	ruleType: 'cash_full_payment',
@@ -148,17 +153,41 @@ describe('commissionRuleSchema', () => {
 });
 
 describe('commissionRuleUpdateSchema', () => {
-	it('adds the rule id', () => {
-		expect(commissionRuleUpdateSchema(10).parse({ ...base, ruleId: RULE_ID })).toMatchObject({
+	it('adds the rule id and the exact version string', () => {
+		expect(
+			commissionRuleUpdateSchema(10).parse({ ...base, ruleId: RULE_ID, expectedUpdatedAt: VERSION })
+		).toMatchObject({
 			ruleId: RULE_ID,
+			expectedUpdatedAt: VERSION,
 			percentage: '25.00'
 		});
 	});
 
 	it('rejects a malformed rule id', () => {
 		expect(
-			errorsOf({ ...base, ruleId: 'nope' }, commissionRuleUpdateSchema(10) as never).ruleId
+			errorsOf(
+				{ ...base, ruleId: 'nope', expectedUpdatedAt: VERSION },
+				commissionRuleUpdateSchema(10) as never
+			).ruleId
 		).toEqual(['Unknown commission rule']);
+	});
+
+	it.each([
+		['missing', undefined],
+		['empty', ''],
+		['date only', '2026-11-17'],
+		['no offset', '2026-11-17T01:02:03.123456']
+	])('requires a valid version (%s)', (_label, expectedUpdatedAt) => {
+		const input: Record<string, string> = { ...base, ruleId: RULE_ID };
+		if (expectedUpdatedAt !== undefined) input.expectedUpdatedAt = expectedUpdatedAt;
+		expect(errorsOf(input, commissionRuleUpdateSchema(10) as never)).toEqual({
+			expectedUpdatedAt: [COMMISSION_RULE_VERSION_INVALID_MESSAGE]
+		});
+	});
+
+	it('reads the version only from the edit form', () => {
+		expect(COMMISSION_RULE_UPDATE_FIELDS).toContain('expectedUpdatedAt');
+		expect(COMMISSION_RULE_FIELDS).not.toContain('expectedUpdatedAt');
 	});
 });
 
