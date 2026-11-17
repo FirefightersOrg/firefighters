@@ -155,7 +155,9 @@ Decisions:
   `active`; once it is `closing`, `closed` or `annulled` they are read-only. A draft campaign's
   `installment_count` cannot drop below an active `custom` rule's installment number.
 - **Editing**: active rules can be edited (type, installment, value, dates). Every change is
-  audited with old and new values. Once settlements consume rules (Phase 9), editing a rule that
+  audited with old and new values. The edit form carries the rule's `updated_at` as loaded
+  (hidden `expectedUpdatedAt`): if someone else changed the rule meanwhile, nothing is saved and
+  the user is asked to reload (409). Once settlements consume rules (Phase 9), editing a rule that
   was already applied should probably be blocked in favor of ending it and creating a new one.
 - **Permissions**: viewing requires `commission.view` (RLS); create, edit and annul require
   `commission.rule_manage` and run through `commission_rule_create`, `commission_rule_update`

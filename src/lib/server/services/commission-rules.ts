@@ -68,7 +68,9 @@ export const COMMISSION_RULE_MESSAGES = {
 	campaignLocked: 'Commission rules can only be changed while the campaign is a draft or active.',
 	annulled: 'This rule was annulled and can no longer be changed.',
 	alreadyAnnulled: 'This rule is already annulled.',
-	reasonRequired: 'A reason is required to annul a commission rule.'
+	reasonRequired: 'A reason is required to annul a commission rule.',
+	staleVersion:
+		'This commission rule was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.'
 } as const;
 
 /** Friendly messages for the table CHECK constraints (backstops of the function checks). */
@@ -115,6 +117,10 @@ export function mapCommissionRuleRpcError(
 
 		case '23P01':
 			return err('conflict', COMMISSION_RULE_MESSAGES.overlap);
+
+		// Optimistic concurrency: the rule changed after the form was loaded (nothing written).
+		case '40001':
+			return err('conflict', COMMISSION_RULE_MESSAGES.staleVersion);
 
 		case '22023': {
 			const range = /^installment number must be between 1 and (\d+)/.exec(message);
@@ -271,7 +277,10 @@ export async function createCommissionRule(
 	return data;
 }
 
-/** Updates an active rule. Returns false when nothing changed (no audit row). */
+/**
+ * Updates an active rule. Returns false when nothing changed (no audit row). Throws a `conflict`
+ * (409) when the rule changed since `input.expectedUpdatedAt` (nothing written).
+ */
 export async function updateCommissionRule(
 	supabase: SupabaseClient,
 	input: CommissionRuleUpdateInput,
@@ -280,7 +289,13 @@ export async function updateCommissionRule(
 	const data = await callCommissionRuleRpc(
 		supabase,
 		'commission_rule_update',
-		{ p_id: input.ruleId, ...ruleArgs(input), p_request_id: ctx.requestId ?? null },
+		{
+			p_id: input.ruleId,
+			...ruleArgs(input),
+			// The exact string as loaded (microseconds); the database compares it with updated_at.
+			p_expected_updated_at: input.expectedUpdatedAt,
+			p_request_id: ctx.requestId ?? null
+		},
 		ctx
 	);
 	return data === true;

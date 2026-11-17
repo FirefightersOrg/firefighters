@@ -39,6 +39,14 @@
 --                                           lowering a campaign's installment_count below a
 --                                           custom rule's installment
 --   23001 restrict_violation                change to id/campaign_id/created_*; delete/truncate
+--   40001 serialization_failure             optimistic concurrency: commission_rule_update requires
+--                                           the updated_at the caller loaded
+--                                           (p_expected_updated_at); if the rule changed since,
+--                                           nothing is written (no audit row)
+--
+-- Optimistic concurrency uses updated_at as the rule version, exactly like campaign_update (see
+-- 20261117000000_campaign_rpcs.sql): compared exactly, passed back as the string PostgREST
+-- returned. commission_rule_annul takes no version: it rejects an already annulled rule (55000).
 
 -- btree_gist lets the EXCLUDE constraint combine equality on uuid/text/int with range overlap.
 -- Supabase keeps extensions in the `extensions` schema; default operator classes are found by
@@ -79,7 +87,11 @@ create table public.commission_rules (
   constraint commission_rules_status_check check (status in ('active', 'annulled')),
   constraint commission_rules_one_value check ((percentage is null) <> (fixed_amount is null)),
   constraint commission_rules_percentage_range check (percentage > 0 and percentage <= 100),
-  constraint commission_rules_fixed_amount_positive check (fixed_amount > 0),
+  -- numeric accepts 'NaN', which Postgres orders above every number (NaN > 0 is true): reject it
+  -- explicitly. ±Infinity is rejected by the numeric(14,2) typmod; the percentage range CHECK
+  -- already rejects NaN (NaN <= 100 is false).
+  constraint commission_rules_fixed_amount_positive
+    check (fixed_amount <> 'NaN' and fixed_amount > 0),
   constraint commission_rules_installment_number_custom check (
     case
       when rule_type = 'custom' then installment_number is not null and installment_number > 0
@@ -325,6 +337,16 @@ begin
       using errcode = 'invalid_parameter_value';
   end if;
 
+  -- The value parameters are unconstrained numeric, so NaN and ±Infinity can reach this function.
+  -- Reject them before any comparison: NaN compares greater than every number (NaN > 0 is true)
+  -- and round() does not accept infinities.
+  if p_percentage in ('NaN', 'Infinity', '-Infinity') then
+    raise exception 'percentage must be a finite number' using errcode = 'invalid_parameter_value';
+  end if;
+  if p_fixed_amount in ('NaN', 'Infinity', '-Infinity') then
+    raise exception 'fixed amount must be a finite number' using errcode = 'invalid_parameter_value';
+  end if;
+
   if (p_percentage is null) = (p_fixed_amount is null) then
     raise exception 'exactly one of percentage or fixed amount is required'
       using errcode = 'invalid_parameter_value';
@@ -442,6 +464,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- commission_rule_update: full replacement of type, installment, value and validity of an
 -- active rule. The audit row keeps only the changed keys (plus campaign_id for context).
+-- p_expected_updated_at is the updated_at the caller loaded (40001 if the rule changed since);
+-- being required, it makes p_valid_to required too (pass null for an open-ended rule).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
 create function public.commission_rule_update(
@@ -451,7 +475,8 @@ create function public.commission_rule_update(
   p_percentage numeric,
   p_fixed_amount numeric,
   p_valid_from date,
-  p_valid_to date default null,
+  p_valid_to date,
+  p_expected_updated_at timestamptz,
   p_request_id text default null,
   p_reason text default null
 )
@@ -479,6 +504,14 @@ begin
   v_campaign := public.commission_rule_lock_campaign(v_campaign_id);
 
   select * into v_old from public.commission_rules where id = p_id for update;
+  -- Optimistic concurrency: before any write or audit row.
+  if v_old.updated_at is distinct from p_expected_updated_at then
+    raise exception 'commission rule was modified by someone else'
+      using errcode = 'serialization_failure',
+        detail = format('commission rule %s: expected updated_at %s, current %s', p_id,
+          coalesce(p_expected_updated_at::text, 'null'), v_old.updated_at),
+        hint = 'reload the commission rules and apply the change again';
+  end if;
   if v_old.status = 'annulled' then
     raise exception 'commission rule % is annulled and cannot be changed', p_id
       using errcode = 'object_not_in_prerequisite_state';
@@ -609,10 +642,10 @@ grant execute on function public.commission_rule_create(
 ) to authenticated;
 
 revoke all on function public.commission_rule_update(
-  uuid, text, integer, numeric, numeric, date, date, text, text
+  uuid, text, integer, numeric, numeric, date, date, timestamptz, text, text
 ) from public, anon, service_role;
 grant execute on function public.commission_rule_update(
-  uuid, text, integer, numeric, numeric, date, date, text, text
+  uuid, text, integer, numeric, numeric, date, date, timestamptz, text, text
 ) to authenticated;
 
 revoke all on function public.commission_rule_annul(uuid, text, text)

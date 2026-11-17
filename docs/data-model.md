@@ -438,7 +438,7 @@ Fields:
 - `rule_type`: `cash_full_payment`, `installment_first`, `installment_middle`, `installment_last`,
   `custom`
 - `installment_number`: required (1..`campaigns.installment_count`) for `custom`, null otherwise
-- `percentage` `numeric(5,2)` (0 < p <= 100) or `fixed_amount` `numeric(14,2)` (> 0): exactly one
+- `percentage` `numeric(5,2)` (0 < p <= 100) or `fixed_amount` `numeric(14,2)` (> 0, not `NaN`): exactly one
 - `applies_to_collector_id`: null for general rules; no FK until `collectors` exists (Phase 5)
 - `valid_from`, `valid_to`: calendar days, both inclusive; `valid_to` null = open-ended
 - `status` (`active`, `annulled`), `annulled_at`, `annulled_by`, `annul_reason`
@@ -451,6 +451,13 @@ Rules:
 - Never deleted: annulled with a reason. Annulled rules are immutable.
 - Writable only while the campaign is `draft` or `active`, only through the audited
   `commission_rule_*` functions (`commission.rule_manage`); readable with `commission.view`.
+- The functions reject `NaN` and `±Infinity` values with `22023` (their parameters are
+  unconstrained `numeric`); the table CHECKs reject `NaN` too.
+- Optimistic concurrency, same as campaigns: `commission_rule_update(p_id, p_rule_type,
+p_installment_number, p_percentage, p_fixed_amount, p_valid_from, p_valid_to,
+p_expected_updated_at, p_request_id, p_reason)` requires the rule's `updated_at` as loaded and
+  raises `40001` without writing (no audit row) if the rule changed since. `p_valid_to` has no
+  default (pass null for open-ended). `commission_rule_annul` takes no version.
 
 ### commission_adjustments
 

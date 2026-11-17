@@ -7,6 +7,8 @@
  *   the chosen field is read: the other input may still hold text when JavaScript is off.
  * - `installmentNumber` is only read for `custom` rules (1..the campaign installment count).
  * - Dates are calendar days (`YYYY-MM-DD`), both inclusive; an empty end date = open-ended.
+ * - Edits carry `expectedUpdatedAt`: the rule's `updated_at` as loaded (optimistic concurrency),
+ *   kept as the exact string PostgREST returned (microseconds), never parsed into a `Date`.
  */
 import { z } from 'zod';
 import {
@@ -39,7 +41,13 @@ export const COMMISSION_RULE_FIELDS = [
 	'validTo',
 	'reason'
 ] as const;
-export const COMMISSION_RULE_UPDATE_FIELDS = ['ruleId', ...COMMISSION_RULE_FIELDS] as const;
+/** Hidden field of the edit form: the rule's `updated_at` as loaded (its version). */
+export const COMMISSION_RULE_VERSION_FIELD = 'expectedUpdatedAt';
+export const COMMISSION_RULE_UPDATE_FIELDS = [
+	'ruleId',
+	COMMISSION_RULE_VERSION_FIELD,
+	...COMMISSION_RULE_FIELDS
+] as const;
 export const COMMISSION_RULE_ANNUL_FIELDS = ['ruleId', 'reason'] as const;
 
 export type CommissionRuleFormField = (typeof COMMISSION_RULE_UPDATE_FIELDS)[number];
@@ -70,7 +78,21 @@ const day = (label: string) =>
 
 const ruleIdField = z.guid({ message: 'Unknown commission rule' });
 
-export type CommissionRuleUpdateInput = CommissionRuleInput & { ruleId: string };
+/** Shown when the hidden version field is missing or malformed (e.g. a form from an old page). */
+export const COMMISSION_RULE_VERSION_INVALID_MESSAGE =
+	'This form is out of date. Reload the page and try again.';
+
+/** The rule version as loaded: ISO 8601 with an offset, exactly as PostgREST returned it. */
+const versionField = z.iso.datetime({
+	offset: true,
+	message: COMMISSION_RULE_VERSION_INVALID_MESSAGE
+});
+
+export type CommissionRuleUpdateInput = CommissionRuleInput & {
+	ruleId: string;
+	/** `updated_at` the edit is based on (sent unchanged to `commission_rule_update`). */
+	expectedUpdatedAt: string;
+};
 
 export interface CommissionRuleInput {
 	ruleType: CommissionRuleType;
@@ -213,13 +235,14 @@ export function commissionRuleSchema(installmentCount: number) {
 		.transform((value): CommissionRuleInput => analyzeRule(value, installmentCount).output);
 }
 
-/** Edit: the rule id plus the rule fields. */
+/** Edit: the rule id, the version the edit is based on, plus the rule fields. */
 export function commissionRuleUpdateSchema(installmentCount: number) {
 	return z
-		.object({ ruleId: ruleIdField, ...ruleShape })
+		.object({ ruleId: ruleIdField, expectedUpdatedAt: versionField, ...ruleShape })
 		.superRefine((value, ctx) => addIssues(value, ctx, installmentCount))
-		.transform(({ ruleId, ...rule }): CommissionRuleUpdateInput => ({
+		.transform(({ ruleId, expectedUpdatedAt, ...rule }): CommissionRuleUpdateInput => ({
 			ruleId,
+			expectedUpdatedAt,
 			...analyzeRule(rule, installmentCount).output
 		}));
 }

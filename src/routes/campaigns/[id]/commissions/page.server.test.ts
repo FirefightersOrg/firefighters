@@ -12,6 +12,8 @@ import {
 import type { CommissionRuleRow } from '$lib/server/repositories/commission-rules';
 
 const RULE_ID = 'a0000000-0000-0000-0000-000000000001';
+/** The rule's updated_at as loaded (hidden `expectedUpdatedAt` field of the edit form). */
+const VERSION = '2026-11-16T12:00:00.123456+00:00';
 const OTHER_CAMPAIGN = 'f0000000-0000-0000-0000-000000000099';
 const PAGE_URL = `http://localhost:5173/campaigns/${CAMPAIGN_ID}/commissions`;
 const MANAGER = [...ADMIN_PERMISSIONS, 'commission.view', 'commission.rule_manage'];
@@ -273,7 +275,8 @@ describe('/campaigns/[id]/commissions', () => {
 			});
 			const result = (await runAction('update', makeLocals({ supabase, permissions: MANAGER }), {
 				...ruleForm,
-				ruleId: RULE_ID
+				ruleId: RULE_ID,
+				expectedUpdatedAt: VERSION
 			})) as ActionFailure;
 			expect(result.status).toBe(404);
 			expect(result.data.ruleId).toBe(RULE_ID);
@@ -285,6 +288,7 @@ describe('/campaigns/[id]/commissions', () => {
 			const result = await runAction('update', makeLocals({ supabase, permissions: MANAGER }), {
 				...ruleForm,
 				ruleId: RULE_ID,
+				expectedUpdatedAt: VERSION,
 				percentage: '12,5'
 			});
 			expect(result).toMatchObject({
@@ -294,8 +298,49 @@ describe('/campaigns/[id]/commissions', () => {
 			});
 			expect(rpc).toHaveBeenCalledWith(
 				'commission_rule_update',
-				expect.objectContaining({ p_id: RULE_ID, p_percentage: '12.50' })
+				expect.objectContaining({
+					p_id: RULE_ID,
+					p_percentage: '12.50',
+					p_expected_updated_at: VERSION
+				})
 			);
+		});
+
+		it('update: a stale version (someone else saved first) is a 409 asking to reload', async () => {
+			const { supabase } = mockDb({
+				rpc: {
+					data: null,
+					error: { code: '40001', message: 'commission rule was modified by someone else' }
+				}
+			});
+			const fields = { ...ruleForm, ruleId: RULE_ID, expectedUpdatedAt: VERSION };
+			const result = (await runAction(
+				'update',
+				makeLocals({ supabase, permissions: MANAGER }),
+				fields
+			)) as ActionFailure;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({
+				form: 'update',
+				ruleId: RULE_ID,
+				message:
+					'This commission rule was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.',
+				values: { expectedUpdatedAt: VERSION }
+			});
+		});
+
+		it('update: a missing version is rejected without calling the database', async () => {
+			const { supabase, rpc } = mockDb();
+			const result = (await runAction('update', makeLocals({ supabase, permissions: MANAGER }), {
+				...ruleForm,
+				ruleId: RULE_ID
+			})) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data).toMatchObject({
+				ruleId: RULE_ID,
+				message: 'This form is out of date. Reload the page and try again.'
+			});
+			expect(rpc).not.toHaveBeenCalled();
 		});
 
 		it('update: a failed edit keeps the rule id so the edit form stays open without JS', async () => {
@@ -303,6 +348,7 @@ describe('/campaigns/[id]/commissions', () => {
 			const result = (await runAction('update', makeLocals({ supabase, permissions: MANAGER }), {
 				...ruleForm,
 				ruleId: RULE_ID,
+				expectedUpdatedAt: VERSION,
 				percentage: '0'
 			})) as ActionFailure;
 			expect(result.status).toBe(400);

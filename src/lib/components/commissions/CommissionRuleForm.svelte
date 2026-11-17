@@ -89,6 +89,13 @@
 		return merged as typeof base;
 	});
 
+	// The rule version (`updated_at`, exact string) this edit is based on: the submitted one after
+	// a failed submit (a stale form keeps failing with a conflict until the page is reloaded),
+	// else the loaded rule's.
+	const expectedVersion = $derived(
+		(result && !result.success ? result.values?.expectedUpdatedAt : undefined) ?? rule?.updatedAt
+	);
+
 	let submitting = $state(false);
 	const fieldId = (name: string) => `${prefix}-${name}`;
 	const describedBy = (name: string, hint = false) =>
@@ -130,6 +137,8 @@
 		{/if}
 		{#if rule}
 			<input type="hidden" name="ruleId" value={rule.id} />
+			<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
+			<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
 		{/if}
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
