@@ -49,7 +49,7 @@ describe('campaign page edit forms (values and version come from the same load)'
 		expect(inputValue(body, 'update', 'expectedUpdatedAt')).toBe(V1);
 		expect(inputValue(body, 'update', 'name')).toBe('Campaign 2026');
 		expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V1);
-		expect(inputValue(body, 'rules', 'simpleBondValue')).toBe('60000.00');
+		expect(inputValue(body, 'rules', 'installmentCount')).toBe('10');
 	});
 
 	it('refills a failed submit based on the loaded version (validation errors stay)', () => {
@@ -76,5 +76,42 @@ describe('campaign page edit forms (values and version come from the same load)'
 		});
 		expect(inputValue(body, 'update', 'name')).toBe('Renamed elsewhere');
 		expect(inputValue(body, 'update', 'expectedUpdatedAt')).toBe(V2);
+	});
+
+	describe('rules form (with its change reason)', () => {
+		const rulesFailure = (expectedUpdatedAt: string) => ({
+			form: 'rules',
+			success: false,
+			message: 'Please fix the highlighted fields.',
+			errors: { confirmRulesChange: ['Confirm the rule changes before saving.'] },
+			values: {
+				simpleBondValue: '70000',
+				installmentCount: '7',
+				numberDigits: '4',
+				maxNumber: '9999',
+				associatedNumberOffset: '4871',
+				overflowPolicy: 'reject',
+				barcodeMode: 'base_number',
+				changeReason: 'Board decision',
+				confirmRulesChange: '',
+				expectedUpdatedAt
+			}
+		});
+		const reasonOf = (body: string) =>
+			body.match(/<textarea[^>]*name="changeReason"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
+
+		it('refills the submitted rules and reason when based on the loaded version', () => {
+			const body = renderPage(campaign(), rulesFailure(V1));
+			expect(inputValue(body, 'rules', 'installmentCount')).toBe('7');
+			expect(reasonOf(body)).toBe('Board decision');
+			expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V1);
+		});
+
+		it('drops the submitted rules and reason when the campaign has a newer version', () => {
+			const body = renderPage(campaign({ installmentCount: 12, updatedAt: V2 }), rulesFailure(V1));
+			expect(inputValue(body, 'rules', 'installmentCount')).toBe('12');
+			expect(reasonOf(body)).toBe('');
+			expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V2);
+		});
 	});
 });

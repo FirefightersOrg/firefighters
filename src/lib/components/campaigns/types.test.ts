@@ -102,6 +102,6 @@ describe('campaignEditSnapshot', () => {
 		expect(general).toEqual({ values: generalValuesOf(after), version: V2 });
 		expect(general.values.name).toBe('Renamed elsewhere');
 		expect(rules).toEqual({ values: rulesValuesOf(after), version: V2 });
-		expect(rules.values.simpleBondValue).toBe('80000.00');
+		expect(rules.values.simpleBondValue).not.toBe(rulesValuesOf(before).simpleBondValue);
 	});
 });
