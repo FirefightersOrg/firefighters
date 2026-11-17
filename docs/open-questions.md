@@ -182,7 +182,7 @@ Reference document: `docs/backup-operations.md`.
 
 Pending confirmation of whether a pata always equals `simple_bond_value * base_number_count` or if there are commercial exceptions.
 
-Temporary decision: implement a configurable rule with proportional default value.
+Temporary decision: implement a configurable rule with proportional default value. Phase 3 (SAN-22) stores `bonds.total_value = simple_bond_value * commercial_unit_count`, checked by the database when the bond is created.
 
 ### Special commissions
 

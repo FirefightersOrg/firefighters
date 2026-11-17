@@ -59,12 +59,17 @@ delivered_to_collector -> returned
 returned -> available
 available -> lost
 delivered_to_collector -> lost
+available -> annulled
 sold -> annulled
 sold -> closed
 ```
 
 Rules:
 
+- Manually entered simple bonds and printed patas start as `available`; `created` is reserved for bonds created by imports (Phase 4).
+- A bond loaded by mistake is annulled (`available -> annulled`: only while available, not while delivered to a collector) with a reason and audit; annulling requires `bond.annul`. Its participating numbers are released so they can be entered again, and the annulled bond and its numbers stay as history.
+- `annulled`, `lost` and `closed` have no outgoing transitions; annulled and closed bonds are immutable (except the recalculated financial status).
+- A simple bond grouped into a manual pata keeps its commercial status but cannot be operated on its own while grouped (there is no `grouped` status).
 - A sold bond cannot be reassigned directly.
 - A bond with confirmed payments can only be corrected with audited annulment.
 - Loss must record responsible party, date, and reason.
