@@ -32,6 +32,7 @@ const bondRow: BondRow = {
 	annulled_at: null,
 	annulled_by: null,
 	annul_reason: null,
+	annulled_from_status: null,
 	created_by: null,
 	created_at: '2026-11-17T12:00:00+00:00',
 	updated_at: '2026-11-17T12:00:00+00:00'
@@ -108,6 +109,24 @@ describe('bonds repository', () => {
 		expect(mapBondRow({ ...bondRow, total_value: 60000 }).totalValue).toBe('60000.00');
 		expect(() => mapBondRow({ ...bondRow, commercial_status: 'grouped' })).toThrow(
 			/commercial_status/
+		);
+	});
+
+	it('maps the status a bond was annulled from', () => {
+		expect(BOND_COLUMNS).toContain('annulled_from_status');
+		expect(mapBondRow(bondRow).annulledFromStatus).toBeNull();
+		expect(
+			mapBondRow({
+				...bondRow,
+				commercial_status: 'annulled',
+				annulled_at: '2026-11-17T12:00:00+00:00',
+				annulled_by: 'p1',
+				annul_reason: 'Loaded by mistake',
+				annulled_from_status: 'available'
+			}).annulledFromStatus
+		).toBe('available');
+		expect(() => mapBondRow({ ...bondRow, annulled_from_status: 'grouped' })).toThrow(
+			/annulled_from_status/
 		);
 	});
 
