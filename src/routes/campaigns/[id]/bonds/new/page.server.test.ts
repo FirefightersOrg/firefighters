@@ -179,7 +179,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
-		it('saves and goes back to the campaign page (Save)', async () => {
+		it('saves and opens the new bond (Save)', async () => {
 			const { locals, rpc } = setup({ permissions: OPERATOR });
 			await expect(
 				runAction(locals, {
@@ -188,7 +188,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 				})
 			).rejects.toMatchObject({
 				status: 303,
-				location: `/campaigns/${CAMPAIGN_ID}`
+				location: `/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}`
 			});
 			expect(rpc).toHaveBeenCalledWith('bond_create', {
 				p_campaign_id: CAMPAIGN_ID,

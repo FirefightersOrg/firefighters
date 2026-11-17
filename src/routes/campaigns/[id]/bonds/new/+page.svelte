@@ -23,11 +23,7 @@
 	/**
 	 * Manual entry of simple bonds. "Save & add another" (also what Enter does: it is the first
 	 * submit button) keeps the operator on the form with the number cleared and focused, and
-	 * confirms the bond just saved; "Save" goes back to the campaign.
-	 *
-	 * The bond record (/campaigns/[id]/bonds/[bondId]) does not exist yet: bonds and conflicts are
-	 * shown as text. SAN-25 adds that route and restores the links (`form.conflicts` keeps the
-	 * bond ids for that).
+	 * confirms the bond just saved; "Save" opens the new bond's record.
 	 */
 	let { data, form }: PageProps = $props();
 
@@ -35,6 +31,8 @@
 	const config = $derived(campaignNumberingConfig(campaign));
 	const numbering = $derived(buildNumberingPreview(config));
 	const campaignHref = $derived(resolve('/campaigns/[id]', { id: campaign.id }));
+	const bondHref = (bondId: string) =>
+		resolve('/campaigns/[id]/bonds/[bondId]', { id: campaign.id, bondId });
 
 	// Initial values only: afterwards the inputs own them (refilled from `form` without JS).
 	function initialValues() {
@@ -77,14 +75,15 @@
 	<title>Load bonds - {campaign.name} - Firefighters</title>
 </svelte:head>
 
-{#snippet conflictNumbers(field: string)}
+{#snippet conflictLinks(field: string)}
 	{#each fieldConflicts(field) as conflict (conflict.bondId)}
-		{#if conflict.numbers.length > 0}
-			<p class="mt-1 text-xs text-slate-600">
-				Another bond already uses
-				<span class="font-mono tabular-nums">{conflict.numbers.join(', ')}</span>.
-			</p>
-		{/if}
+		<p class="mt-1 text-xs">
+			<a href={bondHref(conflict.bondId)} class="font-medium text-blue-700 hover:underline">
+				{conflict.numbers.length > 0
+					? `View the bond that uses ${conflict.numbers.join(', ')} →`
+					: 'View the bond that uses it →'}
+			</a>
+		</p>
 	{/each}
 {/snippet}
 
@@ -97,6 +96,10 @@
 		</div>
 		<p class="text-sm text-slate-500">
 			Simple bonds, one base number at a time. New bonds are available for sale.
+			<a
+				href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
+				class="text-blue-700 hover:underline">Load a pata →</a
+			>
 		</p>
 	</div>
 
@@ -108,7 +111,10 @@
 	{:else}
 		{#if form?.success && form.created}
 			<FormAlert kind="success">
-				<p>{form.message}</p>
+				<p>
+					{form.message}
+					<a href={bondHref(form.created.id)} class="font-medium underline">View bond</a>
+				</p>
 			</FormAlert>
 		{:else if form?.message && !form.success}
 			<FormAlert message={form.message} />
@@ -179,7 +185,7 @@
 						/>
 						<p class={hintClass}>With or without leading zeros (68 or 0068).</p>
 						<FieldError id="baseNumber-error" errors={baseNumberErrors} />
-						{@render conflictNumbers('baseNumber')}
+						{@render conflictLinks('baseNumber')}
 					</div>
 					<div class="sm:pt-6">
 						<BaseNumberPreview {preview} />
@@ -201,7 +207,7 @@
 							class={inputClass}
 						/>
 						<FieldError id="internalCode-error" errors={internalCodeErrors} />
-						{@render conflictNumbers('internalCode')}
+						{@render conflictLinks('internalCode')}
 					</div>
 					<div>
 						<label for="barcode" class={labelClass}>Barcode (optional)</label>
@@ -217,7 +223,7 @@
 							class={inputClass}
 						/>
 						<FieldError id="barcode-error" errors={barcodeErrors} />
-						{@render conflictNumbers('barcode')}
+						{@render conflictLinks('barcode')}
 					</div>
 				</div>
 
@@ -251,13 +257,14 @@
 				<h2 id="saved-title" class="mb-3 text-base font-semibold">Saved from this page</h2>
 				<ul class="divide-y divide-slate-100 text-sm">
 					{#each saved as bond (bond.id)}
-						<li class="py-2">
+						<li class="flex items-center justify-between py-2">
 							<span class="font-mono tabular-nums"
 								>{bond.baseFormatted} <span aria-hidden="true">→</span><span class="sr-only"
 									>associated</span
 								>
 								{bond.associatedFormatted}</span
 							>
+							<a href={bondHref(bond.id)} class="text-blue-700 hover:underline">View</a>
 						</li>
 					{/each}
 				</ul>

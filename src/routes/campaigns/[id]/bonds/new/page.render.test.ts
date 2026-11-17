@@ -133,13 +133,12 @@ describe('/campaigns/[id]/bonds/new page', () => {
 			created: { id: BOND_ID, baseFormatted: '0068', associatedFormatted: '4939' }
 		});
 		expect(body).toContain('Bond 0068 / 4939 saved.');
-		// No link to the bond record yet (the route arrives in SAN-25).
-		expect(body).not.toContain(`/bonds/${BOND_ID}`);
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
 		expect(body).toContain('Saved from this page');
 		expect(inputValue(body, 'baseNumber')).toBe('');
 	});
 
-	it('shows a duplicate with the formatted numbers as text (no link to the bond yet)', () => {
+	it('shows a duplicate with the formatted numbers and a link to the bond using them', () => {
 		const body = renderPage(campaign(), {
 			form: 'create',
 			success: false,
@@ -152,8 +151,8 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		});
 		expect(inputValue(body, 'baseNumber')).toBe('0068');
 		expect(body).toContain('Numbers 0068, 4939 are already used by another bond in this campaign.');
-		expect(body).not.toContain(`/bonds/${OTHER_BOND_ID}`);
-		expect(body).toMatch(/Another bond already uses\s*<span[^>]*>0068, 4939<\/span>/);
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${OTHER_BOND_ID}"`);
+		expect(body).toContain('View the bond that uses 0068, 4939');
 		expect(body).toMatch(/aria-describedby="baseNumber-preview baseNumber-error"/);
 	});
 

@@ -5,6 +5,7 @@ import {
 	BOND_NUMBERS_PAGE_SIZE,
 	campaignHasBonds,
 	getBondById,
+	getBondCampaignId,
 	listBondNumbersByCampaign,
 	mapBondRow,
 	type BondGroupRow,
@@ -101,6 +102,26 @@ describe('bonds repository', () => {
 				queryMock([{ data: null, error: { message: 'boom' } }]).supabase,
 				CAMPAIGN_ID
 			)
+		).resolves.toEqual({ data: null, error: { message: 'boom' } });
+	});
+
+	it('reads the campaign of a bond (one column), null when not visible', async () => {
+		const found = queryMock([{ data: { campaign_id: CAMPAIGN_ID }, error: null }]);
+		await expect(getBondCampaignId(found.supabase, BOND_ID)).resolves.toEqual({
+			data: CAMPAIGN_ID,
+			error: null
+		});
+		expect(found.calls).toEqual([
+			['from', ['bonds']],
+			['select', ['campaign_id']],
+			['eq', ['id', BOND_ID]],
+			['maybeSingle', []]
+		]);
+		await expect(
+			getBondCampaignId(queryMock([{ data: null, error: null }]).supabase, BOND_ID)
+		).resolves.toEqual({ data: null, error: null });
+		await expect(
+			getBondCampaignId(queryMock([{ data: null, error: { message: 'boom' } }]).supabase, BOND_ID)
 		).resolves.toEqual({ data: null, error: { message: 'boom' } });
 	});
 

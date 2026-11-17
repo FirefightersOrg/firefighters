@@ -106,10 +106,8 @@ export const actions: Actions = {
 			return bondServiceFailure('create', err, values);
 		}
 
-		// "Save" goes back to the campaign: the bond record (/campaigns/[id]/bonds/[bondId]) does
-		// not exist yet. SAN-25 switches this to the new bond's record once it adds that route.
 		if (intent === 'save') {
-			redirect(303, `/campaigns/${campaign.id}`);
+			redirect(303, `/campaigns/${campaign.id}/bonds/${id}`);
 		}
 
 		const [base] = parsed.data.baseNumbers;

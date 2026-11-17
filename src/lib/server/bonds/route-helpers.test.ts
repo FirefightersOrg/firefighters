@@ -4,7 +4,8 @@ import {
 	bondServiceFailure,
 	campaignLockedMessage,
 	conflictLinks,
-	duplicateNumbersFieldMessage
+	duplicateNumbersFieldMessage,
+	withoutBondIds
 } from './route-helpers';
 
 const A = 'b0000000-0000-0000-0000-00000000000a';
@@ -54,5 +55,23 @@ describe('bond route helpers', () => {
 		expect(result.status).toBe(500);
 		expect(result.data).toMatchObject({ message: 'Something went wrong. Please try again.' });
 		expect(() => bondServiceFailure('create', new Error('boom'))).toThrow('boom');
+	});
+});
+
+describe('withoutBondIds', () => {
+	it('removes bond ids from database messages', () => {
+		expect(withoutBondIds(`Bond 0068 (${A}) is already annulled.`)).toBe(
+			'Bond 0068 is already annulled.'
+		);
+		expect(withoutBondIds(`Bond 0068 (${A}) already belongs to manually grouped pata ${B}.`)).toBe(
+			'Bond 0068 already belongs to a manually grouped pata.'
+		);
+		expect(withoutBondIds(`Only an available pata can be ungrouped (pata ${B} is sold).`)).toBe(
+			'Only an available pata can be ungrouped (this pata is sold).'
+		);
+		expect(withoutBondIds(`Bond ${A} is listed more than once.`)).toBe(
+			'A bond is listed more than once.'
+		);
+		expect(withoutBondIds('Nothing to remove.')).toBe('Nothing to remove.');
 	});
 });

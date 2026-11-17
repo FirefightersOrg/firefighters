@@ -170,10 +170,27 @@ The database is the authority: the app never sends associated numbers or values,
 `/campaigns/[id]/bonds/new` (requires `campaign.view` and `bond.create`; linked from the campaign page while the campaign is draft or active):
 
 - One base number per bond, typed with or without leading zeros, plus optional internal code and barcode. A live preview (`previewBaseNumber`, `src/lib/domain/bond-preview.ts`) shows the padded base and associated numbers, or the same range/overflow message the server would return.
-- "Save & add another" (the default button, so Enter uses it) keeps the operator on the form: the fields are cleared, the base number keeps focus and the bond just saved is confirmed and listed. "Save" goes back to the campaign page (the bond record `/campaigns/[id]/bonds/[bondId]` arrives with SAN-25, which points "Save" and the links below to it).
-- Duplicates are shown on the field with the formatted numbers as text; the bond that already uses them travels in `BondFormResult.conflicts` (`src/lib/server/bonds/route-helpers.ts`) so the form can link to it once the bond record exists (SAN-25). The bond id is never shown as text.
+- "Save & add another" (the default button, so Enter uses it) keeps the operator on the form: the fields are cleared, the base number keeps focus and the bond just saved is confirmed and listed. "Save" opens the new bond's record (`/campaigns/[id]/bonds/[bondId]`).
+- Duplicates are shown on the field with the formatted numbers and a link to the bond that already uses them (`BondFormResult.conflicts`, `src/lib/server/bonds/route-helpers.ts`); the bond id is never shown as text.
 - Outside draft/active the page explains why instead of showing the form; the action refuses with 409 before calling the database.
 - Once a campaign has any bond (`campaignHasBonds`), the campaign page shows its rules frozen, even in draft, and hides the rules form; `campaign_update_rules` refuses the change anyway (55000).
+
+### Pata entry (SAN-25)
+
+`/campaigns/[id]/bonds/pata/new` (requires `campaign.view` and `bond.create`; linked from the campaign page and from the simple bond entry page while the campaign is draft or active). Two modes (`?mode=printed|grouping`):
+
+- **Printed pata** (`?/printed`): N >= 2 base numbers typed at once (commas, semicolons, spaces or new lines). A live preview (`previewPata`, `src/lib/domain/pata-preview.ts`) shows every base → associated pair (2N numbers), range/overflow problems, numbers repeated inside the pata, N and the total (`simple_bond_value * N`, es-AR). `bond_create` stores it; campaign-wide duplicates are shown with links to the bonds that use them.
+- **Manual grouping** (`?/group`): search available simple bonds that are not in an active group, by base number (`searchGroupableBonds`: one PostgREST query with an anti-join on active `bond_groups` rows, first 20 from the typed number). Picked bonds live in the URL (`?selected=<id>&selected=<id>`), so the page also works without JavaScript; each picked bond is re-checked (`listGroupingMembers`) and flagged when it cannot be grouped. The action checks again with friendly messages (linking to the pata a bond already belongs to) before `bond_group_into_pata`, which is the authority.
+- Both open the new pata's record when saved.
+
+### Bond record (SAN-25, minimal)
+
+`/campaigns/[id]/bonds/[bondId]` (requires `campaign.view` and `bond.view`). For now: general data, participating numbers padded with the campaign's digits (a manual pata shows its members' numbers), manual pata members with their ungroup history, or "In pata X" with a link for an active member (no individual actions). One component per section (`src/lib/components/bonds/record/`), with the view model built by `buildBondRecord` (`src/lib/server/bonds/record.ts`), so the remaining sections of docs/screens.md "Bond record" can be added one by one.
+
+- `?/ungroup`: available manual pata, `bond.create` (operators included), reason required. The pata is annulled, its memberships get `ungrouped_at/by/reason` (never deleted) and its members are free again.
+- `?/annul`: available simple bond or printed pata not in an active group, `bond.annul` (admin only; hidden otherwise, 403 from the action), reason required. Its numbers are released and can be entered again.
+- An annulled bond shows the status it was annulled from (`annulled_from_status`): from `available` (loaded by mistake) its numbers and codes were freed; from `sold` (annulled sale, Phase 10) they stay held.
+- Database messages never show bond ids (`withoutBondIds`, `src/lib/server/bonds/route-helpers.ts`).
 
 ## Barcode and imports
 

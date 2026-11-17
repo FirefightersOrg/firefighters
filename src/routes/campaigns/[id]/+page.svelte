@@ -51,6 +51,10 @@
 						href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
 						class="font-medium text-blue-700 hover:underline">Load bonds →</a
 					>
+					<a
+						href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Load a pata →</a
+					>
 				{/if}
 				{#if data.can.viewCommissions}
 					<a

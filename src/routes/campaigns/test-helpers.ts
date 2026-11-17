@@ -63,18 +63,35 @@ export function mockSupabase(
 			eq: vi.fn(),
 			limit: vi.fn(),
 			maybeSingle: vi.fn(),
+			is: vi.fn(),
+			gte: vi.fn(),
+			in: vi.fn(),
+			or: vi.fn(),
+			range: vi.fn(),
 			overrideTypes: vi.fn().mockResolvedValue(result)
 		};
-		chain.select.mockReturnValue(chain);
-		chain.order.mockReturnValue(chain);
-		chain.eq.mockReturnValue(chain);
-		chain.limit.mockReturnValue(chain);
-		chain.maybeSingle.mockReturnValue(chain);
+		for (const method of [
+			'select',
+			'order',
+			'eq',
+			'limit',
+			'maybeSingle',
+			'is',
+			'gte',
+			'in',
+			'or',
+			'range'
+		] as const) {
+			chain[method].mockReturnValue(chain);
+		}
 		return chain;
 	};
 	let chain = makeChain(query);
+	/** Every chain created, per table (in call order). */
+	const chains: Record<string, ReturnType<typeof makeChain>[]> = {};
 	const from = vi.fn((table: string) => {
 		chain = makeChain(options.tables?.[table] ?? query);
+		(chains[table] ??= []).push(chain);
 		return chain;
 	});
 	const rpc = vi.fn().mockResolvedValue(options.rpc ?? { data: null, error: null });
@@ -82,6 +99,7 @@ export function mockSupabase(
 		supabase: { from, rpc } as unknown as SupabaseClient,
 		from,
 		rpc,
+		chains,
 		get chain() {
 			return chain;
 		}

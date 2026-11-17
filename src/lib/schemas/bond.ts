@@ -52,6 +52,16 @@ export const BOND_CREATE_PATA_FIELDS = [
 	'barcode',
 	'reason'
 ] as const;
+/**
+ * Fields of the printed pata form (`/campaigns/[id]/bonds/pata/new?/printed`): the base numbers
+ * as one text (or repeated values). The campaign comes from the URL; the reason is not asked for.
+ */
+export const PATA_ENTRY_FIELDS = ['baseNumbers', 'internalCode', 'barcode'] as const;
+/** Text fields of the manual grouping form (the picked bonds are repeated `memberBondIds`). */
+export const PATA_GROUP_FIELDS = ['internalCode', 'barcode'] as const;
+/** Fields of the bond record actions (`?/ungroup`, `?/annul`): the bond comes from the URL. */
+export const BOND_RECORD_ACTION_FIELDS = ['reason'] as const;
+
 export const BOND_GROUP_FIELDS = [
 	'campaignId',
 	'memberBondIds',

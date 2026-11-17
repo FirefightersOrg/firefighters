@@ -11,7 +11,7 @@ import {
 	load as bondEntryLoad
 } from '../../src/routes/campaigns/[id]/bonds/new/+page.server';
 import { getUserPermissions } from '$lib/server/auth/permissions';
-import { getBondById, listBondNumbersByCampaign } from '$lib/server/repositories/bonds';
+import { getBondById } from '$lib/server/repositories/bonds';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -213,22 +213,13 @@ describe('manual simple bond entry (local Supabase)', () => {
 		]);
 	});
 
-	it('Save: saves the bond and redirects to the campaign page', async () => {
+	it('Save: redirects to the new bond record', async () => {
 		const result = await enter(admin, campaignId, '0100', 'save');
-		expect(result.redirect, `unexpected result ${JSON.stringify(result)}`).toBe(
-			`/campaigns/${campaignId}`
+		const match = new RegExp(`^/campaigns/${campaignId}/bonds/([0-9a-f-]{36})$`).exec(
+			result.redirect ?? ''
 		);
-		const numbers = await listBondNumbersByCampaign(admin.client, campaignId);
-		expect(numbers.error).toBeNull();
-		expect(
-			numbers.data
-				?.filter((n) => n.numberValue === 100 || n.numberValue === 4971)
-				.map((n) => [n.numberValue, n.numberKind])
-				.sort()
-		).toEqual([
-			[100, 'base'],
-			[4971, 'associated']
-		]);
+		expect(match, `unexpected result ${JSON.stringify(result)}`).not.toBeNull();
+		expect((await getBondById(admin.client, match![1])).data?.numbers).toHaveLength(2);
 	});
 
 	it('reports duplicates with the formatted numbers and the bond that uses them', async () => {
