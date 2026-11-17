@@ -464,6 +464,35 @@ describe('/campaigns/[id]', () => {
 			});
 		});
 
+		it.each([
+			['active', 'Campaign activated. Its rules are now frozen.'],
+			['closing', 'Campaign moved to closing.'],
+			['closed', 'Campaign closed.']
+		])('passes an optional reason through for %s', async (toStatus, message) => {
+			const { supabase, rpc } = mockSupabase();
+			await expect(
+				runAction('transition', makeLocals({ supabase }), { toStatus, reason: ' Season over ' })
+			).resolves.toEqual({ form: 'transition', success: true, message, errors: {} });
+			expect(rpc).toHaveBeenCalledWith('campaign_transition', {
+				p_id: CAMPAIGN_ID,
+				p_to_status: toStatus,
+				p_reason: 'Season over',
+				p_request_id: 'req-test'
+			});
+		});
+
+		it('sends no reason when the optional reason is left empty', async () => {
+			const { supabase, rpc } = mockSupabase();
+			await runAction('transition', makeLocals({ supabase }), {
+				toStatus: 'closing',
+				reason: '  '
+			});
+			expect(rpc).toHaveBeenCalledWith(
+				'campaign_transition',
+				expect.objectContaining({ p_to_status: 'closing', p_reason: null })
+			);
+		});
+
 		it('reports activation without dates as a 409 conflict', async () => {
 			const { supabase } = mockSupabase({
 				rpc: {

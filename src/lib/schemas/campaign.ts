@@ -27,6 +27,7 @@ import {
 	parseMoneyToCents
 } from '$lib/domain/money';
 import {
+	MAX_CAMPAIGN_NUMBER,
 	MAX_NUMBER_DIGITS,
 	validateNumberingConfig,
 	type CampaignNumberingConfig,
@@ -34,9 +35,10 @@ import {
 } from '$lib/domain/numbering';
 
 /** Re-exported for the form components; defined (and enforced) by the numbering domain. */
-export { MAX_NUMBER_DIGITS };
+export { MAX_CAMPAIGN_NUMBER, MAX_NUMBER_DIGITS };
 
-const INT4_MAX = 2_147_483_647;
+/** Upper bound of the other integer fields (Postgres `integer`, same as the numbering cap). */
+const INT4_MAX = MAX_CAMPAIGN_NUMBER;
 export const CAMPAIGN_NAME_MAX_LENGTH = 200;
 export const CAMPAIGN_REASON_MAX_LENGTH = 1000;
 
@@ -159,8 +161,11 @@ const generalShape = {
 
 const numberingShape = {
 	numberDigits: wholeNumber('Number of digits', { min: 1, max: MAX_NUMBER_DIGITS }),
-	maxNumber: wholeNumber('Maximum number', { min: 1 }),
-	associatedNumberOffset: wholeNumber('Associated number offset', { min: 0 }),
+	maxNumber: wholeNumber('Maximum number', { min: 1, max: MAX_CAMPAIGN_NUMBER }),
+	associatedNumberOffset: wholeNumber('Associated number offset', {
+		min: 0,
+		max: MAX_CAMPAIGN_NUMBER
+	}),
 	overflowPolicy: z.string().trim().min(1, 'Overflow policy is required')
 };
 
@@ -225,8 +230,10 @@ function refineNumbering(value: ParsedNumbering, ctx: RefinementCtx) {
 		overflowPolicy: value.overflowPolicy as OverflowPolicy
 	});
 	for (const issue of issues) {
-		// The field schema already reports a numberDigits above MAX_NUMBER_DIGITS ("at most 10").
+		// The field schemas already report a numberDigits above MAX_NUMBER_DIGITS ("at most 10")
+		// and a maxNumber above MAX_CAMPAIGN_NUMBER ("at most 2147483647").
 		if (issue.field === 'numberDigits' && value.numberDigits > MAX_NUMBER_DIGITS) continue;
+		if (issue.field === 'maxNumber' && value.maxNumber > MAX_CAMPAIGN_NUMBER) continue;
 		ctx.addIssue({
 			code: 'custom',
 			path: [issue.field],
