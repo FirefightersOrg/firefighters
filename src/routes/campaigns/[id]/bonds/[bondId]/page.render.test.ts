@@ -50,7 +50,11 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 			{ formatted: '0068', kind: 'base', released: false, ownerBondId: BOND_ID },
 			{ formatted: '4939', kind: 'associated', released: false, ownerBondId: BOND_ID }
 		],
-		group: { members: [], memberOf: null },
+		group: { members: [], memberOf: null, pastPatas: [] },
+		barcode: { barcode: null, internalCode: 'INT-1', modeLabel: 'Barcode is the base number' },
+		collector: { id: null },
+		buyer: { id: null },
+		audit: { allowed: false, entries: [], truncated: false },
 		actions: { ungroup: false, annul: false, lockedMessage: null },
 		...overrides
 	};
@@ -143,7 +147,13 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 
 	it('a member of a manual pata: links to the pata, no actions', () => {
 		const body = renderPage(
-			record({ group: { members: [], memberOf: { pataId: PATA_ID, label: '0068 + 0069' } } })
+			record({
+				group: {
+					members: [],
+					memberOf: { pataId: PATA_ID, label: '0068 + 0069' },
+					pastPatas: []
+				}
+			})
 		);
 		expect(body).toContain('In pata');
 		expect(body).toContain('0068 + 0069');
@@ -171,6 +181,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				],
 				group: {
 					memberOf: null,
+					pastPatas: [],
 					members: [
 						{
 							bondId: BOND_ID,
@@ -216,5 +227,142 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		);
 		expect(body).toContain('This campaign is closed.');
 		expect(body).not.toContain('action="?/annul"');
+	});
+	it('renders the 13 numbered sections in order, with an index of anchors', () => {
+		const body = renderPage(record());
+		const titles = [
+			'General data',
+			'Participating numbers',
+			'Barcode',
+			'Current collector',
+			'Current buyer',
+			'Sale',
+			'Installments',
+			'Payments',
+			'Settlements',
+			'Commissions',
+			'Draws and rosters',
+			'Prizes',
+			'Audit'
+		];
+		const ids = [
+			'general',
+			'numbers',
+			'barcode',
+			'collector',
+			'buyer',
+			'sale',
+			'installments',
+			'payments',
+			'settlements',
+			'commissions',
+			'draws',
+			'prizes',
+			'audit'
+		];
+		let last = -1;
+		ids.forEach((id, i) => {
+			const at = body.indexOf(`<section id="${id}"`);
+			expect(at, id).toBeGreaterThan(last);
+			last = at;
+			expect(body).toContain(`aria-labelledby="${id}-title"`);
+			expect(body).toContain(`href="#${id}"`);
+			expect(body).toMatch(
+				new RegExp(`<h2 id="${id}-title"[^>]*>\\s*<span[^>]*>${i + 1}\\.</span>\\s*${titles[i]}`)
+			);
+		});
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds"`);
+	});
+
+	it('later-phase sections show empty states; collector and buyer are not set', () => {
+		const body = renderPage(record());
+		expect(body).toContain('Not delivered to a collector.');
+		expect(body).toContain('No buyer: the bond is not sold.');
+		expect(body).toContain('This bond has not been sold.');
+		expect(body).toContain('No installment plan.');
+		expect(body).toContain('No payments recorded.');
+		expect(body).toContain('Not included in any settlement.');
+		expect(body).toContain('No commissions generated.');
+		expect(body).toContain('Not included in any draw roster.');
+		expect(body).toContain('No prizes.');
+		expect(body).toContain('Barcode is the base number');
+		expect(body).toContain('No barcode was recorded for this bond.');
+		expect(body).toContain('No payments');
+	});
+
+	it('audit: a note without audit.view; entries with actor, reason and pata link', () => {
+		expect(renderPage(record())).toContain('You do not have permission to view the audit log.');
+
+		const body = renderPage(
+			record({
+				audit: {
+					allowed: true,
+					truncated: false,
+					entries: [
+						{
+							id: 'a2',
+							action: 'bond.group',
+							actionLabel: 'Grouped into a pata',
+							createdAt: '2026-11-17T13:00:00+00:00',
+							actorLabel: 'Operator One',
+							reason: null,
+							summary: 'This bond was grouped into pata 0068 + 0069',
+							viaPata: { pataId: PATA_ID, label: '0068 + 0069' },
+							oldValue: null,
+							newValue: '{\n  "members": []\n}',
+							requestId: 'req-2'
+						},
+						{
+							id: 'a1',
+							action: 'bond.create',
+							actionLabel: 'Loaded',
+							createdAt: '2026-11-17T12:00:00+00:00',
+							actorLabel: 'A user',
+							reason: 'Batch 3',
+							summary: 'Numbers 0068, 4939',
+							viaPata: null,
+							oldValue: null,
+							newValue: '{}',
+							requestId: null
+						}
+					]
+				}
+			})
+		);
+		expect(body).not.toContain('You do not have permission to view the audit log.');
+		expect(body.indexOf('data-audit-action="bond.group"')).toBeLessThan(
+			body.indexOf('data-audit-action="bond.create"')
+		);
+		expect(body).toContain('Operator One');
+		expect(body).toContain('Reason: Batch 3');
+		expect(body).toContain('Numbers 0068, 4939');
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
+
+		const empty = renderPage(record({ audit: { allowed: true, entries: [], truncated: false } }));
+		expect(empty).toContain('No audit entries for this bond.');
+	});
+
+	it('a simple bond that was in an ungrouped pata shows it as history', () => {
+		const body = renderPage(
+			record({
+				group: {
+					members: [],
+					memberOf: null,
+					pastPatas: [
+						{
+							pataId: PATA_ID,
+							label: '0068 + 0069',
+							groupedAt: '2026-11-16T12:00:00+00:00',
+							ungroupedAt: '2026-11-16T15:00:00+00:00',
+							reason: 'Wrong bonds'
+						}
+					]
+				}
+			})
+		);
+		expect(body).toContain('Previous patas');
+		expect(body).toContain('Not in a pata.');
+		expect(body).toContain('Wrong bonds');
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 	});
 });

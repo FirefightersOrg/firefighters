@@ -106,6 +106,7 @@ describe('/campaigns/[id]', () => {
 				editRules: true,
 				transitions: ['active', 'annulled'],
 				viewCommissions: false,
+				viewBonds: false,
 				loadBonds: false
 			});
 		});
@@ -121,6 +122,7 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: ['closing', 'annulled'],
 				viewCommissions: false,
+				viewBonds: false,
 				loadBonds: false
 			});
 		});
@@ -136,6 +138,7 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: ['closed'],
 				viewCommissions: false,
+				viewBonds: false,
 				loadBonds: false
 			});
 		});
@@ -146,6 +149,14 @@ describe('/campaigns/[id]', () => {
 				loadEvent(makeLocals({ permissions: ['campaign.view', 'commission.view'], supabase }))
 			))!;
 			expect(data.can.viewCommissions).toBe(true);
+		});
+
+		it('links to the bonds list only with bond.view', async () => {
+			const { supabase } = mockSupabase({ query: { data: campaignRow(), error: null } });
+			const data = (await load(
+				loadEvent(makeLocals({ permissions: ['campaign.view', 'bond.view'], supabase }))
+			))!;
+			expect(data.can.viewBonds).toBe(true);
 		});
 
 		it('viewer only (operator): no edit forms and no status actions', async () => {
@@ -159,6 +170,7 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: [],
 				viewCommissions: false,
+				viewBonds: false,
 				loadBonds: false
 			});
 		});

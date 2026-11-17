@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { requirePermissionIn } from '$lib/server/auth/permissions';
+import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { buildBondRecord } from '$lib/server/bonds/record';
 import {
 	bondFormFailure,
@@ -14,10 +14,16 @@ import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import {
 	getBondById,
 	getBondCampaignId,
+	listBondBaseNumbers,
 	listBondNumbersByBondIds,
+	listMembershipsOfMember,
 	listPataMemberships,
 	type BondGroupHistoryEntry
 } from '$lib/server/repositories/bonds';
+import {
+	AUDIT_ENTRIES_LIMIT,
+	listAuditEntriesForEntities
+} from '$lib/server/repositories/audit-log';
 import type { RepositoryResult } from '$lib/server/repositories/campaigns';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bonds';
@@ -28,9 +34,11 @@ import { readFormFields } from '$lib/schemas/campaign';
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
 /**
- * /campaigns/[id]/bonds/[bondId]: the bond record. For now general data, participating numbers
- * (padded with the campaign's digit count) and the manual pata membership / members with their
- * ungrouping history; the other sections of docs/screens.md "Bond record" come later.
+ * /campaigns/[id]/bonds/[bondId]: the bond record, with the 13 sections of docs/screens.md
+ * "Bond record". General data (with the manual pata composition and ungroup history),
+ * participating numbers padded with the campaign's digit count, barcode and audit come from the
+ * database; collector, buyer, sale, installments, payments, settlements, commissions, draws and
+ * prizes show empty states until their phases. Audit needs `audit.view` (else a note).
  * Requires an active user with `campaign.view` and `bond.view` (else 403).
  *
  * Actions (the SQL functions re-check permission, status and campaign window). Both answer 404
@@ -68,22 +76,36 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(404, { message: BOND_MESSAGES.bondNotFound });
 	}
 
-	// Manual pata: all its memberships (history) and its members' numbers. Member of a manual
-	// pata: that pata's active members and numbers, to name it.
+	// Manual pata: all its memberships (history) and its members' numbers. Simple bond: every
+	// pata it was a member of (active and ungrouped), named by their base numbers.
 	const isManualPata = bond.origin === 'manual_grouping';
-	const pataId = isManualPata ? bond.id : (bond.activeGroup?.pataBondId ?? null);
-	const membershipsResult: RepositoryResult<BondGroupHistoryEntry[]> = pataId
-		? await listPataMemberships(locals.supabase, pataId)
-		: { data: [], error: null };
+	const membershipsResult: RepositoryResult<BondGroupHistoryEntry[]> = isManualPata
+		? await listPataMemberships(locals.supabase, bond.id)
+		: bond.kind === 'simple'
+			? await listMembershipsOfMember(locals.supabase, bond.id)
+			: { data: [], error: null };
 	if (membershipsResult.error) fail500(membershipsResult.error);
 	const memberships = membershipsResult.data ?? [];
-	const memberIds = isManualPata
-		? memberships.map((m) => m.memberBondId)
-		: memberships.filter((m) => !m.ungroupedAt).map((m) => m.memberBondId);
-	// No query when there are no members (see listBondNumbersByBondIds).
-	const numbersResult = await listBondNumbersByBondIds(locals.supabase, memberIds);
+	const pataIds = isManualPata ? [] : [...new Set(memberships.map((m) => m.pataBondId))];
+
+	const canViewAudit = hasPermissionIn(locals.permissions, 'audit.view');
+	const [numbersResult, basesResult, auditResult] = await Promise.all([
+		// No query when there are no members / patas (see the repository functions).
+		listBondNumbersByBondIds(
+			locals.supabase,
+			isManualPata ? memberships.map((m) => m.memberBondId) : []
+		),
+		listBondBaseNumbers(locals.supabase, pataIds),
+		canViewAudit
+			? listAuditEntriesForEntities(locals.supabase, 'bond', [bond.id, ...pataIds], {
+					limit: AUDIT_ENTRIES_LIMIT + 1
+				})
+			: Promise.resolve(null)
+	]);
 	if (numbersResult.error) fail500(numbersResult.error);
-	const numbers = numbersResult.data ?? [];
+	if (basesResult.error) fail500(basesResult.error);
+	if (auditResult?.error) fail500(auditResult.error);
+	const auditEntries = auditResult?.data ?? [];
 
 	return {
 		campaign,
@@ -91,8 +113,15 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaign,
 			bond,
 			memberships: isManualPata ? memberships : [],
-			memberNumbers: isManualPata ? numbers : [],
-			parentPata: isManualPata || !pataId ? null : { memberIds, numbers },
+			memberNumbers: numbersResult.data ?? [],
+			membershipsAsMember: isManualPata ? [] : memberships,
+			pataBaseNumbers: basesResult.data ?? new Map(),
+			audit: canViewAudit
+				? {
+						entries: auditEntries.slice(0, AUDIT_ENTRIES_LIMIT),
+						truncated: auditEntries.length > AUDIT_ENTRIES_LIMIT
+					}
+				: null,
 			permissions: locals.permissions ?? []
 		})
 	};

@@ -66,6 +66,21 @@ export const BOND_FINANCIAL_STATUSES = [
 ] as const;
 export type BondFinancialStatus = (typeof BOND_FINANCIAL_STATUSES)[number];
 
+export const BOND_FINANCIAL_STATUS_LABELS: Record<BondFinancialStatus, string> = {
+	no_payments: 'No payments',
+	partial_payments: 'Partial payments',
+	up_to_date: 'Up to date',
+	overdue: 'Overdue',
+	fully_paid: 'Fully paid',
+	uncollectible: 'Uncollectible',
+	annulled: 'Annulled'
+};
+
+export const BOND_KIND_LABELS: Record<BondKind, string> = {
+	simple: 'Simple bond',
+	pata: 'Pata'
+};
+
 export const BOND_NUMBER_KINDS = ['base', 'associated', 'extraordinary'] as const;
 export type BondNumberKind = (typeof BOND_NUMBER_KINDS)[number];
 

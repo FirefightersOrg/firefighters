@@ -34,6 +34,7 @@ const can = {
 	editRules: true,
 	transitions: [],
 	viewCommissions: false,
+	viewBonds: false,
 	loadBonds: false
 };
 
@@ -155,6 +156,12 @@ describe('campaign page: bonds', () => {
 	it('links to bond loading only when allowed', () => {
 		const href = '/campaigns/f0000000-0000-0000-0000-000000000001/bonds/new';
 		expect(renderPage(campaign(), null, { can: { loadBonds: true } })).toContain(`href="${href}"`);
+		expect(renderPage(campaign())).not.toContain(href);
+	});
+
+	it('links to the bonds list only with bond.view', () => {
+		const href = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"';
+		expect(renderPage(campaign(), null, { can: { viewBonds: true } })).toContain(href);
 		expect(renderPage(campaign())).not.toContain(href);
 	});
 });

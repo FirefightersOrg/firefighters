@@ -44,8 +44,14 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions || data.can.loadBonds}
+		{#if data.can.viewCommissions || data.can.loadBonds || data.can.viewBonds}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+				{#if data.can.viewBonds}
+					<a
+						href={resolve('/campaigns/[id]/bonds', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Bonds →</a
+					>
+				{/if}
 				{#if data.can.loadBonds}
 					<a
 						href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}

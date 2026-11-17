@@ -2,16 +2,19 @@
 	import { resolve } from '$app/paths';
 	import BondStatusBadge from '$lib/components/bonds/BondStatusBadge.svelte';
 	import BondActionsSection from '$lib/components/bonds/record/BondActionsSection.svelte';
+	import BondAuditSection from '$lib/components/bonds/record/BondAuditSection.svelte';
+	import BondBarcodeSection from '$lib/components/bonds/record/BondBarcodeSection.svelte';
 	import BondGeneralSection from '$lib/components/bonds/record/BondGeneralSection.svelte';
-	import BondGroupSection from '$lib/components/bonds/record/BondGroupSection.svelte';
 	import BondNumbersSection from '$lib/components/bonds/record/BondNumbersSection.svelte';
+	import BondPartySection from '$lib/components/bonds/record/BondPartySection.svelte';
+	import BondPendingSection from '$lib/components/bonds/record/BondPendingSection.svelte';
+	import { BOND_RECORD_SECTIONS } from '$lib/components/bonds/record/types';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import type { PageProps } from './$types';
 
 	/**
-	 * Bond record. One component per section (docs/screens.md "Bond record"): general data,
-	 * participating numbers, manual pata membership / members, actions. Further sections
-	 * (collector, buyer, sale, installments, payments, ...) are added as new components.
+	 * Bond record: the 13 sections of docs/screens.md "Bond record", one component each, with an
+	 * index of anchors at the top. The actions (ungroup / annul) follow the general data.
 	 */
 	let { data, form }: PageProps = $props();
 
@@ -38,14 +41,32 @@
 
 <div class="space-y-6">
 	<div>
-		<a
-			href={resolve('/campaigns/[id]', { id: campaign.id })}
-			class="text-sm text-blue-700 hover:underline">← {campaign.name}</a
-		>
+		<nav aria-label="Breadcrumb" class="flex flex-wrap gap-x-2 text-sm">
+			<a
+				href={resolve('/campaigns/[id]', { id: campaign.id })}
+				class="text-blue-700 hover:underline">← {campaign.name}</a
+			>
+			<span aria-hidden="true" class="text-slate-400">/</span>
+			<a
+				href={resolve('/campaigns/[id]/bonds', { id: campaign.id })}
+				class="text-blue-700 hover:underline">Bonds</a
+			>
+		</nav>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
 			<BondStatusBadge status={general.commercialStatus} />
 		</div>
+		<nav aria-label="Record sections" class="mt-3">
+			<ol class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+				{#each BOND_RECORD_SECTIONS as section, i (section.id)}
+					<li>
+						<a href="#{section.id}" class="text-blue-700 hover:underline"
+							>{i + 1}. {section.title}</a
+						>
+					</li>
+				{/each}
+			</ol>
+		</nav>
 	</div>
 
 	{#if form?.success}
@@ -54,12 +75,18 @@
 		<FormAlert message={form.message} />
 	{/if}
 
-	<BondGeneralSection {general} />
-	<BondNumbersSection campaignId={campaign.id} bondId={general.id} numbers={record.numbers} />
-	<BondGroupSection
-		campaignId={campaign.id}
-		group={record.group}
-		isManualPata={general.origin === 'manual_grouping'}
-	/>
+	<BondGeneralSection campaignId={campaign.id} {general} group={record.group} />
 	<BondActionsSection actions={record.actions} isPata={general.kind === 'pata'} {errors} />
+	<BondNumbersSection campaignId={campaign.id} bondId={general.id} numbers={record.numbers} />
+	<BondBarcodeSection barcode={record.barcode} />
+	<BondPartySection role="collector" party={record.collector} />
+	<BondPartySection role="buyer" party={record.buyer} />
+	<BondPendingSection id="sale" />
+	<BondPendingSection id="installments" />
+	<BondPendingSection id="payments" />
+	<BondPendingSection id="settlements" />
+	<BondPendingSection id="commissions" />
+	<BondPendingSection id="draws" />
+	<BondPendingSection id="prizes" />
+	<BondAuditSection campaignId={campaign.id} audit={record.audit} />
 </div>

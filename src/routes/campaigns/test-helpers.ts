@@ -68,6 +68,7 @@ export function mockSupabase(
 			in: vi.fn(),
 			or: vi.fn(),
 			range: vi.fn(),
+			contains: vi.fn(),
 			overrideTypes: vi.fn().mockResolvedValue(result)
 		};
 		for (const method of [
@@ -80,7 +81,8 @@ export function mockSupabase(
 			'gte',
 			'in',
 			'or',
-			'range'
+			'range',
+			'contains'
 		] as const) {
 			chain[method].mockReturnValue(chain);
 		}

@@ -15,7 +15,7 @@ import {
 const BOND_ID = 'b0000000-0000-0000-0000-000000000001';
 const MEMBER_B = 'b0000000-0000-0000-0000-000000000002';
 const PATA_ID = 'b0000000-0000-0000-0000-0000000000aa';
-const ADMIN = [...ADMIN_PERMISSIONS, 'bond.view', 'bond.create', 'bond.annul'];
+const ADMIN = [...ADMIN_PERMISSIONS, 'bond.view', 'bond.create', 'bond.annul', 'audit.view'];
 const OPERATOR = ['campaign.view', 'bond.view', 'bond.create'];
 const READ_ONLY = ['campaign.view', 'bond.view'];
 
@@ -79,6 +79,8 @@ function setup(
 		bond?: QueryResult;
 		numbers?: QueryResult;
 		groups?: QueryResult;
+		bondList?: QueryResult;
+		audit?: QueryResult;
 		rpc?: QueryResult;
 		permissions?: string[];
 	} = {}
@@ -91,7 +93,9 @@ function setup(
 				data: [numberRow(BOND_ID, 68, 'base'), numberRow(BOND_ID, 4939, 'associated')],
 				error: null
 			},
-			bond_groups: options.groups ?? { data: [], error: null }
+			bond_groups: options.groups ?? { data: [], error: null },
+			bond_list: options.bondList ?? { data: [], error: null },
+			audit_log: options.audit ?? { data: [], error: null }
 		},
 		rpc: options.rpc ?? { data: null, error: null }
 	});
@@ -222,6 +226,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 
 		it('a member of a manual pata: shows the pata and no individual actions', async () => {
 			const { locals } = setup({
+				bondList: { data: [{ id: PATA_ID, base_numbers: [69, 68] }], error: null },
 				groups: { data: [groupRow(BOND_ID), groupRow(MEMBER_B)], error: null },
 				numbers: {
 					data: [
@@ -296,6 +301,118 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				}
 			});
 			expect((await load(loadEvent(readOnly.locals, PATA_ID)))!.record.actions.ungroup).toBe(false);
+		});
+		it('audit: not queried without audit.view; the record says so', async () => {
+			const { locals, from } = setup({ permissions: OPERATOR });
+			const data = (await load(loadEvent(locals)))!;
+			expect(data.record.audit).toEqual({ allowed: false, entries: [], truncated: false });
+			expect(from).not.toHaveBeenCalledWith('audit_log');
+		});
+
+		it('audit: own entries and the grouping entries of patas that list the bond', async () => {
+			const OTHER = 'b0000000-0000-0000-0000-000000000099';
+			const auditRow = (overrides: Record<string, unknown>) => ({
+				id: 'a',
+				action: 'bond.create',
+				entity_type: 'bond',
+				entity_id: BOND_ID,
+				actor_user_id: profile.id,
+				old_value: null,
+				new_value: null,
+				reason: null,
+				created_at: '2026-11-17T12:00:00+00:00',
+				request_id: null,
+				actor: { full_name: 'Admin' },
+				...overrides
+			});
+			const { locals, chains } = setup({
+				groups: {
+					data: [groupRow(BOND_ID, '2026-11-17T14:00:00+00:00')],
+					error: null
+				},
+				bondList: { data: [{ id: PATA_ID, base_numbers: [68, 69] }], error: null },
+				audit: {
+					data: [
+						auditRow({
+							id: 'a3',
+							action: 'bond.ungroup',
+							entity_id: PATA_ID,
+							old_value: { members: [BOND_ID, MEMBER_B] },
+							new_value: { ungrouped_members: [BOND_ID, MEMBER_B] },
+							reason: 'Wrong bonds',
+							actor: null
+						}),
+						auditRow({
+							id: 'a2',
+							action: 'bond.group',
+							entity_id: PATA_ID,
+							new_value: { members: [BOND_ID, MEMBER_B] }
+						}),
+						// A pata entry that does not list this bond is left out.
+						auditRow({
+							id: 'ax',
+							action: 'bond.group',
+							entity_id: PATA_ID,
+							new_value: { members: [OTHER, MEMBER_B] }
+						}),
+						auditRow({
+							id: 'a1',
+							new_value: { numbers: [{ number_value: 68, number_kind: 'base' }] },
+							actor_user_id: null,
+							actor: null
+						})
+					],
+					error: null
+				}
+			});
+			const data = (await load(loadEvent(locals)))!;
+			const audit = chains.audit_log[0];
+			expect(audit.eq).toHaveBeenCalledWith('entity_type', 'bond');
+			expect(audit.in).toHaveBeenCalledWith('entity_id', [BOND_ID, PATA_ID]);
+			const entries = data.record.audit.entries;
+			expect(entries.map((e: { id: string }) => e.id)).toEqual(['a3', 'a2', 'a1']);
+			expect(entries[0]).toMatchObject({
+				actionLabel: 'Pata ungrouped',
+				actorLabel: 'A user',
+				reason: 'Wrong bonds',
+				summary: 'This bond was freed from pata 0068 + 0069',
+				viaPata: { pataId: PATA_ID, label: '0068 + 0069' }
+			});
+			expect(entries[1].actorLabel).toBe('Admin');
+			expect(entries[2]).toMatchObject({
+				actionLabel: 'Loaded',
+				actorLabel: 'System',
+				summary: 'Numbers 0068',
+				viaPata: null
+			});
+			expect(data.record.group.pastPatas).toEqual([
+				{
+					pataId: PATA_ID,
+					label: '0068 + 0069',
+					groupedAt: '2026-11-17T12:00:00+00:00',
+					ungroupedAt: '2026-11-17T14:00:00+00:00',
+					reason: 'Loaded by mistake'
+				}
+			]);
+		});
+
+		it('fills the barcode, collector and buyer sections from the bond', async () => {
+			const { locals } = setup({
+				bond: { data: bondRow({ barcode: 'BC-1', internal_code: 'INT-1' }), error: null }
+			});
+			const { record } = (await load(loadEvent(locals)))!;
+			expect(record.barcode).toEqual({
+				barcode: 'BC-1',
+				internalCode: 'INT-1',
+				modeLabel: 'Barcode is the base number'
+			});
+			expect(record.collector).toEqual({ id: null });
+			expect(record.buyer).toEqual({ id: null });
+		});
+
+		it('returns 500 when the audit log cannot be read', async () => {
+			const { locals } = setup({ audit: { data: null, error: { message: 'boom' } } });
+			await expect(load(loadEvent(locals))).rejects.toMatchObject({ status: 500 });
 		});
 	});
 

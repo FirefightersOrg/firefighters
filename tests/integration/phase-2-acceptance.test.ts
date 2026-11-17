@@ -102,6 +102,7 @@ interface CampaignPageData {
 		editRules: boolean;
 		transitions: string[];
 		viewCommissions: boolean;
+		viewBonds: boolean;
 		loadBonds: boolean;
 	};
 }
@@ -506,6 +507,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				editRules: true,
 				transitions: ['active', 'annulled'],
 				viewCommissions: true,
+				viewBonds: true,
 				loadBonds: true
 			});
 
@@ -1148,6 +1150,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					editRules: false,
 					transitions: [],
 					viewCommissions: false,
+					// SAN-26: every one of these roles has bond.view (bonds list link).
+					viewBonds: true,
 					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
 					loadBonds: role === 'operator' && canLoadBonds(target.status)
 				});

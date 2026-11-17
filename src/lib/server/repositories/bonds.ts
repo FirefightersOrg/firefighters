@@ -576,3 +576,199 @@ export async function listGroupingMembers(
 		return { data: null, error: err as Error };
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Bonds list and record (SAN-26)
+// ---------------------------------------------------------------------------
+
+/** Rows per page of the bonds list. */
+export const BOND_LIST_PAGE_SIZE = 25;
+
+/** Filters of the bonds list (all optional, combined with AND). */
+export interface BondListFilters {
+	/** A participating base number (a manual pata matches through its members). */
+	baseNumber?: number | null;
+	/** A participating associated number (a manual pata matches through its members). */
+	associatedNumber?: number | null;
+	/** Exact barcode or internal code. */
+	code?: string | null;
+	kind?: BondKind | null;
+	commercialStatus?: BondCommercialStatus | null;
+	financialStatus?: BondFinancialStatus | null;
+}
+
+interface BondListRow {
+	id: string;
+	campaign_id: string;
+	kind: string;
+	origin: string;
+	internal_code: string | null;
+	barcode: string | null;
+	commercial_status: string;
+	financial_status_snapshot: string;
+	commercial_unit_count: number;
+	total_value: string | number;
+	created_at: string;
+	base_numbers: number[] | null;
+	associated_numbers: number[] | null;
+	group_pata_id: string | null;
+}
+
+/** A row of the bonds list (`public.bond_list`). */
+export interface BondListEntry {
+	id: string;
+	campaignId: string;
+	kind: BondKind;
+	origin: BondOrigin;
+	internalCode: string | null;
+	barcode: string | null;
+	commercialStatus: BondCommercialStatus;
+	financialStatus: BondFinancialStatus;
+	commercialUnitCount: number;
+	totalValue: string;
+	createdAt: string;
+	/** Participating base numbers, sorted (a manual pata: its members'). */
+	baseNumbers: number[];
+	associatedNumbers: number[];
+	/** The manual pata this simple bond is an active member of. */
+	groupPataId: string | null;
+}
+
+export const BOND_LIST_COLUMNS = [
+	'id',
+	'campaign_id',
+	'kind',
+	'origin',
+	'internal_code',
+	'barcode',
+	'commercial_status',
+	'financial_status_snapshot',
+	'commercial_unit_count',
+	'total_value::text',
+	'created_at',
+	'base_numbers',
+	'associated_numbers',
+	'group_pata_id'
+].join(', ');
+
+export function mapBondListRow(row: BondListRow): BondListEntry {
+	return {
+		id: row.id,
+		campaignId: row.campaign_id,
+		kind: oneOf<BondKind>(BOND_KINDS, row.kind, 'bonds.kind'),
+		origin: oneOf<BondOrigin>(BOND_ORIGINS, row.origin, 'bonds.origin'),
+		internalCode: row.internal_code,
+		barcode: row.barcode,
+		commercialStatus: oneOf<BondCommercialStatus>(
+			BOND_COMMERCIAL_STATUSES,
+			row.commercial_status,
+			'bonds.commercial_status'
+		),
+		financialStatus: oneOf<BondFinancialStatus>(
+			BOND_FINANCIAL_STATUSES,
+			row.financial_status_snapshot,
+			'bonds.financial_status_snapshot'
+		),
+		commercialUnitCount: row.commercial_unit_count,
+		totalValue: toDecimalString(row.total_value),
+		createdAt: row.created_at,
+		baseNumbers: row.base_numbers ?? [],
+		associatedNumbers: row.associated_numbers ?? [],
+		groupPataId: row.group_pata_id
+	};
+}
+
+/**
+ * A value for a PostgREST logic filter (`or=(...)`): double-quoted, with `"` and `\` escaped, so
+ * commas, dots and parentheses in a code are taken literally.
+ */
+export function quotePostgrestValue(value: string): string {
+	return `"${value.replace(/["\\]/g, (c) => `\\${c}`)}"`;
+}
+
+/**
+ * One page of a campaign's bonds (`public.bond_list`, RLS: `bond.view`) and the total matching
+ * the filters, in one query. Stable order: lowest participating base number, then load time, then
+ * id. `page` starts at 1.
+ */
+export async function listBonds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	filters: BondListFilters,
+	options: { page: number; pageSize?: number }
+): Promise<RepositoryResult<{ entries: BondListEntry[]; total: number }>> {
+	const pageSize = options.pageSize ?? BOND_LIST_PAGE_SIZE;
+	const from = (Math.max(1, options.page) - 1) * pageSize;
+	let query = supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS, { count: 'exact' })
+		.eq('campaign_id', campaignId);
+	if (filters.baseNumber != null) query = query.contains('base_numbers', [filters.baseNumber]);
+	if (filters.associatedNumber != null) {
+		query = query.contains('associated_numbers', [filters.associatedNumber]);
+	}
+	if (filters.code) {
+		const code = quotePostgrestValue(filters.code);
+		query = query.or(`barcode.eq.${code},internal_code.eq.${code}`);
+	}
+	if (filters.kind) query = query.eq('kind', filters.kind);
+	if (filters.commercialStatus) query = query.eq('commercial_status', filters.commercialStatus);
+	if (filters.financialStatus) {
+		query = query.eq('financial_status_snapshot', filters.financialStatus);
+	}
+	const { data, error, count } = await query
+		.order('sort_number', { ascending: true, nullsFirst: false })
+		.order('created_at', { ascending: true })
+		.order('id', { ascending: true })
+		.range(from, from + pageSize - 1)
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		return {
+			data: { entries: (data ?? []).map(mapBondListRow), total: count ?? 0 },
+			error: null
+		};
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
+}
+
+/**
+ * Participating base numbers of the given bonds (`public.bond_list`), e.g. to name the manual
+ * patas of the listed members ("in pata 0068 + 0069"). `ids` must be valid uuids.
+ */
+export async function listBondBaseNumbers(
+	supabase: SupabaseClient,
+	ids: readonly string[]
+): Promise<RepositoryResult<Map<string, number[]>>> {
+	if (ids.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('bond_list')
+		.select('id, base_numbers')
+		.in('id', [...ids])
+		.overrideTypes<{ id: string; base_numbers: number[] | null }[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: new Map((data ?? []).map((row) => [row.id, row.base_numbers ?? []])),
+		error: null
+	};
+}
+
+/**
+ * Every manual pata a bond has been a member of (active and ungrouped memberships), oldest
+ * first. `memberBondId` must be a valid uuid.
+ */
+export async function listMembershipsOfMember(
+	supabase: SupabaseClient,
+	memberBondId: string
+): Promise<RepositoryResult<BondGroupHistoryEntry[]>> {
+	const { data, error } = await supabase
+		.from('bond_groups')
+		.select(BOND_GROUP_COLUMNS)
+		.eq('member_bond_id', memberBondId)
+		.order('grouped_at', { ascending: true })
+		.order('id', { ascending: true })
+		.overrideTypes<BondGroupRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: (data ?? []).map(mapHistoryEntry), error: null };
+}

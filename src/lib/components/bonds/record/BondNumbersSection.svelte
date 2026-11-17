@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { cardClass } from '$lib/components/campaigns/styles';
+	import RecordSection from './RecordSection.svelte';
 	import type { BondRecordNumber } from './types';
 
 	/**
-	 * Bond record, "Participating numbers", padded like the campaign shows them. A manual pata owns
-	 * no numbers: its members' numbers are shown, each linking to its member bond.
+	 * Bond record, 2. "Participating numbers" (base, associated, extraordinary), padded like the
+	 * campaign shows them. A manual pata owns no numbers: its members' numbers are shown, each
+	 * linking to its member bond.
 	 */
 	let {
 		campaignId,
@@ -17,8 +18,7 @@
 	const released = $derived(numbers.some((n) => n.released));
 </script>
 
-<section class={cardClass} aria-labelledby="numbers-title">
-	<h2 id="numbers-title" class="mb-4 text-base font-semibold">Participating numbers</h2>
+<RecordSection id="numbers">
 	{#if numbers.length === 0}
 		<p class="text-sm text-slate-500">This bond has no participating numbers.</p>
 	{:else}
@@ -61,4 +61,4 @@
 			</tbody>
 		</table>
 	{/if}
-</section>
+</RecordSection>

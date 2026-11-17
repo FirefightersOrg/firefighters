@@ -183,7 +183,7 @@ The database is the authority: the app never sends associated numbers or values,
 - **Manual grouping** (`?/group`): search available simple bonds that are not in an active group, by base number (`searchGroupableBonds`: one PostgREST query with an anti-join on active `bond_groups` rows, first 20 from the typed number). Picked bonds live in the URL (`?selected=<id>&selected=<id>`), so the page also works without JavaScript; each picked bond is re-checked (`listGroupingMembers`) and flagged when it cannot be grouped. The action checks again with friendly messages (linking to the pata a bond already belongs to) before `bond_group_into_pata`, which is the authority.
 - Both open the new pata's record when saved.
 
-### Bond record (SAN-25, minimal)
+### Bond record (SAN-25, actions)
 
 `/campaigns/[id]/bonds/[bondId]` (requires `campaign.view` and `bond.view`). For now: general data, participating numbers padded with the campaign's digits (a manual pata shows its members' numbers), manual pata members with their ungroup history, or "In pata X" with a link for an active member (no individual actions). One component per section (`src/lib/components/bonds/record/`), with the view model built by `buildBondRecord` (`src/lib/server/bonds/record.ts`), so the remaining sections of docs/screens.md "Bond record" can be added one by one.
 
@@ -191,6 +191,26 @@ The database is the authority: the app never sends associated numbers or values,
 - `?/annul`: available simple bond or printed pata not in an active group, `bond.annul` (admin only; hidden otherwise, 403 from the action), reason required. Its numbers are released and can be entered again.
 - An annulled bond shows the status it was annulled from (`annulled_from_status`): from `available` (loaded by mistake) its numbers and codes were freed; from `sold` (annulled sale, Phase 10) they stay held.
 - Database messages never show bond ids (`withoutBondIds`, `src/lib/server/bonds/route-helpers.ts`).
+- Both actions are scoped to the URL's campaign: they validate `params.id` and `bondId`, read the bond's campaign (`getBondCampaignId`) and answer the same 404 (without calling the SQL function) for a malformed id, a missing bond or a bond of another campaign.
+
+### Bonds list (SAN-26)
+
+`/campaigns/[id]/bonds` (requires `campaign.view` and `bond.view`; linked from the campaign page):
+
+- Filters live in the query string (`base`, `associated`, `code`, `type`, `status`, `financial`, `page`), submitted with a GET form, so the list works without JavaScript and can be bookmarked. Numbers are parsed with the campaign's numbering (padded or not); invalid values are shown on the field and the list is not queried. `code` is an exact match on the barcode or the internal code. Collector and buyer filters are shown disabled until Phase 5.
+- Reads go through the view `public.bond_list` (migration `20261121000000_bond_list_view.sql`, `security_invoker`, so the `bond.view` RLS of the bond tables applies). It exposes each bond's participating base and associated numbers as sorted arrays: its own numbers, or for a manual pata its members' (every membership, so an ungrouped pata is still found by the numbers it had); released numbers are included. The number filters are `cs` (array contains) filters, so a number finds the simple bond and the manual pata it is in.
+- One query per page (`listBonds`): filters, `count=exact`, stable order (`sort_number` = lowest base number, then `created_at`, then `id`) and `range`. A second small query names the manual patas of grouped members ("In pata 0001 + 0002").
+- Quick actions: create bond / create pata (with `bond.create` while the campaign is draft or active), load by barcode (disabled, Phase 4), assign to collector (disabled, Phase 6), and a "View record" link per row.
+
+### Bond record sections (SAN-26)
+
+`/campaigns/[id]/bonds/[bondId]` renders the 13 sections of docs/screens.md "Bond record", one component each in `src/lib/components/bonds/record/` (numbered cards with anchors and an index at the top), from the view model built by `buildBondRecord`:
+
+1. General data, including the manual pata composition and ungroup history, or for a simple bond the pata it is in and the patas it was in before they were ungrouped (`listMembershipsOfMember`, named through `bond_list`).
+2. Participating numbers (base, associated, extraordinary), padded.
+3. Barcode: barcode, internal code and the campaign's barcode mode.
+4. / 5. Current collector / buyer, and 6. to 12. (sale, installments, payments, settlements, commissions, draws and rosters, prizes): empty states naming the phase that adds their data.
+5. Audit (`audit.view`, else a note; the log is not queried): the `audit_log` rows with `entity_type = 'bond'` and `entity_id` = the bond, plus the `bond.group` / `bond.ungroup` rows of manual patas whose snapshot lists the bond as a member, newest first (at most 200). The actor's name is shown when the caller can see the profile (`user.manage`), else "A user".
 
 ## Barcode and imports
 

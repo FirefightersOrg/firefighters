@@ -6,7 +6,11 @@ import {
 	campaignHasBonds,
 	getBondById,
 	getBondCampaignId,
+	listBondBaseNumbers,
 	listBondNumbersByCampaign,
+	listBonds,
+	listMembershipsOfMember,
+	quotePostgrestValue,
 	mapBondRow,
 	type BondGroupRow,
 	type BondNumberRow,
@@ -66,7 +70,18 @@ const groupRow: BondGroupRow = {
 function queryMock(results: Array<{ data: unknown; error: unknown }>) {
 	const calls: Array<[string, unknown[]]> = [];
 	const builder: Record<string, unknown> = {};
-	for (const method of ['select', 'eq', 'is', 'or', 'order', 'range', 'limit', 'maybeSingle']) {
+	for (const method of [
+		'select',
+		'eq',
+		'is',
+		'or',
+		'in',
+		'contains',
+		'order',
+		'range',
+		'limit',
+		'maybeSingle'
+	]) {
 		builder[method] = (...args: unknown[]) => {
 			calls.push([method, args]);
 			return builder;
@@ -123,6 +138,128 @@ describe('bonds repository', () => {
 		await expect(
 			getBondCampaignId(queryMock([{ data: null, error: { message: 'boom' } }]).supabase, BOND_ID)
 		).resolves.toEqual({ data: null, error: { message: 'boom' } });
+	});
+
+	it('lists a page of bonds from bond_list with filters, stable order and the exact count', async () => {
+		const row = {
+			id: BOND_ID,
+			campaign_id: CAMPAIGN_ID,
+			kind: 'pata',
+			origin: 'manual_grouping',
+			internal_code: null,
+			barcode: 'BC,1',
+			commercial_status: 'available',
+			financial_status_snapshot: 'no_payments',
+			commercial_unit_count: 2,
+			total_value: 120000,
+			created_at: '2026-11-17T12:00:00+00:00',
+			base_numbers: [68, 69],
+			associated_numbers: null,
+			group_pata_id: null
+		};
+		const { supabase, calls } = queryMock([{ data: [row], error: null, count: 30 } as never]);
+		const result = await listBonds(
+			supabase,
+			CAMPAIGN_ID,
+			{
+				baseNumber: 68,
+				associatedNumber: 4940,
+				code: 'BC,1',
+				kind: 'pata',
+				commercialStatus: 'available',
+				financialStatus: 'no_payments'
+			},
+			{ page: 2, pageSize: 10 }
+		);
+		expect(result).toEqual({
+			data: {
+				entries: [
+					{
+						id: BOND_ID,
+						campaignId: CAMPAIGN_ID,
+						kind: 'pata',
+						origin: 'manual_grouping',
+						internalCode: null,
+						barcode: 'BC,1',
+						commercialStatus: 'available',
+						financialStatus: 'no_payments',
+						commercialUnitCount: 2,
+						totalValue: '120000.00',
+						createdAt: '2026-11-17T12:00:00+00:00',
+						baseNumbers: [68, 69],
+						associatedNumbers: [],
+						groupPataId: null
+					}
+				],
+				total: 30
+			},
+			error: null
+		});
+		expect(calls).toEqual([
+			['from', ['bond_list']],
+			['select', [expect.stringContaining('total_value::text'), { count: 'exact' }]],
+			['eq', ['campaign_id', CAMPAIGN_ID]],
+			['contains', ['base_numbers', [68]]],
+			['contains', ['associated_numbers', [4940]]],
+			['or', ['barcode.eq."BC,1",internal_code.eq."BC,1"']],
+			['eq', ['kind', 'pata']],
+			['eq', ['commercial_status', 'available']],
+			['eq', ['financial_status_snapshot', 'no_payments']],
+			['order', ['sort_number', { ascending: true, nullsFirst: false }]],
+			['order', ['created_at', { ascending: true }]],
+			['order', ['id', { ascending: true }]],
+			['range', [10, 19]]
+		]);
+
+		const failed = queryMock([{ data: null, error: { message: 'boom' } }]);
+		await expect(listBonds(failed.supabase, CAMPAIGN_ID, {}, { page: 1 })).resolves.toEqual({
+			data: null,
+			error: { message: 'boom' }
+		});
+	});
+
+	it('quotes PostgREST logic-filter values', () => {
+		expect(quotePostgrestValue('A,B')).toBe('"A,B"');
+		expect(quotePostgrestValue('a"b\\c')).toBe('"a\\"b\\\\c"');
+	});
+
+	it('reads base numbers of several bonds, without a query for none', async () => {
+		const none = queryMock([]);
+		await expect(listBondBaseNumbers(none.supabase, [])).resolves.toEqual({
+			data: new Map(),
+			error: null
+		});
+		expect(none.calls).toEqual([]);
+		const { supabase, calls } = queryMock([
+			{ data: [{ id: PATA_ID, base_numbers: [68, 69] }], error: null }
+		]);
+		const result = await listBondBaseNumbers(supabase, [PATA_ID]);
+		expect(result.data?.get(PATA_ID)).toEqual([68, 69]);
+		expect(calls).toContainEqual(['in', ['id', [PATA_ID]]]);
+	});
+
+	it('lists every pata a bond was a member of, oldest first', async () => {
+		const ungrouped = {
+			...groupRow,
+			ungrouped_at: '2026-11-17T13:00:00+00:00',
+			ungrouped_by: 'p1',
+			reason: 'Wrong'
+		};
+		const { supabase, calls } = queryMock([{ data: [ungrouped], error: null }]);
+		const result = await listMembershipsOfMember(supabase, BOND_ID);
+		expect(result.data).toEqual([
+			{
+				id: 'g1',
+				pataBondId: PATA_ID,
+				memberBondId: BOND_ID,
+				groupedAt: '2026-11-17T12:00:00+00:00',
+				groupedBy: 'p1',
+				ungroupedAt: '2026-11-17T13:00:00+00:00',
+				ungroupedBy: 'p1',
+				reason: 'Wrong'
+			}
+		]);
+		expect(calls).toContainEqual(['eq', ['member_bond_id', BOND_ID]]);
 	});
 
 	it('selects money as text and maps rows', () => {

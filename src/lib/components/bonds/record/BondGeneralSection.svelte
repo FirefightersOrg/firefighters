@@ -1,15 +1,22 @@
 <script lang="ts">
-	import { cardClass } from '$lib/components/campaigns/styles';
-	import { BOND_COMMERCIAL_STATUS_LABELS } from '$lib/domain/bonds';
+	import { BOND_COMMERCIAL_STATUS_LABELS, BOND_FINANCIAL_STATUS_LABELS } from '$lib/domain/bonds';
 	import { formatInteger, formatMoney } from '$lib/domain/money';
-	import { formatBondTimestamp, type BondRecordGeneral } from './types';
+	import BondGroupSection from './BondGroupSection.svelte';
+	import RecordSection from './RecordSection.svelte';
+	import { formatBondTimestamp, type BondRecordGeneral, type BondRecordGroup } from './types';
 
-	/** Bond record, "General data": type, status, units, value, codes and dates. */
-	let { general }: { general: BondRecordGeneral } = $props();
+	/**
+	 * Bond record, 1. "General data": type, statuses, units, value, codes and dates, plus the
+	 * manual pata composition and ungroup history (or the pata a simple bond is / was in).
+	 */
+	let {
+		campaignId,
+		general,
+		group
+	}: { campaignId: string; general: BondRecordGeneral; group: BondRecordGroup } = $props();
 </script>
 
-<section class={cardClass} aria-labelledby="general-title">
-	<h2 id="general-title" class="mb-4 text-base font-semibold">General data</h2>
+<RecordSection id="general">
 	<dl class="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
 		<div>
 			<dt class="text-slate-500">Type</dt>
@@ -18,6 +25,10 @@
 		<div>
 			<dt class="text-slate-500">Commercial status</dt>
 			<dd class="font-medium">{BOND_COMMERCIAL_STATUS_LABELS[general.commercialStatus]}</dd>
+		</div>
+		<div>
+			<dt class="text-slate-500">Financial status</dt>
+			<dd class="font-medium">{BOND_FINANCIAL_STATUS_LABELS[general.financialStatus]}</dd>
 		</div>
 		<div>
 			<dt class="text-slate-500">Units (N)</dt>
@@ -30,10 +41,6 @@
 		<div>
 			<dt class="text-slate-500">Internal code</dt>
 			<dd class="font-medium">{general.internalCode ?? '—'}</dd>
-		</div>
-		<div>
-			<dt class="text-slate-500">Barcode</dt>
-			<dd class="font-medium">{general.barcode ?? '—'}</dd>
 		</div>
 		<div>
 			<dt class="text-slate-500">Loaded</dt>
@@ -63,4 +70,5 @@
 			{/if}
 		{/if}
 	</dl>
-</section>
+	<BondGroupSection {campaignId} {group} isManualPata={general.origin === 'manual_grouping'} />
+</RecordSection>

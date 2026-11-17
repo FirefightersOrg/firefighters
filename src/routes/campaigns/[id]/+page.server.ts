@@ -96,6 +96,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				!hasBonds,
 			transitions: availableCampaignTransitions(campaign.status, permissions),
 			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
+			viewBonds: hasPermissionIn(permissions, 'bond.view'),
 			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status)
 		}
 	};
