@@ -1802,7 +1802,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				p_request_id: requestId
 			});
 			expect(error).toMatchObject({
-				code: '40001',
+				code: 'PT409',
 				message: 'campaign was modified by someone else'
 			});
 			await expectNoAudit(requestId);
@@ -1850,7 +1850,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				p_request_id: dbStaleId
 			});
 			expect(error).toMatchObject({
-				code: '40001',
+				code: 'PT409',
 				message: 'campaign was modified by someone else'
 			});
 			await expectNoAudit(dbStaleId);
@@ -1909,7 +1909,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				rpcRulesArgs(loaded, dbStaleId, { p_installment_count: 12 })
 			);
 			expect(error).toMatchObject({
-				code: '40001',
+				code: 'PT409',
 				message: 'campaign was modified by someone else'
 			});
 			await expectNoAudit(dbStaleId);
@@ -1985,7 +1985,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				p_request_id: dbStaleId
 			});
 			expect(error).toMatchObject({
-				code: '40001',
+				code: 'PT409',
 				message: 'commission rule was modified by someone else'
 			});
 			await expectNoAudit(dbStaleId);
