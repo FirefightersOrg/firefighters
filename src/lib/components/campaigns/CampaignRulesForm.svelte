@@ -14,7 +14,7 @@
 	import RulesFields from './RulesFields.svelte';
 	import { diffCampaignRules } from './rules-diff';
 	import { cardClass, hintClass, inputClass, labelClass, primaryButtonClass } from './styles';
-	import { rulesValuesOf, withSubmitted } from './types';
+	import { campaignEditSnapshot, rulesValuesOf } from './types';
 
 	/**
 	 * Edit form for the rules of a draft campaign; posts to the page's `?/rules` action. Only
@@ -41,17 +41,17 @@
 		} | null;
 	} = $props();
 
-	function initialValues() {
-		return withSubmitted(rulesValuesOf(campaign), result?.values);
+	// Values and version (`updated_at`) are taken once, from the same load: the parent re-mounts
+	// this form whenever the campaign's version changes (`campaignEditFormKey`), so they never
+	// drift apart. Afterwards the inputs own the values; a failed submit keeps them and the
+	// version, so a stale form keeps failing with a conflict instead of overwriting newer changes.
+	function initialSnapshot() {
+		return campaignEditSnapshot(rulesValuesOf(campaign), campaign, result?.values);
 	}
-	let values = $state(initialValues());
+	const snapshot = initialSnapshot();
+	let values = $state(snapshot.values);
+	const expectedVersion = snapshot.version;
 	let submitting = $state(false);
-
-	// The campaign version (`updated_at`, exact string) this edit is based on. It follows the
-	// loaded campaign, so a successful save of any form on the page (which reloads it) moves it
-	// forward. After a failed submit it stays at the submitted version: a stale form keeps
-	// failing with a conflict until the page is reloaded, instead of overwriting newer changes.
-	const expectedVersion = $derived(result?.values?.expectedUpdatedAt ?? campaign.updatedAt);
 
 	const installmentError = $derived(
 		previewInstallmentValue(values.simpleBondValue, values.installmentCount).state === 'error'
@@ -62,9 +62,13 @@
 	let confirmedFor = $state<string | null>(null);
 	const confirmErrors = $derived(result?.errors[CAMPAIGN_RULES_CONFIRM_FIELD]);
 	const reasonErrors = $derived(result?.errors[CAMPAIGN_RULES_REASON_FIELD]);
-	// Refilled from the submitted values when JavaScript is off; cleared after a successful save.
+	// Refilled from the submitted values when JavaScript is off (only when they were based on the
+	// loaded version, like the rule values above); cleared after a successful save.
 	function initialReason() {
-		return result?.values?.[CAMPAIGN_RULES_REASON_FIELD] ?? '';
+		const reason = { [CAMPAIGN_RULES_REASON_FIELD]: '' };
+		return campaignEditSnapshot(reason, campaign, result?.values).values[
+			CAMPAIGN_RULES_REASON_FIELD
+		];
 	}
 	let changeReason = $state(initialReason());
 </script>

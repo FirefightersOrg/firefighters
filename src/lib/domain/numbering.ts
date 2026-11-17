@@ -13,7 +13,8 @@
  * `max_number` is blocked.
  *
  * The config checks in {@link validateNumberingConfig} mirror the `campaigns` table
- * constraints (1 <= number_digits <= 10, max_number > 0, max_number < 10^number_digits,
+ * constraints and column type (1 <= number_digits <= 10, 0 < max_number <= 2147483647 — the
+ * Postgres `integer` maximum, see {@link MAX_CAMPAIGN_NUMBER} — max_number < 10^number_digits,
  * associated_number_offset >= 0, associated_number_offset <= max_number).
  */
 import { DomainError } from './errors';
@@ -28,6 +29,13 @@ export const OVERFLOW_POLICIES: readonly OverflowPolicy[] = ['reject'];
  * 10 digits), so a wider format could never be filled. Mirrors `campaigns_number_digits_range`.
  */
 export const MAX_NUMBER_DIGITS = 10;
+
+/**
+ * Highest storable campaign number: `max_number` (and every number derived from it) is a
+ * Postgres `integer`, whose maximum is 2147483647. A 10-digit config therefore cannot use the
+ * full 10-digit range (9999999999); anything above this would fail on insert.
+ */
+export const MAX_CAMPAIGN_NUMBER = 2147483647;
 
 export interface CampaignNumberingConfig {
 	/** Visible digit count; values are left-padded with zeros to this width. */
@@ -84,6 +92,11 @@ export function validateNumberingConfig(config: CampaignNumberingConfig): Number
 	const maxIsPositiveInt = Number.isSafeInteger(maxNumber) && maxNumber > 0;
 	if (!maxIsPositiveInt) {
 		issues.push({ field: 'maxNumber', message: 'maxNumber must be a positive integer' });
+	} else if (maxNumber > MAX_CAMPAIGN_NUMBER) {
+		issues.push({
+			field: 'maxNumber',
+			message: `maxNumber must not exceed ${MAX_CAMPAIGN_NUMBER} (Postgres integer maximum)`
+		});
 	} else if (digitsOk && maxNumber >= 10 ** numberDigits) {
 		issues.push({
 			field: 'maxNumber',
