@@ -5,7 +5,7 @@
 	import FormAlert from './FormAlert.svelte';
 	import GeneralFields from './GeneralFields.svelte';
 	import { cardClass, primaryButtonClass } from './styles';
-	import { generalValuesOf, withSubmitted } from './types';
+	import { campaignEditSnapshot, generalValuesOf } from './types';
 
 	/** Edit form for name and dates; posts to the page's `?/update` action. */
 	let {
@@ -26,19 +26,17 @@
 		datesReadonly?: boolean;
 	} = $props();
 
-	// Initial values only (the parent re-mounts this form per campaign): afterwards the inputs own
-	// them. Without JavaScript, a failed submit refills them from `result.values`.
-	function initialValues() {
-		return withSubmitted(generalValuesOf(campaign), result?.values);
+	// Values and version (`updated_at`) are taken once, from the same load: the parent re-mounts
+	// this form whenever the campaign's version changes (`campaignEditFormKey`), so they never
+	// drift apart. Afterwards the inputs own the values; a failed submit keeps them and the
+	// version, so a stale form keeps failing with a conflict instead of overwriting newer changes.
+	function initialSnapshot() {
+		return campaignEditSnapshot(generalValuesOf(campaign), campaign, result?.values);
 	}
-	let values = $state(initialValues());
+	const snapshot = initialSnapshot();
+	let values = $state(snapshot.values);
+	const expectedVersion = snapshot.version;
 	let submitting = $state(false);
-
-	// The campaign version (`updated_at`, exact string) this edit is based on. It follows the
-	// loaded campaign, so a successful save of any form on the page (which reloads it) moves it
-	// forward. After a failed submit it stays at the submitted version: a stale form keeps
-	// failing with a conflict until the page is reloaded, instead of overwriting newer changes.
-	const expectedVersion = $derived(result?.values?.expectedUpdatedAt ?? campaign.updatedAt);
 </script>
 
 <section class={cardClass} aria-labelledby="general-title">

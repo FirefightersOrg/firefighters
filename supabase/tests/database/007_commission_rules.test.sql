@@ -1,5 +1,5 @@
 begin;
-select plan(138);
+select plan(140);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -61,6 +61,7 @@ grant execute on function pg_temp.act_as(int) to authenticated, anon;
 
 create temporary table ids (k text primary key, id uuid not null);
 grant select, insert on ids to authenticated;
+grant select on ids to service_role;
 
 -- Current versions (updated_at), as the app would have loaded them. They run as the caller, so
 -- they return null for users who cannot see the row (those are denied before the version check).
@@ -753,6 +754,25 @@ select throws_ok(
   $$update public.commission_rules set percentage = 99 where id = (select id from ids where k = 'r-cash-q1')$$,
   '55000', null, 'guard: annulled rules are immutable for every role'
 );
+
+-- An annulment always records who annulled: a direct write (bypassing commission_rule_annul)
+-- without annulled_by is rejected, as the owner and as service_role.
+select throws_ok(
+  $$update public.commission_rules
+    set status = 'annulled', annulled_at = now(), annul_reason = 'Direct write'
+    where id = (select id from ids where k = 'r-ver')$$,
+  '23514', 'new row for relation "commission_rules" violates check constraint "commission_rules_annulment_consistent"',
+  'constraint: an annulled rule requires annulled_by (owner)'
+);
+set local role service_role;
+select throws_ok(
+  $$update public.commission_rules
+    set status = 'annulled', annulled_at = now(), annul_reason = 'Direct write'
+    where id = (select id from ids where k = 'r-ver')$$,
+  '23514', 'new row for relation "commission_rules" violates check constraint "commission_rules_annulment_consistent"',
+  'constraint: an annulled rule requires annulled_by (service_role)'
+);
+reset role;
 
 -- ---------------------------------------------------------------------------
 -- Campaign status gating: closing / closed / annulled campaigns have read-only rules

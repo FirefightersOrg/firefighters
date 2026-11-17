@@ -6,6 +6,7 @@
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
 	import { cardClass } from '$lib/components/campaigns/styles';
+	import { campaignEditFormKey } from '$lib/components/campaigns/types';
 	import {
 		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
@@ -144,8 +145,9 @@
 		</section>
 	{/if}
 
-	<!-- The forms keep their own input state; re-mount them when another campaign is shown. -->
-	{#key campaign.id}
+	<!-- The forms keep their own input state, taken with the version it belongs to: re-mount them
+	     whenever a load brings another campaign or a new version (e.g. after a status change). -->
+	{#key campaignEditFormKey(campaign)}
 		{#if data.can.editName || data.can.editDates}
 			<CampaignGeneralForm
 				{campaign}

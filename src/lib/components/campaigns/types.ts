@@ -2,6 +2,7 @@ import type { Campaign } from '$lib/domain/campaigns';
 import { toCampaignDay } from '$lib/domain/campaigns';
 import { formatMoneyInput } from '$lib/domain/money';
 import { DEFAULT_NUMBERING_CONFIG } from '$lib/domain/numbering';
+import { CAMPAIGN_VERSION_FIELD } from '$lib/schemas/campaign';
 
 /** Raw input values (strings, as typed) of the general part of a campaign form. */
 export interface CampaignGeneralValues {
@@ -68,4 +69,42 @@ export function withSubmitted<T extends object>(base: T, submitted?: Record<stri
 		if (typeof submitted[key] === 'string') result[key] = submitted[key];
 	}
 	return result as T;
+}
+
+/**
+ * `{#key}` for the campaign edit forms: changes whenever a load brings another campaign or a new
+ * version of it (`updated_at`), so the forms re-mount and take their values and their version from
+ * that same load. A failed submit does not change it, so a form keeps showing its own errors and
+ * the values that were submitted.
+ */
+export function campaignEditFormKey(campaign: Pick<Campaign, 'id' | 'updatedAt'>): string {
+	return `${campaign.id}@${campaign.updatedAt}`;
+}
+
+/** What a campaign edit form starts from: its input values and the version they are based on. */
+export interface CampaignEditSnapshot<T> {
+	values: T;
+	/** The campaign's `updated_at` (exact string) the values belong to: the form's hidden version. */
+	version: string;
+}
+
+/**
+ * Initial state of a campaign edit form (optimistic concurrency): the loaded campaign's values
+ * (`base`) and its `updated_at`, always from the same load, so a save can never send old values
+ * with a newer version and silently overwrite a newer change.
+ *
+ * Values from a failed submit are shown again only when they were based on this same version
+ * (e.g. a validation error rendered without JavaScript). Values based on an older version are
+ * dropped in favour of the loaded ones; keeping them under the new version would be a lost update.
+ */
+export function campaignEditSnapshot<T extends object>(
+	base: T,
+	campaign: Pick<Campaign, 'updatedAt'>,
+	submitted?: Record<string, string>
+): CampaignEditSnapshot<T> {
+	const sameVersion = submitted?.[CAMPAIGN_VERSION_FIELD] === campaign.updatedAt;
+	return {
+		values: sameVersion ? withSubmitted(base, submitted) : base,
+		version: campaign.updatedAt
+	};
 }
