@@ -310,6 +310,25 @@ export async function getBondById(
 }
 
 /**
+ * The campaign a bond belongs to, or `data: null` when the bond does not exist or is not visible
+ * to the caller. One row, one column: used to scope bond record actions to the URL's campaign.
+ * `id` must already be a valid uuid.
+ */
+export async function getBondCampaignId(
+	supabase: SupabaseClient,
+	id: string
+): Promise<RepositoryResult<string | null>> {
+	const { data, error } = await supabase
+		.from('bonds')
+		.select('campaign_id')
+		.eq('id', id)
+		.maybeSingle()
+		.overrideTypes<{ campaign_id: string } | null, { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: data?.campaign_id ?? null, error: null };
+}
+
+/**
  * Participating numbers of a campaign, ordered by value. Only live numbers by default (the ones
  * that count for uniqueness); `includeReleased` adds the numbers of annulled bonds (history).
  * Pages through PostgREST's row limit, so every number is returned.

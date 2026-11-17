@@ -13,6 +13,7 @@ import {
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import {
 	getBondById,
+	getBondCampaignId,
 	listBondNumbersByBondIds,
 	listPataMemberships,
 	type BondGroupHistoryEntry
@@ -32,7 +33,8 @@ const isUuid = (value: string) => z.guid().safeParse(value).success;
  * ungrouping history; the other sections of docs/screens.md "Bond record" come later.
  * Requires an active user with `campaign.view` and `bond.view` (else 403).
  *
- * Actions (the SQL functions re-check permission, status and campaign window):
+ * Actions (the SQL functions re-check permission, status and campaign window). Both answer 404
+ * without calling the database function unless the bond belongs to the URL's campaign:
  * - `?/ungroup`: an available manual pata (`bond.create`, reason required). The pata is annulled,
  *   its memberships are kept as history and its members are free again.
  * - `?/annul`: an available simple bond or printed pata that is not in a pata (`bond.annul`,
@@ -96,13 +98,41 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	};
 };
 
+/**
+ * Actions: the bond must exist and belong to the campaign of the URL, else a 404 result (the same
+ * one for a malformed id, a missing bond and a bond of another campaign, so nothing leaks about
+ * other campaigns). Returns null when the action may proceed. Runs after the permission check.
+ */
+async function checkBondInCampaign(
+	locals: App.Locals,
+	params: { id: string; bondId: string },
+	form: 'ungroup' | 'annul'
+) {
+	if (!isUuid(params.id) || !isUuid(params.bondId)) {
+		return bondFormFailure(form, 404, BOND_MESSAGES.bondNotFound);
+	}
+	const { data: campaignId, error: loadError } = await getBondCampaignId(
+		locals.supabase,
+		params.bondId
+	);
+	if (loadError) {
+		console.error('[bonds] bond scope check failed', {
+			requestId: locals.requestId,
+			bondId: params.bondId,
+			error: loadError
+		});
+		return bondFormFailure(form, 500, 'Could not load the bond. Please try again.');
+	}
+	if (campaignId !== params.id) return bondFormFailure(form, 404, BOND_MESSAGES.bondNotFound);
+	return null;
+}
+
 export const actions: Actions = {
 	ungroup: async ({ request, locals, params, url }) => {
 		const denied = checkBondActionPermission(locals, url, 'ungroup', 'bond.create');
 		if (denied) return denied;
-		if (!isUuid(params.bondId)) {
-			return bondFormFailure('ungroup', 404, BOND_MESSAGES.bondNotFound);
-		}
+		const outOfScope = await checkBondInCampaign(locals, params, 'ungroup');
+		if (outOfScope) return outOfScope;
 
 		const values = readFormFields(await request.formData(), BOND_RECORD_ACTION_FIELDS);
 		const parsed = bondUngroupSchema.safeParse({ ...values, pataBondId: params.bondId });
@@ -128,9 +158,8 @@ export const actions: Actions = {
 	annul: async ({ request, locals, params, url }) => {
 		const denied = checkBondActionPermission(locals, url, 'annul', 'bond.annul');
 		if (denied) return denied;
-		if (!isUuid(params.bondId)) {
-			return bondFormFailure('annul', 404, BOND_MESSAGES.bondNotFound);
-		}
+		const outOfScope = await checkBondInCampaign(locals, params, 'annul');
+		if (outOfScope) return outOfScope;
 
 		const values = readFormFields(await request.formData(), BOND_RECORD_ACTION_FIELDS);
 		const parsed = bondAnnulSchema.safeParse({ ...values, bondId: params.bondId });

@@ -111,12 +111,13 @@ function run(
 	action: 'ungroup' | 'annul',
 	locals: App.Locals,
 	fields: Record<string, string>,
-	bondId = BOND_ID
+	bondId = BOND_ID,
+	id = CAMPAIGN_ID
 ) {
-	const url = `http://localhost:5173/campaigns/${CAMPAIGN_ID}/bonds/${bondId}?/${action}`;
+	const url = `http://localhost:5173/campaigns/${id}/bonds/${bondId}?/${action}`;
 	const event = {
 		locals,
-		params: { id: CAMPAIGN_ID, bondId },
+		params: { id, bondId },
 		url: new URL(url),
 		request: postRequest(url, fields)
 	} as unknown as Parameters<typeof actions.annul>[0];
@@ -297,6 +298,71 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			expect((await load(loadEvent(readOnly.locals, PATA_ID)))!.record.actions.ungroup).toBe(false);
 		});
 	});
+
+	describe.each(['ungroup', 'annul'] as const)(
+		'%s action: scoped to the URL campaign',
+		(action) => {
+			const OTHER_CAMPAIGN = 'f0000000-0000-0000-0000-000000000009';
+
+			it('404s without calling the service for a bond of another campaign', async () => {
+				const { locals, rpc, from } = setup({
+					bond: { data: { campaign_id: OTHER_CAMPAIGN }, error: null }
+				});
+				const result = await run(action, locals, { reason: 'x' });
+				expect(result.status).toBe(404);
+				expect(result.data).toMatchObject({
+					form: action,
+					success: false,
+					message: expect.stringContaining('Bond not found')
+				});
+				expect(from).toHaveBeenCalledWith('bonds');
+				expect(rpc).not.toHaveBeenCalled();
+			});
+
+			it('gives the same 404 for a bond that does not exist', async () => {
+				const { locals, rpc } = setup({ bond: { data: null, error: null } });
+				const result = await run(action, locals, { reason: 'x' });
+				expect(result.status).toBe(404);
+				expect(result.data.message).toEqual(expect.stringContaining('Bond not found'));
+				expect(rpc).not.toHaveBeenCalled();
+			});
+
+			it('404s for a malformed campaign id or bond id without touching the database', async () => {
+				for (const [bondId, id] of [
+					[BOND_ID, 'nope'],
+					['nope', CAMPAIGN_ID]
+				]) {
+					const { locals, rpc, from } = setup();
+					const result = await run(action, locals, { reason: 'x' }, bondId, id);
+					expect(result.status).toBe(404);
+					expect(result.data).toMatchObject({ form: action, success: false });
+					expect(from).not.toHaveBeenCalled();
+					expect(rpc).not.toHaveBeenCalled();
+				}
+			});
+
+			it('checks the permission first (403 before any lookup)', async () => {
+				const { supabase, rpc, from } = setup();
+				const result = await run(
+					action,
+					makeLocals({ supabase, permissions: READ_ONLY }),
+					{ reason: 'x' },
+					BOND_ID,
+					'nope'
+				);
+				expect(result.status).toBe(403);
+				expect(from).not.toHaveBeenCalled();
+				expect(rpc).not.toHaveBeenCalled();
+			});
+
+			it('500s without calling the service when the bond cannot be read', async () => {
+				const { locals, rpc } = setup({ bond: { data: null, error: { message: 'boom' } } });
+				const result = await run(action, locals, { reason: 'x' });
+				expect(result.status).toBe(500);
+				expect(rpc).not.toHaveBeenCalled();
+			});
+		}
+	);
 
 	describe('ungroup action', () => {
 		it('requires bond.create (403) and does not call the database', async () => {
