@@ -3,7 +3,11 @@ import type { z } from 'zod';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
-import { campaignFieldErrors, type CampaignFieldErrors } from '$lib/schemas/campaign';
+import {
+	CAMPAIGN_VERSION_FIELD,
+	campaignFieldErrors,
+	type CampaignFieldErrors
+} from '$lib/schemas/campaign';
 import { CAMPAIGN_MESSAGES, CampaignServiceError } from '$lib/server/services/campaigns';
 
 /** Which form on a campaign page an action result belongs to. */
@@ -65,16 +69,18 @@ export function campaignFormSuccess(form: CampaignFormName, message: string): Ca
 
 export const FIX_FIELDS_MESSAGE = 'Please correct the highlighted fields.';
 
-/** 400 failure for a schema validation error. */
+/**
+ * 400 failure for a schema validation error. A missing or malformed version (the hidden
+ * `expectedUpdatedAt` field, which has no visible input) is reported as the form message.
+ */
 export function campaignValidationFailure(
 	form: CampaignFormName,
 	error: z.ZodError,
 	values: Record<string, string>
 ) {
-	return campaignFormFailure(form, 400, FIX_FIELDS_MESSAGE, {
-		errors: campaignFieldErrors(error),
-		values
-	});
+	const errors = campaignFieldErrors(error);
+	const message = errors[CAMPAIGN_VERSION_FIELD]?.[0] ?? FIX_FIELDS_MESSAGE;
+	return campaignFormFailure(form, 400, message, { errors, values });
 }
 
 /** Maps an error thrown by the campaign service to a `fail()` result. Other errors are rethrown. */

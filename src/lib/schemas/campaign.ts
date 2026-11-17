@@ -9,6 +9,9 @@
  * - Money is typed in Argentine format (`60.000,50`, see `parseMoneyInput`) and comes out as a
  *   canonical two-decimal string (`"60000.50"`), never a float.
  * - Dates are calendar days (`YYYY-MM-DD`) turned into timestamps in the campaign time zone.
+ * - Edits of an existing campaign carry `expectedUpdatedAt`: the campaign's `updated_at` as loaded
+ *   (optimistic concurrency). It is kept as the exact string PostgREST returned (microseconds), never
+ *   parsed into a `Date`, so the database can compare it exactly.
  */
 import { z } from 'zod';
 import {
@@ -25,17 +28,19 @@ import {
 	parseMoneyInput
 } from '$lib/domain/money';
 import {
+	MAX_NUMBER_DIGITS,
 	validateNumberingConfig,
 	type CampaignNumberingConfig,
 	type OverflowPolicy
 } from '$lib/domain/numbering';
 import { buildNumberingPreview, type NumberingPreview } from '$lib/domain/numbering-preview';
 
+/** Re-exported for the form components; defined (and enforced) by the numbering domain. */
+export { MAX_NUMBER_DIGITS };
+
 const INT4_MAX = 2_147_483_647;
 export const CAMPAIGN_NAME_MAX_LENGTH = 200;
 export const CAMPAIGN_REASON_MAX_LENGTH = 1000;
-/** Visible digits are capped so `max_number` (a Postgres integer) can always fit them. */
-export const MAX_NUMBER_DIGITS = 10;
 
 // ---------------------------------------------------------------------------
 // Form fields
@@ -67,10 +72,19 @@ export const CAMPAIGN_RULES_CONFIRM_VALUE = 'yes';
 /** Optional reason for a rule change, stored in the audit row (`audit_log.reason`). */
 export const CAMPAIGN_RULES_REASON_FIELD = 'changeReason';
 export const CAMPAIGN_RULES_REASON_MAX_LENGTH = 500;
+/** Hidden field of the edit forms: the campaign's `updated_at` as loaded (its version). */
+export const CAMPAIGN_VERSION_FIELD = 'expectedUpdatedAt';
+/** Fields posted by the rules edit form (`?/rules`). */
 export const CAMPAIGN_RULES_UPDATE_FIELDS = [
 	...CAMPAIGN_RULES_FIELDS,
 	CAMPAIGN_RULES_REASON_FIELD,
-	CAMPAIGN_RULES_CONFIRM_FIELD
+	CAMPAIGN_RULES_CONFIRM_FIELD,
+	CAMPAIGN_VERSION_FIELD
+] as const;
+/** Fields posted by the general-data edit form (`?/update`). */
+export const CAMPAIGN_GENERAL_UPDATE_FIELDS = [
+	...CAMPAIGN_GENERAL_FIELDS,
+	CAMPAIGN_VERSION_FIELD
 ] as const;
 export const CAMPAIGN_TRANSITION_FIELDS = ['toStatus', 'reason'] as const;
 
@@ -78,7 +92,8 @@ export type CampaignFormField =
 	| (typeof CAMPAIGN_CREATE_FIELDS)[number]
 	| (typeof CAMPAIGN_TRANSITION_FIELDS)[number]
 	| typeof CAMPAIGN_RULES_REASON_FIELD
-	| typeof CAMPAIGN_RULES_CONFIRM_FIELD;
+	| typeof CAMPAIGN_RULES_CONFIRM_FIELD
+	| typeof CAMPAIGN_VERSION_FIELD;
 
 /** Raw string values of a form (what the inputs hold). */
 export type CampaignFormValues<F extends string = CampaignFormField> = Record<F, string>;
@@ -130,6 +145,21 @@ const optionalDay = (label: string) =>
 			message: `${label} must be a valid date (YYYY-MM-DD)`
 		})
 		.transform((value) => (value === '' ? null : value));
+
+/** Shown when the hidden version field is missing or malformed (e.g. a form from an old page). */
+export const CAMPAIGN_VERSION_INVALID_MESSAGE =
+	'This form is out of date. Reload the page and try again.';
+
+/**
+ * The campaign version as loaded: an ISO 8601 timestamp with an offset, exactly as PostgREST
+ * returned it (e.g. `2026-11-17T01:02:03.123456+00:00`). Required; output unchanged.
+ */
+export const campaignVersionSchema = z.iso.datetime({
+	offset: true,
+	message: CAMPAIGN_VERSION_INVALID_MESSAGE
+});
+
+const versionShape = { expectedUpdatedAt: campaignVersionSchema };
 
 const generalShape = {
 	name: z
@@ -215,6 +245,8 @@ function refineNumbering(value: ParsedNumbering, ctx: RefinementCtx) {
 		overflowPolicy: value.overflowPolicy as OverflowPolicy
 	});
 	for (const issue of issues) {
+		// The field schema already reports a numberDigits above MAX_NUMBER_DIGITS ("at most 10").
+		if (issue.field === 'numberDigits' && value.numberDigits > MAX_NUMBER_DIGITS) continue;
 		ctx.addIssue({
 			code: 'custom',
 			path: [issue.field],
@@ -300,28 +332,42 @@ export const campaignNumberingSchema = z
 	.superRefine(refineNumbering)
 	.transform((value) => ({ ...value, overflowPolicy: value.overflowPolicy as OverflowPolicy }));
 
-/** General data: name, start and end dates (`campaign.update`). */
+/**
+ * General data edit: name, start and end dates (`campaign.update`), plus the version the edit is
+ * based on (`expectedUpdatedAt`).
+ */
 export const campaignGeneralSchema = z
-	.object(generalShape)
+	.object({ ...generalShape, ...versionShape })
 	.superRefine(refineDates)
-	.transform(toGeneralOutput);
+	.transform((value) => ({
+		...toGeneralOutput(value),
+		expectedUpdatedAt: value.expectedUpdatedAt
+	}));
 
-/** Rules: installments, numbering, overflow policy and barcode mode (`campaign.update_rules`). */
+/**
+ * Rules edit: installments, numbering, overflow policy and barcode mode (`campaign.update_rules`),
+ * plus the version the edit is based on (`expectedUpdatedAt`).
+ */
 export const campaignRulesSchema = z
-	.object(rulesShape)
+	.object({ ...rulesShape, ...versionShape })
 	.superRefine((value, ctx) => {
 		refineNumbering(value, ctx);
 		refineInstallments(value, ctx);
 	})
-	.transform(toRulesOutput);
+	.transform((value) => ({
+		...toRulesOutput(value),
+		expectedUpdatedAt: value.expectedUpdatedAt
+	}));
 
 /**
  * Rules of an existing (draft) campaign: the rules, an optional reason for the audit log (trimmed,
- * blank → null) and the explicit confirmation.
+ * blank → null), the explicit confirmation and the version the edit is based on
+ * (`expectedUpdatedAt`).
  */
 export const campaignRulesUpdateSchema = z
 	.object({
 		...rulesShape,
+		...versionShape,
 		[CAMPAIGN_RULES_REASON_FIELD]: z
 			.string()
 			.trim()
@@ -343,6 +389,7 @@ export const campaignRulesUpdateSchema = z
 	})
 	.transform((value) => ({
 		...toRulesOutput(value),
+		expectedUpdatedAt: value.expectedUpdatedAt,
 		/** Audit reason (`campaign_update_rules(p_reason)`), or null. */
 		reason: value[CAMPAIGN_RULES_REASON_FIELD]
 	}));

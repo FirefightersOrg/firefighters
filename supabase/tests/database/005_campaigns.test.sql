@@ -1,5 +1,5 @@
 begin;
-select plan(147);
+select plan(153);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner, which bypasses RLS and privileges; triggers still fire)
@@ -213,10 +213,49 @@ select throws_ok(
   '23514', 'new row for relation "campaigns" violates check constraint "campaigns_installment_value_exact"',
   'a high-precision quotient rounded to numeric(14,2) is still rejected'
 );
+-- NaN: numeric accepts 'NaN' and orders it above every number (NaN > 0, NaN = NaN), so without
+-- the explicit "<> 'NaN'" both NaN together would pass "> 0" and the exact-installment CHECK.
+-- With one side NaN the exact CHECK already fails (CHECKs run in name order), so only the
+-- both-NaN case pins the positive CHECK; the definitions are asserted directly as well.
+select throws_ok(
+  $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode)
+    values ('NaN value', 'NaN', 10, 6000, 'base_number')$$,
+  '23514', null, 'simple_bond_value NaN is rejected'
+);
+select throws_ok(
+  $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode)
+    values ('NaN installment value', 60000, 10, 'NaN', 'base_number')$$,
+  '23514', null, 'installment_value NaN is rejected'
+);
+select throws_ok(
+  $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode)
+    values ('NaN both', 'NaN', 10, 'NaN', 'base_number')$$,
+  '23514', 'new row for relation "campaigns" violates check constraint "campaigns_installment_value_positive"',
+  'NaN simple_bond_value and installment_value together are rejected (NaN * n = NaN passes the exact CHECK)'
+);
+select ok(
+  (select bool_and(pg_get_constraintdef(c.oid) like '%''NaN''%')
+    from pg_constraint c
+    where c.conrelid = 'public.campaigns'::regclass
+      and c.conname in ('campaigns_simple_bond_value_positive', 'campaigns_installment_value_positive')
+    having count(*) = 2),
+  'simple_bond_value and installment_value positive CHECKs both exclude NaN'
+);
 select throws_ok(
   $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode, number_digits)
     values ('Zero digits', 60000, 10, 6000, 'base_number', 0)$$,
   '23514', null, 'number_digits 0 is rejected'
+);
+select throws_ok(
+  $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode, number_digits)
+    values ('Eleven digits', 60000, 10, 6000, 'base_number', 11)$$,
+  '23514', 'new row for relation "campaigns" violates check constraint "campaigns_number_digits_range"',
+  'number_digits 11 is rejected (max_number is an integer: at most 10 digits)'
+);
+select lives_ok(
+  $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode, number_digits, max_number)
+    values ('Ten digits', 60000, 10, 6000, 'base_number', 10, 2147483647)$$,
+  'number_digits 10 with max_number 2147483647 is accepted'
 );
 select throws_ok(
   $$insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode, max_number, associated_number_offset)

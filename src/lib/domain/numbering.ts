@@ -13,7 +13,7 @@
  * `max_number` is blocked.
  *
  * The config checks in {@link validateNumberingConfig} mirror the `campaigns` table
- * constraints (number_digits > 0, max_number > 0, max_number < 10^number_digits,
+ * constraints (1 <= number_digits <= 10, max_number > 0, max_number < 10^number_digits,
  * associated_number_offset >= 0, associated_number_offset <= max_number).
  */
 import { DomainError } from './errors';
@@ -22,6 +22,12 @@ import { DomainError } from './errors';
 export type OverflowPolicy = 'reject';
 
 export const OVERFLOW_POLICIES: readonly OverflowPolicy[] = ['reject'];
+
+/**
+ * Widest supported digit count. `max_number` is a Postgres `integer` (at most 2147483647,
+ * 10 digits), so a wider format could never be filled. Mirrors `campaigns_number_digits_range`.
+ */
+export const MAX_NUMBER_DIGITS = 10;
 
 export interface CampaignNumberingConfig {
 	/** Visible digit count; values are left-padded with zeros to this width. */
@@ -64,9 +70,15 @@ export function validateNumberingConfig(config: CampaignNumberingConfig): Number
 	const issues: NumberingConfigIssue[] = [];
 	const { numberDigits, maxNumber, associatedNumberOffset, overflowPolicy } = config;
 
-	const digitsOk = Number.isSafeInteger(numberDigits) && numberDigits > 0;
-	if (!digitsOk) {
+	const digitsIsPositiveInt = Number.isSafeInteger(numberDigits) && numberDigits > 0;
+	const digitsOk = digitsIsPositiveInt && numberDigits <= MAX_NUMBER_DIGITS;
+	if (!digitsIsPositiveInt) {
 		issues.push({ field: 'numberDigits', message: 'numberDigits must be a positive integer' });
+	} else if (!digitsOk) {
+		issues.push({
+			field: 'numberDigits',
+			message: `numberDigits must not exceed ${MAX_NUMBER_DIGITS}`
+		});
 	}
 
 	const maxIsPositiveInt = Number.isSafeInteger(maxNumber) && maxNumber > 0;

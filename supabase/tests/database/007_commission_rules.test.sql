@@ -62,6 +62,13 @@ grant execute on function pg_temp.act_as(int) to authenticated, anon;
 create temporary table ids (k text primary key, id uuid not null);
 grant select, insert on ids to authenticated;
 
+-- Current campaign version (updated_at), as the app would have loaded it (campaign_update_rules
+-- requires it since SAN-17's optimistic concurrency).
+create function pg_temp.campaign_version(p_k text) returns timestamptz language sql stable as $$
+  select c.updated_at from public.campaigns c join ids on ids.id = c.id where ids.k = p_k;
+$$;
+grant execute on function pg_temp.campaign_version(text) to authenticated;
+
 -- Campaigns (as the admin): 10 installments, with dates so they can be activated.
 set local role authenticated;
 select pg_temp.act_as(1);
@@ -673,12 +680,12 @@ reset role;
 set local role authenticated;
 select pg_temp.act_as(1);
 select throws_ok(
-  $$select public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 4, 4, 9999, 4871, 'reject', 'base_number', 'req-shrink')$$,
+  $$select public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 4, 4, 9999, 4871, 'reject', 'base_number', pg_temp.campaign_version('c-draft'), 'req-shrink')$$,
   '55000', 'installment count cannot be lowered below 5 while an active commission rule applies to installment 5',
   'campaign: installments cannot drop below a custom rule installment'
 );
 select is(
-  public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 5, 4, 9999, 4871, 'reject', 'base_number', 'req-shrink'),
+  public.campaign_update_rules((select id from ids where k = 'c-draft'), 60000, 5, 4, 9999, 4871, 'reject', 'base_number', pg_temp.campaign_version('c-draft'), 'req-shrink'),
   true, 'campaign: installments can drop down to the highest custom rule installment'
 );
 reset role;

@@ -37,6 +37,12 @@ function runAction(
 	return actions[name](event) as Promise<unknown>;
 }
 
+/** The campaign's updated_at as loaded (hidden `expectedUpdatedAt` field of the edit forms). */
+const VERSION = '2026-11-16T12:00:00.123456+00:00';
+const STALE_ERROR = { code: '40001', message: 'campaign was modified by someone else' };
+const STALE_MESSAGE =
+	'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.';
+
 const rulesForm = {
 	simpleBondValue: '60.000,00',
 	installmentCount: '12',
@@ -46,7 +52,8 @@ const rulesForm = {
 	overflowPolicy: 'reject',
 	barcodeMode: 'internal_code',
 	changeReason: '',
-	confirmRulesChange: 'yes'
+	confirmRulesChange: 'yes',
+	expectedUpdatedAt: VERSION
 };
 
 describe('/campaigns/[id]', () => {
@@ -162,7 +169,12 @@ describe('/campaigns/[id]', () => {
 	});
 
 	describe('update action (general data)', () => {
-		const fields = { name: 'Renamed', startsOn: '2027-03-01', endsOn: '2027-12-31' };
+		const fields = {
+			name: 'Renamed',
+			startsOn: '2027-03-01',
+			endsOn: '2027-12-31',
+			expectedUpdatedAt: VERSION
+		};
 
 		it('returns 403 without campaign.update', async () => {
 			const { supabase, rpc } = mockSupabase();
@@ -198,6 +210,7 @@ describe('/campaigns/[id]', () => {
 				p_name: 'Renamed',
 				p_starts_at: '2027-03-01T00:00:00-03:00',
 				p_ends_at: '2027-12-31T23:59:59-03:00',
+				p_expected_updated_at: VERSION,
 				p_request_id: 'req-test'
 			});
 
@@ -223,7 +236,8 @@ describe('/campaigns/[id]', () => {
 			await runAction('update', makeLocals({ supabase }), {
 				name: 'Renamed',
 				startsOn: '2027-03-01',
-				endsOn: '2028-01-15'
+				endsOn: '2028-01-15',
+				expectedUpdatedAt: VERSION
 			});
 			expect(rpc).toHaveBeenCalledWith(
 				'campaign_update',
@@ -266,6 +280,42 @@ describe('/campaigns/[id]', () => {
 			const result = (await runAction('update', makeLocals({}), fields, 'nope')) as ActionFailure;
 			expect(result.status).toBe(404);
 		});
+
+		it('maps a stale version (someone else saved first) to 409 and keeps the submitted values', async () => {
+			const { supabase, rpc } = mockSupabase({ rpc: { data: null, error: STALE_ERROR } });
+			const result = (await runAction('update', makeLocals({ supabase }), fields)) as ActionFailure;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({
+				form: 'general',
+				success: false,
+				message: STALE_MESSAGE,
+				errors: {},
+				values: fields
+			});
+			expect(rpc).toHaveBeenCalledWith(
+				'campaign_update',
+				expect.objectContaining({ p_expected_updated_at: VERSION })
+			);
+		});
+
+		it('rejects a missing or malformed version without calling the database', async () => {
+			for (const expectedUpdatedAt of [undefined, '', '2026-11-16']) {
+				const { supabase, rpc } = mockSupabase();
+				const posted: Record<string, string> = { ...fields };
+				if (expectedUpdatedAt === undefined) delete posted.expectedUpdatedAt;
+				else posted.expectedUpdatedAt = expectedUpdatedAt;
+				const result = (await runAction(
+					'update',
+					makeLocals({ supabase }),
+					posted
+				)) as ActionFailure;
+				expect(result.status).toBe(400);
+				expect(result.data.message).toBe(
+					'This form is out of date. Reload the page and try again.'
+				);
+				expect(rpc).not.toHaveBeenCalled();
+			}
+		});
 	});
 
 	describe('rules action', () => {
@@ -305,6 +355,7 @@ describe('/campaigns/[id]', () => {
 				p_associated_number_offset: 4871,
 				p_overflow_policy: 'reject',
 				p_barcode_mode: 'internal_code',
+				p_expected_updated_at: VERSION,
 				p_request_id: 'req-test',
 				p_reason: null
 			});
@@ -318,7 +369,10 @@ describe('/campaigns/[id]', () => {
 			});
 			expect(rpc).toHaveBeenCalledWith(
 				'campaign_update_rules',
-				expect.objectContaining({ p_reason: 'Board meeting 2026-11-16' })
+				expect.objectContaining({
+					p_reason: 'Board meeting 2026-11-16',
+					p_expected_updated_at: VERSION
+				})
 			);
 		});
 
@@ -367,6 +421,32 @@ describe('/campaigns/[id]', () => {
 					'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)'
 				]
 			});
+		});
+
+		it('maps a stale version to 409 with a reload message', async () => {
+			const { supabase } = mockSupabase({ rpc: { data: null, error: STALE_ERROR } });
+			const result = (await runAction(
+				'rules',
+				makeLocals({ supabase }),
+				rulesForm
+			)) as ActionFailure;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({
+				form: 'rules',
+				message: STALE_MESSAGE,
+				values: { expectedUpdatedAt: VERSION }
+			});
+		});
+
+		it('requires the version', async () => {
+			const { supabase, rpc } = mockSupabase();
+			const result = (await runAction('rules', makeLocals({ supabase }), {
+				...rulesForm,
+				expectedUpdatedAt: ''
+			})) as ActionFailure;
+			expect(result.status).toBe(400);
+			expect(result.data.errors).toHaveProperty('expectedUpdatedAt');
+			expect(rpc).not.toHaveBeenCalled();
 		});
 
 		it('maps "rules frozen" (campaign no longer draft) to 409', async () => {
