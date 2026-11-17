@@ -26,8 +26,8 @@ import {
 	updateCampaignRules
 } from '$lib/server/services/campaigns';
 import {
-	CAMPAIGN_GENERAL_FIELDS,
-	CAMPAIGN_RULES_FIELDS,
+	CAMPAIGN_GENERAL_UPDATE_FIELDS,
+	CAMPAIGN_RULES_UPDATE_FIELDS,
 	CAMPAIGN_TRANSITION_FIELDS,
 	campaignGeneralSchema,
 	campaignRulesSchema,
@@ -87,7 +87,7 @@ export const actions: Actions = {
 		if (denied) return denied;
 		if (!isUuid(params.id)) return campaignFormFailure('general', 404, CAMPAIGN_MESSAGES.notFound);
 
-		const values = readFormFields(await request.formData(), CAMPAIGN_GENERAL_FIELDS);
+		const values = readFormFields(await request.formData(), CAMPAIGN_GENERAL_UPDATE_FIELDS);
 		const parsed = campaignGeneralSchema.safeParse(values);
 		if (!parsed.success) return campaignValidationFailure('general', parsed.error, values);
 
@@ -115,7 +115,7 @@ export const actions: Actions = {
 		if (denied) return denied;
 		if (!isUuid(params.id)) return campaignFormFailure('rules', 404, CAMPAIGN_MESSAGES.notFound);
 
-		const values = readFormFields(await request.formData(), CAMPAIGN_RULES_FIELDS);
+		const values = readFormFields(await request.formData(), CAMPAIGN_RULES_UPDATE_FIELDS);
 		const parsed = campaignRulesSchema.safeParse(values);
 		if (!parsed.success) return campaignValidationFailure('rules', parsed.error, values);
 

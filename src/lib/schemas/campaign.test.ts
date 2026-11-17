@@ -6,9 +6,15 @@ import {
 	campaignNumberingSchema,
 	campaignRulesSchema,
 	campaignTransitionSchema,
+	campaignVersionSchema,
 	readFormFields,
-	CAMPAIGN_CREATE_FIELDS
+	CAMPAIGN_CREATE_FIELDS,
+	CAMPAIGN_GENERAL_UPDATE_FIELDS,
+	CAMPAIGN_RULES_UPDATE_FIELDS,
+	CAMPAIGN_VERSION_INVALID_MESSAGE,
+	MAX_NUMBER_DIGITS
 } from './campaign';
+import { MAX_NUMBER_DIGITS as DOMAIN_MAX_NUMBER_DIGITS } from '$lib/domain/numbering';
 
 const rules = {
 	simpleBondValue: '60000',
@@ -20,6 +26,8 @@ const rules = {
 	barcodeMode: 'base_number'
 };
 const general = { name: '  Campaign 2027 ', startsOn: '2027-03-01', endsOn: '2027-12-31' };
+/** updated_at as PostgREST returns it (microseconds, explicit offset). */
+const VERSION = '2026-11-17T01:02:03.123456+00:00';
 
 function errorsOf(result: { success: boolean; error?: unknown }) {
 	expect(result.success).toBe(false);
@@ -160,21 +168,37 @@ describe('campaignCreateSchema', () => {
 describe('campaignGeneralSchema', () => {
 	it('allows a one-day campaign and rejects an end before the start', () => {
 		expect(
-			campaignGeneralSchema.parse({ name: 'One day', startsOn: '2027-03-01', endsOn: '2027-03-01' })
+			campaignGeneralSchema.parse({
+				name: 'One day',
+				startsOn: '2027-03-01',
+				endsOn: '2027-03-01',
+				expectedUpdatedAt: VERSION
+			})
 		).toEqual({
 			name: 'One day',
 			startsAt: '2027-03-01T00:00:00-03:00',
-			endsAt: '2027-03-01T23:59:59-03:00'
+			endsAt: '2027-03-01T23:59:59-03:00',
+			expectedUpdatedAt: VERSION
 		});
 		const errors = errorsOf(
-			campaignGeneralSchema.safeParse({ name: 'X', startsOn: '2027-03-02', endsOn: '2027-03-01' })
+			campaignGeneralSchema.safeParse({
+				name: 'X',
+				startsOn: '2027-03-02',
+				endsOn: '2027-03-01',
+				expectedUpdatedAt: VERSION
+			})
 		);
 		expect(errors.endsOn).toEqual(['End date must be on or after the start date']);
 	});
 
 	it('rejects malformed dates', () => {
 		const errors = errorsOf(
-			campaignGeneralSchema.safeParse({ name: 'X', startsOn: '2027-02-30', endsOn: 'tomorrow' })
+			campaignGeneralSchema.safeParse({
+				name: 'X',
+				startsOn: '2027-02-30',
+				endsOn: 'tomorrow',
+				expectedUpdatedAt: VERSION
+			})
 		);
 		expect(errors.startsOn).toEqual(['Start date must be a valid date (YYYY-MM-DD)']);
 		expect(errors.endsOn).toEqual(['End date must be a valid date (YYYY-MM-DD)']);
@@ -183,8 +207,13 @@ describe('campaignGeneralSchema', () => {
 
 describe('campaignRulesSchema / campaignNumberingSchema', () => {
 	it('recomputes the installment value', () => {
-		const result = campaignRulesSchema.parse({ ...rules, installmentCount: '12' });
+		const result = campaignRulesSchema.parse({
+			...rules,
+			installmentCount: '12',
+			expectedUpdatedAt: VERSION
+		});
 		expect(result.installmentValue).toBe('5000.00');
+		expect(result.expectedUpdatedAt).toBe(VERSION);
 	});
 
 	it('validates the numbering inputs on their own (for previews)', () => {
@@ -209,6 +238,57 @@ describe('campaignRulesSchema / campaignNumberingSchema', () => {
 				overflowPolicy: 'reject'
 			}).success
 		).toBe(false);
+	});
+});
+
+describe('expectedUpdatedAt (campaign version)', () => {
+	it('keeps the exact PostgREST string (microseconds are not truncated)', () => {
+		for (const version of [
+			VERSION,
+			'2026-11-17T01:02:03+00:00',
+			'2026-11-17T01:02:03.1+00:00',
+			'2026-11-17T01:02:03.123456Z',
+			'2026-11-16T22:02:03.123456-03:00'
+		]) {
+			expect(campaignVersionSchema.parse(version)).toBe(version);
+		}
+	});
+
+	it.each([
+		['missing', undefined],
+		['empty', ''],
+		['not a date', 'yesterday'],
+		['date only', '2026-11-17'],
+		['no offset', '2026-11-17T01:02:03.123456']
+	])('rejects a %s version', (_label, version) => {
+		expect(campaignVersionSchema.safeParse(version).success).toBe(false);
+	});
+
+	it('is required by the general and rules edit schemas, with a reload message', () => {
+		const general = errorsOf(
+			campaignGeneralSchema.safeParse({
+				name: 'X',
+				startsOn: '',
+				endsOn: '',
+				expectedUpdatedAt: ''
+			})
+		);
+		expect(general.expectedUpdatedAt).toEqual([CAMPAIGN_VERSION_INVALID_MESSAGE]);
+		const rulesErrors = errorsOf(campaignRulesSchema.safeParse({ ...rules }));
+		expect(rulesErrors.expectedUpdatedAt).toEqual([CAMPAIGN_VERSION_INVALID_MESSAGE]);
+	});
+
+	it('is not part of the create form', () => {
+		expect(campaignCreateSchema.safeParse({ ...general, ...rules }).success).toBe(true);
+		expect(CAMPAIGN_CREATE_FIELDS).not.toContain('expectedUpdatedAt');
+		expect(CAMPAIGN_GENERAL_UPDATE_FIELDS).toContain('expectedUpdatedAt');
+		expect(CAMPAIGN_RULES_UPDATE_FIELDS).toContain('expectedUpdatedAt');
+	});
+});
+
+describe('MAX_NUMBER_DIGITS', () => {
+	it('comes from the numbering domain (single source of truth)', () => {
+		expect(MAX_NUMBER_DIGITS).toBe(DOMAIN_MAX_NUMBER_DIGITS);
 	});
 });
 
