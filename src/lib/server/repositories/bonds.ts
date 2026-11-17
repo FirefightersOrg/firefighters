@@ -347,3 +347,198 @@ export async function campaignHasBonds(
 	if (error) return { data: null, error };
 	return { data: (data ?? []).length > 0, error: null };
 }
+
+// ---------------------------------------------------------------------------
+// Manual grouping and group history (SAN-25)
+// ---------------------------------------------------------------------------
+
+/** A membership row with its ungrouping (history): never deleted, `ungroupedAt` once ungrouped. */
+export interface BondGroupHistoryEntry extends BondGroupMembership {
+	ungroupedAt: string | null;
+	ungroupedBy: string | null;
+	/** Ungrouping reason (null while the membership is active). */
+	reason: string | null;
+}
+
+function mapHistoryEntry(row: BondGroupRow): BondGroupHistoryEntry {
+	return {
+		...mapMembership(row),
+		ungroupedAt: row.ungrouped_at,
+		ungroupedBy: row.ungrouped_by,
+		reason: row.reason
+	};
+}
+
+/**
+ * Every membership of a manual pata, active and ungrouped (history), oldest first. Empty for a
+ * bond that is not a manual pata.
+ */
+export async function listPataMemberships(
+	supabase: SupabaseClient,
+	pataBondId: string
+): Promise<RepositoryResult<BondGroupHistoryEntry[]>> {
+	const { data, error } = await supabase
+		.from('bond_groups')
+		.select(BOND_GROUP_COLUMNS)
+		.eq('pata_bond_id', pataBondId)
+		.order('grouped_at', { ascending: true })
+		.order('id', { ascending: true })
+		.overrideTypes<BondGroupRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: (data ?? []).map(mapHistoryEntry), error: null };
+}
+
+/**
+ * Numbers of several bonds (e.g. the members of a manual pata), released ones included, ordered
+ * by bond then kind (base first) then value. `bondIds` must be valid uuids.
+ */
+export async function listBondNumbersByBondIds(
+	supabase: SupabaseClient,
+	bondIds: readonly string[]
+): Promise<RepositoryResult<BondNumber[]>> {
+	if (bondIds.length === 0) return { data: [], error: null };
+	const { data, error } = await supabase
+		.from('bond_numbers')
+		.select(BOND_NUMBER_COLUMNS)
+		.in('bond_id', [...bondIds])
+		.order('number_value', { ascending: true })
+		.overrideTypes<BondNumberRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		const numbers = (data ?? [])
+			.map(mapBondNumberRow)
+			.sort((a, b) => KIND_ORDER[a.numberKind] - KIND_ORDER[b.numberKind]);
+		return { data: numbers, error: null };
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
+}
+
+/** Most bonds a grouping search returns. */
+export const GROUPABLE_SEARCH_LIMIT = 20;
+
+/** An available simple bond that is not an active member of a manual pata. */
+export interface GroupableBond {
+	id: string;
+	baseNumber: number;
+	internalCode: string | null;
+	barcode: string | null;
+}
+
+interface GroupableRow {
+	number_value: number;
+	bond: { id: string; internal_code: string | null; barcode: string | null };
+}
+
+/**
+ * Simple bonds of the campaign that can be grouped into a manual pata (available, not an active
+ * member of another pata), ordered by base number, starting at `fromBase` when given. At most
+ * `limit` rows (default {@link GROUPABLE_SEARCH_LIMIT}). One query: the live base numbers of the
+ * campaign, inner-joined to their bond (kind and status filters) with an anti-join on the bond's
+ * active memberships.
+ */
+export async function searchGroupableBonds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	options: { fromBase?: number | null; limit?: number } = {}
+): Promise<RepositoryResult<GroupableBond[]>> {
+	let query = supabase
+		.from('bond_numbers')
+		.select(
+			'number_value, bond:bonds!bond_numbers_bond_fkey!inner(id, internal_code, barcode, ' +
+				'active:bond_groups!bond_groups_member_bond_id_fkey(id))'
+		)
+		.eq('campaign_id', campaignId)
+		.eq('number_kind', 'base')
+		.is('released_at', null)
+		.eq('bond.kind', 'simple')
+		.eq('bond.commercial_status', 'available')
+		.is('bond.active.ungrouped_at', null)
+		.is('bond.active', null);
+	if (options.fromBase != null) query = query.gte('number_value', options.fromBase);
+	const { data, error } = await query
+		.order('number_value', { ascending: true })
+		.limit(options.limit ?? GROUPABLE_SEARCH_LIMIT)
+		.overrideTypes<GroupableRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: (data ?? []).map((row) => ({
+			id: row.bond.id,
+			baseNumber: row.number_value,
+			internalCode: row.bond.internal_code,
+			barcode: row.bond.barcode
+		})),
+		error: null
+	};
+}
+
+/** A bond picked for a manual pata, with what the grouping rules need to know about it. */
+export interface GroupingMember {
+	id: string;
+	campaignId: string;
+	kind: BondKind;
+	commercialStatus: BondCommercialStatus;
+	internalCode: string | null;
+	/** Live base number (simple bonds); null for a pata or an annulled bond. */
+	baseNumber: number | null;
+	/** The manual pata it is an active member of, if any. */
+	activeGroupPataId: string | null;
+}
+
+interface GroupingMemberRow {
+	id: string;
+	campaign_id: string;
+	kind: string;
+	commercial_status: string;
+	internal_code: string | null;
+	numbers: { number_value: number; number_kind: string; released_at: string | null }[];
+	groups: { pata_bond_id: string; ungrouped_at: string | null }[];
+}
+
+/**
+ * The given bonds (visible to the caller) with their live base number and active membership, in
+ * the order of `ids`; bonds that do not exist are left out. `ids` must be valid uuids.
+ */
+export async function listGroupingMembers(
+	supabase: SupabaseClient,
+	ids: readonly string[]
+): Promise<RepositoryResult<GroupingMember[]>> {
+	if (ids.length === 0) return { data: [], error: null };
+	const { data, error } = await supabase
+		.from('bonds')
+		.select(
+			'id, campaign_id, kind, commercial_status, internal_code, ' +
+				'numbers:bond_numbers!bond_numbers_bond_fkey(number_value, number_kind, released_at), ' +
+				'groups:bond_groups!bond_groups_member_bond_id_fkey(pata_bond_id, ungrouped_at)'
+		)
+		.in('id', [...ids])
+		.overrideTypes<GroupingMemberRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		const byId = new Map(
+			(data ?? []).map((row): [string, GroupingMember] => [
+				row.id,
+				{
+					id: row.id,
+					campaignId: row.campaign_id,
+					kind: oneOf<BondKind>(BOND_KINDS, row.kind, 'bonds.kind'),
+					commercialStatus: oneOf<BondCommercialStatus>(
+						BOND_COMMERCIAL_STATUSES,
+						row.commercial_status,
+						'bonds.commercial_status'
+					),
+					internalCode: row.internal_code,
+					baseNumber:
+						row.kind === 'simple'
+							? (row.numbers.find((n) => n.number_kind === 'base' && n.released_at === null)
+									?.number_value ?? null)
+							: null,
+					activeGroupPataId: row.groups.find((g) => g.ungrouped_at === null)?.pata_bond_id ?? null
+				}
+			])
+		);
+		return { data: ids.flatMap((id) => byId.get(id) ?? []), error: null };
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
+}

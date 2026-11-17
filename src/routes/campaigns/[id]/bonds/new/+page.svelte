@@ -31,9 +31,8 @@
 	const config = $derived(campaignNumberingConfig(campaign));
 	const numbering = $derived(buildNumberingPreview(config));
 	const campaignHref = $derived(resolve('/campaigns/[id]', { id: campaign.id }));
-	// The bond record is /campaigns/[id]/bonds/[bondId], built in SAN-26: switch these links to
-	// `resolve('/campaigns/[id]/bonds/[bondId]', ...)` once that route exists.
-	const bondHref = (bondId: string) => `${campaignHref}/bonds/${bondId}`;
+	const bondHref = (bondId: string) =>
+		resolve('/campaigns/[id]/bonds/[bondId]', { id: campaign.id, bondId });
 
 	// Initial values only: afterwards the inputs own them (refilled from `form` without JS).
 	function initialValues() {
@@ -79,7 +78,6 @@
 {#snippet conflictLinks(field: string)}
 	{#each fieldConflicts(field) as conflict (conflict.bondId)}
 		<p class="mt-1 text-xs">
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- bond record route: SAN-26 -->
 			<a href={bondHref(conflict.bondId)} class="font-medium text-blue-700 hover:underline">
 				{conflict.numbers.length > 0
 					? `View the bond that uses ${conflict.numbers.join(', ')} →`
@@ -98,6 +96,10 @@
 		</div>
 		<p class="text-sm text-slate-500">
 			Simple bonds, one base number at a time. New bonds are available for sale.
+			<a
+				href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
+				class="text-blue-700 hover:underline">Load a pata →</a
+			>
 		</p>
 	</div>
 
@@ -111,7 +113,6 @@
 			<FormAlert kind="success">
 				<p>
 					{form.message}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- bond record route: SAN-26 -->
 					<a href={bondHref(form.created.id)} class="font-medium underline">View bond</a>
 				</p>
 			</FormAlert>
@@ -263,7 +264,6 @@
 								>
 								{bond.associatedFormatted}</span
 							>
-							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- bond record route: SAN-26 -->
 							<a href={bondHref(bond.id)} class="text-blue-700 hover:underline">View</a>
 						</li>
 					{/each}

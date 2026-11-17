@@ -11,8 +11,11 @@ import {
 	type BondNumberConflict
 } from '$lib/server/services/bonds';
 
-/** Which bond form an action result belongs to. */
-export type BondFormName = 'create';
+/**
+ * Which bond form an action result belongs to: simple bond entry (`create`), printed pata
+ * (`pata`), manual grouping (`group`), and the bond record actions (`ungroup`, `annul`).
+ */
+export type BondFormName = 'create' | 'pata' | 'group' | 'ungroup' | 'annul';
 
 /**
  * A bond that already uses a number or code of the submitted form, to link to its record
@@ -126,7 +129,23 @@ export function duplicateNumbersFieldMessage(conflicts: readonly BondNumberConfl
 	return `${subject} already used by ${owners === 1 ? 'another bond' : 'other bonds'} in this campaign.`;
 }
 
-const BOND_ID_REFERENCE = / by bond [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const BOND_ID_REFERENCE = new RegExp(` by bond ${UUID}`, 'i');
+
+/**
+ * Removes bond ids (meaningless to people) from a database message: `Bond 0068 (<id>) is sold`
+ * → `Bond 0068 is sold`; `... manually grouped pata <id>` → `... a manually grouped pata`;
+ * `(pata <id> is sold)` → `(this pata is sold)`; `Bond <id> is listed ...` → `A bond is listed ...`.
+ */
+export function withoutBondIds(message: string): string {
+	return message
+		.replace(new RegExp(` \\(${UUID}\\)`, 'gi'), '')
+		.replace(new RegExp(`manually grouped pata ${UUID}`, 'gi'), 'a manually grouped pata')
+		.replace(new RegExp(`\\bpata ${UUID}`, 'gi'), 'this pata')
+		.replace(new RegExp(`\\b(b)ond ${UUID}`, 'gi'), (_match, b: string) =>
+			b === 'B' ? 'A bond' : 'a bond'
+		);
+}
 
 /**
  * Maps an error thrown by the bond service to a `fail()` result: field errors (with links to the
@@ -148,14 +167,16 @@ export function bondServiceFailure(
 	}
 	if (err.field) {
 		const bondId = err.kind === 'conflict' ? err.conflictingBondId : undefined;
-		const message = bondId
-			? err.message.replace(BOND_ID_REFERENCE, ' by another bond in this campaign')
-			: err.message;
+		const message = withoutBondIds(
+			bondId
+				? err.message.replace(BOND_ID_REFERENCE, ' by another bond in this campaign')
+				: err.message
+		);
 		return bondFormFailure(form, err.status, FIX_FIELDS_MESSAGE, {
 			errors: { [err.field]: [message] },
 			conflicts: bondId ? [{ field: err.field, bondId, numbers: [] }] : [],
 			values
 		});
 	}
-	return bondFormFailure(form, err.status, err.message, { values });
+	return bondFormFailure(form, err.status, withoutBondIds(err.message), { values });
 }
