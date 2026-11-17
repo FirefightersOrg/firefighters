@@ -147,6 +147,24 @@ Rule:
 - Do not use `char(4)` columns.
 - Validate range against `campaign.max_number`.
 
+## Bond loading (SAN-23)
+
+Bonds are written only through the audited SQL functions `bond_create`, `bond_group_into_pata`, `bond_ungroup_pata` and `bond_annul` (see `docs/data-model.md`, "Bond write functions"). The flow for each write:
+
+```txt
+form data
+  -> Zod schema (src/lib/schemas/bond.ts): parses numbers with the campaign config, checks range,
+     overflow and numbers repeated inside the bond (src/lib/domain/bonds.ts)
+  -> service (src/lib/server/services/bonds.ts): optional up-front permission check against
+     locals.permissions, then one RPC with the user-scoped client
+  -> SQL function: actor + permission, campaign locked FOR SHARE, validation, derived values
+     (associated numbers, total value) computed from the campaign, write, one audit_log row
+  -> SQLSTATE mapped to BondServiceError (validation 400, permission 403, not_found 404,
+     conflict 409, internal 500)
+```
+
+The database is the authority: the app never sends associated numbers or values, and duplicates against other bonds are only detected by the database (the unique index on live numbers), which names the number and the bond that already uses it. Duplicate details arrive as JSON in the error `details` and are exposed as `BondServiceError.conflicts` so the UI can link to that bond.
+
 ## Barcode and imports
 
 Barcode reading must be implemented as a configurable flow per campaign.
