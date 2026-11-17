@@ -1,5 +1,5 @@
 begin;
-select plan(129);
+select plan(132);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -792,6 +792,29 @@ select is(
   2, 're-entry: the released number stays as history next to the new one'
 );
 
+-- A bond annulled from sold (Phase 10) keeps its codes held: the conflict names it.
+select lives_ok(
+  $$insert into ids select 'b-sold-codes', public.bond_create(pg_temp.id('c4'), array[3000], 'INT-SOLD', 'BC-SOLD');
+    update public.bonds set commercial_status = 'delivered_to_collector' where id = pg_temp.id('b-sold-codes');
+    update public.bonds set commercial_status = 'sold' where id = pg_temp.id('b-sold-codes');
+    update public.bonds set commercial_status = 'annulled', annul_reason = 'Annulled sale',
+      annulled_by = 'b9000000-0000-0000-0000-000000000001' where id = pg_temp.id('b-sold-codes');$$,
+  'codes: fixture, a bond with codes annulled from sold'
+);
+set local role authenticated;
+select pg_temp.act_as(2);
+select throws_ok(
+  $$select public.bond_create(pg_temp.id('c4'), array[3001], 'INT-SOLD', null, 'req-bad')$$,
+  '23505', format('internal code INT-SOLD is already used by bond %s', pg_temp.id('b-sold-codes')),
+  'codes: the internal code of a bond annulled from sold stays held, naming the bond'
+);
+select throws_ok(
+  $$select public.bond_create(pg_temp.id('c4'), array[3001], null, 'BC-SOLD', 'req-bad')$$,
+  '23505', format('barcode BC-SOLD is already used by bond %s', pg_temp.id('b-sold-codes')),
+  'codes: the barcode of a bond annulled from sold stays held, naming the bond'
+);
+reset role;
+
 -- Printed pata annulment releases all 2N numbers
 set local role authenticated;
 select pg_temp.act_as(1);
@@ -845,7 +868,7 @@ select is(
 select results_eq(
   $$select action, count(*)::int from public.audit_log
     where entity_type = 'bond' and actor_user_id::text like 'b9000000-%' group by action order by action$$,
-  $$values ('bond.annul'::text, 3), ('bond.create'::text, 16), ('bond.group'::text, 3), ('bond.ungroup'::text, 1)$$,
+  $$values ('bond.annul'::text, 3), ('bond.create'::text, 17), ('bond.group'::text, 3), ('bond.ungroup'::text, 1)$$,
   'one audit row per successful call'
 );
 
