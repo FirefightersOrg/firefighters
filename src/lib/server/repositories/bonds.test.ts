@@ -218,6 +218,35 @@ describe('bonds repository', () => {
 		});
 	});
 
+	it('a page past the last one: no entries, the total from a second query', async () => {
+		const { supabase, calls } = queryMock([
+			{ data: null, error: { code: 'PGRST103', message: 'Requested range not satisfiable' } },
+			{ data: [], error: null, count: 30 } as never
+		]);
+		await expect(
+			listBonds(supabase, CAMPAIGN_ID, { kind: 'simple' }, { page: 99, pageSize: 25 })
+		).resolves.toEqual({ data: { entries: [], total: 30 }, error: null });
+		expect(calls.filter(([method]) => method === 'range')).toEqual([
+			['range', [2450, 2474]],
+			['range', [0, 0]]
+		]);
+		expect(calls.filter(([method]) => method === 'eq')).toEqual([
+			['eq', ['campaign_id', CAMPAIGN_ID]],
+			['eq', ['kind', 'simple']],
+			['eq', ['campaign_id', CAMPAIGN_ID]],
+			['eq', ['kind', 'simple']]
+		]);
+
+		const failed = queryMock([
+			{ data: null, error: { code: 'PGRST103', message: 'Requested range not satisfiable' } },
+			{ data: null, error: { message: 'boom' } }
+		]);
+		await expect(listBonds(failed.supabase, CAMPAIGN_ID, {}, { page: 3 })).resolves.toEqual({
+			data: null,
+			error: { message: 'boom' }
+		});
+	});
+
 	it('quotes PostgREST logic-filter values', () => {
 		expect(quotePostgrestValue('A,B')).toBe('"A,B"');
 		expect(quotePostgrestValue('a"b\\c')).toBe('"a\\"b\\\\c"');

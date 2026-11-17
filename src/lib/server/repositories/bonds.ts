@@ -686,19 +686,11 @@ export function quotePostgrestValue(value: string): string {
 	return `"${value.replace(/["\\]/g, (c) => `\\${c}`)}"`;
 }
 
-/**
- * One page of a campaign's bonds (`public.bond_list`, RLS: `bond.view`) and the total matching
- * the filters, in one query. Stable order: lowest participating base number, then load time, then
- * id. `page` starts at 1.
- */
-export async function listBonds(
-	supabase: SupabaseClient,
-	campaignId: string,
-	filters: BondListFilters,
-	options: { page: number; pageSize?: number }
-): Promise<RepositoryResult<{ entries: BondListEntry[]; total: number }>> {
-	const pageSize = options.pageSize ?? BOND_LIST_PAGE_SIZE;
-	const from = (Math.max(1, options.page) - 1) * pageSize;
+/** PostgREST's error when the requested range starts past the last matching row. */
+const RANGE_NOT_SATISFIABLE = 'PGRST103';
+
+/** `public.bond_list` rows of a campaign matching the filters, with the exact count. */
+function filteredBondList(supabase: SupabaseClient, campaignId: string, filters: BondListFilters) {
 	let query = supabase
 		.from('bond_list')
 		.select(BOND_LIST_COLUMNS, { count: 'exact' })
@@ -716,12 +708,36 @@ export async function listBonds(
 	if (filters.financialStatus) {
 		query = query.eq('financial_status_snapshot', filters.financialStatus);
 	}
-	const { data, error, count } = await query
+	return query;
+}
+
+/**
+ * One page of a campaign's bonds (`public.bond_list`, RLS: `bond.view`) and the total matching
+ * the filters, in one query. Stable order: lowest participating base number, then load time, then
+ * id. `page` starts at 1. A page past the last one (a stale link, or `?page=` typed by hand) has
+ * no entries: PostgREST refuses that range (PGRST103), so the total is read with a second query.
+ */
+export async function listBonds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	filters: BondListFilters,
+	options: { page: number; pageSize?: number }
+): Promise<RepositoryResult<{ entries: BondListEntry[]; total: number }>> {
+	const pageSize = options.pageSize ?? BOND_LIST_PAGE_SIZE;
+	const from = (Math.max(1, options.page) - 1) * pageSize;
+	const { data, error, count } = await filteredBondList(supabase, campaignId, filters)
 		.order('sort_number', { ascending: true, nullsFirst: false })
 		.order('created_at', { ascending: true })
 		.order('id', { ascending: true })
 		.range(from, from + pageSize - 1)
 		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error?.code === RANGE_NOT_SATISFIABLE && from > 0) {
+		const first = await filteredBondList(supabase, campaignId, filters)
+			.range(0, 0)
+			.overrideTypes<BondListRow[], { merge: false }>();
+		if (first.error) return { data: null, error: first.error };
+		return { data: { entries: [], total: first.count ?? 0 }, error: null };
+	}
 	if (error) return { data: null, error };
 	try {
 		return {
