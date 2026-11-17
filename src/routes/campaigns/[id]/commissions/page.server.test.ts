@@ -310,7 +310,7 @@ describe('/campaigns/[id]/commissions', () => {
 			const { supabase } = mockDb({
 				rpc: {
 					data: null,
-					error: { code: '40001', message: 'commission rule was modified by someone else' }
+					error: { code: 'PT409', message: 'commission rule was modified by someone else' }
 				}
 			});
 			const fields = { ...ruleForm, ruleId: RULE_ID, expectedUpdatedAt: VERSION };

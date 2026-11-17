@@ -39,14 +39,15 @@
 --                                           lowering a campaign's installment_count below a
 --                                           custom rule's installment
 --   23001 restrict_violation                change to id/campaign_id/created_*; delete/truncate
---   40001 serialization_failure             optimistic concurrency: commission_rule_update requires
+--   PT409 (PostgREST: HTTP 409)             optimistic concurrency: commission_rule_update requires
 --                                           the updated_at the caller loaded
 --                                           (p_expected_updated_at); if the rule changed since,
 --                                           nothing is written (no audit row)
 --
 -- Optimistic concurrency uses updated_at as the rule version, exactly like campaign_update (see
 -- 20261117000000_campaign_rpcs.sql): compared exactly, passed back as the string PostgREST
--- returned. commission_rule_annul takes no version: it rejects an already annulled rule (55000).
+-- returned, PT409 (not 40001, which PostgREST retries without limit) when stale.
+-- commission_rule_annul takes no version: it rejects an already annulled rule (55000).
 
 -- btree_gist lets the EXCLUDE constraint combine equality on uuid/text/int with range overlap.
 -- Supabase keeps extensions in the `extensions` schema; default operator classes are found by
@@ -464,7 +465,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- commission_rule_update: full replacement of type, installment, value and validity of an
 -- active rule. The audit row keeps only the changed keys (plus campaign_id for context).
--- p_expected_updated_at is the updated_at the caller loaded (40001 if the rule changed since);
+-- p_expected_updated_at is the updated_at the caller loaded (PT409 if the rule changed since);
 -- being required, it makes p_valid_to required too (pass null for an open-ended rule).
 -- Returns true when something changed, false for a no-op (nothing written).
 -- ---------------------------------------------------------------------------
@@ -507,7 +508,7 @@ begin
   -- Optimistic concurrency: before any write or audit row.
   if v_old.updated_at is distinct from p_expected_updated_at then
     raise exception 'commission rule was modified by someone else'
-      using errcode = 'serialization_failure',
+      using errcode = 'PT409',
         detail = format('commission rule %s: expected updated_at %s, current %s', p_id,
           coalesce(p_expected_updated_at::text, 'null'), v_old.updated_at),
         hint = 'reload the commission rules and apply the change again';
