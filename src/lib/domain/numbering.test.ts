@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DomainError } from './errors';
 import {
 	DEFAULT_NUMBERING_CONFIG,
+	MAX_CAMPAIGN_NUMBER,
 	MAX_NUMBER_DIGITS,
 	NumberingError,
 	assertValidNumberingConfig,
@@ -326,6 +327,28 @@ describe('validateNumberingConfig', () => {
 		expect(validateNumberingConfig({ ...tenDigits, numberDigits: 11 })).toEqual([
 			{ field: 'numberDigits', message: 'numberDigits must not exceed 10' }
 		]);
+	});
+
+	it('caps maxNumber at MAX_CAMPAIGN_NUMBER (2147483647, the Postgres integer maximum)', () => {
+		expect(MAX_CAMPAIGN_NUMBER).toBe(2147483647);
+		const tenDigits: CampaignNumberingConfig = {
+			numberDigits: 10,
+			maxNumber: 2147483647,
+			associatedNumberOffset: 0,
+			overflowPolicy: 'reject'
+		};
+		expect(validateNumberingConfig(tenDigits)).toEqual([]);
+		expect(validateNumberingConfig({ ...tenDigits, maxNumber: 2147483648 })).toEqual([
+			{
+				field: 'maxNumber',
+				message: 'maxNumber must not exceed 2147483647 (Postgres integer maximum)'
+			}
+		]);
+		expect(fieldsOf({ ...tenDigits, maxNumber: 9999999999 })).toEqual(['maxNumber']);
+		expectNumberingError(
+			() => assertValidNumberingConfig({ ...tenDigits, maxNumber: 9999999999 }),
+			'invalid_config'
+		);
 	});
 
 	it('rejects a huge numberDigits instead of accepting any maxNumber (reviewer case)', () => {
