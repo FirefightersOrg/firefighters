@@ -51,6 +51,7 @@ Rules (enforced by triggers for every role, including `service_role`):
 - Status changes only follow `docs/state-machines.md` (`draft -> active -> closing -> closed`, `draft -> annulled`, `active -> annulled`). Anything else fails with `23514`.
 - Activating requires both `starts_at` and `ends_at`; once activated, neither date can be cleared (`23514`).
 - Edit windows depend on the status before the update: numbering, installment and `barcode_mode` rules only while `draft`; dates while `draft` or `active`; name until `closed`/`annulled`. Closed and annulled campaigns are immutable. Edits outside the window fail with `55000`.
+- Once a campaign has any bond (annulled ones included), its numbering, value/installment and `barcode_mode` rules are frozen even while `draft` (`campaigns_rules_frozen_with_bonds`, SAN-22; `55000` `campaign rules cannot be changed once the campaign has bonds`). Name and dates keep their normal windows, and the campaign can still be activated.
 - `id`, `created_at` and `created_by` never change. `updated_at` is set on every update.
 - Several campaigns can be `active` at the same time.
 - Campaigns are never deleted (annul instead): no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner too.
@@ -174,64 +175,63 @@ Suggested fields:
 
 ### bonds
 
-Sellable commercial unit: simple bond or pata.
+Sellable commercial unit: simple bond or pata. Implemented in `20261119000000_bonds.sql` (SAN-22).
 
-Suggested fields:
+Fields:
 
-- `id`
-- `campaign_id`
-- `kind`
-- `origin`
-- `internal_code`
-- `barcode`
-- `commercial_status`
-- `financial_status_snapshot`
-- `current_collector_id`
-- `current_buyer_id`
-- `commercial_unit_count`
-- `total_value`
-- `created_at`
+- `id` (uuid)
+- `campaign_id` (FK `campaigns`, `on delete restrict`)
+- `kind`: `simple`, `pata`
+- `origin`: `printed`, `manual_grouping`
+- `internal_code`, `barcode` (text, optional; not blank and without surrounding whitespace)
+- `commercial_status`: `created`, `available` (default), `delivered_to_collector`, `sold`, `returned`, `lost`, `annulled`, `closed`
+- `financial_status_snapshot`: `no_payments` (default), `partial_payments`, `up_to_date`, `overdue`, `fully_paid`, `uncollectible`, `annulled`
+- `current_collector_id`, `current_buyer_id` (uuid, nullable): no FK until `collectors` / `buyers` exist (Phase 5)
+- `commercial_unit_count` (integer, default 1)
+- `total_value` (numeric(14,2), > 0, not `NaN`)
+- `annulled_at`, `annulled_by` (profile), `annul_reason`: set together, only when `annulled` (CHECK `bonds_annulment_consistent`)
+- `annulled_from_status`: the status the bond was annulled from (`available` or `sold`). Set by the database when the bond is annulled (callers cannot set it), present only when `annulled` (same CHECK), immutable afterwards (`23001`). Decides whether the bond's numbers can be released (see `bond_numbers`)
+- `created_by` (profile, nullable for system/import actions), `created_at`, `updated_at` (set by the database)
 
-`kind` values:
+Rules (constraints and the `bonds_guard_write` trigger, for every role):
 
-- `simple`
-- `pata`
+- A simple bond is always `printed` and has `commercial_unit_count = 1`. A pata has `commercial_unit_count = N >= 2` (its number of base numbers) and is `printed` or `manual_grouping`.
+- `total_value = campaigns.simple_bond_value * commercial_unit_count`, checked on insert (`23514`). The rules it depends on are frozen once the campaign has bonds.
+- Bonds are created only while the campaign is `draft` or `active` (`55000` otherwise), in `available` (manual entry of simple bonds and printed patas) or `created` (reserved for Phase 4 imports), with `financial_status_snapshot = no_payments`.
+- `commercial_status` changes follow `docs/state-machines.md` (Bond), including `available -> annulled` for a bond loaded by mistake (`23514` otherwise). `annulled_at` and `annulled_from_status` are set by the database.
+- `id`, `campaign_id`, `kind`, `origin`, `commercial_unit_count`, `total_value`, `created_at`, `created_by` never change (`23001`).
+- `annulled` and `closed` bonds are immutable except for `financial_status_snapshot` (`55000`).
+- While a simple bond is an active member of a manual pata (`bond_groups`), its commercial data (status, codes, collector, buyer, annulment) cannot change (`55000`): it is operated through the pata. It keeps its own commercial status; there is no separate "grouped" status.
+- A manually grouped pata is sold as a whole: it can only leave `available` (other than by annulment, after ungrouping) with all its members, i.e. `commercial_unit_count` active `bond_groups` rows (`55000` otherwise).
+- `barcode` and `internal_code` are unique per campaign among bonds that hold them (partial unique indexes `bonds_campaign_barcode_key`, `bonds_campaign_internal_code_key`, `where commercial_status <> 'annulled' or annulled_from_status is distinct from 'available'`). Same rule as number release: only the codes of a bond annulled by mistake (`annulled_from_status = 'available'`) can be entered again; the codes of a bond annulled from `sold` (annulled sale) stay held (`23505`).
+- Bonds are never deleted (annul instead): no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner too.
 
-`origin` values:
-
-- `printed`
-- `manual_grouping`
-
-Rule:
-
-- For simple bond, `commercial_unit_count = 1`.
-- For pata, `commercial_unit_count = number of base numbers`.
+Access: `authenticated` can only `SELECT`, and RLS limits it to `bond.view` (same for `bond_numbers` and `bond_groups`). Writes go through permission-checked, audited SQL functions (SAN-23): creating bonds and grouping/ungrouping manual patas need `bond.create`, annulling needs `bond.annul` (there is no `bond.update` permission). `service_role` has `SELECT`, `INSERT` and `UPDATE`.
 
 ### bond_numbers
 
-Participating numbers associated with bonds.
+Participating numbers associated with bonds. Implemented in `20261119000000_bonds.sql` (SAN-22).
 
-Suggested fields:
+Fields:
 
 - `id`
-- `campaign_id`
-- `bond_id`
-- `number_value`
-- `number_kind`
-- `source_base_number_id`
-- `created_at`
+- `campaign_id`, `bond_id`: composite FK to `bonds (id, campaign_id)`, so a number always belongs to its bond's campaign
+- `number_value` (integer, >= 0)
+- `number_kind`: `base`, `associated`, `extraordinary`
+- `source_base_number_id`: for `associated`, the base number it derives from (required, same bond: composite FK to `bond_numbers (id, bond_id)`); null for `base`
+- `created_at` (set by the database)
+- `released_at`, `released_by` (profile): set together when the number is released (see below)
 
-`number_kind` values:
+Rules (constraints and the `bond_numbers_guard_write` trigger):
 
-- `base`
-- `associated`
-- `extraordinary`
+- `number_value <= campaigns.max_number` (`overflow_policy = reject`), `23514` otherwise.
+- `associated` number = its base number + `campaigns.associated_number_offset`; at most one associated number per base.
+- A bond has at most `commercial_unit_count` base and `commercial_unit_count` associated numbers (a simple bond: 1 + 1; a printed pata of N: N + N). Extraordinary numbers are not limited.
+- A manually grouped pata has no numbers of its own: its members (simple bonds) keep theirs.
+- Numbers cannot be added to an annulled bond. Every column but the release is immutable (`23001`); a released number is immutable (`55000`).
+- Never deleted.
 
-Critical constraints:
-
-- Unique `(campaign_id, number_value)` to prevent duplicate participating numbers.
-- `number_value >= 0`.
-- `number_value <= campaign.max_number` must be validated by service or documented trigger, since it crosses campaign configuration.
+Uniqueness (deviation from the original design): instead of a plain unique `(campaign_id, number_value)`, uniqueness applies to numbers that were **not released** (partial unique index `bond_numbers_campaign_number_key ... where released_at is null`). When a bond loaded by mistake is annulled, its numbers are released (`released_at`, `released_by`; allowed only once the bond is `annulled` **and** its `annulled_from_status` is `available`, `55000` otherwise): the rows stay as history and the same number can be entered again on a new bond. A bond annulled from `sold` (annulled sale, Phase 10) keeps its numbers held: they are never released and no other bond can take them. A participating number therefore still points to at most one live bond per campaign.
 
 Notes:
 
@@ -240,25 +240,23 @@ Notes:
 
 ### bond_groups
 
-Tracks the composition of manually assembled patas and their grouping/ungrouping history.
+Tracks the composition of manually assembled patas and their grouping/ungrouping history. Implemented in `20261119000000_bonds.sql` (SAN-22).
 
-Suggested fields:
+Fields:
 
 - `id`
-- `pata_bond_id`
-- `member_bond_id`
-- `grouped_at`
-- `grouped_by`
-- `ungrouped_at`
-- `ungrouped_by`
-- `reason`
+- `pata_bond_id`, `member_bond_id` (FK `bonds`)
+- `grouped_at` (set by the database), `grouped_by` (profile, required)
+- `ungrouped_at` (set by the database), `ungrouped_by` (profile)
+- `reason`: the ungrouping reason. Null while the membership is active; required (not blank), together with `ungrouped_at` and `ungrouped_by`, once ungrouped (CHECK `bond_groups_ungrouping_consistent`)
 
-Rules:
+Rules (constraints and the `bond_groups_guard_write` trigger):
 
-- Only applies to patas with `origin = manual_grouping`.
-- Printed patas do not use this table (their composition is intrinsic).
-- A member bond can only belong to one active pata at a time (where `ungrouped_at IS NULL`).
-- Ungrouping does not delete the row; it sets `ungrouped_at` and `ungrouped_by` for audit.
+- Only applies to patas with `kind = pata`, `origin = manual_grouping`. Members are simple bonds of the same campaign.
+- Printed patas do not use this table (their composition is intrinsic: they own their numbers).
+- Both the pata and the member must be `available` to group; a pata has at most `commercial_unit_count` active members.
+- A member bond can only belong to one active pata at a time (partial unique index on `member_bond_id` where `ungrouped_at IS NULL`).
+- Ungrouping does not delete the row; it sets `ungrouped_at`, `ungrouped_by` and `reason`. Only an `available` pata can be ungrouped (`55000` for `delivered_to_collector`, `returned`, `sold`, etc.). The guard locks the pata row (`FOR UPDATE`) before checking its status, so an ungrouping and a concurrent status change of the pata serialize: whichever commits first wins and the other fails (a pata never leaves `available` without its members). Ungrouped rows are immutable; the composition columns never change.
 
 ### bond_assignments
 
@@ -699,7 +697,8 @@ Suggested fields:
 
 ## Suggested indexes
 
-- `bond_numbers(campaign_id, number_value)` unique.
+- `bond_numbers(campaign_id, number_value)` unique where `released_at IS NULL` (numbers of annulled bonds are released).
+- `bonds(campaign_id, barcode)` and `bonds(campaign_id, internal_code)` unique except for bonds annulled from `available` (codes of an annulled sale stay held).
 - `bonds(campaign_id, commercial_status)`.
 - `bonds(campaign_id, current_collector_id)`.
 - `buyers(document_number)` when it exists.
