@@ -301,15 +301,27 @@ function commissionAction(
 	) as Promise<unknown>;
 }
 
+/**
+ * The rules form as the page renders it for `campaign`: its values, the confirmation, and the
+ * hidden version (`expectedUpdatedAt` = the `updated_at` string PostgREST returned).
+ */
 function rulesFields(campaign: Campaign, overrides: Fields = {}): Fields {
-	return { ...rulesValuesOf(campaign), changeReason: '', confirmRulesChange: 'yes', ...overrides };
+	return {
+		...rulesValuesOf(campaign),
+		changeReason: '',
+		confirmRulesChange: 'yes',
+		expectedUpdatedAt: campaign.updatedAt,
+		...overrides
+	};
 }
 
+/** The general-data form as the page renders it for `campaign` (with its hidden version). */
 function generalFields(campaign: Campaign, overrides: Fields = {}): Fields {
 	return {
 		name: campaign.name,
 		startsOn: CAMPAIGN_STARTS_ON,
 		endsOn: CAMPAIGN_ENDS_ON,
+		expectedUpdatedAt: campaign.updatedAt,
 		...overrides
 	};
 }
@@ -330,6 +342,19 @@ function ruleFields(overrides: Fields = {}): Fields {
 
 async function getCampaign(id: string): Promise<Campaign> {
 	return (await loadCampaign(users.admin, id)).campaign;
+}
+
+/** A rule as the admin's commissions page loads it (its `updatedAt` is the edit form's version). */
+async function getRule(campaignId: string, ruleId: string): Promise<CommissionRule> {
+	const rule = (await loadCommissions(users.admin, campaignId)).rules.find((r) => r.id === ruleId);
+	expect(rule, `rule ${ruleId}`).toBeDefined();
+	return rule!;
+}
+
+/** The commission rule edit form for `rule` (id and hidden version) plus the rule fields. */
+async function ruleEditFields(campaignId: string, ruleId: string, overrides: Fields = {}) {
+	const rule = await getRule(campaignId, ruleId);
+	return { ruleId, expectedUpdatedAt: rule.updatedAt, ...ruleFields(overrides) };
 }
 
 // ---------------------------------------------------------------------------
@@ -391,6 +416,7 @@ function rpcRulesArgs(campaign: Campaign, requestId: string, overrides: Record<s
 		p_associated_number_offset: campaign.associatedNumberOffset,
 		p_overflow_policy: campaign.overflowPolicy,
 		p_barcode_mode: campaign.barcodeMode,
+		p_expected_updated_at: campaign.updatedAt,
 		p_request_id: requestId,
 		...overrides
 	};
@@ -875,6 +901,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				p_name: before.name,
 				p_starts_at: before.startsAt,
 				p_ends_at: null,
+				p_expected_updated_at: before.updatedAt,
 				p_request_id: dbRequestId
 			});
 			expect(error?.code).toBe('23514');
@@ -1146,6 +1173,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 							p_name: campaignName(`Renamed by ${role}`),
 							p_starts_at: target.startsAt,
 							p_ends_at: target.endsAt,
+							p_expected_updated_at: target.updatedAt,
 							p_request_id: next('rpc-update')
 						}
 					],
@@ -1489,14 +1517,11 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					'update',
 					users.admin,
 					campaignId,
-					{
-						ruleId: ruleIds.cash!,
-						...ruleFields({
-							percentage: '30',
-							validTo: '2027-06-30',
-							reason: 'Raised by the board'
-						})
-					},
+					await ruleEditFields(campaignId, ruleIds.cash!, {
+						percentage: '30',
+						validTo: '2027-06-30',
+						reason: 'Raised by the board'
+					}),
 					requestId
 				)
 			).toMatchObject({
@@ -1520,7 +1545,10 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					'update',
 					users.admin,
 					campaignId,
-					{ ruleId: ruleIds.cash!, ...ruleFields({ percentage: '30,00', validTo: '2027-06-30' }) },
+					await ruleEditFields(campaignId, ruleIds.cash!, {
+						percentage: '30,00',
+						validTo: '2027-06-30'
+					}),
 					noopId
 				)
 			).toMatchObject({ success: true, message: 'No changes to save.' });
@@ -1589,7 +1617,10 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					'update',
 					users.admin,
 					campaignId,
-					{ ruleId: ruleIds.cash!, ...ruleFields({ percentage: '35', validTo: '2027-06-30' }) },
+					await ruleEditFields(campaignId, ruleIds.cash!, {
+						percentage: '35',
+						validTo: '2027-06-30'
+					}),
 					editAnnulledId
 				)
 			).toMatchObject({ status: 409, data: { message: COMMISSION_RULE_MESSAGES.annulled } });
@@ -1673,15 +1704,12 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					'update',
 					users.admin,
 					campaignId,
-					{
-						ruleId: ruleIds.custom8!,
-						...ruleFields({
-							ruleType: 'custom',
-							installmentNumber: '8',
-							valueKind: 'fixed_amount',
-							fixedAmount: '350,00'
-						})
-					},
+					await ruleEditFields(campaignId, ruleIds.custom8!, {
+						ruleType: 'custom',
+						installmentNumber: '8',
+						valueKind: 'fixed_amount',
+						fixedAmount: '350,00'
+					}),
 					editId
 				)
 			).toMatchObject({ success: true, message: 'Rule saved.' });
@@ -1712,14 +1740,11 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				['create', ruleFields({ ruleType: 'custom', installmentNumber: '7', percentage: '3' })],
 				[
 					'update',
-					{
-						ruleId: ruleIds.first!,
-						...ruleFields({
-							ruleType: 'installment_first',
-							valueKind: 'fixed_amount',
-							fixedAmount: '1.600,00'
-						})
-					}
+					await ruleEditFields(campaignId, ruleIds.first!, {
+						ruleType: 'installment_first',
+						valueKind: 'fixed_amount',
+						fixedAmount: '1.600,00'
+					})
 				],
 				['annul', { ruleId: ruleIds.middle!, reason: 'closing' }]
 			];
@@ -1746,7 +1771,313 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 		});
 	});
 
-	describe('6. Audit trail', () => {
+	describe('6. Concurrent edits (optimistic concurrency) and non-finite numbers', () => {
+		// Two admins editing at once is simulated with one admin session: "B" saves first with the
+		// version both loaded, then "A" submits the form it loaded before B's save.
+		let campaignId: string;
+
+		beforeAll(async () => {
+			campaignId = await adminCreatesCampaign('Concurrency', {
+				startsOn: CAMPAIGN_STARTS_ON,
+				endsOn: CAMPAIGN_ENDS_ON
+			});
+		});
+
+		it('the version is the exact PostgREST string (microseconds); a JS Date round-trip is stale', async (ctx) => {
+			const campaign = await getCampaign(campaignId);
+			expect(campaign.updatedAt).toMatch(
+				/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?\+00:00$/
+			);
+			const micros = (/\.(\d{1,6})/.exec(campaign.updatedAt)?.[1] ?? '').padEnd(6, '0');
+			// A Date keeps milliseconds only; if the sub-millisecond part is 0 the two are equal.
+			if (micros.endsWith('000')) ctx.skip();
+
+			const requestId = rid('rpc-version-as-date');
+			const { error } = await rpc(users.admin.client, 'campaign_update', {
+				p_id: campaignId,
+				p_name: campaignName('Concurrency (via Date)'),
+				p_starts_at: campaign.startsAt,
+				p_ends_at: campaign.endsAt,
+				p_expected_updated_at: new Date(campaign.updatedAt).toISOString(),
+				p_request_id: requestId
+			});
+			expect(error).toMatchObject({
+				code: '40001',
+				message: 'campaign was modified by someone else'
+			});
+			await expectNoAudit(requestId);
+			expect(await getCampaign(campaignId)).toEqual(campaign);
+		});
+
+		it('campaign_update: a stale form is a 409 asking to reload; nothing is written', async () => {
+			const loaded = await getCampaign(campaignId);
+
+			const otherId = rid('concurrent-rename');
+			expect(
+				await campaignAction(
+					'update',
+					users.admin,
+					campaignId,
+					generalFields(loaded, { name: campaignName('Concurrency (renamed by B)') }),
+					otherId
+				)
+			).toMatchObject({ success: true, message: 'Changes saved.' });
+			await expectOneAudit(otherId, { action: 'campaign.update', entity_id: campaignId });
+			const afterB = await getCampaign(campaignId);
+			expect(afterB.updatedAt).not.toBe(loaded.updatedAt);
+
+			const staleId = rid('stale-update');
+			const staleFields = generalFields(loaded, { endsOn: '2028-01-31' });
+			expect(
+				await campaignAction('update', users.admin, campaignId, staleFields, staleId)
+			).toMatchObject({
+				status: 409,
+				data: {
+					form: 'general',
+					message: CAMPAIGN_MESSAGES.staleVersion,
+					values: { expectedUpdatedAt: loaded.updatedAt }
+				}
+			});
+			await expectNoAudit(staleId);
+
+			const dbStaleId = rid('rpc-stale-update');
+			const { error } = await rpc(users.admin.client, 'campaign_update', {
+				p_id: campaignId,
+				p_name: loaded.name,
+				p_starts_at: loaded.startsAt,
+				p_ends_at: loaded.endsAt,
+				p_expected_updated_at: loaded.updatedAt,
+				p_request_id: dbStaleId
+			});
+			expect(error).toMatchObject({
+				code: '40001',
+				message: 'campaign was modified by someone else'
+			});
+			await expectNoAudit(dbStaleId);
+			expect(await getCampaign(campaignId)).toEqual(afterB);
+
+			// After reloading, the same edit goes through.
+			const retryId = rid('update-after-reload');
+			expect(
+				await campaignAction(
+					'update',
+					users.admin,
+					campaignId,
+					generalFields(afterB, { endsOn: '2028-01-31' }),
+					retryId
+				)
+			).toMatchObject({ success: true, message: 'Changes saved.' });
+			await expectOneAudit(retryId, { action: 'campaign.update', entity_id: campaignId });
+		});
+
+		it('campaign_update_rules: a stale rules form is a 409; any campaign save makes it stale', async () => {
+			const loaded = await getCampaign(campaignId);
+
+			// B saves the general data: both forms share the campaign version.
+			const otherId = rid('concurrent-dates');
+			expect(
+				await campaignAction(
+					'update',
+					users.admin,
+					campaignId,
+					generalFields(loaded, { endsOn: '2028-02-29' }),
+					otherId
+				)
+			).toMatchObject({ success: true });
+			await expectOneAudit(otherId, { action: 'campaign.update', entity_id: campaignId });
+			const afterB = await getCampaign(campaignId);
+
+			const staleId = rid('stale-rules');
+			expect(
+				await campaignAction(
+					'rules',
+					users.admin,
+					campaignId,
+					rulesFields(loaded, { installmentCount: '12', changeReason: 'Stale' }),
+					staleId
+				)
+			).toMatchObject({
+				status: 409,
+				data: { form: 'rules', message: CAMPAIGN_MESSAGES.staleVersion }
+			});
+			await expectNoAudit(staleId);
+
+			const dbStaleId = rid('rpc-stale-rules');
+			const { error } = await rpc(
+				users.admin.client,
+				'campaign_update_rules',
+				rpcRulesArgs(loaded, dbStaleId, { p_installment_count: 12 })
+			);
+			expect(error).toMatchObject({
+				code: '40001',
+				message: 'campaign was modified by someone else'
+			});
+			await expectNoAudit(dbStaleId);
+			expect(await getCampaign(campaignId)).toEqual(afterB);
+
+			const retryId = rid('rules-after-reload');
+			expect(
+				await campaignAction(
+					'rules',
+					users.admin,
+					campaignId,
+					rulesFields(afterB, { installmentCount: '12' }),
+					retryId
+				)
+			).toMatchObject({ success: true, message: 'Rules saved.' });
+			await expectOneAudit(retryId, { action: 'campaign.update_rules', entity_id: campaignId });
+		});
+
+		it('commission_rule_update: a stale edit form is a 409 asking to reload; nothing is written', async () => {
+			const createId = rid('concurrency-rule-create');
+			const created = (await commissionAction(
+				'create',
+				users.admin,
+				campaignId,
+				ruleFields({ percentage: '10' }),
+				createId
+			)) as { success: boolean; ruleId: string };
+			expect(created).toMatchObject({ success: true });
+			await expectOneAudit(createId, {
+				action: 'commission_rule.create',
+				entity_id: created.ruleId
+			});
+			const ruleId = created.ruleId;
+			const loaded = await getRule(campaignId, ruleId);
+
+			const otherId = rid('concurrent-rule-edit');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{ ruleId, expectedUpdatedAt: loaded.updatedAt, ...ruleFields({ percentage: '11' }) },
+					otherId
+				)
+			).toMatchObject({ success: true, message: 'Rule saved.' });
+			await expectOneAudit(otherId, { action: 'commission_rule.update', entity_id: ruleId });
+
+			const staleId = rid('stale-rule-edit');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{ ruleId, expectedUpdatedAt: loaded.updatedAt, ...ruleFields({ percentage: '12' }) },
+					staleId
+				)
+			).toMatchObject({
+				status: 409,
+				data: { form: 'update', ruleId, message: COMMISSION_RULE_MESSAGES.staleVersion }
+			});
+			await expectNoAudit(staleId);
+
+			const dbStaleId = rid('rpc-stale-rule-edit');
+			const { error } = await rpc(users.admin.client, 'commission_rule_update', {
+				p_id: ruleId,
+				p_rule_type: 'cash_full_payment',
+				p_installment_number: null,
+				p_percentage: '12.00',
+				p_fixed_amount: null,
+				p_valid_from: '2027-01-01',
+				p_valid_to: null,
+				p_expected_updated_at: loaded.updatedAt,
+				p_request_id: dbStaleId
+			});
+			expect(error).toMatchObject({
+				code: '40001',
+				message: 'commission rule was modified by someone else'
+			});
+			await expectNoAudit(dbStaleId);
+			expect(await getRule(campaignId, ruleId)).toMatchObject({ percentage: '11.00' });
+		});
+
+		it('NaN and Infinity are rejected by the SQL functions; nothing is written', async () => {
+			const campaign = await getCampaign(campaignId);
+			const rule = (await loadCommissions(users.admin, campaignId)).rules.find(
+				(r) => r.status === 'active'
+			)!;
+			const cases: [string, Record<string, unknown>, string, string][] = [
+				[
+					'commission_rule_create',
+					rpcRuleArgs(campaignId, rid('rpc-nan-fixed'), {
+						p_percentage: null,
+						p_fixed_amount: 'NaN',
+						p_valid_from: '2030-01-01'
+					}),
+					'22023',
+					'fixed amount must be a finite number'
+				],
+				[
+					'commission_rule_create',
+					rpcRuleArgs(campaignId, rid('rpc-inf-fixed'), {
+						p_percentage: null,
+						p_fixed_amount: 'Infinity',
+						p_valid_from: '2030-01-01'
+					}),
+					'22023',
+					'fixed amount must be a finite number'
+				],
+				[
+					'commission_rule_create',
+					rpcRuleArgs(campaignId, rid('rpc-nan-percentage'), {
+						p_percentage: 'NaN',
+						p_valid_from: '2030-01-01'
+					}),
+					'22023',
+					'percentage must be a finite number'
+				],
+				[
+					'commission_rule_update',
+					{
+						p_id: rule.id,
+						p_rule_type: rule.ruleType,
+						p_installment_number: rule.installmentNumber,
+						p_percentage: null,
+						p_fixed_amount: 'NaN',
+						p_valid_from: rule.validFrom,
+						p_valid_to: rule.validTo,
+						p_expected_updated_at: rule.updatedAt,
+						p_request_id: rid('rpc-nan-rule-update')
+					},
+					'22023',
+					'fixed amount must be a finite number'
+				],
+				// Campaign money: rejected by the table CHECKs (NaN would otherwise pass "> 0" and the
+				// exact-installment check, since NaN = NaN in Postgres).
+				[
+					'campaign_create',
+					rpcCreateArgs(campaignName('NaN value'), rid('rpc-nan-campaign'), {
+						p_simple_bond_value: 'NaN'
+					}),
+					'23514',
+					'campaigns_installment_value_positive'
+				],
+				[
+					'campaign_update_rules',
+					rpcRulesArgs(campaign, rid('rpc-nan-rules'), { p_simple_bond_value: 'NaN' }),
+					'23514',
+					'campaigns_installment_value_positive'
+				]
+			];
+			for (const [fn, args, code, message] of cases) {
+				const { data, error } = await rpc(users.admin.client, fn, args);
+				expect(data, fn).toBeNull();
+				expect(error?.code, `${fn} ${JSON.stringify(args)}`).toBe(code);
+				expect(error?.message).toContain(message);
+				await expectNoAudit(args.p_request_id as string);
+			}
+			expect(await getCampaign(campaignId)).toEqual(campaign);
+			expect(await getRule(campaignId, rule.id)).toEqual(rule);
+			const { data: leaked } = await serviceClient
+				.from('campaigns')
+				.select('id')
+				.eq('name', campaignName('NaN value'));
+			expect(leaked).toEqual([]);
+		});
+	});
+
+	describe('7. Audit trail', () => {
 		it('every successful mutation wrote exactly one row and rejected calls wrote none', async () => {
 			expect(expectedAudit.size).toBeGreaterThan(0);
 			for (const [entityId, expected] of expectedAudit) {
