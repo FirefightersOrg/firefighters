@@ -127,7 +127,8 @@ export function buildBondRecord(input: BondRecordInput): BondRecord {
 			barcode: bond.barcode,
 			createdAt: bond.createdAt,
 			annulledAt: bond.annulledAt,
-			annulReason: bond.annulReason
+			annulReason: bond.annulReason,
+			annulledFromStatus: bond.annulledFromStatus
 		},
 		numbers,
 		group: { members, memberOf },

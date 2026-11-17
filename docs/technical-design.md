@@ -189,6 +189,7 @@ The database is the authority: the app never sends associated numbers or values,
 
 - `?/ungroup`: available manual pata, `bond.create` (operators included), reason required. The pata is annulled, its memberships get `ungrouped_at/by/reason` (never deleted) and its members are free again.
 - `?/annul`: available simple bond or printed pata not in an active group, `bond.annul` (admin only; hidden otherwise, 403 from the action), reason required. Its numbers are released and can be entered again.
+- An annulled bond shows the status it was annulled from (`annulled_from_status`): from `available` (loaded by mistake) its numbers and codes were freed; from `sold` (annulled sale, Phase 10) they stay held.
 - Database messages never show bond ids (`withoutBondIds`, `src/lib/server/bonds/route-helpers.ts`).
 
 ## Barcode and imports

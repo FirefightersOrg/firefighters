@@ -38,6 +38,7 @@ export const BOND_COLUMNS = [
 	'annulled_at',
 	'annulled_by',
 	'annul_reason',
+	'annulled_from_status',
 	'created_by',
 	'created_at',
 	'updated_at'
@@ -85,6 +86,7 @@ export interface BondRow {
 	annulled_at: string | null;
 	annulled_by: string | null;
 	annul_reason: string | null;
+	annulled_from_status: string | null;
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
@@ -131,6 +133,11 @@ export interface Bond {
 	annulledAt: string | null;
 	annulledBy: string | null;
 	annulReason: string | null;
+	/**
+	 * Status the bond was annulled from (set by the database). Only bonds annulled from
+	 * `available` (loaded by mistake) release their numbers; an annulled sale keeps them held.
+	 */
+	annulledFromStatus: BondCommercialStatus | null;
 	createdBy: string | null;
 	createdAt: string;
 	updatedAt: string;
@@ -200,6 +207,14 @@ export function mapBondRow(row: BondRow): Bond {
 		annulledAt: row.annulled_at,
 		annulledBy: row.annulled_by,
 		annulReason: row.annul_reason,
+		annulledFromStatus:
+			row.annulled_from_status === null
+				? null
+				: oneOf<BondCommercialStatus>(
+						BOND_COMMERCIAL_STATUSES,
+						row.annulled_from_status,
+						'bonds.annulled_from_status'
+					),
 		createdBy: row.created_by,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at

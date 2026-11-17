@@ -39,8 +39,10 @@
 --     same reason. The members are free again.
 --   * Annulling (bond.annul, admin only in the seed) only applies to `available` simple bonds and
 --     printed patas that are not active members of a manual pata. Their numbers are released
---     (released_at/released_by) so they can be entered again; rows stay as history. A manual pata
---     is not annulled directly: it is ungrouped. Annulling sold bonds is out of scope (Phase 10).
+--     (released_at/released_by) so they can be entered again; rows stay as history. The SAN-22
+--     guard records annulled_from_status = 'available', which is what allows the release (a bond
+--     annulled from sold keeps its numbers held). A manual pata is not annulled directly: it is
+--     ungrouped. Annulling sold bonds is out of scope (Phase 10).
 --
 -- Audit actions (entity_type 'bond', entity_id = the bond / pata id):
 --   bond.create   new_value: full snapshot (incl. numbers)
@@ -266,7 +268,7 @@ begin
   elsif p_constraint = 'bonds_campaign_internal_code_key' then
     select b.id into v_bond_id from public.bonds b
     where b.campaign_id = p_campaign.id and b.internal_code = p_internal_code
-      and b.commercial_status <> 'annulled';
+      and (b.commercial_status <> 'annulled' or b.annulled_from_status is distinct from 'available');
     if v_bond_id is not null then
       raise exception 'internal code % is already used by bond %', p_internal_code, v_bond_id
         using errcode = 'unique_violation',
@@ -275,7 +277,7 @@ begin
   elsif p_constraint = 'bonds_campaign_barcode_key' then
     select b.id into v_bond_id from public.bonds b
     where b.campaign_id = p_campaign.id and b.barcode = p_barcode
-      and b.commercial_status <> 'annulled';
+      and (b.commercial_status <> 'annulled' or b.annulled_from_status is distinct from 'available');
     if v_bond_id is not null then
       raise exception 'barcode % is already used by bond %', p_barcode, v_bond_id
         using errcode = 'unique_violation',
@@ -664,6 +666,7 @@ begin
   set commercial_status = 'annulled', annulled_by = v_actor, annul_reason = v_reason
   where id = p_bond_id;
 
+  -- Allowed because the bond was annulled from available (annulled_from_status, set by the guard).
   update public.bond_numbers
   set released_at = now(), released_by = v_actor
   where bond_id = p_bond_id and released_at is null;

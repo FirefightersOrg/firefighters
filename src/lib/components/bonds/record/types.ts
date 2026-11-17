@@ -28,6 +28,11 @@ export interface BondRecordGeneral {
 	createdAt: string;
 	annulledAt: string | null;
 	annulReason: string | null;
+	/**
+	 * Status the bond was annulled from. Only `available` (loaded by mistake) freed its numbers and
+	 * codes; an annulled sale keeps them held.
+	 */
+	annulledFromStatus: BondCommercialStatus | null;
 }
 
 export interface BondRecordNumber {

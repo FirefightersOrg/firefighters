@@ -38,6 +38,7 @@ function bondRow(overrides: Record<string, unknown> = {}) {
 		annulled_at: null,
 		annulled_by: null,
 		annul_reason: null,
+		annulled_from_status: null,
 		created_by: profile.id,
 		created_at: '2026-11-17T12:00:00+00:00',
 		updated_at: '2026-11-17T12:00:00+00:00',

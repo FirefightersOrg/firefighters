@@ -43,7 +43,8 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 			barcode: null,
 			createdAt: '2026-11-17T12:00:00+00:00',
 			annulledAt: null,
-			annulReason: null
+			annulReason: null,
+			annulledFromStatus: null
 		},
 		numbers: [
 			{ formatted: '0068', kind: 'base', released: false, ownerBondId: BOND_ID },
@@ -103,7 +104,8 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 					...record().general,
 					commercialStatus: 'annulled',
 					annulledAt: '2026-11-17T13:00:00+00:00',
-					annulReason: 'Loaded twice'
+					annulReason: 'Loaded twice',
+					annulledFromStatus: 'available'
 				},
 				numbers: record().numbers.map((n) => ({ ...n, released: true }))
 			}),
@@ -117,6 +119,26 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(done).toContain('Bond annulled.');
 		expect(done).toContain('Loaded twice');
 		expect(done).toContain('Released');
+		expect(done).toContain('Annulled from');
+		expect(done).toContain('its numbers and codes were freed');
+	});
+
+	it('an annulled sale: numbers and codes stay held', () => {
+		const body = renderPage(
+			record({
+				general: {
+					...record().general,
+					commercialStatus: 'annulled',
+					annulledAt: '2026-11-17T13:00:00+00:00',
+					annulReason: 'Sale cancelled',
+					annulledFromStatus: 'sold'
+				}
+			})
+		);
+		expect(body).toContain('Annulled from');
+		expect(body).toContain('its numbers and codes stay held');
+		expect(body).not.toContain('were freed');
+		expect(body).not.toContain('Released');
 	});
 
 	it('a member of a manual pata: links to the pata, no actions', () => {

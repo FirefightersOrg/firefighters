@@ -46,6 +46,13 @@ function renderPage(
 const inputValue = (body: string, name: string) =>
 	body.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0].match(/value="([^"]*)"/)?.[1];
 
+/** Opening tag of the submit button with the given intent value. */
+const submitButton = (body: string, value: string) =>
+	body.match(new RegExp(`<button[^>]*name="intent"[^>]*value="${value}"[^>]*>`))?.[0] ?? '';
+
+/** The `disabled` attribute itself, not the `disabled:` Tailwind variants in `class`. */
+const isDisabled = (tag: string) => /\sdisabled=""/.test(tag);
+
 describe('BaseNumberPreview', () => {
 	const html = (input: string, config = DEFAULT_NUMBERING_CONFIG) =>
 		render(BaseNumberPreview, { props: { preview: previewBaseNumber(input, config) } }).body;
@@ -94,6 +101,12 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		// Usable range from the numbering preview.
 		expect(body).toContain('0000–5128');
 		expect(body).not.toContain('Saving the first bond freezes its rules');
+		// Both buttons are enabled (their class still has `disabled:` variants).
+		for (const value of ['another', 'save']) {
+			const tag = submitButton(body, value);
+			expect(tag).toContain('disabled:');
+			expect(isDisabled(tag)).toBe(false);
+		}
 	});
 
 	it('warns that the first bond freezes the rules of a draft', () => {
@@ -164,6 +177,7 @@ describe('/campaigns/[id]/bonds/new page', () => {
 			values: { baseNumber: '5129', internalCode: '', barcode: '' }
 		});
 		expect(body).toContain('the highest allowed base number is 5128');
-		expect(body).toMatch(/<button[^>]*value="another"[^>]*disabled/);
+		expect(isDisabled(submitButton(body, 'another'))).toBe(true);
+		expect(isDisabled(submitButton(body, 'save'))).toBe(true);
 	});
 });

@@ -48,6 +48,19 @@
 				<dt class="text-slate-500">Annulment reason</dt>
 				<dd class="font-medium">{general.annulReason ?? '—'}</dd>
 			</div>
+			{#if general.annulledFromStatus}
+				<div class="sm:col-span-3">
+					<dt class="text-slate-500">Annulled from</dt>
+					<dd class="font-medium">
+						{BOND_COMMERCIAL_STATUS_LABELS[general.annulledFromStatus]}
+						<span class="font-normal text-slate-600">
+							{general.annulledFromStatus === 'available'
+								? '— loaded by mistake: its numbers and codes were freed and can be entered again.'
+								: '— its numbers and codes stay held: no other bond can use them.'}
+						</span>
+					</dd>
+				</div>
+			{/if}
 		{/if}
 	</dl>
 </section>
