@@ -33,7 +33,9 @@
 --     (commercial_unit_count active rows), and it can only be ungrouped while it is `available`.
 --     Ungrouping locks the pata row, so it serializes with any concurrent status change: a pata
 --     is never delivered/sold without its members.
---   * barcode and internal_code are unique per campaign among non-annulled bonds.
+--   * barcode and internal_code are unique per campaign among bonds that hold them: like numbers,
+--     codes are freed only when the bond was annulled from `available` (mistaken load); codes of
+--     a bond annulled from `sold` stay held.
 --
 -- Errors (SQLSTATE):
 --   23514 check_violation                   table CHECKs; new bond not created/available or with
@@ -151,11 +153,15 @@ create index bonds_campaign_status_idx on public.bonds (campaign_id, commercial_
 create index bonds_campaign_collector_idx on public.bonds (campaign_id, current_collector_id);
 create index bonds_created_by_idx on public.bonds (created_by);
 create index bonds_annulled_by_idx on public.bonds (annulled_by);
--- Unique per campaign among non-annulled bonds: a code of a bond annulled by mistake can be reused.
+-- Unique per campaign among bonds that hold their codes: only a bond annulled by mistake
+-- (annulled from `available`, same rule as number release) frees them for reuse. Codes of a bond
+-- annulled from any other status (e.g. sold) stay held.
 create unique index bonds_campaign_barcode_key on public.bonds (campaign_id, barcode)
-  where barcode is not null and commercial_status <> 'annulled';
+  where barcode is not null
+    and (commercial_status <> 'annulled' or annulled_from_status is distinct from 'available');
 create unique index bonds_campaign_internal_code_key on public.bonds (campaign_id, internal_code)
-  where internal_code is not null and commercial_status <> 'annulled';
+  where internal_code is not null
+    and (commercial_status <> 'annulled' or annulled_from_status is distinct from 'available');
 
 -- ---------------------------------------------------------------------------
 -- bond_numbers

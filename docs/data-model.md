@@ -203,7 +203,7 @@ Rules (constraints and the `bonds_guard_write` trigger, for every role):
 - `annulled` and `closed` bonds are immutable except for `financial_status_snapshot` (`55000`).
 - While a simple bond is an active member of a manual pata (`bond_groups`), its commercial data (status, codes, collector, buyer, annulment) cannot change (`55000`): it is operated through the pata. It keeps its own commercial status; there is no separate "grouped" status.
 - A manually grouped pata is sold as a whole: it can only leave `available` (other than by annulment, after ungrouping) with all its members, i.e. `commercial_unit_count` active `bond_groups` rows (`55000` otherwise).
-- `barcode` and `internal_code` are unique per campaign among non-annulled bonds (partial unique indexes `bonds_campaign_barcode_key`, `bonds_campaign_internal_code_key`): the codes of a bond annulled by mistake can be entered again.
+- `barcode` and `internal_code` are unique per campaign among bonds that hold them (partial unique indexes `bonds_campaign_barcode_key`, `bonds_campaign_internal_code_key`, `where commercial_status <> 'annulled' or annulled_from_status is distinct from 'available'`). Same rule as number release: only the codes of a bond annulled by mistake (`annulled_from_status = 'available'`) can be entered again; the codes of a bond annulled from `sold` (annulled sale) stay held (`23505`).
 - Bonds are never deleted (annul instead): no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner too.
 
 Access: `authenticated` can only `SELECT`, and RLS limits it to `bond.view` (same for `bond_numbers` and `bond_groups`). Writes go through permission-checked, audited SQL functions (SAN-23, below): creating bonds and grouping/ungrouping manual patas need `bond.create`, annulling needs `bond.annul` (there is no `bond.update` permission). `service_role` has `SELECT`, `INSERT` and `UPDATE`.
@@ -714,7 +714,7 @@ Suggested fields:
 ## Suggested indexes
 
 - `bond_numbers(campaign_id, number_value)` unique where `released_at IS NULL` (numbers of annulled bonds are released).
-- `bonds(campaign_id, barcode)` and `bonds(campaign_id, internal_code)` unique among non-annulled bonds.
+- `bonds(campaign_id, barcode)` and `bonds(campaign_id, internal_code)` unique except for bonds annulled from `available` (codes of an annulled sale stay held).
 - `bonds(campaign_id, commercial_status)`.
 - `bonds(campaign_id, current_collector_id)`.
 - `buyers(document_number)` when it exists.
