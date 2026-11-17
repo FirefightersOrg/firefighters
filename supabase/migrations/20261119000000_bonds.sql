@@ -29,10 +29,10 @@
 --     linked through bond_groups. While a simple bond is an active member of a group, its
 --     commercial data cannot change (it is blocked from individual operations); there is no
 --     separate "grouped" commercial status.
---   * A manual pata can only leave `available` (other than by annulment) with all its members
---     (commercial_unit_count active rows), and it can only be ungrouped while it is `available`.
---     Ungrouping locks the pata row, so it serializes with any concurrent status change: a pata
---     is never delivered/sold without its members.
+--   * A manual pata can only leave `available` with all its members (commercial_unit_count active
+--     rows), except that it can only be annulled after all members are ungrouped. Ungrouping locks
+--     the pata row, so it serializes with any concurrent status change: a pata is never
+--     delivered/sold without its members, nor annulled while they remain blocked.
 --   * barcode and internal_code are unique per campaign among bonds that hold them: like numbers,
 --     codes are freed only when the bond was annulled from `available` (mistaken load); codes of
 --     a bond annulled from `sold` stay held.
@@ -354,16 +354,21 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  -- A manual pata is sold as a whole: it can only leave available (other than by annulment,
-  -- after ungrouping) with all its members. Ungrouping locks this row (bond_groups_guard_write),
-  -- so the count below cannot be stale.
+  -- A manual pata is sold as a whole: it can only leave available with all its members. It can be
+  -- annulled only after ungrouping; otherwise active members would be permanently blocked because
+  -- ungrouping itself requires an available pata. Ungrouping locks this row
+  -- (bond_groups_guard_write), so the count below cannot be stale.
   if old.origin = 'manual_grouping' and old.commercial_status = 'available'
-    and new.commercial_status not in ('available', 'annulled')
+    and new.commercial_status <> 'available'
   then
     select count(*) into v_members
     from public.bond_groups g
     where g.pata_bond_id = old.id and g.ungrouped_at is null;
-    if v_members <> old.commercial_unit_count then
+    if new.commercial_status = 'annulled' and v_members <> 0 then
+      raise exception 'manually grouped pata % has % active members and must be ungrouped before annulment',
+        old.id, v_members
+        using errcode = 'object_not_in_prerequisite_state';
+    elsif v_members <> old.commercial_unit_count then
       raise exception 'manually grouped pata % has % of % members and cannot leave available',
         old.id, v_members, old.commercial_unit_count
         using errcode = 'object_not_in_prerequisite_state';
