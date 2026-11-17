@@ -659,9 +659,10 @@ select results_eq(
   'ungroup: membership rows are kept and marked ungrouped (by, reason)'
 );
 select results_eq(
-  $$select commercial_status, annulled_by, annul_reason, annulled_at is not null
+  $$select commercial_status, annulled_by, annul_reason, annulled_at is not null, annulled_from_status
     from public.bonds where id = pg_temp.id('p1')$$,
-  $$values ('annulled'::text, 'b9000000-0000-0000-0000-000000000002'::uuid, 'Buyer wants them separately'::text, true)$$,
+  $$values ('annulled'::text, 'b9000000-0000-0000-0000-000000000002'::uuid, 'Buyer wants them separately'::text, true,
+      'available'::text)$$,
   'ungroup: the manual pata is annulled with the same reason'
 );
 select results_eq(
@@ -751,10 +752,11 @@ select lives_ok(
 );
 reset role;
 select results_eq(
-  $$select commercial_status, annulled_by, annul_reason, annulled_at is not null
+  $$select commercial_status, annulled_by, annul_reason, annulled_at is not null, annulled_from_status
     from public.bonds where id = pg_temp.id('b-68')$$,
-  $$values ('annulled'::text, 'b9000000-0000-0000-0000-000000000001'::uuid, 'Loaded by mistake'::text, true)$$,
-  'annul: status, actor and trimmed reason are recorded'
+  $$values ('annulled'::text, 'b9000000-0000-0000-0000-000000000001'::uuid, 'Loaded by mistake'::text, true,
+      'available'::text)$$,
+  'annul: status, actor, trimmed reason and annulled-from status (available: numbers released) are recorded'
 );
 select results_eq(
   $$select number_value, released_at is not null, released_by from public.bond_numbers
