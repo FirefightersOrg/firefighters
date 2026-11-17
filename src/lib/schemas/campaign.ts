@@ -64,8 +64,12 @@ export const CAMPAIGN_CREATE_FIELDS = [
  */
 export const CAMPAIGN_RULES_CONFIRM_FIELD = 'confirmRulesChange';
 export const CAMPAIGN_RULES_CONFIRM_VALUE = 'yes';
+/** Optional reason for a rule change, stored in the audit row (`audit_log.reason`). */
+export const CAMPAIGN_RULES_REASON_FIELD = 'changeReason';
+export const CAMPAIGN_RULES_REASON_MAX_LENGTH = 500;
 export const CAMPAIGN_RULES_UPDATE_FIELDS = [
 	...CAMPAIGN_RULES_FIELDS,
+	CAMPAIGN_RULES_REASON_FIELD,
 	CAMPAIGN_RULES_CONFIRM_FIELD
 ] as const;
 export const CAMPAIGN_TRANSITION_FIELDS = ['toStatus', 'reason'] as const;
@@ -73,6 +77,7 @@ export const CAMPAIGN_TRANSITION_FIELDS = ['toStatus', 'reason'] as const;
 export type CampaignFormField =
 	| (typeof CAMPAIGN_CREATE_FIELDS)[number]
 	| (typeof CAMPAIGN_TRANSITION_FIELDS)[number]
+	| typeof CAMPAIGN_RULES_REASON_FIELD
 	| typeof CAMPAIGN_RULES_CONFIRM_FIELD;
 
 /** Raw string values of a form (what the inputs hold). */
@@ -310,10 +315,21 @@ export const campaignRulesSchema = z
 	})
 	.transform(toRulesOutput);
 
-/** Rules of an existing (draft) campaign: the rules plus the explicit confirmation. */
+/**
+ * Rules of an existing (draft) campaign: the rules, an optional reason for the audit log (trimmed,
+ * blank → null) and the explicit confirmation.
+ */
 export const campaignRulesUpdateSchema = z
 	.object({
 		...rulesShape,
+		[CAMPAIGN_RULES_REASON_FIELD]: z
+			.string()
+			.trim()
+			.max(
+				CAMPAIGN_RULES_REASON_MAX_LENGTH,
+				`Reason must be at most ${CAMPAIGN_RULES_REASON_MAX_LENGTH} characters`
+			)
+			.transform((value) => (value === '' ? null : value)),
 		// A non-fatal check (not z.literal), so the rule errors are still reported with it.
 		[CAMPAIGN_RULES_CONFIRM_FIELD]: z
 			.string()
@@ -325,7 +341,11 @@ export const campaignRulesUpdateSchema = z
 		refineNumbering(value, ctx);
 		refineInstallments(value, ctx);
 	})
-	.transform(toRulesOutput);
+	.transform((value) => ({
+		...toRulesOutput(value),
+		/** Audit reason (`campaign_update_rules(p_reason)`), or null. */
+		reason: value[CAMPAIGN_RULES_REASON_FIELD]
+	}));
 
 /** New campaign: general data + rules. */
 export const campaignCreateSchema = z
@@ -408,5 +428,6 @@ export function previewNumberingInput(
 
 export type CampaignGeneralInput = z.output<typeof campaignGeneralSchema>;
 export type CampaignRulesInput = z.output<typeof campaignRulesSchema>;
+export type CampaignRulesUpdateInput = z.output<typeof campaignRulesUpdateSchema>;
 export type CampaignCreateInput = z.output<typeof campaignCreateSchema>;
 export type CampaignTransitionInput = z.output<typeof campaignTransitionSchema>;

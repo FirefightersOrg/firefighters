@@ -252,10 +252,18 @@ describe('campaignRulesSchema / campaignNumberingSchema', () => {
 });
 
 describe('campaignRulesUpdateSchema (existing campaign)', () => {
-	const confirmed = { ...rules, simpleBondValue: '60.000,00', confirmRulesChange: 'yes' };
+	const confirmed = {
+		...rules,
+		simpleBondValue: '60.000,00',
+		changeReason: '',
+		confirmRulesChange: 'yes'
+	};
 
 	it('requires the explicit confirmation', () => {
-		expect(campaignRulesUpdateSchema.parse(confirmed)).toEqual(campaignRulesSchema.parse(rules));
+		expect(campaignRulesUpdateSchema.parse(confirmed)).toEqual({
+			...campaignRulesSchema.parse(rules),
+			reason: null
+		});
 		for (const confirmRulesChange of ['', 'on', 'no', 'YES']) {
 			const errors = errorsOf(
 				campaignRulesUpdateSchema.safeParse({ ...confirmed, confirmRulesChange })
@@ -277,8 +285,22 @@ describe('campaignRulesUpdateSchema (existing campaign)', () => {
 		expect(Object.keys(errors).sort()).toEqual(['confirmRulesChange', 'installmentCount']);
 	});
 
-	it('reads the confirmation field from the form', () => {
+	it('reads the confirmation and reason fields from the form', () => {
 		expect(CAMPAIGN_RULES_UPDATE_FIELDS).toContain('confirmRulesChange');
+		expect(CAMPAIGN_RULES_UPDATE_FIELDS).toContain('changeReason');
+	});
+
+	it('takes an optional audit reason: trimmed, blank → null, at most 500 characters', () => {
+		const parse = (changeReason: string) =>
+			campaignRulesUpdateSchema.parse({ ...confirmed, changeReason }).reason;
+		expect(parse('  Board decision  ')).toBe('Board decision');
+		expect(parse('')).toBeNull();
+		expect(parse('   ')).toBeNull();
+		expect(parse('x'.repeat(500))).toHaveLength(500);
+		const errors = errorsOf(
+			campaignRulesUpdateSchema.safeParse({ ...confirmed, changeReason: 'x'.repeat(501) })
+		);
+		expect(errors).toEqual({ changeReason: ['Reason must be at most 500 characters'] });
 	});
 });
 
