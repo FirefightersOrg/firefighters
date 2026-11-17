@@ -626,7 +626,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Optimistic concurrency (updated_at as version): stale saves raise 40001 and write nothing
+-- Optimistic concurrency (updated_at as version): stale saves raise PT409 and write nothing
 -- ---------------------------------------------------------------------------
 -- Every write in this test runs in one transaction, so updated_at is always now(). To have a
 -- version that a later write supersedes, 'v1' first gets an older updated_at with microseconds
@@ -670,32 +670,32 @@ select is(
 select throws_ok(
   $$select public.campaign_update((select id from ids where k = 'v1'), 'Stale rename', null, null,
       '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else', 'version: update with a stale version is rejected (40001)'
+  'PT409', 'campaign was modified by someone else', 'version: update with a stale version is rejected (PT409)'
 );
 select throws_ok(
   $$select public.campaign_update((select id from ids where k = 'v1'), 'Off by one microsecond', null, null,
       pg_temp.version_of('v1') - interval '1 microsecond', 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else', 'version: the comparison is exact (1 microsecond off is stale)'
+  'PT409', 'campaign was modified by someone else', 'version: the comparison is exact (1 microsecond off is stale)'
 );
 select throws_ok(
   $$select public.campaign_update((select id from ids where k = 'v1'), 'Null version', null, null, null, 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else', 'version: a null version is never current'
+  'PT409', 'campaign was modified by someone else', 'version: a null version is never current'
 );
 select throws_ok(
   $$select public.campaign_update((select id from ids where k = 'v1'), 'Versioned (renamed)', null, null,
       '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else', 'version: a stale no-op is rejected too (checked before comparing values)'
+  'PT409', 'campaign was modified by someone else', 'version: a stale no-op is rejected too (checked before comparing values)'
 );
 select throws_ok(
   $$select public.campaign_update_rules((select id from ids where k = 'v1'), 60000, 12, 4, 9999, 4871, 'reject', 'base_number',
       '2026-01-01 10:00:00.123456+00', 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else',
-  'version: update_rules with a version older than the rename is rejected (40001)'
+  'PT409', 'campaign was modified by someone else',
+  'version: update_rules with a version older than the rename is rejected (PT409)'
 );
 select throws_ok(
   $$select public.campaign_update_rules((select id from ids where k = 'v1'), 60000, 12, 4, 9999, 4871, 'reject', 'base_number',
       null, 'req-ver-stale')$$,
-  '40001', 'campaign was modified by someone else', 'version: update_rules with a null version is rejected'
+  'PT409', 'campaign was modified by someone else', 'version: update_rules with a null version is rejected'
 );
 select throws_ok(
   $$select public.campaign_update((select id from ids where k = 'v1'), '', null, null, '2026-01-01 10:00:00.123456+00', 'req-ver-bad')$$,
