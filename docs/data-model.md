@@ -425,19 +425,29 @@ Rule:
 
 ### commission_rules
 
-Commission rules per campaign.
+Commission rules per campaign. Implemented in SAN-20
+(`20261118000000_commission_rules.sql`; decisions in `docs/commissions.md`).
 
-Suggested fields:
+Fields:
 
 - `id`
-- `campaign_id`
-- `rule_type`
-- `installment_number`
-- `percentage`
-- `fixed_amount`
-- `applies_to_collector_id`
-- `valid_from`
-- `valid_to`
+- `campaign_id` (FK `campaigns`)
+- `rule_type`: `cash_full_payment`, `installment_first`, `installment_middle`, `installment_last`,
+  `custom`
+- `installment_number`: required (1..`campaigns.installment_count`) for `custom`, null otherwise
+- `percentage` `numeric(5,2)` (0 < p <= 100) or `fixed_amount` `numeric(14,2)` (> 0): exactly one
+- `applies_to_collector_id`: null for general rules; no FK until `collectors` exists (Phase 5)
+- `valid_from`, `valid_to`: calendar days, both inclusive; `valid_to` null = open-ended
+- `status` (`active`, `annulled`), `annulled_at`, `annulled_by`, `annul_reason`
+- `created_by`, `created_at`, `updated_at`
+
+Rules:
+
+- Active general rules of the same campaign + `rule_type` (+ `installment_number`) cannot overlap
+  in validity (EXCLUDE constraint `commission_rules_no_overlap`, extension `btree_gist`).
+- Never deleted: annulled with a reason. Annulled rules are immutable.
+- Writable only while the campaign is `draft` or `active`, only through the audited
+  `commission_rule_*` functions (`commission.rule_manage`); readable with `commission.view`.
 
 ### commission_adjustments
 
