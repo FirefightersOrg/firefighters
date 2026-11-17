@@ -1,0 +1,1826 @@
+import { randomUUID } from 'node:crypto';
+import { beforeAll, describe, expect, inject, it } from 'vitest';
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { isRedirect } from '@sveltejs/kit';
+import { load as listLoad } from '../../src/routes/campaigns/+page.server';
+import {
+	actions as newCampaignActions,
+	load as newCampaignLoad
+} from '../../src/routes/campaigns/new/+page.server';
+import {
+	actions as campaignActions,
+	load as campaignLoad
+} from '../../src/routes/campaigns/[id]/+page.server';
+import {
+	actions as commissionActions,
+	load as commissionLoad
+} from '../../src/routes/campaigns/[id]/commissions/+page.server';
+import {
+	defaultRulesValues,
+	emptyGeneralValues,
+	rulesValuesOf
+} from '$lib/components/campaigns/types';
+import { campaignNumberingConfig, type Campaign } from '$lib/domain/campaigns';
+import {
+	formatCommissionRuleType,
+	formatCommissionValue,
+	type CommissionRule
+} from '$lib/domain/commissions';
+import {
+	calculateAssociatedNumber,
+	DEFAULT_NUMBERING_CONFIG,
+	formatCampaignNumber,
+	getMaxValidBaseNumber,
+	NumberingError,
+	parseCampaignNumber,
+	validateNoOverflow
+} from '$lib/domain/numbering';
+import { getUserPermissions } from '$lib/server/auth/permissions';
+import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
+import { COMMISSION_RULE_MESSAGES } from '$lib/server/services/commission-rules';
+import { resolveSeedConfig } from '../../scripts/seed-admin';
+import type { UserProfile } from '../../src/app';
+
+/**
+ * Phase 2 acceptance (SAN-21): campaign creation, rules, transitions, permissions, commission
+ * rules and their audit trail, against the real local Supabase with the seeded users.
+ *
+ * Calls the real code paths: the SvelteKit loads and form actions of /campaigns/** with a
+ * USER-SCOPED client and the caller's real permission list (`my_permissions()`), and the audited
+ * SQL functions directly through the same client when a database-level check is the point.
+ *
+ * Campaigns and commission rules cannot be deleted (by design), so this suite does not clean up:
+ * every campaign it creates is named `[it-p2 <run id>] ...` and every request id starts with
+ * `it-p2-<run id>-`, so a run's data can be told apart and the suite can run again without a
+ * `supabase db reset`. See docs/phase-2-verification.md.
+ */
+
+const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
+const seedConfig = resolveSeedConfig(seedEnv);
+
+const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
+
+const RUN_ID = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 8)}`;
+const NAME_PREFIX = `[it-p2 ${RUN_ID}]`;
+const REQUEST_PREFIX = `it-p2-${RUN_ID}-`;
+const campaignName = (label: string) => `${NAME_PREFIX} ${label}`;
+let requestSeq = 0;
+const rid = (label: string) => `${REQUEST_PREFIX}${String(++requestSeq).padStart(3, '0')}-${label}`;
+
+const NBSP = ' ';
+const CAMPAIGN_STARTS_ON = '2027-03-01';
+const CAMPAIGN_ENDS_ON = '2027-12-31';
+
+type RoleName = 'admin' | 'operator' | 'treasurer' | 'collector' | 'read-only';
+
+interface SignedInUser {
+	role: RoleName;
+	user: User;
+	client: SupabaseClient;
+	profile: UserProfile;
+	/** Real permission list from `my_permissions()`, as the hook would put in `locals`. */
+	permissions: string[];
+}
+
+interface AuditRow {
+	id: string;
+	actor_user_id: string | null;
+	action: string;
+	entity_type: string;
+	entity_id: string;
+	old_value: Record<string, unknown> | null;
+	new_value: Record<string, unknown> | null;
+	reason: string | null;
+	request_id: string | null;
+}
+
+interface CampaignPageData {
+	campaign: Campaign;
+	can: {
+		editName: boolean;
+		editDates: boolean;
+		editRules: boolean;
+		transitions: string[];
+		viewCommissions: boolean;
+	};
+}
+
+interface CommissionPageData {
+	campaign: Campaign;
+	rules: CommissionRule[];
+	can: { manage: boolean };
+}
+
+type Fields = Record<string, string>;
+
+let serviceClient: SupabaseClient;
+const users = {} as Record<RoleName, SignedInUser>;
+
+/** entity_id -> audit rows this run expects for it (one per successful mutation). */
+const expectedAudit = new Map<string, number>();
+/** Every campaign this run created. */
+const runCampaignIds: string[] = [];
+
+// ---------------------------------------------------------------------------
+// Sessions and request events
+// ---------------------------------------------------------------------------
+
+async function signIn(role: RoleName, email: string, password: string): Promise<SignedInUser> {
+	const anonClient = createClient(supabaseUrl, anonKey, clientOptions);
+	const { data, error } = await anonClient.auth.signInWithPassword({ email, password });
+	if (error || !data.session) {
+		throw new Error(
+			`Failed to sign in as ${email}: ${error?.message ?? 'no session'}. ` +
+				'Did you run `supabase db reset` and `APP_ENV=local pnpm seed:admin`?'
+		);
+	}
+	const client = createClient(supabaseUrl, anonKey, {
+		...clientOptions,
+		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
+	});
+	const { data: profile, error: profileError } = await serviceClient
+		.from('profiles')
+		.select('*')
+		.eq('auth_user_id', data.user.id)
+		.single();
+	if (profileError || !profile) {
+		throw new Error(`No profile for ${email}: ${profileError?.message ?? 'not found'}`);
+	}
+	return {
+		role,
+		user: data.user,
+		client,
+		profile: profile as UserProfile,
+		permissions: await getUserPermissions(client)
+	};
+}
+
+function localsFor(caller: SignedInUser, requestId: string, permissions?: string[]): App.Locals {
+	return {
+		supabase: caller.client,
+		safeGetSession: async () => ({ session: null, user: caller.user }),
+		session: null,
+		user: caller.user,
+		profile: caller.profile,
+		permissions: permissions ?? caller.permissions,
+		requestId
+	};
+}
+
+interface EventOptions {
+	path: string;
+	id?: string;
+	requestId: string;
+	/** Form action name (`?/name`); omitted for loads and the default action. */
+	action?: string;
+	query?: string;
+	fields?: Fields;
+	/** Overrides the caller's real permission list (route-gate checks only). */
+	permissions?: string[];
+}
+
+/** A RequestEvent for a load or form action, typed by the call site. */
+function event<E>(caller: SignedInUser, options: EventOptions): E {
+	const search = options.action !== undefined ? `?/${options.action}` : (options.query ?? '');
+	const url = new URL(`http://localhost${options.path}${search}`);
+	let request = new Request(url);
+	if (options.fields) {
+		const body = new FormData();
+		for (const [key, value] of Object.entries(options.fields)) body.set(key, value);
+		request = new Request(url, { method: 'POST', body });
+	}
+	return {
+		locals: localsFor(caller, options.requestId, options.permissions),
+		params: options.id ? { id: options.id } : {},
+		url,
+		request
+	} as unknown as E;
+}
+
+// ---------------------------------------------------------------------------
+// Route helpers
+// ---------------------------------------------------------------------------
+
+function createFields(label: string, overrides: Fields = {}): Fields {
+	return {
+		...emptyGeneralValues(),
+		...defaultRulesValues(),
+		name: campaignName(label),
+		simpleBondValue: '60.000,00',
+		installmentCount: '10',
+		barcodeMode: 'base_number',
+		...overrides
+	};
+}
+
+/** POST /campaigns/new. Returns the new id (303 redirect) or the `fail()` result. */
+async function createCampaignViaAction(
+	caller: SignedInUser,
+	fields: Fields,
+	requestId: string,
+	permissions?: string[]
+): Promise<{ id: string; failure?: undefined } | { id?: undefined; failure: unknown }> {
+	try {
+		const failure = await newCampaignActions.default(
+			event(caller, { path: '/campaigns/new', requestId, fields, permissions })
+		);
+		return { failure };
+	} catch (err) {
+		if (!isRedirect(err)) throw err;
+		expect(err.status).toBe(303);
+		const match = /^\/campaigns\/([0-9a-f-]{36})$/.exec(err.location);
+		expect(match, `unexpected redirect ${err.location}`).not.toBeNull();
+		runCampaignIds.push(match![1]);
+		return { id: match![1] };
+	}
+}
+
+/** Creates a campaign as admin through the route and checks its single campaign.create row. */
+async function adminCreatesCampaign(label: string, overrides: Fields = {}): Promise<string> {
+	const requestId = rid(`create-${label}`);
+	const result = await createCampaignViaAction(
+		users.admin,
+		createFields(label, overrides),
+		requestId
+	);
+	expect(result.failure).toBeUndefined();
+	await expectOneAudit(requestId, {
+		action: 'campaign.create',
+		entity_type: 'campaign',
+		entity_id: result.id
+	});
+	return result.id!;
+}
+
+async function loadCampaign(caller: SignedInUser, id: string): Promise<CampaignPageData> {
+	return (await campaignLoad(
+		event(caller, { path: `/campaigns/${id}`, id, requestId: rid('load') })
+	)) as unknown as CampaignPageData;
+}
+
+async function loadCommissions(caller: SignedInUser, id: string): Promise<CommissionPageData> {
+	return (await commissionLoad(
+		event(caller, { path: `/campaigns/${id}/commissions`, id, requestId: rid('load-rules') })
+	)) as unknown as CommissionPageData;
+}
+
+type CampaignActionName = keyof typeof campaignActions;
+
+function campaignAction(
+	name: CampaignActionName,
+	caller: SignedInUser,
+	id: string,
+	fields: Fields,
+	requestId: string,
+	permissions?: string[]
+): Promise<unknown> {
+	return campaignActions[name](
+		event(caller, { path: `/campaigns/${id}`, id, action: name, fields, requestId, permissions })
+	) as Promise<unknown>;
+}
+
+type CommissionActionName = keyof typeof commissionActions;
+
+function commissionAction(
+	name: CommissionActionName,
+	caller: SignedInUser,
+	campaignId: string,
+	fields: Fields,
+	requestId: string,
+	permissions?: string[]
+): Promise<unknown> {
+	return commissionActions[name](
+		event(caller, {
+			path: `/campaigns/${campaignId}/commissions`,
+			id: campaignId,
+			action: name,
+			fields,
+			requestId,
+			permissions
+		})
+	) as Promise<unknown>;
+}
+
+function rulesFields(campaign: Campaign, overrides: Fields = {}): Fields {
+	return { ...rulesValuesOf(campaign), changeReason: '', confirmRulesChange: 'yes', ...overrides };
+}
+
+function generalFields(campaign: Campaign, overrides: Fields = {}): Fields {
+	return {
+		name: campaign.name,
+		startsOn: CAMPAIGN_STARTS_ON,
+		endsOn: CAMPAIGN_ENDS_ON,
+		...overrides
+	};
+}
+
+function ruleFields(overrides: Fields = {}): Fields {
+	return {
+		ruleType: 'cash_full_payment',
+		installmentNumber: '',
+		valueKind: 'percentage',
+		percentage: '',
+		fixedAmount: '',
+		validFrom: '2027-01-01',
+		validTo: '',
+		reason: '',
+		...overrides
+	};
+}
+
+async function getCampaign(id: string): Promise<Campaign> {
+	return (await loadCampaign(users.admin, id)).campaign;
+}
+
+// ---------------------------------------------------------------------------
+// Audit helpers
+// ---------------------------------------------------------------------------
+
+async function auditRowsFor(requestId: string): Promise<AuditRow[]> {
+	const { data, error } = await serviceClient
+		.from('audit_log')
+		.select('*')
+		.eq('request_id', requestId);
+	expect(error).toBeNull();
+	return (data ?? []) as AuditRow[];
+}
+
+/** Exactly one audit row for the request, matching `expected`; counted for the final tally. */
+async function expectOneAudit(requestId: string, expected: Partial<AuditRow>): Promise<AuditRow> {
+	const rows = await auditRowsFor(requestId);
+	expect(rows, `audit rows for ${requestId}`).toHaveLength(1);
+	expect(rows[0]).toMatchObject({
+		actor_user_id: users.admin.profile.id,
+		request_id: requestId,
+		...expected
+	});
+	expectedAudit.set(rows[0].entity_id, (expectedAudit.get(rows[0].entity_id) ?? 0) + 1);
+	return rows[0];
+}
+
+async function expectNoAudit(requestId: string) {
+	expect(await auditRowsFor(requestId), `audit rows for ${requestId}`).toEqual([]);
+}
+
+async function rpc(client: SupabaseClient, fn: string, args: Record<string, unknown>) {
+	return client.rpc(fn, args);
+}
+
+function rpcCreateArgs(name: string, requestId: string, overrides: Record<string, unknown> = {}) {
+	return {
+		p_name: name,
+		p_simple_bond_value: '60000.00',
+		p_installment_count: 10,
+		p_number_digits: 4,
+		p_max_number: 9999,
+		p_associated_number_offset: 4871,
+		p_overflow_policy: 'reject',
+		p_barcode_mode: 'base_number',
+		p_request_id: requestId,
+		...overrides
+	};
+}
+
+function rpcRulesArgs(campaign: Campaign, requestId: string, overrides: Record<string, unknown>) {
+	return {
+		p_id: campaign.id,
+		p_simple_bond_value: campaign.simpleBondValue,
+		p_installment_count: campaign.installmentCount,
+		p_number_digits: campaign.numberDigits,
+		p_max_number: campaign.maxNumber,
+		p_associated_number_offset: campaign.associatedNumberOffset,
+		p_overflow_policy: campaign.overflowPolicy,
+		p_barcode_mode: campaign.barcodeMode,
+		p_request_id: requestId,
+		...overrides
+	};
+}
+
+function rpcRuleArgs(campaignId: string, requestId: string, overrides: Record<string, unknown>) {
+	return {
+		p_campaign_id: campaignId,
+		p_rule_type: 'cash_full_payment',
+		p_installment_number: null,
+		p_percentage: '10.00',
+		p_fixed_amount: null,
+		p_valid_from: '2027-01-01',
+		p_valid_to: null,
+		p_request_id: requestId,
+		...overrides
+	};
+}
+
+// ---------------------------------------------------------------------------
+
+beforeAll(async () => {
+	serviceClient = createClient(supabaseUrl, serviceRoleKey, clientOptions);
+	const fixture = (role: RoleName) => {
+		const user = seedConfig.fixtures.find((f) => f.roleNames.includes(role));
+		if (!user) throw new Error(`resolveSeedConfig returned no ${role} fixture`);
+		return user;
+	};
+	users.admin = await signIn('admin', seedConfig.admin.email, seedConfig.admin.password);
+	for (const role of ['operator', 'treasurer', 'collector', 'read-only'] as const) {
+		const { email, password } = fixture(role);
+		users[role] = await signIn(role, email, password);
+	}
+	console.log(
+		`[integration] Phase 2 run id: ${RUN_ID} (campaign names start with "${NAME_PREFIX}")`
+	);
+});
+
+describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
+	// Campaign ids shared by the sections below (each section uses its own campaign).
+	let mainId: string;
+	let fiveDigitId: string;
+
+	describe('1. Campaign creation (POST /campaigns/new -> campaign_create)', () => {
+		it('admin creates a draft with es-AR money (60.000,00 / 10 -> 6000.00) and default numbering', async () => {
+			expect(
+				(await newCampaignLoad(
+					event(users.admin, { path: '/campaigns/new', requestId: rid('load-new') })
+				)) ?? {}
+			).toEqual({});
+
+			const requestId = rid('create-main');
+			const fields = createFields('Main draft');
+			// The form's defaults are the 4-digit MVP numbering.
+			expect(fields).toMatchObject({
+				numberDigits: '4',
+				maxNumber: '9999',
+				associatedNumberOffset: '4871',
+				overflowPolicy: 'reject'
+			});
+			const result = await createCampaignViaAction(users.admin, fields, requestId);
+			expect(result.failure).toBeUndefined();
+			mainId = result.id!;
+
+			const { campaign, can } = await loadCampaign(users.admin, mainId);
+			expect(campaign).toMatchObject({
+				id: mainId,
+				name: campaignName('Main draft'),
+				status: 'draft',
+				startsAt: null,
+				endsAt: null,
+				simpleBondValue: '60000.00',
+				installmentCount: 10,
+				installmentValue: '6000.00',
+				numberDigits: 4,
+				maxNumber: 9999,
+				associatedNumberOffset: 4871,
+				overflowPolicy: 'reject',
+				barcodeMode: 'base_number',
+				createdBy: users.admin.profile.id
+			});
+			expect(campaignNumberingConfig(campaign)).toEqual(DEFAULT_NUMBERING_CONFIG);
+			expect(can).toEqual({
+				editName: true,
+				editDates: true,
+				editRules: true,
+				transitions: ['active', 'annulled'],
+				viewCommissions: true
+			});
+
+			const audit = await expectOneAudit(requestId, {
+				action: 'campaign.create',
+				entity_type: 'campaign',
+				entity_id: mainId,
+				old_value: null,
+				reason: null
+			});
+			expect(audit.new_value).toMatchObject({
+				id: mainId,
+				name: campaignName('Main draft'),
+				status: 'draft',
+				simple_bond_value: 60000,
+				installment_count: 10,
+				installment_value: 6000,
+				number_digits: 4,
+				max_number: 9999,
+				associated_number_offset: 4871,
+				overflow_policy: 'reject',
+				barcode_mode: 'base_number',
+				created_by: users.admin.profile.id
+			});
+		});
+
+		it('rejects 60.000,00 / 7 (not exact to the cent) in the form and in campaign_create', async () => {
+			const requestId = rid('create-not-exact');
+			const result = await createCampaignViaAction(
+				users.admin,
+				createFields('Not exact', { installmentCount: '7' }),
+				requestId
+			);
+			expect(result.failure).toMatchObject({
+				status: 400,
+				data: { form: 'create', success: false, errors: { installmentCount: [expect.any(String)] } }
+			});
+			await expectNoAudit(requestId);
+
+			// The database rejects it on its own too (no rounding).
+			const dbRequestId = rid('rpc-create-not-exact');
+			const { data, error } = await rpc(
+				users.admin.client,
+				'campaign_create',
+				rpcCreateArgs(campaignName('Not exact (rpc)'), dbRequestId, { p_installment_count: 7 })
+			);
+			expect(data).toBeNull();
+			expect(error).toMatchObject({
+				code: '22023',
+				message: 'simple bond value 60000.00 cannot be split into 7 equal installments'
+			});
+			await expectNoAudit(dbRequestId);
+
+			const { data: rows } = await serviceClient
+				.from('campaigns')
+				.select('id')
+				.like('name', `${NAME_PREFIX} Not exact%`);
+			expect(rows).toEqual([]);
+		});
+
+		it('creates a 5-digit campaign (number_digits 5, max_number 99999)', async () => {
+			fiveDigitId = await adminCreatesCampaign('Five digits', {
+				numberDigits: '5',
+				maxNumber: '99999',
+				simpleBondValue: '120.000,50',
+				installmentCount: '1',
+				barcodeMode: 'internal_code'
+			});
+			const campaign = await getCampaign(fiveDigitId);
+			expect(campaign).toMatchObject({
+				numberDigits: 5,
+				maxNumber: 99999,
+				associatedNumberOffset: 4871,
+				simpleBondValue: '120000.50',
+				installmentValue: '120000.50',
+				barcodeMode: 'internal_code'
+			});
+		});
+
+		it('rejects a max number that does not fit the digits (form 400, database 23514)', async () => {
+			const requestId = rid('create-bad-numbering');
+			const result = await createCampaignViaAction(
+				users.admin,
+				createFields('Bad numbering', { maxNumber: '99999' }),
+				requestId
+			);
+			expect(result.failure).toMatchObject({
+				status: 400,
+				data: { errors: { maxNumber: [expect.any(String)] } }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-create-bad-numbering');
+			const { error } = await rpc(
+				users.admin.client,
+				'campaign_create',
+				rpcCreateArgs(campaignName('Bad numbering (rpc)'), dbRequestId, { p_max_number: 99999 })
+			);
+			expect(error?.code).toBe('23514');
+			expect(error?.message).toContain('campaigns_max_number_fits_digits');
+			await expectNoAudit(dbRequestId);
+		});
+
+		it('numbering domain on the stored configs: 0068 -> 4939, 5129 overflows, 5-digit zero padding', async () => {
+			const four = campaignNumberingConfig(await getCampaign(mainId));
+			expect(parseCampaignNumber('0068', four)).toBe(68);
+			expect(calculateAssociatedNumber(68, four)).toBe(4939);
+			expect(formatCampaignNumber(68, four)).toBe('0068');
+			expect(formatCampaignNumber(calculateAssociatedNumber(68, four), four)).toBe('4939');
+			expect(getMaxValidBaseNumber(four)).toBe(5128);
+			expect(calculateAssociatedNumber(5128, four)).toBe(9999);
+			expect(validateNoOverflow(5129, four)).toBe(false);
+			expect(() => calculateAssociatedNumber(5129, four)).toThrow(NumberingError);
+			try {
+				calculateAssociatedNumber(5129, four);
+			} catch (err) {
+				expect((err as NumberingError).code).toBe('overflow');
+				expect((err as Error).message).toContain(
+					'10000 (5129 + 4871) exceeds the campaign maximum 9999'
+				);
+			}
+
+			const five = campaignNumberingConfig(await getCampaign(fiveDigitId));
+			expect(formatCampaignNumber(68, five)).toBe('00068');
+			expect(formatCampaignNumber(calculateAssociatedNumber(68, five), five)).toBe('04939');
+			expect(formatCampaignNumber(0, five)).toBe('00000');
+			expect(formatCampaignNumber(99999, five)).toBe('99999');
+			expect(parseCampaignNumber('00068', five)).toBe(68);
+			expect(getMaxValidBaseNumber(five)).toBe(95128);
+			expect(() => calculateAssociatedNumber(95129, five)).toThrow(NumberingError);
+		});
+	});
+
+	describe('2. Rules of a draft (?/rules -> campaign_update_rules)', () => {
+		it('requires the explicit confirmation (400, nothing written)', async () => {
+			const before = await getCampaign(mainId);
+			const requestId = rid('rules-unconfirmed');
+			const result = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(before, { installmentCount: '12', confirmRulesChange: '' }),
+				requestId
+			);
+			expect(result).toMatchObject({
+				status: 400,
+				data: { form: 'rules', errors: { confirmRulesChange: [expect.any(String)] } }
+			});
+			await expectNoAudit(requestId);
+			expect(await getCampaign(mainId)).toEqual(before);
+		});
+
+		it('with confirmation and a reason writes exactly one campaign.update_rules row (old/new/reason)', async () => {
+			const requestId = rid('rules-with-reason');
+			const result = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(await getCampaign(mainId), {
+					installmentCount: '12',
+					changeReason: '  Board decision 2027  '
+				}),
+				requestId
+			);
+			expect(result).toEqual({ form: 'rules', success: true, message: 'Rules saved.', errors: {} });
+
+			const audit = await expectOneAudit(requestId, {
+				action: 'campaign.update_rules',
+				entity_type: 'campaign',
+				entity_id: mainId,
+				reason: 'Board decision 2027'
+			});
+			expect(audit.old_value).toEqual({ installment_count: 10, installment_value: 6000 });
+			expect(audit.new_value).toEqual({ installment_count: 12, installment_value: 5000 });
+			expect(await getCampaign(mainId)).toMatchObject({
+				installmentCount: 12,
+				installmentValue: '5000.00'
+			});
+		});
+
+		it('the reason is optional (audit reason null); a no-op save writes nothing', async () => {
+			const requestId = rid('rules-no-reason');
+			const result = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(await getCampaign(mainId), { barcodeMode: 'manual_mapping' }),
+				requestId
+			);
+			expect(result).toMatchObject({ success: true, message: 'Rules saved.' });
+			const audit = await expectOneAudit(requestId, {
+				action: 'campaign.update_rules',
+				entity_id: mainId,
+				reason: null
+			});
+			expect(audit.old_value).toEqual({ barcode_mode: 'base_number' });
+			expect(audit.new_value).toEqual({ barcode_mode: 'manual_mapping' });
+
+			const noopId = rid('rules-noop');
+			const noop = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(await getCampaign(mainId)),
+				noopId
+			);
+			expect(noop).toMatchObject({ success: true, message: 'No changes to save.' });
+			await expectNoAudit(noopId);
+		});
+
+		it('rejects a non-exact split on edit too (60.000,00 / 7)', async () => {
+			const before = await getCampaign(mainId);
+			const requestId = rid('rules-not-exact');
+			const result = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(before, { installmentCount: '7' }),
+				requestId
+			);
+			expect(result).toMatchObject({
+				status: 400,
+				data: { errors: { installmentCount: [expect.any(String)] } }
+			});
+			await expectNoAudit(requestId);
+			expect(await getCampaign(mainId)).toEqual(before);
+		});
+	});
+
+	describe('3. Status transitions (?/transition, ?/update)', () => {
+		let annulId: string;
+
+		it('activation without dates is rejected (409 in the route, 23514 in the database)', async () => {
+			const requestId = rid('activate-no-dates');
+			const result = await campaignAction(
+				'transition',
+				users.admin,
+				mainId,
+				{ toStatus: 'active', reason: '' },
+				requestId
+			);
+			expect(result).toMatchObject({
+				status: 409,
+				data: { form: 'transition', message: CAMPAIGN_MESSAGES.activationNeedsDates }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-activate-no-dates');
+			const { error } = await rpc(users.admin.client, 'campaign_transition', {
+				p_id: mainId,
+				p_to_status: 'active',
+				p_request_id: dbRequestId
+			});
+			expect(error).toMatchObject({
+				code: '23514',
+				message: 'campaign cannot be activated without starts_at and ends_at'
+			});
+			await expectNoAudit(dbRequestId);
+			expect((await getCampaign(mainId)).status).toBe('draft');
+		});
+
+		it('route gate: activation needs campaign.update_rules, closing/annulling need campaign.close', async () => {
+			const all = users.admin.permissions;
+			const withoutUpdateRules = all.filter((p) => p !== 'campaign.update_rules');
+			const withoutClose = all.filter((p) => p !== 'campaign.close');
+			const cases: [string, string, string[]][] = [
+				['active', '', withoutUpdateRules],
+				['closing', '', withoutClose],
+				['closed', '', withoutClose],
+				['annulled', 'reason', withoutClose]
+			];
+			for (const [toStatus, reason, permissions] of cases) {
+				const requestId = rid(`gate-${toStatus}`);
+				const result = await campaignAction(
+					'transition',
+					users.admin,
+					mainId,
+					{ toStatus, reason },
+					requestId,
+					permissions
+				);
+				expect(result, toStatus).toMatchObject({
+					status: 403,
+					data: { message: CAMPAIGN_MESSAGES.permission }
+				});
+				await expectNoAudit(requestId);
+			}
+			expect((await getCampaign(mainId)).status).toBe('draft');
+		});
+
+		it('sets the dates (one campaign.update row), then activates (one campaign.transition row)', async () => {
+			const datesId = rid('update-dates');
+			const saved = await campaignAction(
+				'update',
+				users.admin,
+				mainId,
+				generalFields(await getCampaign(mainId)),
+				datesId
+			);
+			expect(saved).toEqual({
+				form: 'general',
+				success: true,
+				message: 'Changes saved.',
+				errors: {}
+			});
+			const datesAudit = await expectOneAudit(datesId, {
+				action: 'campaign.update',
+				entity_type: 'campaign',
+				entity_id: mainId,
+				old_value: { starts_at: null, ends_at: null }
+			});
+			expect(Object.keys(datesAudit.new_value ?? {}).sort()).toEqual(['ends_at', 'starts_at']);
+
+			const activateId = rid('activate');
+			const activated = await campaignAction(
+				'transition',
+				users.admin,
+				mainId,
+				{ toStatus: 'active', reason: '' },
+				activateId
+			);
+			expect(activated).toMatchObject({
+				success: true,
+				message: expect.stringContaining('activated')
+			});
+			await expectOneAudit(activateId, {
+				action: 'campaign.transition',
+				entity_type: 'campaign',
+				entity_id: mainId,
+				old_value: { status: 'draft' },
+				new_value: { status: 'active' },
+				reason: null
+			});
+
+			const { campaign, can } = await loadCampaign(users.admin, mainId);
+			expect(campaign.status).toBe('active');
+			expect(campaign.startsAt).not.toBeNull();
+			expect(can).toMatchObject({
+				editName: true,
+				editDates: true,
+				editRules: false,
+				transitions: ['closing', 'annulled']
+			});
+		});
+
+		it('rules are frozen while active (409 in the route, 55000 in the database)', async () => {
+			const before = await getCampaign(mainId);
+			const requestId = rid('rules-active');
+			const result = await campaignAction(
+				'rules',
+				users.admin,
+				mainId,
+				rulesFields(before, { simpleBondValue: '66.000,00' }),
+				requestId
+			);
+			expect(result).toMatchObject({
+				status: 409,
+				data: { message: CAMPAIGN_MESSAGES.rulesFrozen }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-rules-active');
+			const { error } = await rpc(
+				users.admin.client,
+				'campaign_update_rules',
+				rpcRulesArgs(before, dbRequestId, { p_simple_bond_value: '66000.00' })
+			);
+			expect(error?.code).toBe('55000');
+			expect(error?.message).toContain(
+				'campaign rules can only be changed while the campaign is draft'
+			);
+			await expectNoAudit(dbRequestId);
+			expect(await getCampaign(mainId)).toEqual(before);
+		});
+
+		it('dates cannot be cleared after activation but can still change', async () => {
+			const before = await getCampaign(mainId);
+			const requestId = rid('clear-dates');
+			const result = await campaignAction(
+				'update',
+				users.admin,
+				mainId,
+				generalFields(before, { startsOn: '', endsOn: '' }),
+				requestId
+			);
+			expect(result).toMatchObject({
+				status: 409,
+				data: { errors: { startsOn: [CAMPAIGN_MESSAGES.datesCannotBeCleared] } }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-clear-dates');
+			const { error } = await rpc(users.admin.client, 'campaign_update', {
+				p_id: mainId,
+				p_name: before.name,
+				p_starts_at: before.startsAt,
+				p_ends_at: null,
+				p_request_id: dbRequestId
+			});
+			expect(error?.code).toBe('23514');
+			await expectNoAudit(dbRequestId);
+			expect(await getCampaign(mainId)).toEqual(before);
+
+			const moveId = rid('move-end-date');
+			expect(
+				await campaignAction(
+					'update',
+					users.admin,
+					mainId,
+					generalFields(before, { endsOn: '2028-01-31' }),
+					moveId
+				)
+			).toMatchObject({ success: true, message: 'Changes saved.' });
+			await expectOneAudit(moveId, { action: 'campaign.update', entity_id: mainId });
+		});
+
+		it('active -> closing -> closed; a closed campaign is immutable', async () => {
+			for (const toStatus of ['closing', 'closed'] as const) {
+				const from = (await getCampaign(mainId)).status;
+				const requestId = rid(`to-${toStatus}`);
+				expect(
+					await campaignAction(
+						'transition',
+						users.admin,
+						mainId,
+						{ toStatus, reason: '' },
+						requestId
+					)
+				).toMatchObject({ success: true });
+				await expectOneAudit(requestId, {
+					action: 'campaign.transition',
+					entity_id: mainId,
+					old_value: { status: from },
+					new_value: { status: toStatus }
+				});
+			}
+
+			const closed = await getCampaign(mainId);
+			const renameId = rid('rename-closed');
+			expect(
+				await campaignAction(
+					'update',
+					users.admin,
+					mainId,
+					generalFields(closed, { name: campaignName('Renamed'), endsOn: '2028-01-31' }),
+					renameId
+				)
+			).toMatchObject({ status: 409, data: { message: CAMPAIGN_MESSAGES.nameFrozen } });
+			await expectNoAudit(renameId);
+
+			const annulId = rid('annul-closed');
+			expect(
+				await campaignAction(
+					'transition',
+					users.admin,
+					mainId,
+					{ toStatus: 'annulled', reason: 'too late' },
+					annulId
+				)
+			).toMatchObject({ status: 409 });
+			await expectNoAudit(annulId);
+
+			expect((await loadCampaign(users.admin, mainId)).can).toMatchObject({
+				editName: false,
+				editDates: false,
+				editRules: false,
+				transitions: []
+			});
+		});
+
+		it('draft -> annulled requires a reason and is terminal', async () => {
+			annulId = await adminCreatesCampaign('Draft to annul');
+
+			const noReasonId = rid('annul-no-reason');
+			expect(
+				await campaignAction(
+					'transition',
+					users.admin,
+					annulId,
+					{ toStatus: 'annulled', reason: '   ' },
+					noReasonId
+				)
+			).toMatchObject({ status: 400, data: { errors: { reason: [expect.any(String)] } } });
+			await expectNoAudit(noReasonId);
+
+			const dbNoReasonId = rid('rpc-annul-no-reason');
+			const { error } = await rpc(users.admin.client, 'campaign_transition', {
+				p_id: annulId,
+				p_to_status: 'annulled',
+				p_reason: ' ',
+				p_request_id: dbNoReasonId
+			});
+			expect(error).toMatchObject({
+				code: '22023',
+				message: 'a reason is required to annul a campaign'
+			});
+			await expectNoAudit(dbNoReasonId);
+
+			const requestId = rid('annul-draft');
+			expect(
+				await campaignAction(
+					'transition',
+					users.admin,
+					annulId,
+					{ toStatus: 'annulled', reason: 'Created by mistake' },
+					requestId
+				)
+			).toMatchObject({ success: true, message: 'Campaign annulled.' });
+			await expectOneAudit(requestId, {
+				action: 'campaign.transition',
+				entity_id: annulId,
+				old_value: { status: 'draft' },
+				new_value: { status: 'annulled' },
+				reason: 'Created by mistake'
+			});
+
+			// Terminal: no transition, no rule, date or name change.
+			const annulled = await getCampaign(annulId);
+			const attempts: [CampaignActionName, Fields][] = [
+				['transition', { toStatus: 'active', reason: '' }],
+				['transition', { toStatus: 'annulled', reason: 'again' }],
+				['rules', rulesFields(annulled, { installmentCount: '12' })],
+				[
+					'update',
+					generalFields(annulled, {
+						name: campaignName('Renamed annulled'),
+						startsOn: '',
+						endsOn: ''
+					})
+				]
+			];
+			for (const [name, fields] of attempts) {
+				const attemptId = rid(`annulled-${name}`);
+				expect(
+					await campaignAction(name, users.admin, annulId, fields, attemptId),
+					`${name} ${JSON.stringify(fields)}`
+				).toMatchObject({ status: 409 });
+				await expectNoAudit(attemptId);
+			}
+			expect(await getCampaign(annulId)).toEqual(annulled);
+			expect((await loadCampaign(users.admin, annulId)).can.transitions).toEqual([]);
+		});
+
+		it('an annulled campaign rejects commission rule changes (409)', async () => {
+			const requestId = rid('rule-on-annulled');
+			expect(
+				await commissionAction(
+					'create',
+					users.admin,
+					annulId,
+					ruleFields({ percentage: '10' }),
+					requestId
+				)
+			).toMatchObject({
+				status: 409,
+				data: { message: COMMISSION_RULE_MESSAGES.campaignLocked }
+			});
+			await expectNoAudit(requestId);
+		});
+	});
+
+	describe('4. Permissions (docs/permissions.md matrix)', () => {
+		let targetId: string;
+		let target: Campaign;
+
+		beforeAll(async () => {
+			// A draft with dates: every denied call below would otherwise succeed for an admin.
+			targetId = await adminCreatesCampaign('Permission target', {
+				startsOn: CAMPAIGN_STARTS_ON,
+				endsOn: CAMPAIGN_ENDS_ON
+			});
+			target = await getCampaign(targetId);
+		});
+
+		it('seeded grants: campaign.view for operator/treasurer/read-only, nothing for collector; commissions admin-only', async () => {
+			const campaignAndCommission = (u: SignedInUser) =>
+				u.permissions
+					.filter((p) => p.startsWith('campaign.') || p.startsWith('commission.'))
+					.sort();
+
+			expect(campaignAndCommission(users.admin)).toEqual([
+				'campaign.close',
+				'campaign.create',
+				'campaign.update',
+				'campaign.update_rules',
+				'campaign.view',
+				'commission.adjust',
+				'commission.rule_manage',
+				'commission.settle',
+				'commission.view'
+			]);
+			expect(campaignAndCommission(users.operator)).toEqual(['campaign.view']);
+			expect(campaignAndCommission(users['read-only'])).toEqual(['campaign.view']);
+			// The treasurer may adjust commissions (later phase) but not view or manage the rules.
+			expect(campaignAndCommission(users.treasurer)).toEqual([
+				'campaign.view',
+				'commission.adjust'
+			]);
+			expect(campaignAndCommission(users.collector)).toEqual([]);
+		});
+
+		describe.each(['operator', 'treasurer', 'read-only'] as const)('%s', (role) => {
+			it('can list and view campaigns (read-only UI hints)', async () => {
+				const caller = users[role];
+				const list = (await listLoad(
+					event(caller, { path: '/campaigns', requestId: rid(`${role}-list`) })
+				)) as unknown as { campaigns: Campaign[]; canCreate: boolean };
+				expect(list.canCreate).toBe(false);
+				expect(list.campaigns.map((c) => c.id)).toContain(targetId);
+
+				const { campaign, can } = await loadCampaign(caller, targetId);
+				expect(campaign).toEqual(target);
+				expect(can).toEqual({
+					editName: false,
+					editDates: false,
+					editRules: false,
+					transitions: [],
+					viewCommissions: false
+				});
+
+				await expect(
+					newCampaignLoad(event(caller, { path: '/campaigns/new', requestId: rid('new') }))
+				).rejects.toMatchObject({ status: 403 });
+			});
+
+			it('is denied create/update/rules/transition by the route (403) and the database (42501)', async () => {
+				const caller = users[role];
+				const requestIds: string[] = [];
+				const next = (label: string) => {
+					const id = rid(`${role}-${label}`);
+					requestIds.push(id);
+					return id;
+				};
+
+				const created = await createCampaignViaAction(
+					caller,
+					createFields(`Denied ${role}`),
+					next('create')
+				);
+				expect(created.failure).toMatchObject({
+					status: 403,
+					data: { message: CAMPAIGN_MESSAGES.permission }
+				});
+				const routeAttempts: [CampaignActionName, Fields][] = [
+					['update', generalFields(target, { name: campaignName(`Renamed by ${role}`) })],
+					['rules', rulesFields(target, { installmentCount: '12' })],
+					['transition', { toStatus: 'active', reason: '' }],
+					['transition', { toStatus: 'annulled', reason: 'no' }]
+				];
+				for (const [name, fields] of routeAttempts) {
+					expect(
+						await campaignAction(name, caller, targetId, fields, next(name)),
+						`${role} ${name}`
+					).toMatchObject({ status: 403, data: { message: CAMPAIGN_MESSAGES.permission } });
+				}
+
+				const rpcAttempts: [string, Record<string, unknown>][] = [
+					[
+						'campaign_create',
+						rpcCreateArgs(campaignName(`Denied ${role} (rpc)`), next('rpc-create'))
+					],
+					[
+						'campaign_update',
+						{
+							p_id: targetId,
+							p_name: campaignName(`Renamed by ${role}`),
+							p_starts_at: target.startsAt,
+							p_ends_at: target.endsAt,
+							p_request_id: next('rpc-update')
+						}
+					],
+					[
+						'campaign_update_rules',
+						rpcRulesArgs(target, next('rpc-rules'), { p_installment_count: 12 })
+					],
+					...(['active', 'closing', 'annulled'] as const).map(
+						(toStatus): [string, Record<string, unknown>] => [
+							'campaign_transition',
+							{
+								p_id: targetId,
+								p_to_status: toStatus,
+								p_reason: 'denied',
+								p_request_id: next(`rpc-${toStatus}`)
+							}
+						]
+					)
+				];
+				for (const [fn, args] of rpcAttempts) {
+					const { data, error } = await rpc(caller.client, fn, args);
+					expect(data, fn).toBeNull();
+					expect(error?.code, `${role} ${fn}`).toBe('42501');
+					expect(error?.message).toMatch(/^permission denied: campaign\.\w+ is required$/);
+				}
+
+				for (const id of requestIds) await expectNoAudit(id);
+				expect(await getCampaign(targetId)).toEqual(target);
+				const { data: leaked } = await serviceClient
+					.from('campaigns')
+					.select('id')
+					.like('name', `${NAME_PREFIX} Denied ${role}%`);
+				expect(leaked).toEqual([]);
+			});
+
+			it('cannot see or manage commission rules (no commission.view / commission.rule_manage)', async () => {
+				const caller = users[role];
+				await expect(loadCommissions(caller, targetId)).rejects.toMatchObject({ status: 403 });
+
+				const createId = rid(`${role}-rule-create`);
+				expect(
+					await commissionAction(
+						'create',
+						caller,
+						targetId,
+						ruleFields({ percentage: '10' }),
+						createId
+					)
+				).toMatchObject({
+					status: 403,
+					data: { message: COMMISSION_RULE_MESSAGES.permission }
+				});
+
+				const rpcId = rid(`${role}-rpc-rule-create`);
+				const { error } = await rpc(
+					caller.client,
+					'commission_rule_create',
+					rpcRuleArgs(targetId, rpcId, {})
+				);
+				expect(error).toMatchObject({
+					code: '42501',
+					message: 'permission denied: commission.rule_manage is required'
+				});
+
+				// RLS hides every rule (commission.view), without an error.
+				const { data: visible, error: selectError } = await caller.client
+					.from('commission_rules')
+					.select('id')
+					.limit(1);
+				expect(selectError).toBeNull();
+				expect(visible).toEqual([]);
+
+				await expectNoAudit(createId);
+				await expectNoAudit(rpcId);
+			});
+		});
+
+		it('the database denies even when the route gate is bypassed (forged locals.permissions)', async () => {
+			// The operator's request carries the admin's permission list: the route lets it through,
+			// the SQL function checks the real caller and refuses (42501 -> 403).
+			const forged = users.admin.permissions;
+			const createId = rid('forged-create');
+			const created = await createCampaignViaAction(
+				users.operator,
+				createFields('Forged create'),
+				createId,
+				forged
+			);
+			expect(created.failure).toMatchObject({
+				status: 403,
+				data: { message: CAMPAIGN_MESSAGES.permission }
+			});
+
+			const transitionId = rid('forged-activate');
+			expect(
+				await campaignAction(
+					'transition',
+					users.operator,
+					targetId,
+					{ toStatus: 'active', reason: '' },
+					transitionId,
+					forged
+				)
+			).toMatchObject({ status: 403, data: { message: CAMPAIGN_MESSAGES.permission } });
+
+			const rulesId = rid('forged-rules');
+			expect(
+				await campaignAction(
+					'rules',
+					users.operator,
+					targetId,
+					rulesFields(target, { installmentCount: '12' }),
+					rulesId,
+					forged
+				)
+			).toMatchObject({ status: 403 });
+
+			// The operator can see the campaign (campaign.view), so the action reaches
+			// commission_rule_create, which refuses (42501 -> 403).
+			const ruleId = rid('forged-rule-create');
+			expect(
+				await commissionAction(
+					'create',
+					users.operator,
+					targetId,
+					ruleFields({ percentage: '10' }),
+					ruleId,
+					forged
+				)
+			).toMatchObject({ status: 403, data: { message: COMMISSION_RULE_MESSAGES.permission } });
+
+			for (const id of [createId, transitionId, rulesId, ruleId]) await expectNoAudit(id);
+			expect(await getCampaign(targetId)).toEqual(target);
+		});
+
+		it('collector cannot view campaigns (403 in the route, empty under RLS, 42501 on writes)', async () => {
+			const collector = users.collector;
+			await expect(
+				listLoad(event(collector, { path: '/campaigns', requestId: rid('collector-list') }))
+			).rejects.toMatchObject({ status: 403 });
+			await expect(loadCampaign(collector, targetId)).rejects.toMatchObject({ status: 403 });
+
+			const { data, error } = await collector.client.from('campaigns').select('id').limit(1);
+			expect(error).toBeNull();
+			expect(data).toEqual([]);
+
+			const requestId = rid('collector-rpc-create');
+			const { error: rpcError } = await rpc(
+				collector.client,
+				'campaign_create',
+				rpcCreateArgs(campaignName('Collector'), requestId)
+			);
+			expect(rpcError?.code).toBe('42501');
+			await expectNoAudit(requestId);
+		});
+	});
+
+	describe('5. Commission rules (/campaigns/[id]/commissions -> commission_rule_*)', () => {
+		let campaignId: string;
+		const ruleIds: Partial<Record<string, string>> = {};
+
+		async function createRule(label: string, fields: Fields): Promise<string> {
+			const requestId = rid(`rule-${label}`);
+			const result = (await commissionAction(
+				'create',
+				users.admin,
+				campaignId,
+				ruleFields(fields),
+				requestId
+			)) as { success: boolean; message: string; ruleId: string };
+			expect(result, label).toMatchObject({
+				form: 'create',
+				success: true,
+				message: 'Rule added.'
+			});
+			const audit = await expectOneAudit(requestId, {
+				action: 'commission_rule.create',
+				entity_type: 'commission_rule',
+				entity_id: result.ruleId,
+				old_value: null
+			});
+			expect(audit.new_value).toMatchObject({
+				id: result.ruleId,
+				campaign_id: campaignId,
+				rule_type: fields.ruleType,
+				status: 'active',
+				applies_to_collector_id: null,
+				created_by: users.admin.profile.id
+			});
+			return result.ruleId;
+		}
+
+		beforeAll(async () => {
+			campaignId = await adminCreatesCampaign('Commissions', {
+				startsOn: CAMPAIGN_STARTS_ON,
+				endsOn: CAMPAIGN_ENDS_ON
+			});
+		});
+
+		it('admin sees the empty rules page with management enabled (draft)', async () => {
+			const data = await loadCommissions(users.admin, campaignId);
+			expect(data.campaign.id).toBe(campaignId);
+			expect(data.rules).toEqual([]);
+			expect(data.can.manage).toBe(true);
+		});
+
+		it('creates rules of all 5 types (percentage and es-AR fixed amounts), displayed in es-AR', async () => {
+			ruleIds.cash = await createRule('cash', {
+				ruleType: 'cash_full_payment',
+				valueKind: 'percentage',
+				percentage: '25',
+				validFrom: '2027-01-01',
+				validTo: '2027-06-30'
+			});
+			ruleIds.first = await createRule('first', {
+				ruleType: 'installment_first',
+				valueKind: 'fixed_amount',
+				fixedAmount: '1.500,00'
+			});
+			ruleIds.middle = await createRule('middle', {
+				ruleType: 'installment_middle',
+				valueKind: 'percentage',
+				percentage: '12,5'
+			});
+			ruleIds.last = await createRule('last', {
+				ruleType: 'installment_last',
+				valueKind: 'fixed_amount',
+				fixedAmount: '2.000,50'
+			});
+			ruleIds.custom10 = await createRule('custom-10', {
+				ruleType: 'custom',
+				installmentNumber: '10',
+				valueKind: 'percentage',
+				percentage: '5'
+			});
+
+			const { rules } = await loadCommissions(users.admin, campaignId);
+			const byId = new Map(rules.map((r) => [r.id, r]));
+			const shown = (key: string) => {
+				const rule = byId.get(ruleIds[key]!)!;
+				return { type: formatCommissionRuleType(rule), value: formatCommissionValue(rule), rule };
+			};
+			expect(shown('cash')).toMatchObject({
+				value: `25${NBSP}%`,
+				rule: {
+					percentage: '25.00',
+					fixedAmount: null,
+					validFrom: '2027-01-01',
+					validTo: '2027-06-30'
+				}
+			});
+			expect(shown('first')).toMatchObject({
+				value: `$${NBSP}1.500,00`,
+				rule: { percentage: null, fixedAmount: '1500.00', validTo: null }
+			});
+			expect(shown('middle').value).toBe(`12,5${NBSP}%`);
+			expect(shown('last').value).toBe(`$${NBSP}2.000,50`);
+			expect(shown('custom10')).toMatchObject({
+				type: 'Specific installment: #10',
+				value: `5${NBSP}%`,
+				rule: { installmentNumber: 10 }
+			});
+			expect(rules.every((r) => r.status === 'active' && r.appliesToCollectorId === null)).toBe(
+				true
+			);
+		});
+
+		it('rejects a custom installment above the campaign installment count (form 400, database 22023)', async () => {
+			const requestId = rid('rule-custom-11');
+			expect(
+				await commissionAction(
+					'create',
+					users.admin,
+					campaignId,
+					ruleFields({ ruleType: 'custom', installmentNumber: '11', percentage: '5' }),
+					requestId
+				)
+			).toMatchObject({
+				status: 400,
+				data: { errors: { installmentNumber: ['Installment number must be between 1 and 10'] } }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-rule-custom-11');
+			const { error } = await rpc(
+				users.admin.client,
+				'commission_rule_create',
+				rpcRuleArgs(campaignId, dbRequestId, { p_rule_type: 'custom', p_installment_number: 11 })
+			);
+			expect(error).toMatchObject({
+				code: '22023',
+				message: 'installment number must be between 1 and 10'
+			});
+			await expectNoAudit(dbRequestId);
+		});
+
+		it('rejects overlapping validity of the same type (23P01 -> friendly 409); adjacent range is fine', async () => {
+			const overlapId = rid('rule-overlap');
+			expect(
+				await commissionAction(
+					'create',
+					users.admin,
+					campaignId,
+					ruleFields({ percentage: '20', validFrom: '2027-06-30' }),
+					overlapId
+				)
+			).toMatchObject({ status: 409, data: { message: COMMISSION_RULE_MESSAGES.overlap } });
+			await expectNoAudit(overlapId);
+
+			const dbOverlapId = rid('rpc-rule-overlap');
+			const { error } = await rpc(
+				users.admin.client,
+				'commission_rule_create',
+				rpcRuleArgs(campaignId, dbOverlapId, {
+					p_valid_from: '2027-03-01',
+					p_valid_to: '2027-03-31'
+				})
+			);
+			expect(error?.code).toBe('23P01');
+			expect(error?.message).toContain('commission_rules_no_overlap');
+			await expectNoAudit(dbOverlapId);
+
+			// Starts the day after the first cash rule ends.
+			ruleIds.cashLater = await createRule('cash-adjacent', {
+				ruleType: 'cash_full_payment',
+				percentage: '20',
+				validFrom: '2027-07-01'
+			});
+			// Another custom installment with the same validity is a different rule key.
+			ruleIds.custom9 = await createRule('custom-9', {
+				ruleType: 'custom',
+				installmentNumber: '9',
+				percentage: '4'
+			});
+		});
+
+		it('edits a rule (one commission_rule.update row with the changed keys and reason); no-op writes nothing', async () => {
+			const requestId = rid('rule-edit');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{
+						ruleId: ruleIds.cash!,
+						...ruleFields({
+							percentage: '30',
+							validTo: '2027-06-30',
+							reason: 'Raised by the board'
+						})
+					},
+					requestId
+				)
+			).toMatchObject({
+				form: 'update',
+				success: true,
+				message: 'Rule saved.',
+				ruleId: ruleIds.cash
+			});
+			await expectOneAudit(requestId, {
+				action: 'commission_rule.update',
+				entity_type: 'commission_rule',
+				entity_id: ruleIds.cash,
+				old_value: { campaign_id: campaignId, percentage: 25 },
+				new_value: { campaign_id: campaignId, percentage: 30 },
+				reason: 'Raised by the board'
+			});
+
+			const noopId = rid('rule-edit-noop');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{ ruleId: ruleIds.cash!, ...ruleFields({ percentage: '30,00', validTo: '2027-06-30' }) },
+					noopId
+				)
+			).toMatchObject({ success: true, message: 'No changes to save.' });
+			await expectNoAudit(noopId);
+		});
+
+		it('annuls a rule (reason required); an annulled rule cannot change; the slot can be re-used', async () => {
+			const noReasonId = rid('rule-annul-no-reason');
+			expect(
+				await commissionAction(
+					'annul',
+					users.admin,
+					campaignId,
+					{ ruleId: ruleIds.cash!, reason: '  ' },
+					noReasonId
+				)
+			).toMatchObject({ status: 400, data: { errors: { reason: [expect.any(String)] } } });
+			await expectNoAudit(noReasonId);
+
+			const dbNoReasonId = rid('rpc-rule-annul-no-reason');
+			const { error } = await rpc(users.admin.client, 'commission_rule_annul', {
+				p_id: ruleIds.cash,
+				p_reason: '',
+				p_request_id: dbNoReasonId
+			});
+			expect(error).toMatchObject({
+				code: '22023',
+				message: 'a reason is required to annul a commission rule'
+			});
+			await expectNoAudit(dbNoReasonId);
+
+			const annulId = rid('rule-annul');
+			expect(
+				await commissionAction(
+					'annul',
+					users.admin,
+					campaignId,
+					{ ruleId: ruleIds.cash!, reason: 'Wrong percentage' },
+					annulId
+				)
+			).toMatchObject({ form: 'annul', success: true, message: 'Rule annulled.' });
+			await expectOneAudit(annulId, {
+				action: 'commission_rule.annul',
+				entity_type: 'commission_rule',
+				entity_id: ruleIds.cash,
+				old_value: { campaign_id: campaignId, status: 'active' },
+				new_value: {
+					campaign_id: campaignId,
+					status: 'annulled',
+					annulled_by: users.admin.profile.id
+				},
+				reason: 'Wrong percentage'
+			});
+			const annulled = (await loadCommissions(users.admin, campaignId)).rules.find(
+				(r) => r.id === ruleIds.cash
+			);
+			expect(annulled).toMatchObject({
+				status: 'annulled',
+				annulReason: 'Wrong percentage',
+				annulledBy: users.admin.profile.id
+			});
+
+			const editAnnulledId = rid('rule-edit-annulled');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{ ruleId: ruleIds.cash!, ...ruleFields({ percentage: '35', validTo: '2027-06-30' }) },
+					editAnnulledId
+				)
+			).toMatchObject({ status: 409, data: { message: COMMISSION_RULE_MESSAGES.annulled } });
+			const annulAgainId = rid('rule-annul-again');
+			expect(
+				await commissionAction(
+					'annul',
+					users.admin,
+					campaignId,
+					{ ruleId: ruleIds.cash!, reason: 'again' },
+					annulAgainId
+				)
+			).toMatchObject({
+				status: 409,
+				data: { message: COMMISSION_RULE_MESSAGES.alreadyAnnulled }
+			});
+			await expectNoAudit(editAnnulledId);
+			await expectNoAudit(annulAgainId);
+
+			// Annulled rules never block: the same type and validity can be created again.
+			ruleIds.cashAgain = await createRule('cash-recreate', {
+				ruleType: 'cash_full_payment',
+				percentage: '25',
+				validFrom: '2027-01-01',
+				validTo: '2027-06-30'
+			});
+		});
+
+		it('a draft cannot lower installment_count below an active custom rule (form 400, database 55000)', async () => {
+			const before = await getCampaign(campaignId);
+			const requestId = rid('rules-below-custom');
+			expect(
+				await campaignAction(
+					'rules',
+					users.admin,
+					campaignId,
+					rulesFields(before, { installmentCount: '5' }),
+					requestId
+				)
+			).toMatchObject({
+				status: 400,
+				data: { errors: { installmentCount: [expect.stringContaining('installment 10')] } }
+			});
+			await expectNoAudit(requestId);
+
+			const dbRequestId = rid('rpc-rules-below-custom');
+			const { error } = await rpc(
+				users.admin.client,
+				'campaign_update_rules',
+				rpcRulesArgs(before, dbRequestId, { p_installment_count: 5 })
+			);
+			expect(error?.code).toBe('55000');
+			expect(error?.message).toContain('installment count cannot be lowered below 10');
+			await expectNoAudit(dbRequestId);
+			expect(await getCampaign(campaignId)).toEqual(before);
+		});
+
+		it('rules stay manageable once the campaign is active', async () => {
+			const activateId = rid('commissions-activate');
+			expect(
+				await campaignAction(
+					'transition',
+					users.admin,
+					campaignId,
+					{ toStatus: 'active', reason: '' },
+					activateId
+				)
+			).toMatchObject({ success: true });
+			await expectOneAudit(activateId, { action: 'campaign.transition', entity_id: campaignId });
+
+			expect((await loadCommissions(users.admin, campaignId)).can.manage).toBe(true);
+			ruleIds.custom8 = await createRule('custom-8-active', {
+				ruleType: 'custom',
+				installmentNumber: '8',
+				valueKind: 'fixed_amount',
+				fixedAmount: '300'
+			});
+			const editId = rid('rule-edit-active');
+			expect(
+				await commissionAction(
+					'update',
+					users.admin,
+					campaignId,
+					{
+						ruleId: ruleIds.custom8!,
+						...ruleFields({
+							ruleType: 'custom',
+							installmentNumber: '8',
+							valueKind: 'fixed_amount',
+							fixedAmount: '350,00'
+						})
+					},
+					editId
+				)
+			).toMatchObject({ success: true, message: 'Rule saved.' });
+			await expectOneAudit(editId, {
+				action: 'commission_rule.update',
+				entity_id: ruleIds.custom8,
+				old_value: { campaign_id: campaignId, fixed_amount: 300 },
+				new_value: { campaign_id: campaignId, fixed_amount: 350 }
+			});
+		});
+
+		it('rules are read-only once the campaign is closing (409 in the route, 55000 in the database)', async () => {
+			const closingId = rid('commissions-closing');
+			expect(
+				await campaignAction(
+					'transition',
+					users.admin,
+					campaignId,
+					{ toStatus: 'closing', reason: '' },
+					closingId
+				)
+			).toMatchObject({ success: true });
+			await expectOneAudit(closingId, { action: 'campaign.transition', entity_id: campaignId });
+
+			expect((await loadCommissions(users.admin, campaignId)).can.manage).toBe(false);
+
+			const attempts: [CommissionActionName, Fields][] = [
+				['create', ruleFields({ ruleType: 'custom', installmentNumber: '7', percentage: '3' })],
+				[
+					'update',
+					{
+						ruleId: ruleIds.first!,
+						...ruleFields({
+							ruleType: 'installment_first',
+							valueKind: 'fixed_amount',
+							fixedAmount: '1.600,00'
+						})
+					}
+				],
+				['annul', { ruleId: ruleIds.middle!, reason: 'closing' }]
+			];
+			for (const [name, fields] of attempts) {
+				const requestId = rid(`closing-rule-${name}`);
+				expect(
+					await commissionAction(name, users.admin, campaignId, fields, requestId),
+					name
+				).toMatchObject({
+					status: 409,
+					data: { message: COMMISSION_RULE_MESSAGES.campaignLocked }
+				});
+				await expectNoAudit(requestId);
+			}
+
+			const dbRequestId = rid('rpc-closing-rule-annul');
+			const { error } = await rpc(users.admin.client, 'commission_rule_annul', {
+				p_id: ruleIds.middle,
+				p_reason: 'closing',
+				p_request_id: dbRequestId
+			});
+			expect(error?.code).toBe('55000');
+			await expectNoAudit(dbRequestId);
+		});
+	});
+
+	describe('6. Audit trail', () => {
+		it('every successful mutation wrote exactly one row and rejected calls wrote none', async () => {
+			expect(expectedAudit.size).toBeGreaterThan(0);
+			for (const [entityId, expected] of expectedAudit) {
+				const { count, error } = await serviceClient
+					.from('audit_log')
+					.select('id', { count: 'exact', head: true })
+					.eq('entity_id', entityId);
+				expect(error).toBeNull();
+				expect(count, `audit rows for entity ${entityId}`).toBe(expected);
+			}
+
+			// Every row this run wrote carries one of its request ids, and nothing else did.
+			const total = [...expectedAudit.values()].reduce((a, b) => a + b, 0);
+			const { count, error } = await serviceClient
+				.from('audit_log')
+				.select('id', { count: 'exact', head: true })
+				.like('request_id', `${REQUEST_PREFIX}%`);
+			expect(error).toBeNull();
+			expect(count).toBe(total);
+			console.log(
+				`[integration] Phase 2 audit: ${total} rows for ${expectedAudit.size} entities, ` +
+					`${runCampaignIds.length} campaigns created`
+			);
+		});
+
+		it('audit rows of this run cannot be updated or deleted through the API (sanity)', async () => {
+			const { data: row } = await serviceClient
+				.from('audit_log')
+				.select('id, action')
+				.like('request_id', `${REQUEST_PREFIX}%`)
+				.limit(1)
+				.single();
+			expect(row).not.toBeNull();
+			for (const client of [serviceClient, users.admin.client]) {
+				const { error: updateError } = await client
+					.from('audit_log')
+					.update({ action: 'tampered' })
+					.eq('id', row!.id);
+				expect(updateError).toMatchObject({ code: '42501' });
+				const { error: deleteError } = await client.from('audit_log').delete().eq('id', row!.id);
+				expect(deleteError).toMatchObject({ code: '42501' });
+			}
+			const { data: after } = await serviceClient
+				.from('audit_log')
+				.select('id, action')
+				.eq('id', row!.id)
+				.single();
+			expect(after).toEqual(row);
+		});
+
+		it('campaigns and commission rules cannot be deleted (so this suite leaves its data)', async () => {
+			for (const client of [serviceClient, users.admin.client]) {
+				const { error: campaignError } = await client
+					.from('campaigns')
+					.delete()
+					.eq('id', runCampaignIds[0]);
+				expect(campaignError).toMatchObject({
+					code: '42501',
+					message: 'permission denied for table campaigns'
+				});
+				const { error: ruleError } = await client
+					.from('commission_rules')
+					.delete()
+					.in('campaign_id', runCampaignIds);
+				expect(ruleError).toMatchObject({
+					code: '42501',
+					message: 'permission denied for table commission_rules'
+				});
+			}
+			const { count } = await serviceClient
+				.from('campaigns')
+				.select('id', { count: 'exact', head: true })
+				.like('name', `${NAME_PREFIX}%`);
+			expect(count).toBe(runCampaignIds.length);
+		});
+	});
+});
