@@ -67,11 +67,13 @@ sold -> closed
 Rules:
 
 - Manually entered simple bonds and printed patas start as `available`; `created` is reserved for bonds created by imports (Phase 4).
-- A bond loaded by mistake is annulled (`available -> annulled`: only while available, not while delivered to a collector) with a reason and audit; annulling requires `bond.annul`. Its participating numbers are released so they can be entered again, and the annulled bond and its numbers stay as history.
+- A bond loaded by mistake is annulled (`available -> annulled`: only while available, not while delivered to a collector) with a reason and audit; annulling requires `bond.annul`. Its participating numbers are released so they can be entered again, and the annulled bond and its numbers stay as history. The database records the status a bond was annulled from (`annulled_from_status`); only bonds annulled from `available` release their numbers.
+- `sold -> annulled` (annulling a sale) is Phase 10: the bond's numbers stay held (never released), so no other bond can take them.
 - `annulled`, `lost` and `closed` have no outgoing transitions; annulled and closed bonds are immutable (except the recalculated financial status).
 - Annulling a bond loaded by mistake (`bond_annul`, SAN-23) only applies to `available` simple bonds and printed patas that are not grouped into a manual pata, and only while the campaign is `draft` or `active`. Annulling a sold bond is a Phase 10 correction.
 - A simple bond grouped into a manual pata keeps its commercial status but cannot be operated on its own while grouped (there is no `grouped` status).
 - A manual pata is not annulled directly: ungrouping it (`bond_ungroup_pata`, `bond.create`, reason required, only while the pata is `available`) marks every membership as ungrouped and moves the pata `available -> annulled` with the same reason. Its members are free again (they never changed status).
+- A manual pata leaves `available` (other than by annulment) only with all its members, and can only be ungrouped while `available`.
 - A sold bond cannot be reassigned directly.
 - A bond with confirmed payments can only be corrected with audited annulment.
 - Loss must record responsible party, date, and reason.

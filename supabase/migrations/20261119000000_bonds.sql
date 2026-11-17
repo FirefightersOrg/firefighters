@@ -18,6 +18,10 @@
 --     frees its participating numbers: the bond_numbers rows are kept and marked released
 --     (released_at / released_by), and uniqueness of (campaign_id, number_value) only applies to
 --     numbers that are not released, so the same number can be entered again.
+--   * Only a mistaken load releases numbers: the guard records the status the bond was annulled
+--     from (annulled_from_status, set by the database, immutable) and numbers can be released only
+--     when it is `available`. A sold bond can still be annulled (sold -> annulled, Phase 10), but
+--     its numbers stay held: nobody else can take them.
 --   * A simple bond is always printed (commercial_unit_count = 1). A pata has N >= 2 base
 --     numbers (commercial_unit_count = N). total_value = campaigns.simple_bond_value * N.
 --   * Printed patas own their numbers (N base + N associated). Manually grouped patas
@@ -25,6 +29,10 @@
 --     linked through bond_groups. While a simple bond is an active member of a group, its
 --     commercial data cannot change (it is blocked from individual operations); there is no
 --     separate "grouped" commercial status.
+--   * A manual pata can only leave `available` (other than by annulment) with all its members
+--     (commercial_unit_count active rows), and it can only be ungrouped while it is `available`.
+--     Ungrouping locks the pata row, so it serializes with any concurrent status change: a pata
+--     is never delivered/sold without its members.
 --   * barcode and internal_code are unique per campaign among non-annulled bonds.
 --
 -- Errors (SQLSTATE):
@@ -42,10 +50,13 @@
 --                                           changed while it has bonds; annulled/closed bond
 --                                           changed; active group member changed; numbers added
 --                                           to an annulled bond; number released while its bond
---                                           is not annulled; released number or ungrouped row
---                                           changed; grouping bonds that are not available;
---                                           ungrouping a sold/closed pata
---   23001 restrict_violation                change to an immutable column; delete/truncate
+--                                           is not annulled or was not annulled from available;
+--                                           released number or ungrouped row changed; grouping
+--                                           bonds that are not available; ungrouping a pata that
+--                                           is not available; a manual pata leaving available
+--                                           without all its members
+--   23001 restrict_violation                change to an immutable column (annulled_from_status
+--                                           included); delete/truncate
 
 -- ---------------------------------------------------------------------------
 -- bonds
@@ -69,6 +80,9 @@ create table public.bonds (
   annulled_at timestamptz,
   annulled_by uuid references public.profiles (id) on delete restrict,
   annul_reason text,
+  -- Status the bond was annulled from (set by bonds_guard_write, never by callers). Only bonds
+  -- annulled from `available` (loaded by mistake) release their numbers.
+  annulled_from_status text,
 
   -- Creating profile; null for system/import actions (same convention as campaigns.created_by).
   created_by uuid references public.profiles (id) on delete restrict,
@@ -106,11 +120,16 @@ create table public.bonds (
   constraint bonds_barcode_valid check (btrim(barcode) <> '' and barcode = btrim(barcode)),
   -- numeric accepts 'NaN' (greater than every number): reject it explicitly, as in campaigns.
   constraint bonds_total_value_positive check (total_value <> 'NaN' and total_value > 0),
+  -- The statuses a bond can be annulled from (see the transitions in bonds_guard_write).
+  constraint bonds_annulled_from_status_check
+    check (annulled_from_status in ('available', 'sold')),
   constraint bonds_annulment_consistent check (
     case
       when commercial_status = 'annulled' then annulled_at is not null and annulled_by is not null
         and annul_reason is not null and btrim(annul_reason) <> ''
+        and annulled_from_status is not null
       else annulled_at is null and annulled_by is null and annul_reason is null
+        and annulled_from_status is null
     end
   )
 );
@@ -121,6 +140,8 @@ comment on column public.bonds.commercial_unit_count is
   'Number of base numbers: 1 for a simple bond, N >= 2 for a pata.';
 comment on column public.bonds.total_value is
   'campaigns.simple_bond_value * commercial_unit_count, fixed at creation.';
+comment on column public.bonds.annulled_from_status is
+  'Status the bond was annulled from (set by the database). Numbers are released only if available.';
 comment on column public.bonds.current_collector_id is
   'Current collector. FK to public.collectors added in Phase 5.';
 comment on column public.bonds.current_buyer_id is
@@ -238,6 +259,7 @@ set search_path = ''
 as $$
 declare
   v_campaign public.campaigns;
+  v_members integer;
 begin
   if tg_op = 'INSERT' then
     if new.commercial_status not in ('created', 'available') then
@@ -326,8 +348,29 @@ begin
       using errcode = 'check_violation';
   end if;
 
+  -- A manual pata is sold as a whole: it can only leave available (other than by annulment,
+  -- after ungrouping) with all its members. Ungrouping locks this row (bond_groups_guard_write),
+  -- so the count below cannot be stale.
+  if old.origin = 'manual_grouping' and old.commercial_status = 'available'
+    and new.commercial_status not in ('available', 'annulled')
+  then
+    select count(*) into v_members
+    from public.bond_groups g
+    where g.pata_bond_id = old.id and g.ungrouped_at is null;
+    if v_members <> old.commercial_unit_count then
+      raise exception 'manually grouped pata % has % of % members and cannot leave available',
+        old.id, v_members, old.commercial_unit_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+  end if;
+
+  -- annulled_at and annulled_from_status are set here, never by callers.
   if new.commercial_status = 'annulled' and old.commercial_status <> 'annulled' then
     new.annulled_at := now();
+    new.annulled_from_status := old.commercial_status;
+  elsif new.annulled_from_status is distinct from old.annulled_from_status then
+    raise exception 'bonds.annulled_from_status is set by the database when the bond is annulled and cannot be changed'
+      using errcode = 'restrict_violation';
   end if;
 
   new.updated_at := now();
@@ -373,6 +416,13 @@ begin
       select * into v_bond from public.bonds where id = new.bond_id;
       if v_bond.commercial_status <> 'annulled' then
         raise exception 'bond numbers can only be released once their bond is annulled (status: %)', v_bond.commercial_status
+          using errcode = 'object_not_in_prerequisite_state';
+      end if;
+      -- Only a mistaken load (annulled from available) frees its numbers; an annulled sale keeps
+      -- them held (Phase 10).
+      if v_bond.annulled_from_status is distinct from 'available' then
+        raise exception 'bond numbers can only be released when their bond was annulled from available (annulled from: %)',
+          v_bond.annulled_from_status
           using errcode = 'object_not_in_prerequisite_state';
       end if;
       new.released_at := now();
@@ -472,9 +522,12 @@ begin
         using errcode = 'object_not_in_prerequisite_state';
     end if;
     if new.ungrouped_at is not null then
-      select * into v_pata from public.bonds where id = new.pata_bond_id;
-      if v_pata.commercial_status in ('sold', 'closed') then
-        raise exception 'a % pata cannot be ungrouped', v_pata.commercial_status
+      -- Lock the pata before reading its status: a concurrent status change (which also locks
+      -- the row) either commits first, and is seen here, or waits for this transaction and then
+      -- sees the missing members (bonds_guard_write).
+      select * into v_pata from public.bonds where id = new.pata_bond_id for update;
+      if v_pata.commercial_status <> 'available' then
+        raise exception 'only an available pata can be ungrouped (pata status: %)', v_pata.commercial_status
           using errcode = 'object_not_in_prerequisite_state';
       end if;
       new.ungrouped_at := now();

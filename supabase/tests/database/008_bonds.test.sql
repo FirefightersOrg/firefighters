@@ -1,5 +1,5 @@
 begin;
-select plan(174);
+select plan(196);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -279,6 +279,18 @@ select ok(
     and conname in ('bonds_commercial_status_check', 'bonds_financial_status_snapshot_check')),
   'constraint: commercial_status and financial_status_snapshot domains'
 );
+select throws_ok(
+  $$insert into public.bonds (campaign_id, kind, origin, total_value, annulled_from_status)
+    values (pg_temp.id('c-draft'), 'simple', 'printed', 60000, 'available')$$,
+  '23514', 'new row for relation "bonds" violates check constraint "bonds_annulment_consistent"',
+  'constraint: a new (not annulled) bond has no annulled_from_status'
+);
+select ok(
+  exists (select 1 from pg_constraint where conrelid = 'public.bonds'::regclass
+    and conname = 'bonds_annulled_from_status_check'
+    and pg_get_constraintdef(oid) like '%available%sold%'),
+  'constraint: annulled_from_status is available or sold (bonds_annulled_from_status_check)'
+);
 
 -- ---------------------------------------------------------------------------
 -- bonds: guard on insert (campaign status, initial status, value, server timestamps)
@@ -492,6 +504,30 @@ select is(
   (select annulled_at from public.bonds where id = pg_temp.id('ts')), now(),
   'annul: annulled_at is set by the database'
 );
+select is(
+  (select annulled_from_status from public.bonds where id = pg_temp.id('ts')), 'available',
+  'annul: annulled_from_status records the previous status'
+);
+select throws_ok(
+  $$update public.bonds set annulled_from_status = 'sold' where id = pg_temp.id('ts')$$,
+  '23001', 'bonds.annulled_from_status is set by the database when the bond is annulled and cannot be changed',
+  'annul: annulled_from_status is immutable once annulled'
+);
+select throws_ok(
+  $$update public.bonds set annulled_from_status = 'available' where id = pg_temp.id('s-created')$$,
+  '23001', 'bonds.annulled_from_status is set by the database when the bond is annulled and cannot be changed',
+  'annul: callers cannot set annulled_from_status'
+);
+select lives_ok(
+  $$insert into ids values ('ts2', pg_temp.bond('c-active'));
+    update public.bonds set commercial_status = 'annulled', annulled_by = 'b8000000-0000-0000-0000-000000000001',
+      annul_reason = 'Loaded by mistake', annulled_from_status = 'sold' where id = pg_temp.id('ts2');$$,
+  'annul: with a client-supplied annulled_from_status'
+);
+select is(
+  (select annulled_from_status from public.bonds where id = pg_temp.id('ts2')), 'available',
+  'annul: a client-supplied annulled_from_status is overwritten by the database'
+);
 select throws_ok(
   $$select pg_temp.set_status('ts', 'available')$$,
   '55000', null,
@@ -702,6 +738,10 @@ select is(
   (select count(*)::int from public.bond_numbers where bond_id = pg_temp.id('s1') and released_at = now()),
   2, 'release: released_at is set by the database'
 );
+select is(
+  (select annulled_from_status from public.bonds where id = pg_temp.id('s1')), 'available',
+  'release: allowed because the bond was annulled from available (mistaken load)'
+);
 select throws_ok(
   $$update public.bond_numbers set released_by = 'b8000000-0000-0000-0000-000000000002' where id = pg_temp.id('n68')$$,
   '55000', null,
@@ -725,6 +765,42 @@ select throws_ok(
   $$select pg_temp.num('pp', 68, 'extraordinary')$$,
   '23505', 'duplicate key value violates unique constraint "bond_numbers_campaign_number_key"',
   'release: the re-entered number is unique again'
+);
+
+-- An annulled sale (sold -> annulled, Phase 10) keeps its numbers held: only a mistaken load
+-- (annulled from available) releases them.
+select lives_ok(
+  $$insert into ids values ('sold1', pg_temp.bond('c-draft'));
+    insert into ids values ('n2500', pg_temp.num('sold1', 2500));
+    select pg_temp.num('sold1', 7371, 'associated', 'n2500');
+    select pg_temp.set_status('sold1', 'delivered_to_collector');
+    select pg_temp.set_status('sold1', 'sold');
+    select pg_temp.annul('sold1');$$,
+  'release: a sold bond with numbers is annulled'
+);
+select is(
+  (select annulled_from_status from public.bonds where id = pg_temp.id('sold1')), 'sold',
+  'release: the annulled sale records annulled_from_status sold'
+);
+select throws_ok(
+  $$update public.bond_numbers set released_by = 'b8000000-0000-0000-0000-000000000001', released_at = now()
+    where bond_id = pg_temp.id('sold1')$$,
+  '55000', 'bond numbers can only be released when their bond was annulled from available (annulled from: sold)',
+  'release: numbers of a bond annulled from sold cannot be released'
+);
+select is(
+  (select count(*)::int from public.bond_numbers where bond_id = pg_temp.id('sold1') and released_at is null),
+  2, 'release: the annulled sale keeps its numbers held'
+);
+select throws_ok(
+  $$insert into ids values ('sold2', pg_temp.bond('c-draft')); select pg_temp.num('sold2', 2500);$$,
+  '23505', 'duplicate key value violates unique constraint "bond_numbers_campaign_number_key"',
+  'release: another bond cannot take a number of an annulled sale'
+);
+select throws_ok(
+  $$insert into ids values ('sold3', pg_temp.bond('c-draft')); select pg_temp.num('sold3', 7371, 'extraordinary');$$,
+  '23505', 'duplicate key value violates unique constraint "bond_numbers_campaign_number_key"',
+  'release: nor its associated number'
 );
 
 -- ---------------------------------------------------------------------------
@@ -869,14 +945,55 @@ select lives_ok(
 select throws_ok(
   $$update public.bond_groups set ungrouped_at = now(), ungrouped_by = 'b8000000-0000-0000-0000-000000000001',
       reason = 'Too late' where pata_bond_id = pg_temp.id('mp2')$$,
-  '55000', 'a sold pata cannot be ungrouped',
+  '55000', 'only an available pata can be ungrouped (pata status: sold)',
   'ungroup: a sold pata keeps its members'
 );
+
+-- A manual pata leaves available only with all its members, and is ungrouped only while available.
+select lives_ok(
+  $$select pg_temp.grp('mp-other', 'm-other')$$,
+  'groups: a manual pata of 2 with one member so far'
+);
 select throws_ok(
-  $$select pg_temp.grp('mp-other', 'm-other'); select pg_temp.set_status('mp-other', 'delivered_to_collector');
-    insert into ids values ('m-other2', pg_temp.bond('c-other')); select pg_temp.grp('mp-other', 'm-other2')$$,
+  $$select pg_temp.set_status('mp-other', 'delivered_to_collector')$$,
+  '55000', format('manually grouped pata %s has 1 of 2 members and cannot leave available', pg_temp.id('mp-other')),
+  'groups: a manual pata cannot be delivered without all its members'
+);
+select throws_ok(
+  $$select pg_temp.set_status('mp-other', 'lost')$$,
+  '55000', format('manually grouped pata %s has 1 of 2 members and cannot leave available', pg_temp.id('mp-other')),
+  'groups: nor leave available in any other way (lost)'
+);
+select lives_ok(
+  $$insert into ids values ('m-other2', pg_temp.bond('c-other')), ('m-other3', pg_temp.bond('c-other'));
+    select pg_temp.grp('mp-other', 'm-other2');
+    select pg_temp.set_status('mp-other', 'delivered_to_collector');$$,
+  'groups: a complete manual pata is delivered'
+);
+select throws_ok(
+  $$select pg_temp.grp('mp-other', 'm-other3')$$,
   '55000', 'only available bonds can be grouped (pata: delivered_to_collector, member: available)',
   'groups: members are added while the pata is available'
+);
+select throws_ok(
+  $$update public.bond_groups set ungrouped_at = now(), ungrouped_by = 'b8000000-0000-0000-0000-000000000001',
+      reason = 'Collector has it' where pata_bond_id = pg_temp.id('mp-other')$$,
+  '55000', 'only an available pata can be ungrouped (pata status: delivered_to_collector)',
+  'ungroup: a pata delivered to a collector cannot be ungrouped'
+);
+select lives_ok(
+  $$select pg_temp.set_status('mp-other', 'returned')$$,
+  'groups: the manual pata is returned'
+);
+select throws_ok(
+  $$update public.bond_groups set ungrouped_at = now(), ungrouped_by = 'b8000000-0000-0000-0000-000000000001',
+      reason = 'Returned' where pata_bond_id = pg_temp.id('mp-other')$$,
+  '55000', 'only an available pata can be ungrouped (pata status: returned)',
+  'ungroup: a returned pata cannot be ungrouped (make it available first)'
+);
+select is(
+  (select count(*)::int from public.bond_groups where pata_bond_id = pg_temp.id('mp-other') and ungrouped_at is null),
+  2, 'ungroup: the rejected ungroupings keep every member'
 );
 
 -- ---------------------------------------------------------------------------
