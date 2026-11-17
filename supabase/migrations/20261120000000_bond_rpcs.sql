@@ -268,7 +268,7 @@ begin
   elsif p_constraint = 'bonds_campaign_internal_code_key' then
     select b.id into v_bond_id from public.bonds b
     where b.campaign_id = p_campaign.id and b.internal_code = p_internal_code
-      and b.commercial_status <> 'annulled';
+      and (b.commercial_status <> 'annulled' or b.annulled_from_status is distinct from 'available');
     if v_bond_id is not null then
       raise exception 'internal code % is already used by bond %', p_internal_code, v_bond_id
         using errcode = 'unique_violation',
@@ -277,7 +277,7 @@ begin
   elsif p_constraint = 'bonds_campaign_barcode_key' then
     select b.id into v_bond_id from public.bonds b
     where b.campaign_id = p_campaign.id and b.barcode = p_barcode
-      and b.commercial_status <> 'annulled';
+      and (b.commercial_status <> 'annulled' or b.annulled_from_status is distinct from 'available');
     if v_bond_id is not null then
       raise exception 'barcode % is already used by bond %', p_barcode, v_bond_id
         using errcode = 'unique_violation',

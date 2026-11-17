@@ -1,5 +1,5 @@
 begin;
-select plan(196);
+select plan(199);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -160,9 +160,9 @@ select is(
     'bond_groups_active_member_key unique=t where (ungrouped_at IS NULL)',
     'bond_numbers_campaign_number_key unique=t where (released_at IS NULL)',
     'bond_numbers_one_associated_per_base unique=t where (number_kind = ''associated''::text)',
-    'bonds_campaign_barcode_key unique=t where ((barcode IS NOT NULL) AND (commercial_status <> ''annulled''::text))',
-    'bonds_campaign_internal_code_key unique=t where ((internal_code IS NOT NULL) AND (commercial_status <> ''annulled''::text))'),
-  'partial unique indexes: active numbers, one associated per base, codes of non-annulled bonds, active members'
+    'bonds_campaign_barcode_key unique=t where ((barcode IS NOT NULL) AND ((commercial_status <> ''annulled''::text) OR (annulled_from_status IS DISTINCT FROM ''available''::text)))',
+    'bonds_campaign_internal_code_key unique=t where ((internal_code IS NOT NULL) AND ((commercial_status <> ''annulled''::text) OR (annulled_from_status IS DISTINCT FROM ''available''::text)))'),
+  'partial unique indexes: active numbers, one associated per base, codes held unless annulled from available, active members'
 );
 select ok(
   has_table_privilege('authenticated', 'public.bonds', 'select')
@@ -545,7 +545,7 @@ select throws_ok(
 );
 
 -- ---------------------------------------------------------------------------
--- bonds: barcode / internal code uniqueness among non-annulled bonds of a campaign
+-- bonds: barcode / internal code uniqueness per campaign (freed only by a mistaken-load annulment)
 -- ---------------------------------------------------------------------------
 select throws_ok(
   $$select pg_temp.bond('c-draft', p_barcode => '0068')$$,
@@ -569,7 +569,25 @@ select lives_ok(
   $$insert into ids values ('dup', pg_temp.bond('c-draft', p_barcode => '0500', p_code => 'A-0500'));
     select pg_temp.annul('dup');
     insert into ids values ('dup2', pg_temp.bond('c-draft', p_barcode => '0500', p_code => 'A-0500'));$$,
-  'unique: codes of an annulled bond can be used again'
+  'unique: codes of a bond annulled from available can be used again'
+);
+-- A bond annulled from sold (Phase 10) keeps its codes held, like its numbers.
+select lives_ok(
+  $$insert into ids values ('code-sold', pg_temp.bond('c-draft', p_barcode => '0600', p_code => 'A-0600'));
+    select pg_temp.set_status('code-sold', 'delivered_to_collector');
+    select pg_temp.set_status('code-sold', 'sold');
+    select pg_temp.annul('code-sold');$$,
+  'unique: a sold bond with codes is annulled'
+);
+select throws_ok(
+  $$select pg_temp.bond('c-draft', p_barcode => '0600')$$,
+  '23505', 'duplicate key value violates unique constraint "bonds_campaign_barcode_key"',
+  'unique: the barcode of a bond annulled from sold cannot be reused'
+);
+select throws_ok(
+  $$select pg_temp.bond('c-draft', p_code => 'A-0600')$$,
+  '23505', 'duplicate key value violates unique constraint "bonds_campaign_internal_code_key"',
+  'unique: the internal code of a bond annulled from sold cannot be reused'
 );
 
 -- ---------------------------------------------------------------------------
