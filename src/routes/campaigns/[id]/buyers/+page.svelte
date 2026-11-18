@@ -60,7 +60,7 @@
 							><td>{buyer.phone ?? '—'}</td><td
 								>{#if collector(buyer.usualCollectorId)}<a
 										class="text-blue-700 underline"
-										href={collectorHref(collectorHref(collector(buyer.usualCollectorId)!.id))}
+										href={collectorHref(collector(buyer.usualCollectorId)!.id)}
 										>{collector(buyer.usualCollectorId)!.displayName}</a
 									>{:else}—{/if}</td
 							></tr
@@ -68,4 +68,11 @@
 				>
 			</table>
 		</div>{/if}
+	{#if data.pagination.pageCount > 1}<nav class="flex justify-between text-sm">
+			<span>Page {data.pagination.page} of {data.pagination.pageCount}</span
+			>{#if data.pagination.page < data.pagination.pageCount}<a
+					class="text-blue-700 underline"
+					href={`${href}?page=${data.pagination.page + 1}`}>Next →</a
+				>{/if}
+		</nav>{/if}
 </div>
