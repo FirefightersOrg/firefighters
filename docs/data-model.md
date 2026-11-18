@@ -721,6 +721,25 @@ Rules (constraints and the `import_session_items_guard_write` trigger):
 
 Access (both tables): `authenticated` can only `SELECT`, with `bond.import` **or** `bond.scan` (RLS). Writes go through audited SQL functions (SAN-45 staging and validation, SAN-47 confirmation and rollback). `service_role` has `SELECT`, `INSERT` and `UPDATE`; `anon` nothing.
 
+SAN-45 write functions:
+
+- `import_session_create(campaign_id, source_type, file_name, notes, request_id)`: creates a
+  draft session. File sources require `bond.import`; `barcode_scan` requires `bond.scan`.
+- `import_session_add_items(session_id, rows jsonb, request_id)`: stages up to 1,000 parsed file
+  rows, revalidates them, and returns the preview summary. Payload shape errors are `22023`;
+  business errors remain on their rows.
+- `import_session_add_scan(session_id, barcode, group_key, base_number, raw_value, request_id)`:
+  resolves the code using the campaign's barcode mode and stages one row. A scan with `group_key`
+  is a pata row; otherwise it is simple.
+- `import_session_remove_item(item_id, reason, request_id)`: audited soft removal, then
+  revalidation.
+- `import_session_validate(session_id, request_id)`: revalidates and moves `draft -> validated`
+  only when every live row is valid and every pata group has at least two rows.
+- `import_session_cancel(session_id, reason, request_id)`: audited cancellation of a draft or
+  validated session.
+- `import_session_summary(session_id)`: preview counts: simple bonds, patas, base and
+  participating numbers, errors, warnings and duplicates.
+
 ### legacy_migration_staging
 
 Staging area for data exported from the old system.
