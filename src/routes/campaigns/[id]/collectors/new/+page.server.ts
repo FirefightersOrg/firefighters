@@ -37,12 +37,12 @@ export const actions: Actions = {
 				errors: parsed.error.flatten().fieldErrors,
 				message: 'Please review the form.'
 			});
+		let collectorId: string;
 		try {
-			const id = await createCollector(locals.supabase, parsed.data, {
+			collectorId = await createCollector(locals.supabase, parsed.data, {
 				requestId: locals.requestId,
 				permissions: locals.permissions
 			});
-			redirect(303, `/campaigns/${params.id}/collectors/${id}`);
 		} catch (err) {
 			const party = err instanceof PartyServiceError ? err : null;
 			return fail(party?.status ?? 500, {
@@ -51,5 +51,6 @@ export const actions: Actions = {
 				message: party?.message ?? 'Something went wrong. Please try again.'
 			});
 		}
+		redirect(303, `/campaigns/${params.id}/collectors/${collectorId}`);
 	}
 };

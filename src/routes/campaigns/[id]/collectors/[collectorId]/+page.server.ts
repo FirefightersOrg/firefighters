@@ -74,7 +74,8 @@ export const actions: Actions = {
 	update: async ({ request, locals, params, url }) => {
 		requireCampaignViewer(locals, url);
 		requirePermissionIn(locals.permissions, 'collector.manage');
-		if (!uuid(params.id) || !uuid(params.collectorId)) return fail(404, { message: notFound });
+		if (!uuid(params.id)) return fail(404, { message: CAMPAIGN_MESSAGES.notFound });
+		if (!uuid(params.collectorId)) return fail(404, { message: notFound });
 		const values = readFormFields(await request.formData(), COLLECTOR_UPDATE_FIELDS);
 		const parsed = collectorSchema.safeParse(values);
 		if (!parsed.success)

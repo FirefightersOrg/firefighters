@@ -29,7 +29,11 @@ export const collectorSchema = z.object({
 	),
 	address: nullableText(PARTY_LIMITS.address),
 	status: z.enum(COLLECTOR_STATUSES),
-	userProfileId: z.string().uuid('Select a valid user.').nullable()
+	userProfileId: z
+		.string()
+		.trim()
+		.transform((value) => value || null)
+		.pipe(z.string().uuid('Select a valid user.').nullable())
 });
 
 export type CollectorFormValues = Record<(typeof COLLECTOR_FORM_FIELDS)[number], string>;
