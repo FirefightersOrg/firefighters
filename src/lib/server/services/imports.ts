@@ -164,7 +164,10 @@ async function callImportRpc(
 	if (result.error) {
 		const mapped = mapImportRpcError(result.error);
 		if (mapped.kind === 'internal') {
-			console.error(`[imports] ${fn} RPC failed`, { requestId: ctx.requestId, error: result.error });
+			console.error(`[imports] ${fn} RPC failed`, {
+				requestId: ctx.requestId,
+				error: result.error
+			});
 		}
 		throw mapped;
 	}
@@ -244,7 +247,11 @@ export async function addScanItem(
 		supabase,
 		'import_session_add_scan',
 		'bond.scan',
-		{ p_session_id: input.sessionId, p_item: toRpcFields(input), p_request_id: ctx.requestId ?? null },
+		{
+			p_session_id: input.sessionId,
+			p_item: toRpcFields(input),
+			p_request_id: ctx.requestId ?? null
+		},
 		ctx
 	);
 	if (typeof data !== 'string' || data === '') unexpected('import_session_add_scan', data, ctx);
@@ -321,7 +328,10 @@ export function mapValidationResult(data: unknown): ImportValidationResult | nul
 	if (!data || typeof data !== 'object') return null;
 	const raw = data as Record<string, unknown>;
 	const status = raw.status;
-	if (typeof status !== 'string' || !(IMPORT_SESSION_STATUSES as readonly string[]).includes(status)) {
+	if (
+		typeof status !== 'string' ||
+		!(IMPORT_SESSION_STATUSES as readonly string[]).includes(status)
+	) {
 		return null;
 	}
 	const summary = {} as ImportSummary;

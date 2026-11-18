@@ -253,7 +253,11 @@ async function pagedCodes(
 	for (let from = 0; ; from += PAGE_SIZE) {
 		let query = supabase
 			.from(table)
-			.select(table === 'bonds' ? 'id, barcode, commercial_status, annulled_from_status' : 'bond_id, barcode')
+			.select(
+				table === 'bonds'
+					? 'id, barcode, commercial_status, annulled_from_status'
+					: 'bond_id, barcode'
+			)
 			.eq('campaign_id', campaignId)
 			.not('barcode', 'is', null);
 		if (table === 'bond_numbers') query = query.is('released_at', null);
@@ -266,7 +270,8 @@ async function pagedCodes(
 		for (const row of page) {
 			if (table === 'bonds') {
 				// Live: not annulled from available (same predicate as the unique index).
-				if (row.commercial_status === 'annulled' && row.annulled_from_status === 'available') continue;
+				if (row.commercial_status === 'annulled' && row.annulled_from_status === 'available')
+					continue;
 				out.push([row.barcode as string, row.id as string]);
 			} else {
 				out.push([row.barcode as string, row.bond_id as string]);

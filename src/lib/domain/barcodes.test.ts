@@ -72,9 +72,9 @@ describe('readBarcode', () => {
 	it('manual_mapping and pattern modes without a pattern read nothing', () => {
 		expect(readBarcode('X', { ...base, barcodeMode: 'manual_mapping' })).toEqual({ kind: 'none' });
 		expect(readBarcode('X', { ...pattern, barcodePattern: null })).toEqual({ kind: 'none' });
-		expect(barcodeNeedsManualNumber({ barcodeMode: 'external_legacy_code', barcodePattern: null })).toBe(
-			true
-		);
+		expect(
+			barcodeNeedsManualNumber({ barcodeMode: 'external_legacy_code', barcodePattern: null })
+		).toBe(true);
 		expect(barcodeNeedsManualNumber(pattern)).toBe(false);
 		expect(barcodeNeedsManualNumber(base)).toBe(false);
 	});

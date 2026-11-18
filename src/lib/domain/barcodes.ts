@@ -74,7 +74,9 @@ export function isBarcodePatternPortable(pattern: string): boolean {
 }
 
 /** Whether the base number must come from the operator / the file (the barcode has none). */
-export function barcodeNeedsManualNumber(rules: Pick<BarcodeRules, 'barcodeMode' | 'barcodePattern'>) {
+export function barcodeNeedsManualNumber(
+	rules: Pick<BarcodeRules, 'barcodeMode' | 'barcodePattern'>
+) {
 	return (
 		rules.barcodeMode === 'manual_mapping' ||
 		(barcodeModeUsesPattern(rules.barcodeMode) && rules.barcodePattern === null)

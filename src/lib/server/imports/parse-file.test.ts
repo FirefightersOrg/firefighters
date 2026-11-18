@@ -42,7 +42,9 @@ describe('parseImportFile (CSV)', () => {
 			)
 		});
 		expect(parsed.sourceType).toBe('csv_file');
-		expect(parsed.rows.map((r) => [r.rowNumber, r.tipoBono, r.grupoPata, r.numeroBase, r.barcode])).toEqual([
+		expect(
+			parsed.rows.map((r) => [r.rowNumber, r.tipoBono, r.grupoPata, r.numeroBase, r.barcode])
+		).toEqual([
 			[2, 'simple', null, '1658', '1658'],
 			[3, 'simple', null, '0068', '0068'],
 			[4, 'pata', 'PATA1200', '1200', 'PATA1200-1200'],
@@ -64,13 +66,20 @@ describe('parseImportFile (CSV)', () => {
 	});
 
 	it('rejects empty, oversized and malformed files', async () => {
-		expect(await fileError(parseImportFile({ name: 'a.csv', bytes: new Uint8Array() }))).toBe('empty_file');
+		expect(await fileError(parseImportFile({ name: 'a.csv', bytes: new Uint8Array() }))).toBe(
+			'empty_file'
+		);
 		expect(
-			await fileError(parseImportFile({ name: 'a.csv', bytes: new Uint8Array(5 * 1024 * 1024 + 1) }))
+			await fileError(
+				parseImportFile({ name: 'a.csv', bytes: new Uint8Array(5 * 1024 * 1024 + 1) })
+			)
 		).toBe('file_too_large');
 		expect(
 			await fileError(
-				parseImportFile({ name: 'a.csv', bytes: encode('tipo_bono,grupo_pata,numero_base,barcode\nsimple,,"1,1\n') })
+				parseImportFile({
+					name: 'a.csv',
+					bytes: encode('tipo_bono,grupo_pata,numero_base,barcode\nsimple,,"1,1\n')
+				})
 			)
 		).toBe('invalid_file');
 	});
@@ -84,7 +93,12 @@ describe('parseImportFile (.xlsx)', () => {
 				['simple', null, 68, '0068'],
 				[],
 				['pata', 'P1', 1200, 1200],
-				['pata', 'P1', { formula: '1300+15', result: 1315 }, { richText: [{ text: '13' }, { text: '15' }] }]
+				[
+					'pata',
+					'P1',
+					{ formula: '1300+15', result: 1315 },
+					{ richText: [{ text: '13' }, { text: '15' }] }
+				]
 			],
 			(sheet) => {
 				sheet.getCell('C2').numFmt = '0000';
@@ -92,7 +106,9 @@ describe('parseImportFile (.xlsx)', () => {
 		);
 		const parsed = await parseImportFile({ name: 'bonos.xlsx', bytes });
 		expect(parsed.sourceType).toBe('excel_file');
-		expect(parsed.rows.map((r) => [r.rowNumber, r.tipoBono, r.grupoPata, r.numeroBase, r.barcode])).toEqual([
+		expect(
+			parsed.rows.map((r) => [r.rowNumber, r.tipoBono, r.grupoPata, r.numeroBase, r.barcode])
+		).toEqual([
 			[2, 'simple', null, '0068', '0068'],
 			[4, 'pata', 'P1', '1200', '1200'],
 			[5, 'pata', 'P1', '1315', '1315']

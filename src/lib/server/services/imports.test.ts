@@ -52,20 +52,45 @@ function rpcClient(responses: Record<string, { data?: unknown; error?: unknown }
 
 describe('mapImportRpcError', () => {
 	it.each([
-		['42501', 'permission denied: bond.import is required', 'permission', IMPORT_MESSAGES.permission],
+		[
+			'42501',
+			'permission denied: bond.import is required',
+			'permission',
+			IMPORT_MESSAGES.permission
+		],
 		['P0002', 'campaign x not found', 'not_found', IMPORT_MESSAGES.campaignNotFound],
 		['P0002', 'import session x not found', 'not_found', IMPORT_MESSAGES.sessionNotFound],
 		['P0002', 'import session item x not found', 'not_found', IMPORT_MESSAGES.itemNotFound],
-		['22023', 'row 2 is already in this import session', 'validation', 'Row 2 is already in this import session.'],
+		[
+			'22023',
+			'row 2 is already in this import session',
+			'validation',
+			'Row 2 is already in this import session.'
+		],
 		[
 			'55000',
 			'imports can only be staged or validated while the campaign is draft or active (status: closed)',
 			'conflict',
 			`${IMPORT_MESSAGES.campaignLocked} This campaign is closed.`
 		],
-		['55000', 'import session x is cancelled and cannot be changed', 'conflict', IMPORT_MESSAGES.sessionClosed],
-		['55000', 'import session item x was removed and cannot be changed', 'conflict', IMPORT_MESSAGES.itemRemoved],
-		['55000', 'import session x has no items to validate', 'conflict', IMPORT_MESSAGES.nothingToValidate],
+		[
+			'55000',
+			'import session x is cancelled and cannot be changed',
+			'conflict',
+			IMPORT_MESSAGES.sessionClosed
+		],
+		[
+			'55000',
+			'import session item x was removed and cannot be changed',
+			'conflict',
+			IMPORT_MESSAGES.itemRemoved
+		],
+		[
+			'55000',
+			'import session x has no items to validate',
+			'conflict',
+			IMPORT_MESSAGES.nothingToValidate
+		],
 		['23514', 'new row violates check constraint', 'validation', IMPORT_MESSAGES.invalid],
 		['XX000', 'boom', 'internal', IMPORT_MESSAGES.internal]
 	])('%s %s', (code, message, kind, text) => {
@@ -105,7 +130,10 @@ describe('import service calls', () => {
 
 	it('checks the permission up front without calling the database', async () => {
 		const { supabase, rpc } = rpcClient({});
-		const input = importSessionCreateSchema.parse({ campaignId: CAMPAIGN_ID, sourceType: 'barcode_scan' });
+		const input = importSessionCreateSchema.parse({
+			campaignId: CAMPAIGN_ID,
+			sourceType: 'barcode_scan'
+		});
 		await expect(
 			createImportSession(supabase, input, { permissions: ['bond.import'] })
 		).rejects.toMatchObject({ kind: 'permission' });
@@ -116,13 +144,29 @@ describe('import service calls', () => {
 		const { supabase, rpc } = rpcClient({ import_session_add_items: { data: 1 } });
 		const input = importAddItemsSchema.parse({
 			sessionId: SESSION_ID,
-			items: [{ rowNumber: 2, raw: 'simple,,0068,0068', tipoBono: 'simple', grupoPata: '', numeroBase: '0068', barcode: '0068' }]
+			items: [
+				{
+					rowNumber: 2,
+					raw: 'simple,,0068,0068',
+					tipoBono: 'simple',
+					grupoPata: '',
+					numeroBase: '0068',
+					barcode: '0068'
+				}
+			]
 		});
 		await expect(addImportItems(supabase, input)).resolves.toBe(1);
 		expect(rpc.mock.calls[0][1]).toEqual({
 			p_session_id: SESSION_ID,
 			p_items: [
-				{ row_number: 2, raw: 'simple,,0068,0068', tipo_bono: 'simple', grupo_pata: null, numero_base: '0068', barcode: '0068' }
+				{
+					row_number: 2,
+					raw: 'simple,,0068,0068',
+					tipo_bono: 'simple',
+					grupo_pata: null,
+					numero_base: '0068',
+					barcode: '0068'
+				}
 			],
 			p_request_id: null
 		});
@@ -134,15 +178,24 @@ describe('import service calls', () => {
 			import_session_update_item: { data: true }
 		});
 		await expect(
-			addScanItem(supabase, importAddScanSchema.parse({ sessionId: SESSION_ID, tipoBono: 'simple', barcode: ' BC-1 ' }))
+			addScanItem(
+				supabase,
+				importAddScanSchema.parse({ sessionId: SESSION_ID, tipoBono: 'simple', barcode: ' BC-1 ' })
+			)
 		).resolves.toBe(ITEM_ID);
 		expect(rpc.mock.calls[0][1]).toMatchObject({
 			p_item: { tipo_bono: 'simple', grupo_pata: null, numero_base: null, barcode: 'BC-1' }
 		});
 		await expect(
-			updateImportItem(supabase, importUpdateItemSchema.parse({ itemId: ITEM_ID, tipoBono: 'simple', barcode: '0068' }))
+			updateImportItem(
+				supabase,
+				importUpdateItemSchema.parse({ itemId: ITEM_ID, tipoBono: 'simple', barcode: '0068' })
+			)
 		).resolves.toBe(true);
-		await removeImportItem(supabase, importRemoveItemSchema.parse({ itemId: ITEM_ID, reason: ' dup ' }));
+		await removeImportItem(
+			supabase,
+			importRemoveItemSchema.parse({ itemId: ITEM_ID, reason: ' dup ' })
+		);
 		expect(rpc.mock.calls[2]).toEqual([
 			'import_session_remove_item',
 			{ p_item_id: ITEM_ID, p_reason: 'dup', p_request_id: null }
@@ -174,7 +227,9 @@ describe('import service calls', () => {
 
 	it('turns database errors and thrown errors into ImportServiceError', async () => {
 		const failing = rpcClient({
-			import_session_validate: { error: { code: '55000', message: 'import session x has no items to validate' } }
+			import_session_validate: {
+				error: { code: '55000', message: 'import session x has no items to validate' }
+			}
 		});
 		await expect(validateImportSession(failing.supabase, SESSION_ID)).rejects.toMatchObject({
 			kind: 'conflict',
@@ -187,7 +242,10 @@ describe('import service calls', () => {
 		});
 		const odd = rpcClient({ import_session_create: { data: 42 } });
 		await expect(
-			createImportSession(odd.supabase, importSessionCreateSchema.parse({ campaignId: CAMPAIGN_ID, sourceType: 'barcode_scan' }))
+			createImportSession(
+				odd.supabase,
+				importSessionCreateSchema.parse({ campaignId: CAMPAIGN_ID, sourceType: 'barcode_scan' })
+			)
 		).rejects.toMatchObject({ kind: 'internal' });
 		errorSpy.mockRestore();
 	});
@@ -215,7 +273,10 @@ describe('stageImportFile', () => {
 			'import_session_add_items',
 			'import_session_validate'
 		]);
-		expect(rpc.mock.calls[0][1]).toMatchObject({ p_source_type: 'csv_file', p_file_name: 'bonos.csv' });
+		expect(rpc.mock.calls[0][1]).toMatchObject({
+			p_source_type: 'csv_file',
+			p_file_name: 'bonos.csv'
+		});
 		expect((rpc.mock.calls[1][1] as { p_items: unknown[] }).p_items[1]).toEqual({
 			row_number: 3,
 			raw: 'pata;P1;;1200',

@@ -25,7 +25,13 @@
  * runs the same rules against the live campaign data and is the authority; codes, statuses and
  * messages are the same on both sides (cross-checked by the integration tests).
  */
-import { BARCODE_MAX_LENGTH, compileBarcodePattern, isNumberText, padNumber, readBarcode } from './barcodes';
+import {
+	BARCODE_MAX_LENGTH,
+	compileBarcodePattern,
+	isNumberText,
+	padNumber,
+	readBarcode
+} from './barcodes';
 import type { BarcodeRules } from './barcodes';
 import type { BondKind } from './bonds';
 import { MIN_PATA_SIZE } from './bonds';
@@ -161,8 +167,10 @@ export function interpretImportItem(
 	const n = raw.numeroBase;
 
 	const barcode = b !== null && b.length <= BARCODE_MAX_LENGTH ? b : null;
-	const groupKey = kind === 'pata' && group !== null && group.length <= BARCODE_MAX_LENGTH ? group : null;
-	const itemType: BondKind | null = kind === 'simple' ? 'simple' : groupKey !== null ? 'pata' : null;
+	const groupKey =
+		kind === 'pata' && group !== null && group.length <= BARCODE_MAX_LENGTH ? group : null;
+	const itemType: BondKind | null =
+		kind === 'simple' ? 'simple' : groupKey !== null ? 'pata' : null;
 
 	let error: ImportIssue<ImportErrorCode> | null = null;
 	const fail = (code: ImportErrorCode, message: string) => {
@@ -170,7 +178,8 @@ export function interpretImportItem(
 	};
 
 	if (raw.tipoBono === null) fail('missing_type', 'Bond type is required (simple or pata)');
-	else if (kind === null) fail('invalid_type', `Unknown bond type "${raw.tipoBono}" (use simple or pata)`);
+	else if (kind === null)
+		fail('invalid_type', `Unknown bond type "${raw.tipoBono}" (use simple or pata)`);
 
 	if (b === null) fail('missing_barcode', 'Barcode is required');
 	else if (b.length > BARCODE_MAX_LENGTH)
@@ -197,7 +206,10 @@ export function interpretImportItem(
 		} else if (n !== null && !isNumberText(n, digits)) {
 			fail('invalid_base_number', `Base number "${n}" must be a number of up to ${digits} digits`);
 		} else if (reading.kind === 'none' && n === null) {
-			fail('missing_base_number', "Base number is required: this campaign's barcodes do not carry it");
+			fail(
+				'missing_base_number',
+				"Base number is required: this campaign's barcodes do not carry it"
+			);
 		} else {
 			const typed = n === null ? null : Number(n);
 			const read = reading.kind === 'number' ? reading.value : null;

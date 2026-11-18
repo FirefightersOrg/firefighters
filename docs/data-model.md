@@ -719,7 +719,7 @@ Rules (constraints and the `import_session_items_guard_write` trigger):
 - `id`, `import_session_id`, `row_number`, `created_at` never change (`23001`). Removed items and items linked to a bond are immutable (`55000`).
 - Never deleted (soft removal instead); a trigger blocks `DELETE`/`TRUNCATE`.
 
-Access (both tables): `authenticated` can only `SELECT`, with `bond.import` **or** `bond.scan` (RLS). Writes go through audited SQL functions (SAN-45 staging and validation, SAN-47 confirmation and rollback). `service_role` has `SELECT`, `INSERT` and `UPDATE`; `anon` nothing.
+Access (both tables): `authenticated` can only `SELECT`, with `bond.import` **or** `bond.scan` (RLS). Writes go through audited SQL functions (SAN-45 staging and validation, SAN-47 confirmation and rollback). Staging functions (SAN-45, `20261126000000_import_staging_rpcs.sql`): `import_session_create`, `import_session_add_items` (file rows in bulk), `import_session_add_scan`, `import_session_update_item`, `import_session_remove_item`, `import_session_cancel`, `import_session_validate`; each writes one `audit_log` row (`import.*`). `parsed_value` holds the four raw fields (`tipo_bono`, `grupo_pata`, `numero_base`, `barcode`), trimmed, blank = null; `barcode`, `item_type`, `group_key` and `base_number` are derived from them with the campaign rules; `error_code` / `error_message` also carry the `warning` code and message. See `docs/imports.md`. `service_role` has `SELECT`, `INSERT` and `UPDATE`; `anon` nothing.
 
 ### legacy_migration_staging
 

@@ -61,14 +61,38 @@ describe('interpretImportItem', () => {
 
 	it.each([
 		[raw(null, null, null, '1'), 'missing_type', 'Bond type is required (simple or pata)'],
-		[raw('doble', null, null, '1'), 'invalid_type', 'Unknown bond type "doble" (use simple or pata)'],
+		[
+			raw('doble', null, null, '1'),
+			'invalid_type',
+			'Unknown bond type "doble" (use simple or pata)'
+		],
 		[raw('simple', null, '1', null), 'missing_barcode', 'Barcode is required'],
-		[raw('simple', null, null, 'x'.repeat(201)), 'barcode_too_long', 'Barcode must be at most 200 characters'],
-		[raw('simple', 'P1', null, '1'), 'simple_with_group', 'A simple bond cannot belong to a pata group ("P1")'],
+		[
+			raw('simple', null, null, 'x'.repeat(201)),
+			'barcode_too_long',
+			'Barcode must be at most 200 characters'
+		],
+		[
+			raw('simple', 'P1', null, '1'),
+			'simple_with_group',
+			'A simple bond cannot belong to a pata group ("P1")'
+		],
 		[raw('pata', null, null, '1'), 'missing_group', 'A pata row needs a pata group (grupo_pata)'],
-		[raw('pata', 'g'.repeat(201), null, '1'), 'group_too_long', 'Pata group must be at most 200 characters'],
-		[raw('simple', null, null, 'ABC'), 'invalid_barcode', 'Barcode "ABC" is not a base number of up to 4 digits'],
-		[raw('simple', null, '68x', '0068'), 'invalid_base_number', 'Base number "68x" must be a number of up to 4 digits'],
+		[
+			raw('pata', 'g'.repeat(201), null, '1'),
+			'group_too_long',
+			'Pata group must be at most 200 characters'
+		],
+		[
+			raw('simple', null, null, 'ABC'),
+			'invalid_barcode',
+			'Barcode "ABC" is not a base number of up to 4 digits'
+		],
+		[
+			raw('simple', null, '68x', '0068'),
+			'invalid_base_number',
+			'Base number "68x" must be a number of up to 4 digits'
+		],
 		[
 			raw('simple', null, '0069', '0068'),
 			'base_number_mismatch',
@@ -99,7 +123,10 @@ describe('interpretImportItem', () => {
 		const small = { ...rules, maxNumber: 5000, associatedNumberOffset: 0 };
 		expect(interpretImportItem(raw('simple', null, null, '6000'), small)).toMatchObject({
 			baseNumber: null,
-			error: { code: 'out_of_range', message: 'Number 6000 exceeds the campaign maximum number 5000' }
+			error: {
+				code: 'out_of_range',
+				message: 'Number 6000 exceeds the campaign maximum number 5000'
+			}
 		});
 	});
 
@@ -112,7 +139,11 @@ describe('interpretImportItem', () => {
 			'base_number_not_padded'
 		);
 		// Pattern captures are not checked.
-		const pattern = { ...rules, barcodeMode: 'internal_code' as const, barcodePattern: '^BC-(\\d+)$' };
+		const pattern = {
+			...rules,
+			barcodeMode: 'internal_code' as const,
+			barcodePattern: '^BC-(\\d+)$'
+		};
 		expect(interpretImportItem(raw('simple', null, null, 'BC-68'), pattern)).toMatchObject({
 			baseNumber: 68,
 			warning: null
@@ -245,10 +276,13 @@ describe('validateImportBatch', () => {
 	});
 
 	it('offset 0: every number is its own associated number', () => {
-		const { items: results } = validateImportBatch(batch([[1, raw('simple', null, null, '0001')]]), {
-			...rules,
-			associatedNumberOffset: 0
-		});
+		const { items: results } = validateImportBatch(
+			batch([[1, raw('simple', null, null, '0001')]]),
+			{
+				...rules,
+				associatedNumberOffset: 0
+			}
+		);
 		expect(results[0].errorMessage).toBe('Number 0001 is repeated in this import (row 1)');
 	});
 
@@ -278,7 +312,13 @@ describe('rowsLabel / summarizeImportItems', () => {
 				{ status: 'warning', itemType: 'pata', groupKey: 'A', errorCode: 'base_number_not_padded' },
 				{ status: 'error', itemType: 'pata', groupKey: 'B', errorCode: 'duplicate_number_in_batch' }
 			])
-		).toMatchObject({ patas: 1, baseNumbers: 2, participatingNumbers: 4, duplicates: 1, errors: 1 });
+		).toMatchObject({
+			patas: 1,
+			baseNumbers: 2,
+			participatingNumbers: 4,
+			duplicates: 1,
+			errors: 1
+		});
 	});
 });
 
@@ -317,7 +357,13 @@ describe('rowsFromTable', () => {
 	it.each([
 		[[], 'empty_file'],
 		[[['tipo_bono', 'grupo_pata', 'numero_base', 'barcode']], 'empty_file'],
-		[[['tipo_bono', 'barcode'], ['simple', '1']], 'missing_columns'],
+		[
+			[
+				['tipo_bono', 'barcode'],
+				['simple', '1']
+			],
+			'missing_columns'
+		],
 		[[['tipo_bono', 'tipo', 'grupo_pata', 'numero_base', 'barcode']], 'duplicate_column']
 	])('file error %#', (table, code) => {
 		expect(() => rowsFromTable(t(table))).toThrow(ImportFileError);
@@ -329,14 +375,24 @@ describe('rowsFromTable', () => {
 	});
 
 	it('names the missing columns', () => {
-		expect(() => rowsFromTable(t([['tipo_bono', 'barcode'], ['simple', '1']]))).toThrow(
+		expect(() =>
+			rowsFromTable(
+				t([
+					['tipo_bono', 'barcode'],
+					['simple', '1']
+				])
+			)
+		).toThrow(
 			'Missing columns: grupo_pata, numero_base (the header row must be tipo_bono,grupo_pata,numero_base,barcode)'
 		);
 	});
 
 	it('limits rows and value length', () => {
 		const header = ['tipo_bono', 'grupo_pata', 'numero_base', 'barcode'];
-		const many = [header, ...Array.from({ length: IMPORT_MAX_ROWS + 1 }, () => ['simple', '', '', '1'])];
+		const many = [
+			header,
+			...Array.from({ length: IMPORT_MAX_ROWS + 1 }, () => ['simple', '', '', '1'])
+		];
 		expect(() => rowsFromTable(t(many))).toThrow(/at most 5000/);
 		expect(() => rowsFromTable(t([header, ['simple', '', '', 'x'.repeat(501)]]))).toThrow(
 			'Row 2: barcode is longer than 500 characters'
