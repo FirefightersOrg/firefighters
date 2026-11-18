@@ -161,6 +161,95 @@ export async function getDeliveryNote(
 	}));
 }
 
+/** A delivered bond and the numbers printed on a delivery note. */
+export interface DeliveryNoteBond {
+	id: string;
+	kind: 'simple' | 'pata';
+	commercialUnitCount: number;
+	barcode: string | null;
+	numbers: {
+		id: string;
+		value: number;
+		kind: 'base' | 'associated' | 'extraordinary';
+		sourceBaseNumberId: string | null;
+		barcode: string | null;
+	}[];
+	/** Simple members of a manually grouped pata (empty for printed bonds). */
+	members: DeliveryNoteBond[];
+}
+
+interface DeliveryBondRow {
+	id: string;
+	kind: 'simple' | 'pata';
+	commercial_unit_count: number;
+	barcode: string | null;
+	numbers: {
+		id: string;
+		number_value: number;
+		number_kind: 'base' | 'associated' | 'extraordinary';
+		source_base_number_id: string | null;
+		barcode: string | null;
+	}[];
+	groups: {
+		ungrouped_at: string | null;
+		member: Omit<DeliveryBondRow, 'groups'> | null;
+	}[];
+}
+
+function mapDeliveryBond(row: DeliveryBondRow): DeliveryNoteBond {
+	return {
+		id: row.id,
+		kind: row.kind,
+		commercialUnitCount: row.commercial_unit_count,
+		barcode: row.barcode,
+		numbers: (row.numbers ?? []).map((number) => ({
+			id: number.id,
+			value: number.number_value,
+			kind: number.number_kind,
+			sourceBaseNumberId: number.source_base_number_id,
+			barcode: number.barcode
+		})),
+		// Only the current members of a manual pata (an ungrouped membership is history).
+		members: (row.groups ?? []).flatMap((group) =>
+			group.member && group.ungrouped_at === null
+				? [mapDeliveryBond({ ...group.member, groups: [] })]
+				: []
+		)
+	};
+}
+
+/**
+ * Bonds on a note, including their participating numbers and barcodes. A manual pata exposes the
+ * numbers (and per-base barcode) of each leg, because it owns no numbers itself.
+ */
+export async function listDeliveryNoteBonds(
+	supabase: SupabaseClient,
+	noteId: string
+): Promise<RepositoryResult<DeliveryNoteBond[]>> {
+	const { data, error } = await supabase
+		.from('delivery_note_items')
+		.select(
+			'bond:bonds!delivery_note_items_bond_fkey(' +
+				'id, kind, commercial_unit_count, barcode, ' +
+				'numbers:bond_numbers(id, number_value, number_kind, source_base_number_id, barcode), ' +
+				'groups:bond_groups!bond_groups_pata_bond_id_fkey(ungrouped_at, ' +
+				'member:bonds!bond_groups_member_bond_id_fkey(id, kind, commercial_unit_count, barcode, ' +
+				'numbers:bond_numbers(id, number_value, number_kind, source_base_number_id, barcode)))' +
+				')'
+		)
+		.eq('delivery_note_id', noteId)
+		.overrideTypes<{ bond: DeliveryBondRow | null }[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		return {
+			data: (data ?? []).flatMap((item) => (item.bond ? [mapDeliveryBond(item.bond)] : [])),
+			error: null
+		};
+	} catch (cause) {
+		return { data: null, error: cause as Error };
+	}
+}
+
 /** Custody history of one bond, oldest first. */
 export async function listBondAssignments(
 	supabase: SupabaseClient,
