@@ -201,7 +201,7 @@ Rules (constraints and the `bonds_guard_write` trigger, for every role):
 
 - A simple bond is always `printed` and has `commercial_unit_count = 1`. A pata has `commercial_unit_count = N >= 2` (its number of base numbers) and is `printed` or `manual_grouping`.
 - `total_value = campaigns.simple_bond_value * commercial_unit_count`, checked on insert (`23514`). The rules it depends on are frozen once the campaign has bonds.
-- Bonds are created only while the campaign is `draft` or `active` (`55000` otherwise), in `available` (manual entry of simple bonds and printed patas) or `created` (reserved for Phase 4 imports), with `financial_status_snapshot = no_payments`.
+- Bonds are created only while the campaign is `draft` or `active` (`55000` otherwise), in `available` (manual entry of simple bonds and printed patas, and every bond created by an import), with `financial_status_snapshot = no_payments`. A bond with `import_session_id` cannot start in `created` (`23514`): `created` is reserved for future phases, not for imports.
 - `commercial_status` changes follow `docs/state-machines.md` (Bond), including `available -> annulled` for a bond loaded by mistake (`23514` otherwise). `annulled_at` and `annulled_from_status` are set by the database.
 - `id`, `campaign_id`, `kind`, `origin`, `commercial_unit_count`, `total_value`, `created_at`, `created_by` never change (`23001`).
 - `annulled` and `closed` bonds are immutable except for `financial_status_snapshot` (`55000`).
@@ -694,7 +694,7 @@ Rules (constraints and the `import_sessions_guard_write` trigger, for every role
 - `id`, `campaign_id`, `source_type`, `file_name`, `created_by`, `created_at` never change (`23001`).
 - Transitions (`23514` otherwise): `draft -> validated`, `validated -> draft`, `validated -> confirmed`, `draft|validated -> cancelled`, `draft|validated -> failed`.
 - `-> validated` needs at least one live (not removed) item and none `pending` or `error`; `-> validated` and `-> confirmed` need the campaign `draft` or `active` (`55000`).
-- `-> confirmed` needs every live item linked to its bond (`created_bond_id`). A validated session that already has bonds (inside the confirming transaction) cannot go back to draft, be cancelled or fail (`55000`).
+- `-> confirmed` needs every live item linked to the bond it created (`created_bond_id`) and that bond must be the right one: a `simple` item maps one-to-one to a simple bond whose `barcode` is the item barcode; all rows of a `grupo_pata` map to one printed pata with one row per unit and the `grupo_pata` as its barcode; no bond of the session can be left without a live item. Every bond must still be `available` and have its complete set of base and associated numbers (one per unit), with each row's `base_number` (and its `barcode` for a pata row) present on the base number (`55000` otherwise). A validated session that already has bonds (inside the confirming transaction) cannot go back to draft, be cancelled or fail (`55000`).
 - `confirmed`, `cancelled` and `failed` are final (`55000`). A confirmed session only accepts the rollback marker, once, when none of its bonds is still live (all annulled).
 - Never deleted: no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner (`23001`).
 

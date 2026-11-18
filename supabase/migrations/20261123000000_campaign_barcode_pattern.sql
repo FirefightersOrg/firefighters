@@ -53,8 +53,12 @@ revoke all on function public.campaign_barcode_pattern_valid(text)
 grant execute on function public.campaign_barcode_pattern_valid(text) to service_role;
 
 alter table public.campaigns
+  -- Any POSIX whitespace counts (tab, newline, ...), not just the ASCII space `btrim` removes;
+  -- this keeps the CHECK aligned with the `trim()` the form applies.
   add constraint campaigns_barcode_pattern_format check (
-    btrim(barcode_pattern) <> '' and barcode_pattern = btrim(barcode_pattern)
+    barcode_pattern <> ''
+      and barcode_pattern !~ '^[[:space:]]'
+      and barcode_pattern !~ '[[:space:]]$'
       and char_length(barcode_pattern) <= 200
   ),
   add constraint campaigns_barcode_pattern_mode check (
@@ -223,7 +227,8 @@ immutable
 set search_path = ''
 as $$
 declare
-  v_pattern text := nullif(btrim(p_pattern), '');
+  -- Trim every POSIX whitespace character, like the form's `trim()` (btrim only knows spaces).
+  v_pattern text := nullif(regexp_replace(p_pattern, '^[[:space:]]+|[[:space:]]+$', '', 'g'), '');
 begin
   if v_pattern is null then
     return null;

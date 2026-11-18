@@ -1,7 +1,7 @@
 -- SAN-44: import_sessions, import_session_items, campaigns.barcode_pattern, bonds.import_session_id,
 -- bond_numbers.barcode and the per-campaign barcode namespace; operator gets bond.scan.
 begin;
-select plan(145);
+select plan(156);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -98,6 +98,19 @@ create function pg_temp.base(p_bond uuid, p_value int, p_barcode text default nu
 returns uuid language sql as $$
   insert into public.bond_numbers (campaign_id, bond_id, number_value, number_kind, barcode)
   select b.campaign_id, b.id, p_value, 'base', p_barcode from public.bonds b where b.id = p_bond
+  returning id;
+$$;
+
+-- The associated number of a base number (base + campaign offset), as the owner.
+create function pg_temp.assoc(p_bond uuid, p_base_value int) returns uuid language sql as $$
+  insert into public.bond_numbers
+    (campaign_id, bond_id, number_value, number_kind, source_base_number_id)
+  select b.campaign_id, b.id, p_base_value + c.associated_number_offset, 'associated', n.id
+  from public.bonds b
+  join public.campaigns c on c.id = b.campaign_id
+  join public.bond_numbers n
+    on n.bond_id = b.id and n.number_value = p_base_value and n.number_kind = 'base'
+  where b.id = p_bond
   returning id;
 $$;
 
@@ -216,6 +229,14 @@ select throws_ok(
   $$update public.campaigns set barcode_pattern = ' ^(\d+)$' where id = pg_temp.id('c-pattern')$$,
   '23514', null, 'a pattern with surrounding whitespace is rejected by the CHECK'
 );
+select throws_ok(
+  $$update public.campaigns set barcode_pattern = chr(9) || '^(\d+)$' where id = pg_temp.id('c-pattern')$$,
+  '23514', null, 'a pattern with a leading tab is rejected by the CHECK'
+);
+select throws_ok(
+  $$update public.campaigns set barcode_pattern = '^(\d+)$' || chr(10) where id = pg_temp.id('c-pattern')$$,
+  '23514', null, 'a pattern with a trailing newline is rejected by the CHECK'
+);
 
 create function pg_temp.version_of(p_k text) returns timestamptz language sql stable as $$
   select updated_at from public.campaigns where id = pg_temp.id(p_k);
@@ -280,6 +301,16 @@ select throws_ok(
   $$select public.campaign_update_rules(pg_temp.id('c-active'), 60000, 10, 4, 9999, 4871, 'reject',
       'external_legacy_code', pg_temp.version_of('c-active'), null, null, '^X(\d+)$')$$,
   '55000', null, 'update_rules: the pattern cannot be set on an active campaign'
+);
+select is(
+  public.campaign_update_rules(pg_temp.id('c-pattern'), 60000, 10, 4, 9999, 4871, 'reject',
+    'internal_code', pg_temp.version_of('c-pattern'), 'req-pattern-tabs', null,
+    chr(9) || '^TAB(\d+)$' || chr(10)),
+  true, 'update_rules: a pattern with tabs/newlines is trimmed, not rejected'
+);
+select is(
+  (select barcode_pattern from public.campaigns where id = pg_temp.id('c-pattern')),
+  '^TAB(\d+)$', 'the pattern is stored without any surrounding whitespace'
 );
 select is(
   public.campaign_update_rules(pg_temp.id('c-pattern'), 60000, 10, 4, 9999, 4871, 'reject',
@@ -517,6 +548,23 @@ select is(
   (select status from public.import_sessions where id = pg_temp.id('s1')),
   'validated', 'linking items to their bonds keeps the session validated'
 );
+-- A confirmed import leaves its bonds complete: one base and one associated number per unit, with
+-- the item's barcode on the pata's base number.
+insert into ids select 'n-s1-simple-base', pg_temp.base(pg_temp.id('b-s1-simple'), 1);
+insert into ids select 'n-s1-simple-assoc', pg_temp.assoc(pg_temp.id('b-s1-simple'), 1);
+insert into ids select 'n-s1-pata-base-3', pg_temp.base(pg_temp.id('b-s1-pata'), 3, 'IT-3');
+insert into ids select 'n-s1-pata-assoc-3', pg_temp.assoc(pg_temp.id('b-s1-pata'), 3);
+insert into ids select 'n-s1-pata-base-4', pg_temp.base(pg_temp.id('b-s1-pata'), 4, 'IT-4');
+insert into ids select 'n-s1-pata-assoc-4', pg_temp.assoc(pg_temp.id('b-s1-pata'), 4);
+select throws_ok(
+  $$insert into public.bonds
+      (campaign_id, kind, origin, commercial_unit_count, total_value, barcode, commercial_status,
+       created_by, import_session_id)
+    values (pg_temp.id('c-draft'), 'simple', 'printed', 1, 60000, 'CREATED-IMPORT', 'created',
+      'b4400000-0000-0000-0000-000000000001', pg_temp.id('s1'))$$,
+  '23514', 'bonds created by an import must start as available (got created)',
+  'a bond linked to an import session cannot start in created'
+);
 select throws_ok(
   $$update public.import_session_items set raw_value = 'late edit' where id = pg_temp.id('i1')$$,
   '55000', null, 'an item linked to a bond cannot be edited'
@@ -596,6 +644,107 @@ select is(
 select throws_ok(
   $$update public.import_sessions set rollback_reason = 'again' where id = pg_temp.id('s1')$$,
   '55000', null, 'the rollback marker is set once'
+);
+
+-- ---------------------------------------------------------------------------
+-- Confirmation validates the item -> bond mapping and the bond completeness
+-- (SAN-44 review: the three P1s, each with a negative test)
+-- ---------------------------------------------------------------------------
+-- Two simple items cannot share one bond.
+insert into ids select 's6', pg_temp.session('c-draft');
+insert into ids select 'i6-1', pg_temp.item(pg_temp.id('s6'), 501);
+insert into ids select 'i6-2', pg_temp.item(pg_temp.id('s6'), 502);
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s6');
+insert into ids select 'b6', pg_temp.bond('c-draft', 1, 'IT-501', pg_temp.id('s6'));
+update public.import_session_items set created_bond_id = pg_temp.id('b6')
+where id in (pg_temp.id('i6-1'), pg_temp.id('i6-2'));
+insert into ids select 'n6-base', pg_temp.base(pg_temp.id('b6'), 501);
+insert into ids select 'n6-assoc', pg_temp.assoc(pg_temp.id('b6'), 501);
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s6')$$,
+  '55000', 'import session ' || pg_temp.id('s6') || ' has 1 simple bond(s) shared by more than one item',
+  'two simple items cannot share one bond'
+);
+
+-- A printed pata without its base and associated numbers cannot be confirmed.
+insert into ids select 's7', pg_temp.session('c-draft');
+insert into ids select 'i7-1', pg_temp.item(pg_temp.id('s7'), 503, 'valid', 'pata', 'P7');
+insert into ids select 'i7-2', pg_temp.item(pg_temp.id('s7'), 504, 'valid', 'pata', 'P7');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s7');
+insert into ids select 'b7', pg_temp.bond('c-draft', 2, 'P7', pg_temp.id('s7'));
+update public.import_session_items set created_bond_id = pg_temp.id('b7')
+where id in (pg_temp.id('i7-1'), pg_temp.id('i7-2'));
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s7')$$,
+  '55000', 'import session ' || pg_temp.id('s7') || ' has 1 bond(s) without a complete set of base and associated numbers',
+  'a pata without numbers cannot be confirmed'
+);
+
+-- A bond attached to the session but not linked to any live item blocks the confirmation.
+insert into ids select 's8', pg_temp.session('c-draft');
+insert into ids select 'i8-1', pg_temp.item(pg_temp.id('s8'), 505);
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s8');
+insert into ids select 'b8', pg_temp.bond('c-draft', 1, 'IT-505', pg_temp.id('s8'));
+insert into ids select 'b8-orphan', pg_temp.bond('c-draft', 1, 'ORPHAN-8', pg_temp.id('s8'));
+update public.import_session_items set created_bond_id = pg_temp.id('b8') where id = pg_temp.id('i8-1');
+insert into ids select 'n8-base', pg_temp.base(pg_temp.id('b8'), 505);
+insert into ids select 'n8-assoc', pg_temp.assoc(pg_temp.id('b8'), 505);
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s8')$$,
+  '55000', 'import session ' || pg_temp.id('s8') || ' has 1 bond(s) not linked to a live item',
+  'a bond of the session without a live item blocks the confirmation'
+);
+
+-- Two grupos_pata cannot share one pata bond.
+insert into ids select 's9', pg_temp.session('c-draft');
+insert into ids select 'i9-1', pg_temp.item(pg_temp.id('s9'), 506, 'valid', 'pata', 'P9A');
+insert into ids select 'i9-2', pg_temp.item(pg_temp.id('s9'), 507, 'valid', 'pata', 'P9B');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s9');
+insert into ids select 'b9', pg_temp.bond('c-draft', 2, 'P9', pg_temp.id('s9'));
+update public.import_session_items set created_bond_id = pg_temp.id('b9')
+where id in (pg_temp.id('i9-1'), pg_temp.id('i9-2'));
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s9')$$,
+  '55000', 'import session ' || pg_temp.id('s9') || ' has 1 pata bond(s) shared by more than one group',
+  'two grupos_pata cannot share one pata bond'
+);
+
+-- A pata group must have exactly one row per unit.
+insert into ids select 's10', pg_temp.session('c-draft');
+insert into ids select 'i10-1', pg_temp.item(pg_temp.id('s10'), 508, 'valid', 'pata', 'P10');
+insert into ids select 'i10-2', pg_temp.item(pg_temp.id('s10'), 509, 'valid', 'pata', 'P10');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s10');
+insert into ids select 'b10', pg_temp.bond('c-draft', 3, 'P10', pg_temp.id('s10'));
+update public.import_session_items set created_bond_id = pg_temp.id('b10')
+where id in (pg_temp.id('i10-1'), pg_temp.id('i10-2'));
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s10')$$,
+  '55000', 'import session ' || pg_temp.id('s10') || ' has 1 pata group(s) whose bond is incomplete or has a different barcode',
+  'a pata bond needs one row per unit'
+);
+
+-- Each pata row's barcode must be on its base number.
+insert into ids select 's11', pg_temp.session('c-draft');
+insert into ids select 'i11-1', pg_temp.item(pg_temp.id('s11'), 511, 'valid', 'pata', 'P11');
+insert into ids select 'i11-2', pg_temp.item(pg_temp.id('s11'), 512, 'valid', 'pata', 'P11');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s11');
+insert into ids select 'b11', pg_temp.bond('c-draft', 2, 'P11', pg_temp.id('s11'));
+update public.import_session_items set created_bond_id = pg_temp.id('b11')
+where id in (pg_temp.id('i11-1'), pg_temp.id('i11-2'));
+insert into ids select 'n11-base-1', pg_temp.base(pg_temp.id('b11'), 511, 'WRONG-511');
+insert into ids select 'n11-assoc-1', pg_temp.assoc(pg_temp.id('b11'), 511);
+insert into ids select 'n11-base-2', pg_temp.base(pg_temp.id('b11'), 512, 'IT-512');
+insert into ids select 'n11-assoc-2', pg_temp.assoc(pg_temp.id('b11'), 512);
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s11')$$,
+  '55000', 'import session ' || pg_temp.id('s11') || ' has 1 item(s) whose base number or barcode was not created',
+  'a pata row whose base number barcode differs blocks the confirmation'
 );
 
 -- Cancel and fail.

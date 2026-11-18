@@ -215,8 +215,10 @@ const rulesShape = {
 	barcodePattern: z
 		.string()
 		.trim()
-		.max(
-			BARCODE_PATTERN_MAX_LENGTH,
+		// Count code points, like Postgres `char_length`, not UTF-16 code units: an emoji is one
+		// character in the database but two in JavaScript.
+		.refine(
+			(value) => [...value].length <= BARCODE_PATTERN_MAX_LENGTH,
 			`Barcode pattern must be at most ${BARCODE_PATTERN_MAX_LENGTH} characters`
 		)
 		.optional()

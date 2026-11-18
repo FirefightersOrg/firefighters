@@ -108,7 +108,7 @@ Rules:
 
 - A session is created in `draft`, only for a `draft` or `active` campaign.
 - Validating requires at least one live item and no item `pending` or in `error` (erroneous rows are fixed or soft-removed first). Adding or editing items of a `validated` session returns it to `draft`.
-- Confirming requires a `draft`/`active` campaign and every live item linked to the bond it created; bonds are created (as `available`) only in the confirming transaction.
+- Confirming requires a `draft`/`active` campaign and every live item linked to the bond it created: a `simple` item maps one-to-one to a simple bond, all rows of a `grupo_pata` map to one printed pata with one row per unit, and no bond of the session is left unlinked. Every bond must be `available` with a complete set of base and associated numbers (one per unit) and the base number (and pata barcode) announced by each row. Bonds are created (as `available`) only in the confirming transaction; an import bond cannot start in `created`.
 - `confirmed`, `cancelled` and `failed` are final. A confirmed import is never deleted: its functional rollback annuls its bonds (SAN-47) and then records `rolled_back_at`, `rolled_back_by` and a reason on the still-confirmed session.
 - Cancelling records who cancelled (reason optional); failing records the failure reason.
 

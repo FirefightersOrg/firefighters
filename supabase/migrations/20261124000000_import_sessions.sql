@@ -20,10 +20,15 @@
 --   * A session is created only for a draft or active campaign; validating and confirming also
 --     require it (campaign locked FOR SHARE).
 --   * validated requires at least one live (not removed) item and none pending or in error.
---     confirmed requires every live item to point to the bond it created (created_bond_id).
+--     confirmed requires every live item to point to the bond it created (created_bond_id) and
+--     that the bond is the right one: a simple item maps one-to-one to a simple bond, all the rows
+--     of a grupo_pata map to one printed pata with one row per unit, no bond of the session is left
+--     unlinked, and every bond is `available` with its complete set of base and associated numbers
+--     (each row's base number and barcode actually exists).
 --   * Bonds are created only on confirmation, directly as `available`, with import_session_id
 --     (immutable) set; a bond can be attached to a session only while the session is validated
---     (SAN-47 inserts the bonds, links the items and then confirms, in one transaction).
+--     (SAN-47 inserts the bonds, links the items and then confirms, in one transaction). An import
+--     bond cannot start in `created`: the guard rejects it on insert.
 --   * A pata imported from rows sharing grupo_pata stores grupo_pata as the pata bond's barcode
 --     and each row's barcode on its base number (bond_numbers.barcode, base numbers only).
 --   * One barcode namespace per campaign: a code cannot be held by two live things among
@@ -396,12 +401,166 @@ begin
   end if;
 
   if new.status = 'confirmed' then
+    -- Keep the session's bonds stable while validating them: a concurrent annulment or barcode
+    -- change of one of them cannot interleave with the confirmation.
+    perform 1 from public.bonds b
+    where b.import_session_id = old.id
+    order by b.id
+    for share;
+
+    -- Every live item must point to the bond it created (the composite FK keeps it in this
+    -- session; the checks below make sure it is the right shape and that the bond is complete).
     select count(*) into v_count
     from public.import_session_items i
     where i.import_session_id = old.id and i.removed_at is null and i.created_bond_id is null;
     if v_count > 0 then
       raise exception 'import session % has % item(s) without a created bond', old.id, v_count
         using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- A simple item needs a simple bond; a pata row needs a printed pata.
+    select count(*) into v_count
+    from public.import_session_items i
+    join public.bonds b on b.id = i.created_bond_id
+    where i.import_session_id = old.id and i.removed_at is null
+      and (
+        (i.item_type = 'simple' and b.kind <> 'simple')
+        or (i.item_type = 'pata' and (b.kind <> 'pata' or b.origin <> 'printed'))
+      );
+    if v_count > 0 then
+      raise exception 'import session % has % item(s) linked to a bond of the wrong kind', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state',
+          hint = 'a simple item maps to a simple bond; a grupo_pata maps to one printed pata';
+    end if;
+
+    -- A simple item maps one-to-one to its bond (no two simple rows share a bond).
+    select count(*) into v_count
+    from (
+      select i.created_bond_id
+      from public.import_session_items i
+      where i.import_session_id = old.id and i.removed_at is null and i.item_type = 'simple'
+      group by i.created_bond_id
+      having count(*) <> 1
+    ) g;
+    if v_count > 0 then
+      raise exception 'import session % has % simple bond(s) shared by more than one item', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- All the rows of one grupo_pata share exactly one bond.
+    select count(*) into v_count
+    from (
+      select i.group_key
+      from public.import_session_items i
+      where i.import_session_id = old.id and i.removed_at is null and i.item_type = 'pata'
+      group by i.group_key
+      having count(distinct i.created_bond_id) <> 1
+    ) g;
+    if v_count > 0 then
+      raise exception 'import session % has % pata group(s) split across bonds', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- And one pata bond holds exactly one grupo_pata.
+    select count(*) into v_count
+    from (
+      select i.created_bond_id
+      from public.import_session_items i
+      where i.import_session_id = old.id and i.removed_at is null and i.item_type = 'pata'
+      group by i.created_bond_id
+      having count(distinct i.group_key) <> 1
+    ) g;
+    if v_count > 0 then
+      raise exception 'import session % has % pata bond(s) shared by more than one group', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- The pata has one row per unit and its barcode is the grupo_pata.
+    select count(*) into v_count
+    from (
+      select i.group_key, i.created_bond_id, count(*) as items
+      from public.import_session_items i
+      where i.import_session_id = old.id and i.removed_at is null and i.item_type = 'pata'
+      group by i.group_key, i.created_bond_id
+    ) g
+    join public.bonds b on b.id = g.created_bond_id
+    where b.commercial_unit_count <> g.items
+      or b.barcode is distinct from g.group_key;
+    if v_count > 0 then
+      raise exception 'import session % has % pata group(s) whose bond is incomplete or has a different barcode', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state',
+          hint = 'the pata bond needs one row per unit and its barcode must be the grupo_pata';
+    end if;
+
+    -- A simple bond carries the item barcode.
+    select count(*) into v_count
+    from public.import_session_items i
+    join public.bonds b on b.id = i.created_bond_id
+    where i.import_session_id = old.id and i.removed_at is null and i.item_type = 'simple'
+      and b.barcode is distinct from i.barcode;
+    if v_count > 0 then
+      raise exception 'import session % has % simple item(s) whose bond barcode differs from the item barcode', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- A bond cannot be attached to the session without a live item: the confirmation certifies
+    -- every bond it leaves behind.
+    select count(*) into v_count
+    from public.bonds b
+    where b.import_session_id = old.id
+      and not exists (
+        select 1 from public.import_session_items i
+        where i.created_bond_id = b.id and i.removed_at is null
+      );
+    if v_count > 0 then
+      raise exception 'import session % has % bond(s) not linked to a live item', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- Every bond of the import must still be available (never created/annulled).
+    select count(*) into v_count
+    from public.bonds b
+    where b.import_session_id = old.id and b.commercial_status <> 'available';
+    if v_count > 0 then
+      raise exception 'import session % has % bond(s) that are not available', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state';
+    end if;
+
+    -- Each unit needs its base and associated number (the pata without numbers case).
+    select count(*) into v_count
+    from public.bonds b
+    where b.import_session_id = old.id
+      and (
+        (select count(*) from public.bond_numbers n
+         where n.bond_id = b.id and n.number_kind = 'base' and n.released_at is null)
+          <> b.commercial_unit_count
+        or (select count(*) from public.bond_numbers n
+            where n.bond_id = b.id and n.number_kind = 'associated' and n.released_at is null)
+          <> b.commercial_unit_count
+      );
+    if v_count > 0 then
+      raise exception 'import session % has % bond(s) without a complete set of base and associated numbers', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state',
+          hint = 'create one base and one associated number per unit before confirming';
+    end if;
+
+    -- The numbers must be the ones the rows announced: each item's base number, and for a pata
+    -- row its barcode on that base number.
+    select count(*) into v_count
+    from public.import_session_items i
+    where i.import_session_id = old.id and i.removed_at is null
+      and not exists (
+        select 1 from public.bond_numbers n
+        where n.bond_id = i.created_bond_id
+          and n.number_kind = 'base'
+          and n.released_at is null
+          and n.number_value = i.base_number
+          and (i.item_type <> 'pata' or n.barcode is not distinct from i.barcode)
+      );
+    if v_count > 0 then
+      raise exception 'import session % has % item(s) whose base number or barcode was not created', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state',
+          hint = 'create the base number (and its barcode for a pata row) before confirming';
     end if;
   end if;
 
@@ -545,6 +704,12 @@ begin
   end if;
 
   if new.import_session_id is not null then
+    -- Imports create definitive data directly as `available`: a bond that starts in `created`
+    -- (reserved for future phases) must never be left behind by a confirmed import.
+    if new.commercial_status <> 'available' then
+      raise exception 'bonds created by an import must start as available (got %)', new.commercial_status
+        using errcode = 'check_violation';
+    end if;
     select s.status into v_session_status
     from public.import_sessions s
     where s.id = new.import_session_id

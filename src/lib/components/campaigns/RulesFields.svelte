@@ -2,7 +2,6 @@
 	import {
 		BARCODE_MODE_LABELS,
 		BARCODE_MODES,
-		BARCODE_PATTERN_MAX_LENGTH,
 		barcodeModeUsesPattern
 	} from '$lib/domain/campaigns';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
@@ -69,7 +68,6 @@
 				id="barcodePattern"
 				name="barcodePattern"
 				type="text"
-				maxlength={BARCODE_PATTERN_MAX_LENGTH}
 				autocomplete="off"
 				spellcheck="false"
 				placeholder="^BC-(\d+)$"

@@ -92,6 +92,27 @@ describe('campaignCreateSchema', () => {
 		}
 	});
 
+	it('counts the barcode pattern in code points, like Postgres (SAN-44)', () => {
+		// 101 emoji + "(\d+)" is 106 code points but 209 UTF-16 units: the database accepts it,
+		// so the client must accept it too.
+		const emojiHeavy = `${'😀'.repeat(101)}(\\d+)`;
+		expect([...emojiHeavy].length).toBe(106);
+		const parsed = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: emojiHeavy
+		});
+		expect(parsed.barcodePattern).toBe(emojiHeavy);
+		const tooLong = campaignCreateSchema.safeParse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: `${'😀'.repeat(201)}(\\d+)`
+		});
+		expect(tooLong.success).toBe(false);
+	});
+
 	it('allows a draft without dates', () => {
 		const result = campaignCreateSchema.parse({ ...general, startsOn: '', endsOn: '', ...rules });
 		expect(result.startsAt).toBeNull();
