@@ -208,12 +208,23 @@ export interface ImportSessionSummary extends ImportSummary {
 	removedItems: number;
 	/** Only from `import_session_validate`: whether this call moved the session to validated. */
 	validated?: boolean;
+	/** Only from `import_session_add_scan`: the row this scan staged (SAN-46). */
+	itemId?: string;
+	rowNumber?: number;
 }
 
 const SUMMARY_COUNTS: Record<
 	Exclude<
 		keyof ImportSessionSummary,
-		'sessionId' | 'campaignId' | 'sourceType' | 'fileName' | 'status' | 'valid' | 'validated'
+		| 'sessionId'
+		| 'campaignId'
+		| 'sourceType'
+		| 'fileName'
+		| 'status'
+		| 'valid'
+		| 'validated'
+		| 'itemId'
+		| 'rowNumber'
 	>,
 	string
 > = {
@@ -266,6 +277,8 @@ export function mapImportSummary(data: unknown): ImportSessionSummary | null {
 		summary[key] = value;
 	}
 	if (validated !== undefined) summary.validated = validated;
+	if (typeof raw.item_id === 'string') summary.itemId = raw.item_id;
+	if (typeof raw.row_number === 'number') summary.rowNumber = raw.row_number;
 	return summary;
 }
 

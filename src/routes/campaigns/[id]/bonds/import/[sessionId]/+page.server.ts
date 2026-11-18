@@ -19,7 +19,9 @@ import {
 	type ImportFormName,
 	type ImportFormResult
 } from '$lib/server/imports/route-helpers';
+import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
+	getImportItem,
 	getImportSession,
 	listImportItems,
 	type ImportSession
@@ -126,7 +128,8 @@ function failLoad(locals: App.Locals, sessionId: string, err: unknown): never {
  */
 async function sessionForAction(
 	event: RequestEvent,
-	form: ImportFormName
+	form: ImportFormName,
+	options: { openCampaign?: boolean } = {}
 ): Promise<{ session: ImportSession } | { failure: ReturnType<typeof importFormFailure> }> {
 	const { locals, params, url } = event;
 	// Either import permission lets the session be read; its own permission is checked below.
@@ -151,7 +154,42 @@ async function sessionForAction(
 	if (!hasPermissionIn(locals.permissions, importSessionPermission(result.data.sourceType))) {
 		return { failure: importFormFailure(form, 403, IMPORT_MESSAGES.permission) };
 	}
+	if (options.openCampaign) {
+		// Same guard as the upload: rows of a campaign that no longer accepts bonds are not edited.
+		const campaign = await getCampaignById(locals.supabase, params.id);
+		if (campaign.error) {
+			console.error('[imports] campaign lookup failed', {
+				requestId: locals.requestId,
+				campaignId: params.id,
+				error: campaign.error
+			});
+			return { failure: importFormFailure(form, 500, IMPORT_MESSAGES.internal) };
+		}
+		if (campaign.data && !canLoadBonds(campaign.data.status)) {
+			return {
+				failure: importFormFailure(form, 409, campaignLockedMessage(campaign.data.status))
+			};
+		}
+	}
 	return { session: result.data };
+}
+
+/** The row must belong to the session of the URL (else 404, nothing is written). */
+async function itemOfSession(
+	locals: App.Locals,
+	session: ImportSession,
+	itemId: string
+): Promise<'ok' | 'missing' | 'error'> {
+	const item = await getImportItem(locals.supabase, itemId);
+	if (item.error) {
+		console.error('[imports] row lookup failed', {
+			requestId: locals.requestId,
+			itemId,
+			error: item.error
+		});
+		return 'error';
+	}
+	return item.data && item.data.sessionId === session.id ? 'ok' : 'missing';
 }
 
 const ctxOf = (locals: App.Locals) => ({
@@ -172,7 +210,7 @@ function fieldErrors(issues: readonly { path: PropertyKey[]; message: string }[]
 export const actions: Actions = {
 	/** Retype the fields of one row (also clears a parser error) and revalidate. */
 	update: async (event) => {
-		const found = await sessionForAction(event, 'update');
+		const found = await sessionForAction(event, 'update', { openCampaign: true });
 		if ('failure' in found) return found.failure;
 
 		const formData = await event.request.formData();
@@ -188,6 +226,12 @@ export const actions: Actions = {
 			const errors = fieldErrors(parsed.error.issues);
 			if (errors.itemId) return importFormFailure('update', 404, IMPORT_MESSAGES.itemNotFound);
 			return importFormFailure('update', 400, FIX_FIELDS, { errors, itemId, values });
+		}
+		const owned = await itemOfSession(event.locals, found.session, itemId);
+		if (owned !== 'ok') {
+			return owned === 'error'
+				? importFormFailure('update', 500, IMPORT_MESSAGES.internal, { itemId, values })
+				: importFormFailure('update', 404, IMPORT_MESSAGES.itemNotFound, { itemId });
 		}
 
 		try {
@@ -211,12 +255,18 @@ export const actions: Actions = {
 
 	/** Soft-remove a row (kept as history) and revalidate. */
 	remove: async (event) => {
-		const found = await sessionForAction(event, 'remove');
+		const found = await sessionForAction(event, 'remove', { openCampaign: true });
 		if ('failure' in found) return found.failure;
 		const formData = await event.request.formData();
 		const itemId = textField(formData, 'itemId') ?? '';
 		const reason = textField(formData, 'reason');
 		if (!isUuid(itemId)) return importFormFailure('remove', 404, IMPORT_MESSAGES.itemNotFound);
+		const owned = await itemOfSession(event.locals, found.session, itemId);
+		if (owned !== 'ok') {
+			return owned === 'error'
+				? importFormFailure('remove', 500, IMPORT_MESSAGES.internal, { itemId })
+				: importFormFailure('remove', 404, IMPORT_MESSAGES.itemNotFound, { itemId });
+		}
 		if (reason && reason.length > IMPORT_REASON_MAX_LENGTH) {
 			return importFormFailure(
 				'remove',

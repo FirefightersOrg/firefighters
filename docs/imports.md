@@ -265,6 +265,10 @@ Built on the app layer above (SAN-98); they add no parsing or validation of thei
 - `/campaigns/[id]/bonds/import` uploads a `.csv` or `.xlsx` file through `stageImportFile`
   (up to 5 MB) and lists the campaign's file imports. A file that cannot be read is reported on
   the file field before any session is opened.
+  The upload goes through the request body, so the deployment must accept at least ~6 MB:
+  `adapter-auto` leaves the limit to the platform (adapter-node defaults to 512K and needs
+  `BODY_SIZE_LIMIT=6M`, see `.env.example`; Vercel caps bodies near 4.5 MB). With a smaller limit
+  the platform answers 413 before the app can explain the 5 MB rule.
 - `/campaigns/[id]/bonds/scan` stages one code per scan into an open `barcode_scan` session
   (`?session=`). Enter or Tab sends the code; the field is cleared at once (so a fast scanner never
   loses the next code) and refocused, and a beep plus a coloured frame say whether the code was

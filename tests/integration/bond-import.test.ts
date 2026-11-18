@@ -426,4 +426,147 @@ describe('bond imports (local Supabase)', () => {
 		);
 		expect(result.status).toBe(404);
 	});
+
+	// Review on #39 ---------------------------------------------------------------------------
+
+	async function newCampaign(label: string): Promise<string> {
+		const { data, error } = await admin.client.rpc('campaign_create', {
+			p_name: `[it-bond-import ${RUN_ID}] ${label}`,
+			p_simple_bond_value: '60000.00',
+			p_installment_count: 10,
+			p_number_digits: 4,
+			p_max_number: 9999,
+			p_associated_number_offset: 4871,
+			p_overflow_policy: 'reject',
+			p_barcode_mode: 'base_number',
+			p_request_id: rid(`campaign-${label}`)
+		});
+		if (error) throw new Error(`campaign_create failed: ${error.message}`);
+		return data as string;
+	}
+
+	function scanIn(caller: Caller, campaign: string, sessionId: string, barcode: string) {
+		return run(
+			scanActions.scan as (e: never) => unknown,
+			event(caller, { id: campaign }, '/bonds/scan', {
+				action: 'scan',
+				body: form({ sessionId, barcode })
+			})
+		);
+	}
+
+	async function startScanIn(campaign: string): Promise<string> {
+		const started = await run(
+			scanActions.start as (e: never) => unknown,
+			event(operator, { id: campaign }, '/bonds/scan', { action: 'start', body: form({}) })
+		);
+		return /session=([0-9a-f-]{36})$/.exec(started.redirect ?? '')![1];
+	}
+
+	it('concurrent scans each report their own staged row', async () => {
+		const campaign = await newCampaign('Concurrent scans');
+		const session = await startScanIn(campaign);
+		const results = await Promise.all(
+			['0201', 'BAD-1', '0202', 'BAD-2', '0203'].map((code) =>
+				scanIn(operator, campaign, session, code)
+			)
+		);
+		for (const [i, code] of ['0201', 'BAD-1', '0202', 'BAD-2', '0203'].entries()) {
+			const scanned = results[i].scanned as { barcode: string; status: string } | null;
+			expect(scanned?.barcode).toBe(code);
+			expect(results[i].success).toBe(!code.startsWith('BAD'));
+		}
+	});
+
+	it('a correction keeps the campaign barcode rule', async () => {
+		const campaign = await newCampaign('Correction rule');
+		const file = new File(
+			['tipo_bono,grupo_pata,numero_base,barcode\nsimple,,0300,0300\n'],
+			'r.csv'
+		);
+		const uploaded = await run(
+			importActions.upload as (e: never) => unknown,
+			event(operator, { id: campaign }, '/bonds/import', {
+				action: 'upload',
+				body: form({ file, notes: '' })
+			})
+		);
+		const sessionId = /\/bonds\/import\/([0-9a-f-]{36})$/.exec(uploaded.redirect ?? '')![1];
+		const act = (action: keyof typeof previewActions, fields: Record<string, string>) =>
+			run(
+				previewActions[action] as (e: never) => unknown,
+				event(operator, { id: campaign, sessionId }, `/bonds/import/${sessionId}`, {
+					action,
+					body: form(fields)
+				})
+			);
+		const { data: items } = await serviceClient
+			.from('import_session_items')
+			.select('id')
+			.eq('import_session_id', sessionId);
+		const itemId = items![0].id as string;
+
+		// base_number campaign: barcode 0300 with base 301 is a mismatch, not a valid row.
+		const mismatch = await act('update', {
+			itemId,
+			itemType: 'simple',
+			baseNumber: '0301',
+			barcode: '0300'
+		});
+		expect(mismatch).toMatchObject({ success: true, summary: { errors: 1 } });
+		const { data: row } = await serviceClient
+			.from('import_session_items')
+			.select('error_code')
+			.eq('id', itemId)
+			.single();
+		expect(row?.error_code).toBe('parse_base_number_mismatch');
+
+		// A row of another session cannot be corrected or removed from this URL.
+		const other = await startScanIn(campaign);
+		await scanIn(operator, campaign, other, '0400');
+		const { data: foreign } = await serviceClient
+			.from('import_session_items')
+			.select('id')
+			.eq('import_session_id', other)
+			.single();
+		const crossUpdate = await act('update', {
+			itemId: foreign!.id as string,
+			itemType: 'simple',
+			baseNumber: '0401',
+			barcode: '0401'
+		});
+		expect(crossUpdate.status).toBe(404);
+		const crossRemove = await act('remove', { itemId: foreign!.id as string });
+		expect(crossRemove.status).toBe(404);
+	});
+
+	it('scanning and row edits stop once the campaign no longer accepts bonds', async () => {
+		const campaign = await newCampaign('Closing scans');
+		const session = await startScanIn(campaign);
+		await scanIn(operator, campaign, session, '0500');
+		// Activating needs both dates (campaign rule), then active -> closing.
+		for (const change of [
+			{ starts_at: '2026-03-01T03:00:00Z', ends_at: '2026-12-31T03:00:00Z' },
+			{ status: 'active' },
+			{ status: 'closing' }
+		]) {
+			const { error } = await serviceClient.from('campaigns').update(change).eq('id', campaign);
+			if (error) throw new Error(`campaign update failed: ${error.message}`);
+		}
+		const scan = await scanIn(operator, campaign, session, '0501');
+		expect(scan.status).toBe(409);
+		const { data: item } = await serviceClient
+			.from('import_session_items')
+			.select('id')
+			.eq('import_session_id', session)
+			.single();
+		const remove = await run(
+			previewActions.remove as (e: never) => unknown,
+			event(operator, { id: campaign, sessionId: session }, `/bonds/import/${session}`, {
+				action: 'remove',
+				body: form({ itemId: item!.id as string })
+			})
+		);
+		expect(remove.status).toBe(409);
+	});
 });

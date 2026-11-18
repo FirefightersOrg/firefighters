@@ -18,7 +18,7 @@ import {
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
 	getImportSession,
-	getLastImportItem,
+	getImportItem,
 	listImportItems,
 	listImportSessions
 } from '$lib/server/repositories/imports';
@@ -170,6 +170,11 @@ export const actions: Actions = {
 			return importFormFailure('scan', 500, IMPORT_MESSAGES.internal, { values });
 		}
 		if (!campaignResult.data) return importFormFailure('scan', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!canLoadBonds(campaignResult.data.status)) {
+			return importFormFailure('scan', 409, campaignLockedMessage(campaignResult.data.status), {
+				values
+			});
+		}
 		if (
 			!sessionResult.data ||
 			sessionResult.data.campaignId !== params.id ||
@@ -188,15 +193,20 @@ export const actions: Actions = {
 			return importServiceFailure('scan', err, { values });
 		}
 
-		const last = await getLastImportItem(locals.supabase, sessionId);
-		if (last.error) {
-			console.error('[imports] last scan lookup failed', {
-				requestId: locals.requestId,
-				sessionId,
-				error: last.error
-			});
+		// The row this request staged (returned by the database), never "the session's last row":
+		// a fast scanner sends the next code before this answer arrives.
+		let scanned = null;
+		if (summary.itemId) {
+			const staged = await getImportItem(locals.supabase, summary.itemId);
+			if (staged.error) {
+				console.error('[imports] scanned row lookup failed', {
+					requestId: locals.requestId,
+					sessionId,
+					error: staged.error
+				});
+			}
+			scanned = staged.data ?? null;
 		}
-		const scanned = last.data ?? null;
 		const result: ImportFormResult = {
 			form: 'scan',
 			success: scanned?.status !== 'error',

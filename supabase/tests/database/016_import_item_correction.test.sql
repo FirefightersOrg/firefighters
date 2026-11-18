@@ -1,6 +1,6 @@
 -- SAN-46: correcting a staged import row (import_session_update_item).
 begin;
-select plan(22);
+select plan(30);
 
 -- auth ids / profiles: ...01 admin, ...02 operator, ...03 treasurer
 insert into auth.users (id, email)
@@ -43,15 +43,22 @@ create function pg_temp.item(p_session text, p_row int) returns uuid language sq
 $$;
 grant execute on function pg_temp.item(text, int) to authenticated, anon, service_role;
 
--- Campaign: 4 digits, max 9999, offset 4871 (highest base: 5128).
+-- Campaigns: 4 digits, max 9999, offset 4871 (highest base: 5128). 'c' uses manual_mapping (no
+-- barcode rule, so the free-form codes below are fine); 'cb' and 'cp' check the barcode rules.
 with c as (
   insert into public.campaigns
-    (name, simple_bond_value, installment_count, installment_value, barcode_mode,
+    (name, simple_bond_value, installment_count, installment_value, barcode_mode, barcode_pattern,
      starts_at, ends_at)
-  values ('Correct', 60000, 10, 6000, 'base_number', '2026-03-01 00:00-03', '2026-12-31 23:59:59-03')
-  returning id
+  select v.name, 60000, 10, 6000, v.mode, v.pattern, '2026-03-01 00:00-03', '2026-12-31 23:59:59-03'
+  from (values
+    ('c', 'Correct', 'manual_mapping', null),
+    ('cb', 'Base', 'base_number', null),
+    ('cp', 'Pattern', 'internal_code', '^IT-([0-9]{4})$')
+  ) as v (k, name, mode, pattern)
+  returning id, name
 )
-insert into ids select 'c', id from c;
+insert into ids
+select case name when 'Correct' then 'c' when 'Base' then 'cb' else 'cp' end, id from c;
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -187,6 +194,63 @@ select is(
   (select (old_value ->> 'row_number') || ':' || (new_value ->> 'item_id')
    from public.audit_log where action = 'import.update_item' and request_id = 'req-fix'),
   '3:' || pg_temp.item('s1', 3)::text, 'the audit entry names the corrected row'
+);
+
+-- ---------------------------------------------------------------------------
+-- The campaign's barcode rule is applied again on correction (review on #39)
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+select pg_temp.act_as(2);
+insert into ids select 'sb', public.import_session_create(pg_temp.id('cb'), 'csv_file', 'base.csv');
+select public.import_session_add_items(pg_temp.id('sb'),
+  '[{"row_number":2,"item_type":"simple","base_number":30,"barcode":"0030"}]'::jsonb);
+select public.import_session_update_item(pg_temp.item('sb', 2), 'simple', null, 31, '0030');
+select is(
+  (select status || ':' || error_code from public.import_session_items where id = pg_temp.item('sb', 2)),
+  'error:parse_base_number_mismatch',
+  'base_number mode: a code that is not the typed number stays a parse error'
+);
+select public.import_session_update_item(pg_temp.item('sb', 2), 'simple', null, 31, 'X-31');
+select is(
+  (select error_code from public.import_session_items where id = pg_temp.item('sb', 2)),
+  'parse_code_not_a_number', 'base_number mode: a code that is not a number stays a parse error'
+);
+select public.import_session_update_item(pg_temp.item('sb', 2), 'simple', null, 31, '0031');
+select is(
+  (select status from public.import_session_items where id = pg_temp.item('sb', 2)),
+  'valid', 'base_number mode: a matching code and number are valid'
+);
+
+insert into ids select 'sp', public.import_session_create(pg_temp.id('cp'), 'csv_file', 'pattern.csv');
+select public.import_session_add_items(pg_temp.id('sp'),
+  '[{"row_number":2,"item_type":"simple","base_number":40,"barcode":"IT-0040"}]'::jsonb);
+select public.import_session_update_item(pg_temp.item('sp', 2), 'simple', null, 40, 'ZZ');
+select is(
+  (select error_code from public.import_session_items where id = pg_temp.item('sp', 2)),
+  'parse_code_not_recognized', 'pattern mode: a code that does not match the pattern stays a parse error'
+);
+select public.import_session_update_item(pg_temp.item('sp', 2), 'simple', null, 41, 'IT-0040');
+select is(
+  (select error_code from public.import_session_items where id = pg_temp.item('sp', 2)),
+  'parse_base_number_mismatch', 'pattern mode: the captured number must be the typed number'
+);
+select public.import_session_update_item(pg_temp.item('sp', 2), 'simple', null, 41, 'IT-0041');
+select is(
+  (select status from public.import_session_items where id = pg_temp.item('sp', 2)),
+  'valid', 'pattern mode: a matching code is valid'
+);
+
+-- import_session_add_scan returns the row it staged (concurrent scans report their own row).
+insert into ids select 'ss', public.import_session_create(pg_temp.id('cb'), 'barcode_scan');
+create temporary table scan_result as
+  select public.import_session_add_scan(pg_temp.id('ss'), '0050') as r;
+select is(
+  (select (r ->> 'item_id')::uuid from scan_result), pg_temp.item('ss', 1),
+  'add_scan returns the id of the staged row'
+);
+select is(
+  (select (r ->> 'row_number')::int || ':' || (r ->> 'status') from scan_result), '1:draft',
+  'add_scan returns the row number together with the summary'
 );
 
 select * from finish();
