@@ -318,7 +318,9 @@ describe('Phase 1 end-to-end acceptance (local Supabase)', () => {
 		});
 
 		it('getUserPermissions returns every permission for the admin', async () => {
-			expect([...(await getUserPermissions(admin.client))].sort()).toEqual(sortedPermissionCodes);
+			const permissions = await getUserPermissions(admin.client);
+			expect(permissions).not.toBeNull();
+			expect([...(permissions ?? [])].sort()).toEqual(sortedPermissionCodes);
 		});
 
 		it('has_permission_for_user works for service_role and is denied (42501) to authenticated', async () => {

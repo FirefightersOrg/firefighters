@@ -24,7 +24,11 @@ declare global {
 			session: Session | null;
 			user: User | null;
 			profile?: UserProfile | null;
-			permissions?: string[];
+			/**
+			 * Permission codes of the active user (`[]` when anonymous or none). `null` when loading
+			 * them failed: `requirePermissionIn` then answers 500 instead of 403.
+			 */
+			permissions?: string[] | null;
 			requestId?: string;
 		}
 		interface PageData {
