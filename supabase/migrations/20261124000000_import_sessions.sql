@@ -562,6 +562,26 @@ begin
         using errcode = 'object_not_in_prerequisite_state',
           hint = 'create the base number (and its barcode for a pata row) before confirming';
     end if;
+
+    -- And the other direction: no base number may be left without its row. This catches duplicate
+    -- row base numbers that would otherwise hide a missing unit behind equal counts.
+    select count(*) into v_count
+    from public.bond_numbers n
+    join public.bonds b on b.id = n.bond_id
+    where b.import_session_id = old.id
+      and n.number_kind = 'base'
+      and n.released_at is null
+      and not exists (
+        select 1 from public.import_session_items i
+        where i.created_bond_id = n.bond_id
+          and i.removed_at is null
+          and i.base_number = n.number_value
+      );
+    if v_count > 0 then
+      raise exception 'import session % has % base number(s) without a matching item', old.id, v_count
+        using errcode = 'object_not_in_prerequisite_state',
+          hint = 'every base number needs its row; check for duplicated base numbers';
+    end if;
   end if;
 
   -- Bonds are linked only inside the confirming transaction: a validated session that already

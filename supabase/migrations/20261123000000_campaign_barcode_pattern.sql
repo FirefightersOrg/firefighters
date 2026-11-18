@@ -53,12 +53,13 @@ revoke all on function public.campaign_barcode_pattern_valid(text)
 grant execute on function public.campaign_barcode_pattern_valid(text) to service_role;
 
 alter table public.campaigns
-  -- Any POSIX whitespace counts (tab, newline, ...), not just the ASCII space `btrim` removes;
-  -- this keeps the CHECK aligned with the `trim()` the form applies.
+  -- Any POSIX whitespace counts (tab, newline, NBSP, ...), not just the ASCII space `btrim`
+  -- removes, plus U+FEFF (a BOM that `trim()` also strips). This keeps the CHECK aligned with the
+  -- `trim()` the form applies.
   add constraint campaigns_barcode_pattern_format check (
     barcode_pattern <> ''
-      and barcode_pattern !~ '^[[:space:]]'
-      and barcode_pattern !~ '[[:space:]]$'
+      and barcode_pattern !~ ('^([[:space:]]|' || chr(65279) || ')')
+      and barcode_pattern !~ ('([[:space:]]|' || chr(65279) || ')$')
       and char_length(barcode_pattern) <= 200
   ),
   add constraint campaigns_barcode_pattern_mode check (
@@ -227,8 +228,16 @@ immutable
 set search_path = ''
 as $$
 declare
-  -- Trim every POSIX whitespace character, like the form's `trim()` (btrim only knows spaces).
-  v_pattern text := nullif(regexp_replace(p_pattern, '^[[:space:]]+|[[:space:]]+$', '', 'g'), '');
+  -- Trim every POSIX whitespace character plus U+FEFF, like the form's `trim()` (btrim only
+  -- knows spaces).
+  v_pattern text := nullif(
+    regexp_replace(
+      p_pattern,
+      '^([[:space:]]|' || chr(65279) || ')+|([[:space:]]|' || chr(65279) || ')+$',
+      '', 'g'
+    ),
+    ''
+  );
 begin
   if v_pattern is null then
     return null;

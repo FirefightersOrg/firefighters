@@ -1,7 +1,7 @@
 -- SAN-44: import_sessions, import_session_items, campaigns.barcode_pattern, bonds.import_session_id,
 -- bond_numbers.barcode and the per-campaign barcode namespace; operator gets bond.scan.
 begin;
-select plan(156);
+select plan(158);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -237,6 +237,10 @@ select throws_ok(
   $$update public.campaigns set barcode_pattern = '^(\d+)$' || chr(10) where id = pg_temp.id('c-pattern')$$,
   '23514', null, 'a pattern with a trailing newline is rejected by the CHECK'
 );
+select throws_ok(
+  $$update public.campaigns set barcode_pattern = chr(65279) || '^(\d+)$' where id = pg_temp.id('c-pattern')$$,
+  '23514', null, 'a pattern with a leading BOM is rejected by the CHECK'
+);
 
 create function pg_temp.version_of(p_k text) returns timestamptz language sql stable as $$
   select updated_at from public.campaigns where id = pg_temp.id(p_k);
@@ -305,8 +309,8 @@ select throws_ok(
 select is(
   public.campaign_update_rules(pg_temp.id('c-pattern'), 60000, 10, 4, 9999, 4871, 'reject',
     'internal_code', pg_temp.version_of('c-pattern'), 'req-pattern-tabs', null,
-    chr(9) || '^TAB(\d+)$' || chr(10)),
-  true, 'update_rules: a pattern with tabs/newlines is trimmed, not rejected'
+    chr(65279) || chr(9) || '^TAB(\d+)$' || chr(10) || chr(65279)),
+  true, 'update_rules: a pattern with tabs/newlines/BOM is trimmed, not rejected'
 );
 select is(
   (select barcode_pattern from public.campaigns where id = pg_temp.id('c-pattern')),
@@ -745,6 +749,26 @@ select throws_ok(
       confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s11')$$,
   '55000', 'import session ' || pg_temp.id('s11') || ' has 1 item(s) whose base number or barcode was not created',
   'a pata row whose base number barcode differs blocks the confirmation'
+);
+
+-- Duplicated row base numbers must not hide a base without its row.
+insert into ids select 's12', pg_temp.session('c-draft');
+insert into ids select 'i12-1', pg_temp.item(pg_temp.id('s12'), 513, 'valid', 'pata', 'P12');
+insert into ids select 'i12-2', pg_temp.item(pg_temp.id('s12'), 514, 'valid', 'pata', 'P12');
+update public.import_session_items set base_number = 513, barcode = 'IT-513' where id = pg_temp.id('i12-2');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s12');
+insert into ids select 'b12', pg_temp.bond('c-draft', 2, 'P12', pg_temp.id('s12'));
+update public.import_session_items set created_bond_id = pg_temp.id('b12')
+where id in (pg_temp.id('i12-1'), pg_temp.id('i12-2'));
+insert into ids select 'n12-base-1', pg_temp.base(pg_temp.id('b12'), 513, 'IT-513');
+insert into ids select 'n12-assoc-1', pg_temp.assoc(pg_temp.id('b12'), 513);
+insert into ids select 'n12-base-2', pg_temp.base(pg_temp.id('b12'), 514, 'IT-514');
+insert into ids select 'n12-assoc-2', pg_temp.assoc(pg_temp.id('b12'), 514);
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s12')$$,
+  '55000', 'import session ' || pg_temp.id('s12') || ' has 1 base number(s) without a matching item',
+  'a duplicated row base number cannot hide a base number without its row'
 );
 
 -- Cancel and fail.

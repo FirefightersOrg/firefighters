@@ -104,11 +104,23 @@ describe('campaignCreateSchema', () => {
 			barcodePattern: emojiHeavy
 		});
 		expect(parsed.barcodePattern).toBe(emojiHeavy);
+		const atLimit = `${'😀'.repeat(195)}(\\d+)`;
+		expect([...atLimit].length).toBe(200);
+		expect(
+			campaignCreateSchema.parse({
+				...general,
+				...rules,
+				barcodeMode: 'internal_code',
+				barcodePattern: atLimit
+			}).barcodePattern
+		).toBe(atLimit);
+		const overLimit = `${'😀'.repeat(196)}(\\d+)`;
+		expect([...overLimit].length).toBe(201);
 		const tooLong = campaignCreateSchema.safeParse({
 			...general,
 			...rules,
 			barcodeMode: 'internal_code',
-			barcodePattern: `${'😀'.repeat(201)}(\\d+)`
+			barcodePattern: overLimit
 		});
 		expect(tooLong.success).toBe(false);
 	});
