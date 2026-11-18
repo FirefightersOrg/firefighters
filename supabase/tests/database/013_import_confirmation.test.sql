@@ -1,6 +1,6 @@
 -- SAN-47: confirmation and functional rollback of import sessions.
 begin;
-select plan(46);
+select plan(51);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -125,8 +125,11 @@ select throws_ok(
 -- ---------------------------------------------------------------------------
 select pg_temp.act_as(2);
 select is(
-  public.import_session_confirm(pg_temp.id('s1'), 'req-confirm') ->> 'status', 'confirmed',
-  'the operator confirms the validated session'
+  (select r ->> 'status' || ':' || (r ->> 'confirmed') || ':' || (r ->> 'bonds_created') || ':'
+     || (r ->> 'numbers_created')
+   from (select public.import_session_confirm(pg_temp.id('s1'), 'req-confirm') as r) x),
+  'confirmed:true:2:6',
+  'the operator confirms the validated session and gets the bonds and numbers created'
 );
 select is(
   (select status || ':' || (confirmed_at is not null) || ':' || confirmed_by
@@ -190,6 +193,12 @@ select is(
   1, 'the confirmation is audited with its request id'
 );
 select is(
+  (select new_value ->> 'source_type' || ':' || (new_value ->> 'file_name') || ':'
+     || (new_value ->> 'bonds_created') || ':' || (new_value ->> 'numbers_created')
+   from public.audit_log where action = 'import.confirm' and entity_id = pg_temp.id('s1')::text),
+  'csv_file:bonds.csv:2:6', 'the confirmation audit keeps the source and what was created'
+);
+select is(
   (select count(*)::int from public.audit_log a
    join public.bonds b on a.entity_type = 'bond' and a.entity_id = b.id::text
    where b.import_session_id = pg_temp.id('s1') and a.action = 'bond.create'
@@ -239,6 +248,15 @@ select is(
   (select count(*)::int from public.bonds where import_session_id = pg_temp.id('s2')),
   0, 'a stale session creates no bonds'
 );
+reset role;
+select is(
+  (select count(*)::int from public.audit_log
+   where action = 'import.confirm_rejected' and entity_id = pg_temp.id('s2')::text
+     and new_value ->> 'status' = 'draft'),
+  1, 'the rejected confirmation is audited (the session went back to draft)'
+);
+set local role authenticated;
+select pg_temp.act_as(2);
 
 -- ---------------------------------------------------------------------------
 -- Confirmation needs a campaign that still accepts bonds
@@ -354,6 +372,35 @@ select public.import_session_add_items(pg_temp.id('s5'), $$[
 select is(
   public.import_session_validate(pg_temp.id('s5')) ->> 'status', 'validated',
   'the numbers and barcodes freed by the rollback validate again'
+);
+
+-- ---------------------------------------------------------------------------
+-- A bond grouped into a manual pata blocks the rollback until it is ungrouped
+-- ---------------------------------------------------------------------------
+select pg_temp.act_as(2);
+insert into ids select 's6', public.import_session_create(pg_temp.id('c-confirm'), 'csv_file', 'group.csv');
+select public.import_session_add_items(pg_temp.id('s6'), $$[
+  {"row_number":2,"item_type":"simple","base_number":60,"barcode":"G-60"},
+  {"row_number":3,"item_type":"simple","base_number":61,"barcode":"G-61"}
+]$$::jsonb);
+select public.import_session_validate(pg_temp.id('s6'));
+select public.import_session_confirm(pg_temp.id('s6'));
+insert into ids select 'p6', public.bond_group_into_pata(pg_temp.id('c-confirm'),
+  (select array_agg(id order by id) from public.bonds where import_session_id = pg_temp.id('s6')));
+
+select pg_temp.act_as(1);
+select throws_ok(
+  $$select public.import_session_rollback(pg_temp.id('s6'), 'grouped')$$,
+  '55000', null, 'an import with a bond grouped into a manual pata cannot be rolled back'
+);
+select public.bond_ungroup_pata(pg_temp.id('p6'), 'regroup later');
+select lives_ok(
+  $$select public.import_session_rollback(pg_temp.id('s6'), 'after ungrouping')$$,
+  'once ungrouped, the import can be rolled back'
+);
+select is(
+  (select commercial_status::text from public.bonds where id = pg_temp.id('p6')),
+  'annulled', 'the manual pata is not part of the import (it was annulled by the ungroup, not the rollback)'
 );
 
 -- ---------------------------------------------------------------------------

@@ -16,6 +16,29 @@ as $$
     p_request_id);
 $$;
 
+-- A confirmation that found the session stale: back to draft (the user must review the new
+-- errors and validate again), audited, reported with `confirmed: false`.
+create function public.import_session_reject_confirmation(
+  p_actor uuid, p_session_id uuid, p_request_id text
+)
+returns jsonb
+language plpgsql
+volatile
+set search_path = ''
+as $$
+declare
+  v_summary jsonb;
+begin
+  update public.import_sessions set status = 'draft' where id = p_session_id and status <> 'draft';
+  v_summary := public.import_session_summary(p_session_id);
+  insert into public.audit_log (actor_user_id, action, entity_type, entity_id, new_value, request_id)
+  values (p_actor, 'import.confirm_rejected', 'import_session', p_session_id::text,
+    jsonb_build_object('status', 'draft', 'reason', 'session is no longer valid', 'summary', v_summary),
+    p_request_id);
+  return v_summary || jsonb_build_object('confirmed', false, 'reason', 'session is no longer valid');
+end;
+$$;
+
 create function public.import_session_confirm(p_session_id uuid, p_request_id text default null)
 returns jsonb
 language plpgsql
@@ -30,6 +53,9 @@ declare
   v_group record;
   v_bond public.bonds;
   v_base_id uuid;
+  v_bonds integer := 0;
+  v_numbers integer := 0;
+  v_summary jsonb;
 begin
   select * into v_session from public.import_sessions where id = p_session_id for update;
   if not found then raise exception 'import session % not found', p_session_id using errcode = 'no_data_found'; end if;
@@ -43,15 +69,17 @@ begin
   perform public.import_session_revalidate(p_session_id);
   perform public.import_session_check_groups(p_session_id);
   if not (public.import_session_summary(p_session_id) ->> 'valid')::boolean then
-    update public.import_sessions set status = 'draft' where id = p_session_id;
-    return public.import_session_summary(p_session_id)
-      || jsonb_build_object('confirmed', false, 'reason', 'session is no longer valid');
+    return public.import_session_reject_confirmation(v_actor, p_session_id, p_request_id);
   end if;
   -- Revalidation rewrites item statuses. Its write guard deliberately moves the session back to
   -- draft, so return it to validated only after the fresh preview is clean; item-to-bond links
   -- are permitted exclusively in that state.
   update public.import_sessions set status = 'validated' where id = p_session_id;
 
+  -- A concurrent confirmation of overlapping numbers/codes can commit between the revalidation
+  -- above and these inserts: the unique indexes then raise 23505. Roll back this block only and
+  -- report the session as stale (revalidated, back to draft) instead of a raw error.
+  begin
   -- Simple rows create one printed simple bond each.
   for v_item in select * from public.import_session_items
     where import_session_id = p_session_id and removed_at is null and item_type = 'simple'
@@ -68,6 +96,8 @@ begin
       'associated', v_base_id);
     update public.import_session_items set created_bond_id = v_bond.id where id = v_item.id;
     perform public.import_audit_bond_create(v_actor, v_bond, p_session_id, p_request_id);
+    v_bonds := v_bonds + 1;
+    v_numbers := v_numbers + 2;
   end loop;
 
   -- Each grupo_pata is one printed pata; row barcodes live on its base numbers.
@@ -89,14 +119,26 @@ begin
       values (v_campaign.id, v_bond.id, v_item.base_number + v_campaign.associated_number_offset,
         'associated', v_base_id);
       update public.import_session_items set created_bond_id = v_bond.id where id = v_item.id;
+      v_numbers := v_numbers + 2;
     end loop;
     perform public.import_audit_bond_create(v_actor, v_bond, p_session_id, p_request_id);
+    v_bonds := v_bonds + 1;
   end loop;
   update public.import_sessions set status = 'confirmed', confirmed_by = v_actor where id = p_session_id;
+  exception when unique_violation then
+    perform public.import_session_revalidate(p_session_id);
+    return public.import_session_reject_confirmation(v_actor, p_session_id, p_request_id);
+  end;
+
+  v_summary := public.import_session_summary(p_session_id);
   insert into public.audit_log (actor_user_id, action, entity_type, entity_id, new_value, request_id)
   values (v_actor, 'import.confirm', 'import_session', p_session_id::text,
-    jsonb_build_object('status', 'confirmed'), p_request_id);
-  return public.import_session_summary(p_session_id);
+    jsonb_build_object('status', 'confirmed', 'source_type', v_session.source_type,
+      'file_name', v_session.file_name, 'bonds_created', v_bonds, 'numbers_created', v_numbers,
+      'summary', v_summary),
+    p_request_id);
+  return v_summary
+    || jsonb_build_object('confirmed', true, 'bonds_created', v_bonds, 'numbers_created', v_numbers);
 end;
 $$;
 
@@ -153,6 +195,8 @@ end;
 $$;
 
 revoke all on function public.import_audit_bond_create(uuid, public.bonds, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.import_session_reject_confirmation(uuid, uuid, text)
   from public, anon, authenticated, service_role;
 revoke all on function public.import_session_confirm(uuid, text) from public, anon, authenticated, service_role;
 revoke all on function public.import_session_rollback(uuid, text, text) from public, anon, authenticated, service_role;
