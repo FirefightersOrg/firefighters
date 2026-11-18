@@ -34,6 +34,19 @@ export const BARCODE_MODE_LABELS: Record<BarcodeMode, string> = {
 	manual_mapping: 'Manual mapping'
 };
 
+/**
+ * Modes whose barcodes are read with the campaign's `barcodePattern` (a regex whose first capture
+ * group is the base number). Without a pattern they behave like `manual_mapping`: the operator
+ * types the base number when scanning.
+ */
+export const BARCODE_PATTERN_MODES = ['internal_code', 'external_legacy_code'] as const;
+/** Same limit as the `campaigns_barcode_pattern_format` CHECK. */
+export const BARCODE_PATTERN_MAX_LENGTH = 200;
+
+export function barcodeModeUsesPattern(mode: string): boolean {
+	return (BARCODE_PATTERN_MODES as readonly string[]).includes(mode);
+}
+
 /** Statuses a campaign can be moved to (`draft` is only ever the initial status). */
 export const CAMPAIGN_TRANSITION_TARGETS = ['active', 'closing', 'closed', 'annulled'] as const;
 export type CampaignTransitionTarget = (typeof CAMPAIGN_TRANSITION_TARGETS)[number];
@@ -120,6 +133,8 @@ export interface Campaign {
 	associatedNumberOffset: number;
 	overflowPolicy: OverflowPolicy;
 	barcodeMode: BarcodeMode;
+	/** Regex extracting the base number (first capture group); only for BARCODE_PATTERN_MODES. */
+	barcodePattern: string | null;
 	createdBy: string | null;
 	createdAt: string;
 	updatedAt: string;

@@ -94,7 +94,8 @@ describe('/campaigns/new', () => {
 				name: ['Name is required'],
 				barcodeMode: ['Choose how barcodes are read']
 			});
-			expect(result.data.values).toEqual(form);
+			// The pattern field is only rendered for the internal / external code modes.
+			expect(result.data.values).toEqual({ ...form, barcodePattern: '' });
 			expect(rpc).not.toHaveBeenCalled();
 		});
 

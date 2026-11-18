@@ -94,23 +94,23 @@ select ok(
 );
 
 select ok(
-  has_function_privilege('authenticated', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text)', 'execute')
+  has_function_privilege('authenticated', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text, text)', 'execute')
   and has_function_privilege('authenticated', 'public.campaign_update(uuid, text, timestamptz, timestamptz, timestamptz, text, text)', 'execute')
-  and has_function_privilege('authenticated', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text)', 'execute')
+  and has_function_privilege('authenticated', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text, text)', 'execute')
   and has_function_privilege('authenticated', 'public.campaign_transition(uuid, text, text, text)', 'execute'),
   'authenticated can execute the four campaign write functions'
 );
 select ok(
-  not has_function_privilege('anon', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text)', 'execute')
+  not has_function_privilege('anon', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text, text)', 'execute')
   and not has_function_privilege('anon', 'public.campaign_update(uuid, text, timestamptz, timestamptz, timestamptz, text, text)', 'execute')
-  and not has_function_privilege('anon', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text)', 'execute')
+  and not has_function_privilege('anon', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text, text)', 'execute')
   and not has_function_privilege('anon', 'public.campaign_transition(uuid, text, text, text)', 'execute'),
   'anon cannot execute the campaign write functions'
 );
 select ok(
-  not has_function_privilege('service_role', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text)', 'execute')
+  not has_function_privilege('service_role', 'public.campaign_create(text, numeric, integer, integer, integer, integer, text, text, timestamptz, timestamptz, text, text, text)', 'execute')
   and not has_function_privilege('service_role', 'public.campaign_update(uuid, text, timestamptz, timestamptz, timestamptz, text, text)', 'execute')
-  and not has_function_privilege('service_role', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text)', 'execute')
+  and not has_function_privilege('service_role', 'public.campaign_update_rules(uuid, numeric, integer, integer, integer, integer, text, text, timestamptz, text, text, text)', 'execute')
   and not has_function_privilege('service_role', 'public.campaign_transition(uuid, text, text, text)', 'execute'),
   'service_role cannot execute the campaign write functions (they act as auth.uid())'
 );

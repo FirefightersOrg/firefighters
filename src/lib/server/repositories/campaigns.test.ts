@@ -22,6 +22,7 @@ const row: CampaignRow = {
 	associated_number_offset: 4871,
 	overflow_policy: 'reject',
 	barcode_mode: 'base_number',
+	barcode_pattern: null,
 	created_by: 'e0000000-0000-0000-0000-000000000001',
 	created_at: '2026-11-16T12:00:00+00:00',
 	updated_at: '2026-11-16T12:00:00+00:00'
@@ -48,6 +49,7 @@ describe('campaigns repository', () => {
 			associatedNumberOffset: 4871,
 			overflowPolicy: 'reject',
 			barcodeMode: 'base_number',
+			barcodePattern: null,
 			createdBy: row.created_by,
 			createdAt: row.created_at,
 			updatedAt: row.updated_at

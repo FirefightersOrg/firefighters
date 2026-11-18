@@ -20,6 +20,7 @@ export interface CampaignRulesValues {
 	associatedNumberOffset: string;
 	overflowPolicy: string;
 	barcodeMode: string;
+	barcodePattern: string;
 }
 
 /** Empty general values for a new campaign. */
@@ -36,7 +37,8 @@ export function defaultRulesValues(): CampaignRulesValues {
 		maxNumber: String(DEFAULT_NUMBERING_CONFIG.maxNumber),
 		associatedNumberOffset: String(DEFAULT_NUMBERING_CONFIG.associatedNumberOffset),
 		overflowPolicy: DEFAULT_NUMBERING_CONFIG.overflowPolicy,
-		barcodeMode: ''
+		barcodeMode: '',
+		barcodePattern: ''
 	};
 }
 
@@ -57,7 +59,8 @@ export function rulesValuesOf(campaign: Campaign): CampaignRulesValues {
 		maxNumber: String(campaign.maxNumber),
 		associatedNumberOffset: String(campaign.associatedNumberOffset),
 		overflowPolicy: campaign.overflowPolicy,
-		barcodeMode: campaign.barcodeMode
+		barcodeMode: campaign.barcodeMode,
+		barcodePattern: campaign.barcodePattern ?? ''
 	};
 }
 

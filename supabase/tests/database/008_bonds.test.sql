@@ -1043,7 +1043,8 @@ select throws_ok(
   'truncate: bond_groups (owner)'
 );
 select throws_ok(
-  $$truncate public.bonds, public.bond_numbers, public.bond_groups$$,
+  -- import_session_items (SAN-44) references bonds: include it so the FK does not fail first.
+  $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items$$,
   '23001', null,
   'truncate: bonds and bond_numbers (owner)'
 );

@@ -59,8 +59,37 @@ describe('campaignCreateSchema', () => {
 			maxNumber: 9999,
 			associatedNumberOffset: 4871,
 			overflowPolicy: 'reject',
-			barcodeMode: 'base_number'
+			barcodeMode: 'base_number',
+			barcodePattern: null
 		});
+	});
+
+	it('takes a barcode pattern only for the internal / external code modes (SAN-44)', () => {
+		const withPattern = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'external_legacy_code',
+			barcodePattern: '  ^LEG(\\d+)$ '
+		});
+		expect(withPattern.barcodePattern).toBe('^LEG(\\d+)$');
+		const blank = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: '   '
+		});
+		expect(blank.barcodePattern).toBeNull();
+		const wrongMode = campaignCreateSchema.safeParse({
+			...general,
+			...rules,
+			barcodePattern: '^(\\d+)$'
+		});
+		expect(wrongMode.success).toBe(false);
+		if (!wrongMode.success) {
+			expect(campaignFieldErrors(wrongMode.error).barcodePattern?.[0]).toMatch(
+				/only used with the internal or external\/legacy code modes/
+			);
+		}
 	});
 
 	it('allows a draft without dates', () => {

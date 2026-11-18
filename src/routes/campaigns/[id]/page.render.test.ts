@@ -21,6 +21,7 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
 		associatedNumberOffset: 4871,
 		overflowPolicy: 'reject',
 		barcodeMode: 'base_number',
+		barcodePattern: null,
 		createdBy: null,
 		createdAt: V1,
 		updatedAt: V1,

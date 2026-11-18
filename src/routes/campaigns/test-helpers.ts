@@ -38,6 +38,7 @@ export function campaignRow(overrides: Partial<CampaignRow> = {}): CampaignRow {
 		associated_number_offset: 4871,
 		overflow_policy: 'reject',
 		barcode_mode: 'base_number',
+		barcode_pattern: null,
 		created_by: profile.id,
 		created_at: '2026-11-16T12:00:00+00:00',
 		updated_at: '2026-11-16T12:00:00+00:00',
