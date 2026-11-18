@@ -107,8 +107,9 @@ create table public.buyers (
     check (btrim(phone) <> '' and phone = btrim(phone) and char_length(phone) <= 50),
   constraint buyers_address_valid
     check (btrim(address) <> '' and address = btrim(address) and char_length(address) <= 500),
+  -- Trimmed at both ends like every other field (inner line breaks are kept).
   constraint buyers_notes_valid
-    check (btrim(notes) <> '' and char_length(notes) <= 2000)
+    check (btrim(notes) <> '' and notes = btrim(notes) and char_length(notes) <= 2000)
 );
 
 comment on table public.buyers is
@@ -407,7 +408,9 @@ begin
     raise exception 'collector was modified by someone else' using errcode = 'PT409',
       hint = 'reload the collector and apply the change again';
   end if;
-  v := public.collector_validate(p_display_name, p_phone, p_email, p_address, p_user_profile_id, p_status);
+  -- No status means "keep it": an update must never reactivate a collector by omission.
+  v := public.collector_validate(p_display_name, p_phone, p_email, p_address, p_user_profile_id,
+    coalesce(nullif(btrim(p_status), ''), v_old.status));
   if public.collector_audit_snapshot(v) = public.collector_audit_snapshot(v_old) then
     return false;
   end if;
