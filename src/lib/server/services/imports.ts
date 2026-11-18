@@ -498,7 +498,7 @@ export const IMPORT_CONFIRM_MESSAGES = {
 	stale:
 		'Some rows are no longer valid (a number or code was taken after validation). Review the errors and validate again.',
 	notRollbackable:
-		'This import cannot be rolled back: some of its bonds were delivered, sold, grouped or annulled.',
+		'This import cannot be rolled back: some of its bonds were delivered, sold or grouped into a pata (bonds annulled by hand are skipped).',
 	notConfirmed: 'Only a confirmed import that was not rolled back yet can be rolled back.'
 } as const;
 

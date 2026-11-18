@@ -222,8 +222,9 @@
 		<section class="{cardClass} space-y-3" aria-labelledby="rollback-title">
 			<h2 id="rollback-title" class="text-base font-semibold">Roll back this import</h2>
 			<p class="text-sm text-slate-600">
-				Annuls every bond of this import and releases their numbers and codes. Only possible while
-				none of them was delivered, sold or grouped.
+				Annuls the available bonds of this import and releases their numbers and codes. Bonds
+				already annulled by hand are left as they are. Only possible while none of them was
+				delivered, sold or grouped into a pata.
 			</p>
 			<form
 				method="POST"
