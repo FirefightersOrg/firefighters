@@ -130,6 +130,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `bond.import`            |   yes |      yes |        no |        no |        no |
 | `bond.scan`              |   yes |      yes |        no |        no |        no |
 | `bond.assign`            |   yes |      yes |        no |        no |        no |
+| `buyer.view`             |   yes |      yes |        no |        no |        no |
 | `buyer.manage`           |   yes |      yes |        no |        no |        no |
 | `collector.manage`       |   yes |       no |        no |        no |        no |
 | `sale.create`            |   yes |      yes |        no |        no |        no |
@@ -138,13 +139,30 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `settlement.create`      |   yes |      yes |       yes |        no |        no |
 | `settlement.close`       |   yes |       no |       yes |        no |        no |
 | `settlement.correct`     |   yes |       no |       yes |        no |        no |
+| `commission.view`        |   yes |       no |       yes |        no |        no |
 | `commission.rule_manage` |   yes |       no |        no |        no |        no |
 | `commission.adjust`      |   yes |       no |       yes |        no |        no |
+| `draw.view`              |   yes |      yes |       yes |        no |        no |
 | `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
 | `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
 | `report.view_financial`  |   yes |       no |       yes |        no |       yes |
 | `audit.view`             |   yes |       no |       yes |        no |        no |
 | `user.manage`            |   yes |       no |        no |        no |        no |
+
+### Action implies view (SAN-93)
+
+A role that holds an action permission on a domain also holds that domain's `<domain>.view` permission, when that permission exists. The domain is the code without its last segment (`buyer.manage` -> `buyer`, `collector.ledger.adjust` -> `collector.ledger`). Codes whose last segment is `view` or `view_*` are views, not actions.
+
+`20261201000000_role_matching_view_permissions.sql` added these grants:
+
+| Role        | Added             | Because of                               |
+| ----------- | ----------------- | ---------------------------------------- |
+| `operator`  | `buyer.view`      | `buyer.manage`                           |
+| `operator`  | `draw.view`       | `draw.load_winner`                       |
+| `treasurer` | `commission.view` | `commission.adjust`                      |
+| `treasurer` | `draw.view`       | `draw.freeze_roster`, `draw.load_winner` |
+
+The `sale`, `payment` and `settlement` domains have no `.view` permission yet, so the rule does not apply to them. Cross-domain needs (for example `bond.assign` and `collector.view`) are not covered by this rule. The pgTAP test `017_role_view_permissions` checks the rule for every role, so a later grant cannot break it silently.
 
 ## Technical rules
 
