@@ -134,13 +134,10 @@ select col_default_is('public', 'bonds', 'commercial_status', 'available', 'bond
 select col_default_is('public', 'bonds', 'financial_status_snapshot', 'no_payments', 'bonds.financial_status_snapshot defaults to no_payments');
 select col_default_is('public', 'bonds', 'commercial_unit_count', '1', 'bonds.commercial_unit_count defaults to 1');
 select ok(
-  not exists (
-    select 1 from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
-    where c.conrelid = 'public.bonds'::regclass and c.contype = 'f'
-      and a.attname in ('current_collector_id', 'current_buyer_id')
-  ),
-  'current_collector_id / current_buyer_id have no FK yet (Phase 5)'
+  (select count(*) = 2 from pg_constraint
+   where conrelid = 'public.bonds'::regclass and contype = 'f'
+     and conname in ('bonds_current_collector_fkey', 'bonds_current_buyer_fkey')),
+  'current_collector_id / current_buyer_id reference collectors / buyers (Phase 5, SAN-49)'
 );
 select col_is_null('public', 'bonds', 'current_collector_id', 'current_collector_id is nullable');
 select col_is_null('public', 'bonds', 'current_buyer_id', 'current_buyer_id is nullable');
