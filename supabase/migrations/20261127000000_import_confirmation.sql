@@ -154,6 +154,8 @@ declare
   v_reason text := nullif(btrim(p_reason), '');
   v_count integer;
   v_bond record;
+  v_ids uuid[];
+  v_skipped integer;
 begin
   if v_reason is null then raise exception 'a rollback reason is required' using errcode = 'invalid_parameter_value'; end if;
   select * into v_session from public.import_sessions where id = p_session_id for update;
@@ -164,16 +166,23 @@ begin
   -- Like bond_annul: imported bonds can only be annulled while the campaign is draft or active.
   perform public.bond_lock_campaign(v_session.campaign_id);
   perform 1 from public.bonds where import_session_id = p_session_id order by id for update;
+  -- Bonds already annulled (by hand) are skipped as they are: their own bond.annul entry, reason,
+  -- author and numbers stay untouched (a bond annulled from sold keeps its numbers held). Any
+  -- other unavailable status, or an active manual grouping, blocks the whole rollback.
   select count(*) into v_count from public.bonds b where b.import_session_id = p_session_id
-    and (b.commercial_status <> 'available' or exists (
+    and (b.commercial_status not in ('available', 'annulled') or exists (
       select 1 from public.bond_groups g where (g.member_bond_id = b.id or g.pata_bond_id = b.id)
         and g.ungrouped_at is null));
   if v_count > 0 then raise exception 'import session % has % bond(s) that cannot be rolled back', p_session_id, v_count
     using errcode = 'object_not_in_prerequisite_state'; end if;
-  -- One bond.annul entry per bond (same shape as bond_annul), snapshotted before the release.
+  select coalesce(array_agg(b.id order by b.id), '{}') into v_ids
+  from public.bonds b where b.import_session_id = p_session_id and b.commercial_status = 'available';
+  select count(*) into v_skipped
+  from public.bonds b where b.import_session_id = p_session_id and b.commercial_status = 'annulled';
+  -- One bond.annul entry per annulled bond (same shape as bond_annul), snapshotted before the release.
   for v_bond in
     select b.id, public.bond_audit_snapshot(b) -> 'numbers' as numbers
-    from public.bonds b where b.import_session_id = p_session_id order by b.id
+    from public.bonds b where b.id = any (v_ids) order by b.id
   loop
     insert into public.audit_log
       (actor_user_id, action, entity_type, entity_id, old_value, new_value, reason, request_id)
@@ -184,13 +193,14 @@ begin
       v_reason, p_request_id);
   end loop;
   update public.bonds set commercial_status = 'annulled', annulled_by = v_actor, annul_reason = v_reason
-  where import_session_id = p_session_id;
+  where id = any (v_ids);
   update public.bond_numbers set released_at = now(), released_by = v_actor
-  where bond_id in (select id from public.bonds where import_session_id = p_session_id) and released_at is null;
+  where bond_id = any (v_ids) and released_at is null;
   update public.import_sessions set rolled_back_by = v_actor, rollback_reason = v_reason where id = p_session_id;
   insert into public.audit_log (actor_user_id, action, entity_type, entity_id, new_value, reason, request_id)
   values (v_actor, 'import.rollback', 'import_session', p_session_id::text,
-    jsonb_build_object('status', 'confirmed', 'rolled_back', true), v_reason, p_request_id);
+    jsonb_build_object('status', 'confirmed', 'rolled_back', true,
+      'bonds_annulled', cardinality(v_ids), 'bonds_skipped', v_skipped), v_reason, p_request_id);
 end;
 $$;
 

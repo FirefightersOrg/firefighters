@@ -1,6 +1,6 @@
 -- SAN-47: confirmation and functional rollback of import sessions.
 begin;
-select plan(51);
+select plan(56);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -299,17 +299,60 @@ select throws_ok(
   'P0002', null, 'an unknown session is rejected on rollback'
 );
 
--- A bond annulled on its own blocks the rollback of its import (it is no longer available).
-select public.bond_annul(
-  (select id from public.bonds where import_session_id = pg_temp.id('s3')), 'damaged card');
+-- A bond that left `available` for any status but `annulled` blocks the rollback of its import.
+reset role;
+update public.bonds set commercial_status = 'delivered_to_collector'
+where import_session_id = pg_temp.id('s3');
+set local role authenticated;
+select pg_temp.act_as(1);
 select throws_ok(
   $$select public.import_session_rollback(pg_temp.id('s3'), 'wrong batch')$$,
-  '55000', null, 'an import with a bond that is no longer available cannot be rolled back'
+  '55000', null, 'an import with a delivered bond cannot be rolled back'
 );
 select is(
   (select rolled_back_at from public.import_sessions where id = pg_temp.id('s3')),
   null, 'a refused rollback leaves the session untouched'
 );
+
+-- A bond already annulled by hand is skipped: the rollback annuls the rest and leaves it as it was.
+select pg_temp.act_as(2);
+insert into ids select 's7', public.import_session_create(pg_temp.id('c-confirm'), 'csv_file', 'skip.csv');
+select public.import_session_add_items(pg_temp.id('s7'), $$[
+  {"row_number":2,"item_type":"simple","base_number":70,"barcode":"K-70"},
+  {"row_number":3,"item_type":"simple","base_number":71,"barcode":"K-71"}
+]$$::jsonb);
+select public.import_session_validate(pg_temp.id('s7'));
+select public.import_session_confirm(pg_temp.id('s7'));
+insert into ids select 'b70', id from public.bonds where import_session_id = pg_temp.id('s7') and barcode = 'K-70';
+insert into ids select 'b71', id from public.bonds where import_session_id = pg_temp.id('s7') and barcode = 'K-71';
+select pg_temp.act_as(1);
+select public.bond_annul(pg_temp.id('b70'), 'damaged card');
+select lives_ok(
+  $$select public.import_session_rollback(pg_temp.id('s7'), 'wrong batch 7', 'req-skip')$$,
+  'an import with a bond annulled by hand can be rolled back'
+);
+select is(
+  (select annul_reason || ':' || annulled_by from public.bonds where id = pg_temp.id('b70')),
+  'damaged card:b5700000-0000-0000-0000-000000000001',
+  'the bond annulled by hand keeps its own reason and author'
+);
+select is(
+  (select commercial_status || ':' || annul_reason from public.bonds where id = pg_temp.id('b71')),
+  'annulled:wrong batch 7', 'the other bond of the import is annulled by the rollback'
+);
+reset role;
+select is(
+  (select count(*)::int from public.audit_log
+   where action = 'bond.annul' and entity_id = pg_temp.id('b70')::text),
+  1, 'the skipped bond gets no second bond.annul entry'
+);
+select is(
+  (select (new_value ->> 'bonds_annulled') || ':' || (new_value ->> 'bonds_skipped')
+   from public.audit_log where action = 'import.rollback' and request_id = 'req-skip'),
+  '1:1', 'the rollback audit counts annulled and skipped bonds'
+);
+set local role authenticated;
+select pg_temp.act_as(1);
 
 -- ---------------------------------------------------------------------------
 -- Rollback
