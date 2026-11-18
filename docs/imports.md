@@ -172,7 +172,7 @@ Void import through audited process.
 
 Voiding must mark created bonds as voided if they have no sales, payments, or settlements. If they already have operations, it requires specific administrative correction.
 
-## Decisions (SAN-44)
+## Decisions (SAN-44 / SAN-45)
 
 Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_sessions.sql`, `20261125000000_operator_bond_scan.sql`. Details in `docs/data-model.md` (`import_sessions`, `import_session_items`, `bonds`, `bond_numbers`) and `docs/state-machines.md` (Import session).
 
@@ -183,3 +183,16 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
 - **Patas and barcodes.** Rows sharing a `grupo_pata` form one printed pata: the pata bond's `barcode` is the `grupo_pata`, and each row's barcode is kept on its base number (`bond_numbers.barcode`). A barcode identifies one live thing per campaign across bonds and base numbers; codes are freed only when a bond is annulled from `available` (and its numbers are released), like participating numbers.
 - **Rollback (SAN-47).** Rolling back a confirmed import annuls its bonds (`bond.annul`, admin only, reason required, only if none was delivered, sold or grouped), which frees their numbers and codes, and then marks the session as rolled back (it stays `confirmed`).
 - **Permissions.** Import data is readable with `bond.import` or `bond.scan`. The operator has both (`bond.scan` added in SAN-44).
+- **Staging and validation (SAN-45).** `import_session_create`, `import_session_add_items`,
+  `import_session_add_scan`, `import_session_remove_item`, `import_session_validate` and
+  `import_session_cancel` are audited `SECURITY DEFINER` functions. File sessions require
+  `bond.import`; scan sessions require `bond.scan`. A malformed API payload is rejected (`22023`);
+  a business problem is retained as an `error` item so the preview can show it. Revalidation checks
+  the campaign range (including the associated number), duplicate participating numbers and
+  barcodes in the batch, live numbers/codes already held by the campaign, pata barcode/group rules,
+  and the minimum two rows per pata group when validating. A clean session moves from `draft` to
+  `validated`; editing it returns it to `draft`.
+- **Scan resolution (SAN-45).** `base_number` parses the scanned code as the base number.
+  `manual_mapping` requires the operator to type it. `internal_code` and
+  `external_legacy_code` use the first capture group of `barcode_pattern`; without a pattern they
+  behave as `manual_mapping`. Every scan remains a staged row, including an unrecognized one.
