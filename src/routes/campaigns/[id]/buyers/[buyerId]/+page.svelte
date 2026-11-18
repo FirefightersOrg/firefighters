@@ -5,10 +5,22 @@
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import { cardClass } from '$lib/components/campaigns/styles';
 	import { buyerDisplayName, buyerIdentification, BUYER_TYPE_LABELS } from '$lib/domain/parties';
+	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	const collectorHref = (collectorId: string) =>
 		`/campaigns/${data.campaign.id}/collectors/${collectorId}`;
+	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
+		bond.baseNumbers
+			.map((number) =>
+				formatCampaignNumber(number, {
+					numberDigits: bond.campaignNumberDigits,
+					maxNumber: 10 ** bond.campaignNumberDigits - 1,
+					associatedNumberOffset: 0,
+					overflowPolicy: 'reject'
+				})
+			)
+			.join(', ');
 </script>
 
 <svelte:head
@@ -65,7 +77,17 @@
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Purchased bonds in this campaign</h2>
-		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 7: sales and buyer assignment.</p>
+		<ul class="mt-2 text-sm">
+			{#each data.campaignBonds as bond (bond.id)}<li class="border-t py-2">
+					<a
+						class="text-blue-700 underline"
+						href={resolve('/campaigns/[id]/bonds/[bondId]', {
+							id: data.campaign.id,
+							bondId: bond.id
+						})}>{baseNumbers(bond) || 'No base number'}</a
+					>
+				</li>{:else}<li class="text-slate-500">No bonds purchased in this campaign.</li>{/each}
+		</ul>
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Installments and debt</h2>
@@ -77,9 +99,18 @@
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Historical numbers</h2>
-		<p class="mt-2 text-sm text-slate-500">
-			No historical numbers yet. Legacy-data migration is post-MVP.
-		</p>
+		<ul class="mt-2 text-sm">
+			{#each data.historicalBonds as bond (bond.id)}<li class="border-t py-2">
+					{bond.campaignName}:
+					<a
+						class="text-blue-700 underline"
+						href={resolve('/campaigns/[id]/bonds/[bondId]', {
+							id: bond.campaignId,
+							bondId: bond.id
+						})}>{baseNumbers(bond) || 'No base number'}</a
+					>
+				</li>{:else}<li class="text-slate-500">No historical numbers.</li>{/each}
+		</ul>
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Audit</h2>

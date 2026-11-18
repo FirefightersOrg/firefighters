@@ -40,4 +40,9 @@ export const buyerSchema = z
 			ctx.addIssue({ code: 'custom', path: ['firstName'], message: 'Enter a first or last name.' });
 		if (data.type === 'business' && !data.businessName)
 			ctx.addIssue({ code: 'custom', path: ['businessName'], message: 'Enter a business name.' });
-	});
+	})
+	.transform((data) =>
+		data.type === 'individual'
+			? { ...data, businessName: null, taxId: null }
+			: { ...data, firstName: null, lastName: null, documentNumber: null }
+	);

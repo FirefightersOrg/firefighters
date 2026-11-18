@@ -52,6 +52,21 @@ export interface BuyerRow {
 	updated_at: string;
 }
 
+interface BuyerBondRow {
+	id: string;
+	campaign_id: string;
+	bond_numbers: { number_value: number; number_kind: string }[];
+	campaigns: { name: string; number_digits: number } | null;
+}
+
+export interface BuyerBondNumber {
+	id: string;
+	campaignId: string;
+	campaignName: string;
+	campaignNumberDigits: number;
+	baseNumbers: number[];
+}
+
 function oneOf<T extends string>(values: readonly T[], value: string, what: string): T {
 	if (!(values as readonly string[]).includes(value))
 		throw new Error(`unexpected ${what}: ${value}`);
@@ -250,6 +265,43 @@ export async function getBuyer(
 		.overrideTypes<BuyerRow | null, { merge: false }>();
 	if (error) return { data: null, error };
 	return wrap(() => (data ? mapBuyerRow(data) : null));
+}
+
+/**
+ * Bonds currently assigned to a buyer. The campaign and base numbers are embedded in the same
+ * query, so the buyer record never turns into an N+1 lookup.
+ */
+export async function listBuyerBonds(
+	supabase: SupabaseClient,
+	buyerId: string,
+	options: { campaignId?: string; excludeCampaignId?: string } = {}
+): Promise<RepositoryResult<BuyerBondNumber[]>> {
+	let query = supabase
+		.from('bonds')
+		.select(
+			'id, campaign_id, bond_numbers(number_value, number_kind), campaigns!inner(name, number_digits)'
+		)
+		.eq('current_buyer_id', buyerId);
+	if (options.campaignId) query = query.eq('campaign_id', options.campaignId);
+	if (options.excludeCampaignId) query = query.neq('campaign_id', options.excludeCampaignId);
+	const { data, error } = await query
+		.order('campaign_id', { ascending: true })
+		.order('id', { ascending: true })
+		.overrideTypes<BuyerBondRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: (data ?? []).map((bond) => ({
+			id: bond.id,
+			campaignId: bond.campaign_id,
+			campaignName: bond.campaigns?.name ?? 'Unknown campaign',
+			campaignNumberDigits: bond.campaigns?.number_digits ?? 4,
+			baseNumbers: (bond.bond_numbers ?? [])
+				.filter((number) => number.number_kind === 'base')
+				.map((number) => number.number_value)
+				.sort((a, b) => a - b)
+		})),
+		error: null
+	};
 }
 
 /** Other buyers with the same document number or tax id (possible duplicates to warn about). */
