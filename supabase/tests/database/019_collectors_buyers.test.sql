@@ -1,6 +1,6 @@
 -- SAN-49: collectors and buyers tables, links, RLS and audited write functions.
 begin;
-select plan(55);
+select plan(60);
 
 -- auth ids / profiles: ...01 admin, ...02 operator, ...03 treasurer, ...04 collector, ...05 read-only
 insert into auth.users (id, email)
@@ -148,6 +148,13 @@ select is(
   (select phone || ':' || status from public.collectors where id = pg_temp.id('ana')),
   '11 9999:inactive', 'the update is stored (deactivation included)'
 );
+select public.collector_update(pg_temp.id('ana'), 'Ana Pérez', '11 9998', 'ana@example.com', null,
+  'b6100000-0000-0000-0000-000000000004', null,
+  (select updated_at from public.collectors where id = pg_temp.id('ana')));
+select is(
+  (select phone || ':' || status from public.collectors where id = pg_temp.id('ana')),
+  '11 9998:inactive', 'an update without a status keeps it (no reactivation by omission)'
+);
 
 -- ---------------------------------------------------------------------------
 -- Buyers: permissions and validation
@@ -213,11 +220,27 @@ select throws_ok($$update public.buyers set type = 'business', business_name = n
 select throws_ok($$update public.collectors set email = ' a@b.co' where id = pg_temp.id('beto')$$,
   '23514', null, 'untrimmed values are rejected for every role');
 
--- FK: a bond cannot point to an unknown collector or buyer.
+-- FK: a bond cannot point to an unknown collector or buyer (own campaign and bond, so the check
+-- does not depend on data left in the database).
+with c as (
+  insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode)
+  values ('Party FK', 60000, 10, 6000, 'base_number') returning id
+)
+insert into ids select 'fk-campaign', id from c;
+with b as (
+  insert into public.bonds (campaign_id, kind, origin, commercial_unit_count, total_value, commercial_status)
+  values (pg_temp.id('fk-campaign'), 'simple', 'printed', 1, 60000, 'available') returning id
+)
+insert into ids select 'fk-bond', id from b;
 select throws_ok(
   $$update public.bonds set current_buyer_id = '00000000-0000-0000-0000-000000000000'
-    where id = (select id from public.bonds limit 1)$$,
-  null, null, 'a bond cannot reference an unknown buyer'
+    where id = pg_temp.id('fk-bond')$$,
+  '23503', null, 'a bond cannot reference an unknown buyer'
+);
+select throws_ok(
+  $$update public.bonds set current_collector_id = '00000000-0000-0000-0000-000000000000'
+    where id = pg_temp.id('fk-bond')$$,
+  '23503', null, 'a bond cannot reference an unknown collector'
 );
 
 -- ---------------------------------------------------------------------------
@@ -242,6 +265,19 @@ select is((select count(*)::int from public.buyers), 0, 'the collector login rea
 select pg_temp.act_as(5);
 select is((select count(*)::int from public.collectors where id in (pg_temp.id('ana'), pg_temp.id('beto'))),
   0, 'read-only without collector.view reads no collectors (matrix pending SAN-93)');
+select is((select count(*)::int from public.buyers where id in (pg_temp.id('juan'), pg_temp.id('ferre'))),
+  0, 'read-only without buyer.view reads no buyers');
+select pg_temp.act_as(3);
+select is((select count(*)::int from public.buyers where id in (pg_temp.id('juan'), pg_temp.id('ferre'))),
+  0, 'the treasurer without buyer.view reads no buyers');
+
+-- An inactive profile cannot write, whatever its roles.
+reset role;
+update public.profiles set status = 'inactive' where id = 'b6100000-0000-0000-0000-000000000002';
+set local role authenticated;
+select pg_temp.act_as(2);
+select throws_ok($$select public.buyer_create('individual', 'Late')$$, '42501', null,
+  'an inactive profile cannot create a buyer');
 
 -- ---------------------------------------------------------------------------
 -- Audit
@@ -275,7 +311,8 @@ select is(
 select is(
   (select count(*)::int from public.audit_log where action = 'collector.update'
      and entity_id = pg_temp.id('ana')::text),
-  1, 'a no-op update writes no audit row'
+  -- Two real updates (phone + deactivation, then phone without status); the no-op wrote nothing.
+  2, 'a no-op update writes no audit row'
 );
 
 select * from finish();
