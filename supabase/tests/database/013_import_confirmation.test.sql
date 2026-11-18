@@ -1,27 +1,28 @@
 -- SAN-47: confirmation and functional rollback of import sessions.
 begin;
-select plan(56);
+select plan(59);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
 -- ---------------------------------------------------------------------------
--- auth ids / profiles: ...01 admin, ...02 operator, ...03 treasurer
+-- auth ids / profiles: ...01 admin, ...02 operator, ...03 treasurer, ...04 second admin
 insert into auth.users (id, email)
 select ('a5700000-0000-0000-0000-00000000000' || n)::uuid, 'confirm-' || n || '@example.com'
-from generate_series(1, 3) as n;
+from generate_series(1, 4) as n;
 
 insert into public.profiles (id, auth_user_id, full_name, email, status)
 select ('b5700000-0000-0000-0000-00000000000' || n)::uuid,
   ('a5700000-0000-0000-0000-00000000000' || n)::uuid,
   'Confirm user ' || n, 'confirm-' || n || '@example.com', 'active'
-from generate_series(1, 3) as n;
+from generate_series(1, 4) as n;
 
 insert into public.user_roles (user_id, role_id)
 select v.profile_id::uuid, r.id
 from (values
   ('b5700000-0000-0000-0000-000000000001', 'admin'),
   ('b5700000-0000-0000-0000-000000000002', 'operator'),
-  ('b5700000-0000-0000-0000-000000000003', 'treasurer')
+  ('b5700000-0000-0000-0000-000000000003', 'treasurer'),
+  ('b5700000-0000-0000-0000-000000000004', 'admin')
 ) as v (profile_id, role_name)
 join public.roles r on r.name = v.role_name;
 
@@ -325,15 +326,17 @@ select public.import_session_validate(pg_temp.id('s7'));
 select public.import_session_confirm(pg_temp.id('s7'));
 insert into ids select 'b70', id from public.bonds where import_session_id = pg_temp.id('s7') and barcode = 'K-70';
 insert into ids select 'b71', id from public.bonds where import_session_id = pg_temp.id('s7') and barcode = 'K-71';
-select pg_temp.act_as(1);
+-- Annulled by hand by ANOTHER admin, so the author check below would catch an overwrite.
+select pg_temp.act_as(4);
 select public.bond_annul(pg_temp.id('b70'), 'damaged card');
+select pg_temp.act_as(1);
 select lives_ok(
   $$select public.import_session_rollback(pg_temp.id('s7'), 'wrong batch 7', 'req-skip')$$,
   'an import with a bond annulled by hand can be rolled back'
 );
 select is(
   (select annul_reason || ':' || annulled_by from public.bonds where id = pg_temp.id('b70')),
-  'damaged card:b5700000-0000-0000-0000-000000000001',
+  'damaged card:b5700000-0000-0000-0000-000000000004',
   'the bond annulled by hand keeps its own reason and author'
 );
 select is(
@@ -350,6 +353,43 @@ select is(
   (select (new_value ->> 'bonds_annulled') || ':' || (new_value ->> 'bonds_skipped')
    from public.audit_log where action = 'import.rollback' and request_id = 'req-skip'),
   '1:1', 'the rollback audit counts annulled and skipped bonds'
+);
+set local role authenticated;
+select pg_temp.act_as(1);
+
+-- A bond sold and then annulled keeps its numbers held: the rollback skips it and must not try to
+-- release them (the trigger forbids releasing the numbers of a bond annulled from sold).
+select pg_temp.act_as(2);
+insert into ids select 's8', public.import_session_create(pg_temp.id('c-confirm'), 'csv_file', 'sold.csv');
+select public.import_session_add_items(pg_temp.id('s8'), '[
+  {"row_number":2,"item_type":"simple","base_number":80,"barcode":"S-80"},
+  {"row_number":3,"item_type":"simple","base_number":81,"barcode":"S-81"}
+]'::jsonb);
+select public.import_session_validate(pg_temp.id('s8'));
+select public.import_session_confirm(pg_temp.id('s8'));
+insert into ids select 'b80', id from public.bonds where import_session_id = pg_temp.id('s8') and barcode = 'S-80';
+insert into ids select 'b81', id from public.bonds where import_session_id = pg_temp.id('s8') and barcode = 'S-81';
+reset role;
+update public.bonds set commercial_status = 'delivered_to_collector' where id = pg_temp.id('b80');
+update public.bonds set commercial_status = 'sold' where id = pg_temp.id('b80');
+update public.bonds set commercial_status = 'annulled', annulled_by = 'b5700000-0000-0000-0000-000000000004',
+  annul_reason = 'sale cancelled' where id = pg_temp.id('b80');
+set local role authenticated;
+select pg_temp.act_as(1);
+select lives_ok(
+  'select public.import_session_rollback(pg_temp.id(''s8''), ''wrong batch 8'')',
+  'an import with a bond annulled from sold can be rolled back'
+);
+reset role;
+select is(
+  (select count(*)::int || ':' || count(*) filter (where released_at is null)
+   from public.bond_numbers where bond_id = pg_temp.id('b80')),
+  '2:2', 'the numbers of the bond annulled from sold stay held'
+);
+select is(
+  (select (select annulled_from_status from public.bonds where id = pg_temp.id('b80')) || ':'
+     || (select commercial_status || '/' || annul_reason from public.bonds where id = pg_temp.id('b81'))),
+  'sold:annulled/wrong batch 8', 'the sold-annulled bond is skipped and the other one is annulled'
 );
 set local role authenticated;
 select pg_temp.act_as(1);
