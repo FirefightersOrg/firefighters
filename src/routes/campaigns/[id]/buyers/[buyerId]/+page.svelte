@@ -1,5 +1,4 @@
 <script lang="ts">
-	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { resolve } from '$app/paths';
 	import BuyerForm from '$lib/components/buyers/BuyerForm.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
@@ -8,8 +7,6 @@
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
-	const collectorHref = (collectorId: string) =>
-		`/campaigns/${data.campaign.id}/collectors/${collectorId}`;
 	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
 		bond.baseNumbers
 			.map((number) =>
@@ -50,11 +47,17 @@
 				campaignId={data.campaign.id}
 				buyer={data.buyer}
 				collectors={data.collectors}
+				usualCollectorNotVisible={data.usualCollectorNotVisible}
+				canViewCollectors={data.canViewCollectors}
 				{form}
 			/>{:else}<dl class="grid gap-3 sm:grid-cols-2">
 				<div>
 					<dt class="text-slate-500">Type</dt>
 					<dd>{BUYER_TYPE_LABELS[data.buyer.type]}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Name</dt>
+					<dd>{buyerDisplayName(data.buyer)}</dd>
 				</div>
 				<div>
 					<dt class="text-slate-500">Identification</dt>
@@ -66,12 +69,15 @@
 				</div>
 				<div>
 					<dt class="text-slate-500">Usual collector</dt>
-					<dd>
-						{#if data.collector}<a
-								class="text-blue-700 underline"
-								href={collectorHref(data.collector.id)}>{data.collector.displayName}</a
-							>{:else}—{/if}
-					</dd>
+					<dd>{data.collector?.displayName ?? '—'}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Address</dt>
+					<dd>{data.buyer.address ?? '—'}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Notes</dt>
+					<dd class="whitespace-pre-wrap">{data.buyer.notes ?? '—'}</dd>
 				</div>
 			</dl>{/if}
 	</section>

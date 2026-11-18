@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { requirePermissionIn } from '$lib/server/auth/permissions';
+import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { buyerDisplayName } from '$lib/domain/parties';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
@@ -30,7 +30,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (campaign.error || collectors.error)
 		error(500, { message: 'Could not load the form. Please try again.' });
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
-	return { campaign: campaign.data, collectors: collectors.data ?? [] };
+	return {
+		campaign: campaign.data,
+		collectors: collectors.data ?? [],
+		canViewCollectors:
+			hasPermissionIn(locals.permissions, 'collector.view') ||
+			hasPermissionIn(locals.permissions, 'collector.manage')
+	};
 };
 export const actions: Actions = {
 	default: async ({ request, locals, params, url }) => {
