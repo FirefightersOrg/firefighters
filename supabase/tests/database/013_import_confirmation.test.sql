@@ -1,6 +1,6 @@
 -- SAN-47: confirmation and functional rollback of import sessions.
 begin;
-select plan(59);
+select plan(63);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -258,6 +258,35 @@ select is(
 );
 set local role authenticated;
 select pg_temp.act_as(2);
+
+-- Atomicity: in a batch of several bonds, ONE number taken after validation leaves nothing behind
+-- (no bond of the session, none of its other numbers) and the session back in draft.
+insert into ids select 's9', public.import_session_create(pg_temp.id('c-confirm'), 'csv_file', 'multi.csv');
+select public.import_session_add_items(pg_temp.id('s9'), '[
+  {"row_number":2,"item_type":"simple","base_number":90,"barcode":"M-90"},
+  {"row_number":3,"item_type":"pata","group_key":"MP","base_number":91,"barcode":"M-91"},
+  {"row_number":4,"item_type":"pata","group_key":"MP","base_number":92,"barcode":"M-92"},
+  {"row_number":5,"item_type":"simple","base_number":93,"barcode":"M-93"}
+]'::jsonb);
+select public.import_session_validate(pg_temp.id('s9'));
+select public.bond_create(pg_temp.id('c-confirm'), array[93]);
+select is(
+  public.import_session_confirm(pg_temp.id('s9')) ->> 'confirmed', 'false',
+  'a batch with one number taken after validation is not confirmed'
+);
+select is(
+  (select count(*)::int from public.bonds where import_session_id = pg_temp.id('s9')),
+  0, 'no bond of the stale batch exists (not even those whose numbers were free)'
+);
+select is(
+  (select count(*)::int from public.bond_numbers
+   where campaign_id = pg_temp.id('c-confirm') and number_value in (90, 91, 92, 4961, 4962, 4963)),
+  0, 'none of the stale batch numbers was created'
+);
+select is(
+  (select status from public.import_sessions where id = pg_temp.id('s9')),
+  'draft', 'the stale batch is back in draft'
+);
 
 -- ---------------------------------------------------------------------------
 -- Confirmation needs a campaign that still accepts bonds
