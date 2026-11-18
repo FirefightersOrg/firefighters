@@ -1,5 +1,5 @@
 # Toolchain for this repo (matches package.json "packageManager" and "engines").
 # When bumping "packageManager" in package.json, update pnpm here too.
 [tools]
-node = "22.23.1"
+node = "22"
 pnpm = "11.17.0"
