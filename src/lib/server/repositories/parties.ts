@@ -52,6 +52,12 @@ export interface BuyerRow {
 	updated_at: string;
 }
 
+export interface CollectorProfileOption {
+	id: string;
+	fullName: string;
+	email: string;
+}
+
 function oneOf<T extends string>(values: readonly T[], value: string, what: string): T {
 	if (!(values as readonly string[]).includes(value))
 		throw new Error(`unexpected ${what}: ${value}`);
@@ -177,6 +183,70 @@ export async function listActiveCollectorOptions(
 		data: (data ?? []).map((c) => ({ id: c.id, displayName: c.display_name })),
 		error: null
 	};
+}
+
+/** Active login profiles not already linked to a collector, for the collector form. */
+export async function listAvailableCollectorProfileOptions(
+	supabase: SupabaseClient
+): Promise<RepositoryResult<CollectorProfileOption[]>> {
+	const { data: profiles, error: profileError } = await supabase
+		.from('profiles')
+		.select('id, full_name, email')
+		.eq('status', 'active')
+		.order('full_name', { ascending: true })
+		.limit(1000)
+		.overrideTypes<{ id: string; full_name: string; email: string }[], { merge: false }>();
+	if (profileError) return { data: null, error: profileError };
+	const { data: linked, error: linkedError } = await supabase
+		.from('collectors')
+		.select('user_profile_id')
+		.not('user_profile_id', 'is', null)
+		.overrideTypes<{ user_profile_id: string }[], { merge: false }>();
+	if (linkedError) return { data: null, error: linkedError };
+	const linkedIds = new Set((linked ?? []).map((row) => row.user_profile_id));
+	return {
+		data: (profiles ?? [])
+			.filter((profile) => !linkedIds.has(profile.id))
+			.map((profile) => ({ id: profile.id, fullName: profile.full_name, email: profile.email })),
+		error: null
+	};
+}
+
+/** Assigned bond counts for all collectors shown on one page (one query, never N+1). */
+export async function countAssignedBondsByCollector(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorIds: readonly string[]
+): Promise<RepositoryResult<Map<string, number>>> {
+	if (collectorIds.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('bonds')
+		.select('current_collector_id')
+		.eq('campaign_id', campaignId)
+		.in('current_collector_id', [...collectorIds])
+		.overrideTypes<{ current_collector_id: string }[], { merge: false }>();
+	if (error) return { data: null, error };
+	const counts = new Map<string, number>();
+	for (const row of data ?? [])
+		counts.set(row.current_collector_id, (counts.get(row.current_collector_id) ?? 0) + 1);
+	return { data: counts, error: null };
+}
+
+/** This campaign's bonds currently assigned to a collector. */
+export async function listAssignedBondsForCollector(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorId: string
+): Promise<RepositoryResult<{ id: string }[]>> {
+	const { data, error } = await supabase
+		.from('bonds')
+		.select('id')
+		.eq('campaign_id', campaignId)
+		.eq('current_collector_id', collectorId)
+		.order('created_at', { ascending: false })
+		.overrideTypes<{ id: string }[], { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: data ?? [], error: null };
 }
 
 /**
