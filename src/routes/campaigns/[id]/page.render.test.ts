@@ -28,11 +28,28 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
 	};
 }
 
-const can = { editName: true, editDates: true, editRules: true, transitions: [] };
+const can = {
+	editName: true,
+	editDates: true,
+	editRules: true,
+	transitions: [],
+	viewCommissions: false,
+	viewBonds: false,
+	loadBonds: false
+};
 
-function renderPage(loaded: Campaign, form: Record<string, unknown> | null = null) {
+function renderPage(
+	loaded: Campaign,
+	form: Record<string, unknown> | null = null,
+	extra: { hasBonds?: boolean; can?: Partial<typeof can> } = {}
+) {
+	const data = {
+		campaign: loaded,
+		hasBonds: extra.hasBonds ?? false,
+		can: { ...can, ...extra.can }
+	};
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
-	const props = { data: { campaign: loaded, can }, form, params: { id: loaded.id } } as any;
+	const props = { data, form, params: { id: loaded.id } } as any;
 	return render(Page, { props }).body;
 }
 
@@ -113,5 +130,38 @@ describe('campaign page edit forms (values and version come from the same load)'
 			expect(reasonOf(body)).toBe('');
 			expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V2);
 		});
+	});
+});
+
+describe('campaign page: bonds', () => {
+	it('shows the rules of a draft with bonds as frozen, explaining why, without the rules form', () => {
+		const body = renderPage(campaign(), null, { hasBonds: true, can: { editRules: false } });
+		expect(body).toContain('Rules are frozen.');
+		expect(body).toContain('This campaign already has bonds');
+		expect(body).toContain('even though the campaign is still a');
+		expect(body).not.toMatch(/action="\?\/rules"/);
+		// General data stays editable.
+		expect(body).toMatch(/action="\?\/update"/);
+	});
+
+	it('explains the status when an active campaign has frozen rules', () => {
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			hasBonds: true,
+			can: { editRules: false }
+		});
+		expect(body).toContain('This campaign is active');
+		expect(body).not.toContain('This campaign already has bonds');
+	});
+
+	it('links to bond loading only when allowed', () => {
+		const href = '/campaigns/f0000000-0000-0000-0000-000000000001/bonds/new';
+		expect(renderPage(campaign(), null, { can: { loadBonds: true } })).toContain(`href="${href}"`);
+		expect(renderPage(campaign())).not.toContain(href);
+	});
+
+	it('links to the bonds list only with bond.view', () => {
+		const href = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"';
+		expect(renderPage(campaign(), null, { can: { viewBonds: true } })).toContain(href);
+		expect(renderPage(campaign())).not.toContain(href);
 	});
 });

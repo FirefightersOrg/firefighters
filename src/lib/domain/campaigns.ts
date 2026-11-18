@@ -95,6 +95,14 @@ export function canEditCampaignName(status: CampaignStatus): boolean {
 	return status === 'draft' || status === 'active' || status === 'closing';
 }
 
+/**
+ * Bonds can be loaded (and grouped, ungrouped or annulled) while the campaign is a draft or
+ * active (`bond_create` and the other `bond_*` SQL functions enforce the same window).
+ */
+export function canLoadBonds(status: CampaignStatus): boolean {
+	return status === 'draft' || status === 'active';
+}
+
 /** App representation of a `campaigns` row. Money is a two-decimal string (see `money.ts`). */
 export interface Campaign {
 	id: string;

@@ -7,6 +7,7 @@ import {
 	canEditCampaignDates,
 	canEditCampaignName,
 	canEditCampaignRules,
+	canLoadBonds,
 	CAMPAIGN_STATUSES,
 	CAMPAIGN_TRANSITION_PERMISSIONS,
 	formatCampaignDate,
@@ -62,6 +63,7 @@ describe('campaign status machine', () => {
 	it('mirrors the edit windows of the write guard', () => {
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignRules)).toEqual(['draft']);
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignDates)).toEqual(['draft', 'active']);
+		expect(CAMPAIGN_STATUSES.filter(canLoadBonds)).toEqual(['draft', 'active']);
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignName)).toEqual(['draft', 'active', 'closing']);
 	});
 

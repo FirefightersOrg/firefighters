@@ -7,6 +7,16 @@
 --   2. B delivers (not committed yet); A tries to ungroup. A must wait for B's lock and, once B
 --      commits, fail because the pata is no longer available.
 -- Either way no pata leaves `available` without its members.
+-- Annulment (review of SAN-22): a manual pata can only be annulled with no active members, so
+-- its members are never left blocked behind an annulled pata. Annulment and ungrouping lock the
+-- same pata row, so they serialize:
+--   4. A ungroups through bond_ungroup_pata (ungroup + annul, not committed yet); B tries to annul
+--      the pata directly. B waits and, once A commits, fails because the pata is already annulled.
+--   5. B ungroups every member (not committed yet); A tries to annul the pata. A waits and, once B
+--      commits, succeeds: the pata no longer has active members.
+--   6. A ungroups one of two members (not committed yet); B tries to annul the pata. B waits and,
+--      once A commits, fails because one member is still active.
+-- No annulled manual pata ever keeps active members.
 --
 -- dblink needs a password-authenticated connection for a non-superuser: it connects to this same
 -- server over TCP (inet_server_addr()) as postgres with the local Supabase password. If that is
@@ -16,7 +26,7 @@
 -- that cleanup only, inside one transaction of the setup session). This session never touches the
 -- bond tables itself, so the cleanup's locks cannot wait on it.
 begin;
-select plan(12);
+select plan(24);
 -- dblink reports the expected remote errors as notices: keep the output quiet.
 set local client_min_messages = warning;
 
@@ -101,7 +111,8 @@ insert into race values ('connected', pg_temp.connect_all()::text);
 -- ---------------------------------------------------------------------------
 insert into race
 select k, gen_random_uuid()::text
-from unnest(array['user', 'profile', 'campaign', 'p1', 'p1m1', 'p1m2', 'p2', 'p2m1', 'p2m2']) as k;
+from unnest(array['user', 'profile', 'campaign', 'p1', 'p1m1', 'p1m2', 'p2', 'p2m1', 'p2m2',
+  'p3', 'p3m1', 'p3m2', 'p4', 'p4m1', 'p4m2', 'p5', 'p5m1', 'p5m2']) as k;
 
 select pg_temp.exec('race_setup', format($sql$
   insert into auth.users (id, email) values (%1$L, %1$L || '@race.example.com');
@@ -125,6 +136,30 @@ select pg_temp.exec('race_setup', format($sql$
   pg_temp.v('p1m1'), pg_temp.v('p1m2'), pg_temp.v('p2'), pg_temp.v('p2m1'), pg_temp.v('p2m2')))
 where pg_temp.v('connected')::boolean;
 
+-- Annulment races: three more complete manual patas of 2, and the operator role (bond.create)
+-- so the race user can call bond_ungroup_pata.
+select pg_temp.exec('race_setup', format($sql$
+  insert into public.user_roles (user_id, role_id)
+    select %1$L, r.id from public.roles r where r.name = 'operator';
+  insert into public.bonds (id, campaign_id, kind, origin, commercial_unit_count, total_value, created_by)
+    values (%3$L, %2$L, 'pata', 'manual_grouping', 2, 120000, %1$L),
+           (%4$L, %2$L, 'simple', 'printed', 1, 60000, %1$L),
+           (%5$L, %2$L, 'simple', 'printed', 1, 60000, %1$L),
+           (%6$L, %2$L, 'pata', 'manual_grouping', 2, 120000, %1$L),
+           (%7$L, %2$L, 'simple', 'printed', 1, 60000, %1$L),
+           (%8$L, %2$L, 'simple', 'printed', 1, 60000, %1$L),
+           (%9$L, %2$L, 'pata', 'manual_grouping', 2, 120000, %1$L),
+           (%10$L, %2$L, 'simple', 'printed', 1, 60000, %1$L),
+           (%11$L, %2$L, 'simple', 'printed', 1, 60000, %1$L);
+  insert into public.bond_groups (pata_bond_id, member_bond_id, grouped_by)
+    values (%3$L, %4$L, %1$L), (%3$L, %5$L, %1$L), (%6$L, %7$L, %1$L), (%6$L, %8$L, %1$L),
+           (%9$L, %10$L, %1$L), (%9$L, %11$L, %1$L);
+  $sql$,
+  pg_temp.v('profile'), pg_temp.v('campaign'), pg_temp.v('p3'), pg_temp.v('p3m1'), pg_temp.v('p3m2'),
+  pg_temp.v('p4'), pg_temp.v('p4m1'), pg_temp.v('p4m2'), pg_temp.v('p5'), pg_temp.v('p5m1'),
+  pg_temp.v('p5m2')))
+where pg_temp.v('connected')::boolean;
+
 insert into race
 select 'pid_a', pg_temp.fetch('race_a', 'select pg_backend_pid()::text')
 where pg_temp.v('connected')::boolean;
@@ -142,6 +177,12 @@ declare
   v_deliver text := 'update public.bonds set commercial_status = ''delivered_to_collector'' where id = %L';
   v_state text := 'select b.commercial_status || ''/'' || (select count(*) from public.bond_groups g '
     || 'where g.pata_bond_id = b.id and g.ungrouped_at is null) from public.bonds b where b.id = %L';
+  v_annul text := 'update public.bonds set commercial_status = ''annulled'', annulled_by = %L, '
+    || 'annul_reason = ''Race annul'' where id = %L';
+  -- Status of both members and how many active memberships they still have.
+  v_members text := 'select string_agg(b.commercial_status, '','' order by b.id) || ''/'' || '
+    || '(select count(*) from public.bond_groups g where g.member_bond_id in (%1$L, %2$L) '
+    || 'and g.ungrouped_at is null) from public.bonds b where b.id in (%1$L, %2$L)';
 begin
   -- A set-returning function runs before any WHERE on its rows: check the connection here.
   if not pg_temp.v('connected')::boolean then
@@ -208,6 +249,93 @@ begin
     'only an available pata can be ungrouped (pata status: sold)',
     'race 3: a sold pata cannot be ungrouped'
   );
+
+  -- 4. bond_ungroup_pata first (ungroups and annuls): the concurrent direct annulment waits, then
+  --    finds the pata already annulled.
+  perform pg_temp.exec('race_a', 'begin');
+  perform pg_temp.exec('race_a', 'set local role authenticated');
+  -- dblink_exec runs statements that return no rows: SET and DO instead of SELECT.
+  perform pg_temp.exec('race_a', format(
+    'set local request.jwt.claims = %L',
+    format('{"sub":"%s","role":"authenticated"}', pg_temp.v('user'))));
+  perform pg_temp.exec('race_a', format(
+    'do $do$ begin perform public.bond_ungroup_pata(%L, ''Race ungroup''); end $do$', pg_temp.v('p3')));
+  perform extensions.dblink_send_query('race_b', format(v_annul, pg_temp.v('profile'), pg_temp.v('p3')));
+  return next ok(
+    pg_temp.waits_for_lock(pg_temp.v('pid_b')::int),
+    'race 4: the direct annulment waits for the uncommitted bond_ungroup_pata (pata row locked)'
+  );
+  perform pg_temp.exec('race_a', 'commit');
+  return next is(
+    pg_temp.async_result('race_b'),
+    format('bond %s is annulled and cannot be changed', pg_temp.v('p3')),
+    'race 4: once the ungrouping commits, the direct annulment fails (already annulled)'
+  );
+  return next is(
+    pg_temp.fetch('race_setup', format(v_state, pg_temp.v('p3'))), 'annulled/0',
+    'race 4: the pata is annulled without members'
+  );
+  return next is(
+    pg_temp.fetch('race_setup', format(v_members, pg_temp.v('p3m1'), pg_temp.v('p3m2'))),
+    'available,available/0',
+    'race 4: the former members are available and free'
+  );
+
+  -- 5. Ungrouping first: the concurrent annulment waits, then sees no active members and succeeds.
+  perform pg_temp.exec('race_b', 'begin');
+  perform pg_temp.exec('race_b', format(v_ungroup, pg_temp.v('profile'), pg_temp.v('p4')));
+  perform extensions.dblink_send_query('race_a', format(v_annul, pg_temp.v('profile'), pg_temp.v('p4')));
+  return next ok(
+    pg_temp.waits_for_lock(pg_temp.v('pid_a')::int),
+    'race 5: the annulment waits for the uncommitted ungrouping (pata row locked)'
+  );
+  perform pg_temp.exec('race_b', 'commit');
+  return next is(
+    pg_temp.async_result('race_a'), 'ok',
+    'race 5: once the ungrouping commits, the annulment succeeds (no active members left)'
+  );
+  return next is(
+    pg_temp.fetch('race_setup', format(v_state, pg_temp.v('p4'))), 'annulled/0',
+    'race 5: the pata is annulled without members'
+  );
+  return next is(
+    pg_temp.fetch('race_setup', format(v_members, pg_temp.v('p4m1'), pg_temp.v('p4m2'))),
+    'available,available/0',
+    'race 5: the former members are available and free'
+  );
+
+  -- 6. Partial ungrouping first: the concurrent annulment waits, then sees the remaining member.
+  perform pg_temp.exec('race_a', 'begin');
+  perform pg_temp.exec('race_a', format(
+    'update public.bond_groups set ungrouped_at = now(), ungrouped_by = %L, reason = ''Race'' '
+    || 'where pata_bond_id = %L and member_bond_id = %L',
+    pg_temp.v('profile'), pg_temp.v('p5'), pg_temp.v('p5m1')));
+  perform extensions.dblink_send_query('race_b', format(v_annul, pg_temp.v('profile'), pg_temp.v('p5')));
+  return next ok(
+    pg_temp.waits_for_lock(pg_temp.v('pid_b')::int),
+    'race 6: the annulment waits for the uncommitted partial ungrouping (pata row locked)'
+  );
+  perform pg_temp.exec('race_a', 'commit');
+  return next is(
+    pg_temp.async_result('race_b'),
+    format('manually grouped pata %s has 1 active members and must be ungrouped before annulment',
+      pg_temp.v('p5')),
+    'race 6: once the partial ungrouping commits, the annulment fails (one member is still active)'
+  );
+  return next is(
+    pg_temp.fetch('race_setup', format(v_state, pg_temp.v('p5'))), 'available/1',
+    'race 6: the pata stays available with its remaining member'
+  );
+
+  return next is(
+    pg_temp.fetch('race_setup', format(
+      'select count(*)::text from public.bonds b where b.campaign_id = %L and b.origin = ''manual_grouping'' '
+      || 'and b.commercial_status = ''annulled'' and exists (select 1 from public.bond_groups g '
+      || 'where g.pata_bond_id = b.id and g.ungrouped_at is null)',
+      pg_temp.v('campaign'))),
+    '0',
+    'no annulled manual pata keeps active members'
+  );
   return next is(
     pg_temp.fetch('race_setup', format(
       'select count(*)::text from public.bonds b where b.campaign_id = %L and b.origin = ''manual_grouping'' '
@@ -221,7 +349,7 @@ end;
 $$;
 
 select * from pg_temp.race_tests();
-select skip('dblink cannot connect to this server', 10) where not pg_temp.v('connected')::boolean;
+select skip('dblink cannot connect to this server', 22) where not pg_temp.v('connected')::boolean;
 
 -- ---------------------------------------------------------------------------
 -- Cleanup of the committed fixtures (one transaction in the setup session)
@@ -232,6 +360,9 @@ select lives_ok(
     alter table public.bond_groups disable trigger bond_groups_forbid_delete;
     alter table public.bonds disable trigger bonds_forbid_delete;
     alter table public.campaigns disable trigger campaigns_forbid_delete;
+    alter table public.audit_log disable trigger audit_log_forbid_update_delete;
+    delete from public.audit_log where actor_user_id = %2$L;
+    delete from public.user_roles where user_id = %2$L;
     delete from public.bond_groups where pata_bond_id in (select id from public.bonds where campaign_id = %1$L);
     delete from public.bonds where campaign_id = %1$L;
     delete from public.campaigns where id = %1$L;
@@ -240,6 +371,7 @@ select lives_ok(
     alter table public.bond_groups enable trigger bond_groups_forbid_delete;
     alter table public.bonds enable trigger bonds_forbid_delete;
     alter table public.campaigns enable trigger campaigns_forbid_delete;
+    alter table public.audit_log enable trigger audit_log_forbid_update_delete;
     commit;
     $sql$, pg_temp.v('campaign'), pg_temp.v('profile'), pg_temp.v('user'))),
   'cleanup: the committed race fixtures are removed'

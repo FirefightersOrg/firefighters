@@ -20,7 +20,7 @@ import {
 	emptyGeneralValues,
 	rulesValuesOf
 } from '$lib/components/campaigns/types';
-import { campaignNumberingConfig, type Campaign } from '$lib/domain/campaigns';
+import { campaignNumberingConfig, canLoadBonds, type Campaign } from '$lib/domain/campaigns';
 import {
 	formatCommissionRuleType,
 	formatCommissionValue,
@@ -102,6 +102,8 @@ interface CampaignPageData {
 		editRules: boolean;
 		transitions: string[];
 		viewCommissions: boolean;
+		viewBonds: boolean;
+		loadBonds: boolean;
 	};
 }
 
@@ -504,7 +506,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				editDates: true,
 				editRules: true,
 				transitions: ['active', 'annulled'],
-				viewCommissions: true
+				viewCommissions: true,
+				viewBonds: true,
+				loadBonds: true
 			});
 
 			const audit = await expectOneAudit(requestId, {
@@ -1145,7 +1149,11 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					editDates: false,
 					editRules: false,
 					transitions: [],
-					viewCommissions: false
+					viewCommissions: false,
+					// SAN-26: every one of these roles has bond.view (bonds list link).
+					viewBonds: true,
+					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
+					loadBonds: role === 'operator' && canLoadBonds(target.status)
 				});
 
 				await expect(
