@@ -268,7 +268,7 @@ Built on the app layer above (SAN-98); they add no parsing or validation of thei
   blocking error), Cancel and, with `bond.annul`, Roll back. Files need `bond.import`, scans
   `bond.scan`.
 - **Row correction.** `import_session_update_item` (migration
-  `20261129000000_import_item_correction.sql`, service `updateImportItem`) retypes the type,
+  `20261130000000_import_item_correction.sql`, service `updateImportItem`) retypes the type,
   `grupo_pata`, base number and barcode of a live row of a draft/validated session and
   revalidates it (audited as `import.update_item`, with the replaced fields). Unlike revalidation,
   it also clears a parser error, since the operator typed the values again; `raw_value` keeps the
