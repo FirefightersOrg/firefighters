@@ -18,7 +18,7 @@ join public.permissions v on v.code = regexp_replace(a.code, '\.[^.]+$', '') || 
 where substring(a.code from '[^.]+$') !~ '^view(_|$)'
 on conflict do nothing;
 
--- Guard: the expected grants exist and no role is left with an action but without the view.
+-- Guard: the grants listed above exist (the invariant itself is checked by pgTAP 017).
 do $$
 declare
   v_missing text;

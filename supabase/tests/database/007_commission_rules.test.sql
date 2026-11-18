@@ -7,7 +7,7 @@ select plan(140);
 -- auth ids / profiles:
 --   ...01 admin (every permission)
 --   ...02 operator      (no commission.* permission)
---   ...03 treasurer     (commission.adjust only: no commission.view / commission.rule_manage)
+--   ...03 treasurer     (commission.adjust + commission.view since SAN-93; no commission.rule_manage)
 --   ...04 read-only     (no commission.* permission)
 --   ...05 no roles
 --   ...06 inactive admin
@@ -829,7 +829,7 @@ select ok((select count(*) from public.commission_rules) >= 10, 'rls: viewer see
 select pg_temp.act_as(2);
 select is((select count(*)::int from public.commission_rules), 0, 'rls: operator sees no rules');
 select pg_temp.act_as(3);
-select is((select count(*)::int from public.commission_rules), 0, 'rls: treasurer sees no rules (no commission.view)');
+select ok((select count(*) from public.commission_rules) >= 10, 'rls: treasurer sees every rule (commission.view, SAN-93)');
 select pg_temp.act_as(4);
 select is((select count(*)::int from public.commission_rules), 0, 'rls: read-only sees no rules');
 select pg_temp.act_as(6);

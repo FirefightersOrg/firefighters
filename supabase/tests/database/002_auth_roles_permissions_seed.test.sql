@@ -1,5 +1,5 @@
 begin;
-select plan(13);
+select plan(14);
 
 select is((select count(*)::int from public.roles), 5, '5 roles seeded');
 select is((select count(*)::int from public.permissions), 44, '44 permissions seeded');
@@ -20,8 +20,8 @@ join public.roles r on r.id = rp.role_id
 join public.permissions p on p.id = rp.permission_id;
 
 select is((select count(*)::int from _rp where role_name = 'admin'), 44, 'admin has all 44 permissions');
-select is((select count(*)::int from _rp where role_name = 'operator'), 11, 'operator has 11 permissions (bond.scan added in SAN-44)');
-select is((select count(*)::int from _rp where role_name = 'treasurer'), 12, 'treasurer has 12 permissions');
+select is((select count(*)::int from _rp where role_name = 'operator'), 13, 'operator has 13 permissions (bond.scan in SAN-44; buyer.view, draw.view in SAN-93)');
+select is((select count(*)::int from _rp where role_name = 'treasurer'), 14, 'treasurer has 14 permissions (commission.view, draw.view in SAN-93)');
 select is((select count(*)::int from _rp where role_name = 'read-only'), 3, 'read-only has 3 permissions');
 select is((select count(*)::int from _rp where role_name = 'collector'), 0, 'collector has no permissions');
 
@@ -34,9 +34,16 @@ select is(
 );
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'operator'),
-  array['bond.assign', 'bond.create', 'bond.import', 'bond.scan', 'bond.view', 'buyer.manage', 'campaign.view',
-        'draw.load_winner', 'payment.create', 'sale.create', 'settlement.create'],
+  array['bond.assign', 'bond.create', 'bond.import', 'bond.scan', 'bond.view', 'buyer.manage', 'buyer.view',
+        'campaign.view', 'draw.load_winner', 'draw.view', 'payment.create', 'sale.create', 'settlement.create'],
   'operator grants match the matrix'
+);
+select is(
+  (select array_agg(code order by code) from _rp where role_name = 'treasurer'),
+  array['audit.view', 'bond.view', 'campaign.view', 'commission.adjust', 'commission.view', 'draw.freeze_roster',
+        'draw.load_winner', 'draw.view', 'payment.annul', 'payment.create', 'report.view_financial',
+        'settlement.close', 'settlement.correct', 'settlement.create'],
+  'treasurer grants match the matrix'
 );
 
 select * from finish();
