@@ -1,5 +1,21 @@
 -- SAN-47: atomically materialize a validated import and functionally roll it back.
 
+-- Each imported bond gets the same bond.create entry as a manual load, so its record shows how it
+-- was loaded (the snapshot is taken once its numbers exist) and which import created it.
+create function public.import_audit_bond_create(
+  p_actor uuid, p_bond public.bonds, p_session_id uuid, p_request_id text
+)
+returns void
+language sql
+volatile
+set search_path = ''
+as $$
+  insert into public.audit_log (actor_user_id, action, entity_type, entity_id, new_value, request_id)
+  values (p_actor, 'bond.create', 'bond', p_bond.id::text,
+    public.bond_audit_snapshot(p_bond) || jsonb_build_object('import_session_id', p_session_id),
+    p_request_id);
+$$;
+
 create function public.import_session_confirm(p_session_id uuid, p_request_id text default null)
 returns jsonb
 language plpgsql
@@ -51,6 +67,7 @@ begin
     values (v_campaign.id, v_bond.id, v_item.base_number + v_campaign.associated_number_offset,
       'associated', v_base_id);
     update public.import_session_items set created_bond_id = v_bond.id where id = v_item.id;
+    perform public.import_audit_bond_create(v_actor, v_bond, p_session_id, p_request_id);
   end loop;
 
   -- Each grupo_pata is one printed pata; row barcodes live on its base numbers.
@@ -73,6 +90,7 @@ begin
         'associated', v_base_id);
       update public.import_session_items set created_bond_id = v_bond.id where id = v_item.id;
     end loop;
+    perform public.import_audit_bond_create(v_actor, v_bond, p_session_id, p_request_id);
   end loop;
   update public.import_sessions set status = 'confirmed', confirmed_by = v_actor where id = p_session_id;
   insert into public.audit_log (actor_user_id, action, entity_type, entity_id, new_value, request_id)
@@ -93,6 +111,7 @@ declare
   v_session public.import_sessions;
   v_reason text := nullif(btrim(p_reason), '');
   v_count integer;
+  v_bond record;
 begin
   if v_reason is null then raise exception 'a rollback reason is required' using errcode = 'invalid_parameter_value'; end if;
   select * into v_session from public.import_sessions where id = p_session_id for update;
@@ -100,6 +119,8 @@ begin
   if v_session.status <> 'confirmed' or v_session.rolled_back_at is not null then
     raise exception 'import session % cannot be rolled back', p_session_id using errcode = 'object_not_in_prerequisite_state';
   end if;
+  -- Like bond_annul: imported bonds can only be annulled while the campaign is draft or active.
+  perform public.bond_lock_campaign(v_session.campaign_id);
   perform 1 from public.bonds where import_session_id = p_session_id order by id for update;
   select count(*) into v_count from public.bonds b where b.import_session_id = p_session_id
     and (b.commercial_status <> 'available' or exists (
@@ -107,6 +128,19 @@ begin
         and g.ungrouped_at is null));
   if v_count > 0 then raise exception 'import session % has % bond(s) that cannot be rolled back', p_session_id, v_count
     using errcode = 'object_not_in_prerequisite_state'; end if;
+  -- One bond.annul entry per bond (same shape as bond_annul), snapshotted before the release.
+  for v_bond in
+    select b.id, public.bond_audit_snapshot(b) -> 'numbers' as numbers
+    from public.bonds b where b.import_session_id = p_session_id order by b.id
+  loop
+    insert into public.audit_log
+      (actor_user_id, action, entity_type, entity_id, old_value, new_value, reason, request_id)
+    values (v_actor, 'bond.annul', 'bond', v_bond.id::text,
+      jsonb_build_object('commercial_status', 'available', 'numbers', v_bond.numbers),
+      jsonb_build_object('commercial_status', 'annulled', 'numbers', '[]'::jsonb,
+        'released_numbers', v_bond.numbers, 'import_session_id', p_session_id),
+      v_reason, p_request_id);
+  end loop;
   update public.bonds set commercial_status = 'annulled', annulled_by = v_actor, annul_reason = v_reason
   where import_session_id = p_session_id;
   update public.bond_numbers set released_at = now(), released_by = v_actor
@@ -118,6 +152,8 @@ begin
 end;
 $$;
 
+revoke all on function public.import_audit_bond_create(uuid, public.bonds, uuid, text)
+  from public, anon, authenticated, service_role;
 revoke all on function public.import_session_confirm(uuid, text) from public, anon, authenticated, service_role;
 revoke all on function public.import_session_rollback(uuid, text, text) from public, anon, authenticated, service_role;
 grant execute on function public.import_session_confirm(uuid, text) to authenticated;
