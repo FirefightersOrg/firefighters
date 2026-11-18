@@ -173,29 +173,8 @@ async function upload(caller: Caller, name: string, content: string): Promise<Ac
 let admin: Caller;
 let operator: Caller;
 let readOnly: Caller;
+let treasurer: Caller;
 let campaignId: string;
-
-beforeAll(async () => {
-	serviceClient = createClient(supabaseUrl, serviceRoleKey, clientOptions);
-	admin = await signIn(seedConfig.admin.email, seedConfig.admin.password);
-	const op = fixture('operator');
-	operator = await signIn(op.email, op.password);
-	const ro = fixture('read-only');
-	readOnly = await signIn(ro.email, ro.password);
-	const { data, error } = await admin.client.rpc('campaign_create', {
-		p_name: `[it-bond-import ${RUN_ID}] Imports`,
-		p_simple_bond_value: '60000.00',
-		p_installment_count: 10,
-		p_number_digits: 4,
-		p_max_number: 9999,
-		p_associated_number_offset: 4871,
-		p_overflow_policy: 'reject',
-		p_barcode_mode: 'base_number',
-		p_request_id: rid('campaign')
-	});
-	if (error) throw new Error(`campaign_create failed: ${error.message}`);
-	campaignId = data as string;
-});
 
 const sessionIdOf = (location: string | undefined) => {
 	const match = /\/bonds\/import\/([0-9a-f-]{36})$/.exec(location ?? '');
@@ -266,6 +245,7 @@ beforeAll(async () => {
 	admin = await signIn(seedConfig.admin.email, seedConfig.admin.password);
 	operator = await signIn(fixture('operator').email, fixture('operator').password);
 	readOnly = await signIn(fixture('read-only').email, fixture('read-only').password);
+	treasurer = await signIn(fixture('treasurer').email, fixture('treasurer').password);
 });
 
 describe('Phase 4 end-to-end acceptance (local Supabase)', () => {
@@ -305,6 +285,7 @@ describe('Phase 4 end-to-end acceptance (local Supabase)', () => {
 				['base_number', null, '0020', '0020'],
 				['internal_code', '^IT-([0-9]{4})$', 'IT-0021', '0021'],
 				['external_legacy_code', '^EX-([0-9]{4})$', 'EX-0022', '0022'],
+				['internal_code', null, 'INTERNAL', '0027'],
 				['external_legacy_code', null, 'LEGACY', '0023'],
 				['manual_mapping', null, 'MANUAL', '0024']
 			] as const) {
@@ -533,7 +514,7 @@ describe('Phase 4 end-to-end acceptance (local Supabase)', () => {
 	});
 
 	describe('7. Permissions follow session source', () => {
-		it('denies read-only and distinguishes bond.import from bond.scan', async () => {
+		it('denies users without import permissions and keeps each session on its source', async () => {
 			campaignId = await createCampaign('permissions');
 			await expect(
 				importLoad(event(readOnly, { id: campaignId }, '/bonds/import'))
@@ -541,6 +522,18 @@ describe('Phase 4 end-to-end acceptance (local Supabase)', () => {
 			await expect(
 				scanLoad(event(readOnly, { id: campaignId }, '/bonds/scan'))
 			).rejects.toMatchObject({ status: 403 });
+			// The treasurer has neither bond.import nor bond.scan (docs/permissions.md).
+			const denied = await upload(
+				treasurer,
+				'denied.csv',
+				'tipo_bono,grupo_pata,numero_base,barcode\nsimple,,0101,0101'
+			);
+			expect(denied.status).toBe(403);
+			const deniedScan = await run(
+				scanActions.start as (e: never) => unknown,
+				event(treasurer, { id: campaignId }, '/bonds/scan', { action: 'start', body: form({}) })
+			);
+			expect(deniedScan.status).toBe(403);
 			const scanId = await startScan(operator);
 			const scanPreview = await preview(operator, scanId);
 			expect(scanPreview.session.sourceType).toBe('barcode_scan');
