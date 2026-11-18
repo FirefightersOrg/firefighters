@@ -1,7 +1,7 @@
 -- SAN-44: import_sessions, import_session_items, campaigns.barcode_pattern, bonds.import_session_id,
 -- bond_numbers.barcode and the per-campaign barcode namespace; operator gets bond.scan.
 begin;
-select plan(158);
+select plan(159);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner)
@@ -769,6 +769,27 @@ select throws_ok(
       confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s12')$$,
   '55000', 'import session ' || pg_temp.id('s12') || ' has 1 base number(s) without a matching item',
   'a duplicated row base number cannot hide a base number without its row'
+);
+
+-- A pata row without barcode is not a match: a null barcode on the base number cannot stand in
+-- for the row's barcode.
+insert into ids select 's13', pg_temp.session('c-draft');
+insert into ids select 'i13-1', pg_temp.item(pg_temp.id('s13'), 515, 'valid', 'pata', 'P13');
+insert into ids select 'i13-2', pg_temp.item(pg_temp.id('s13'), 516, 'valid', 'pata', 'P13');
+update public.import_session_items set barcode = null where id = pg_temp.id('i13-1');
+update public.import_sessions set status = 'validated' where id = pg_temp.id('s13');
+insert into ids select 'b13', pg_temp.bond('c-draft', 2, 'P13', pg_temp.id('s13'));
+update public.import_session_items set created_bond_id = pg_temp.id('b13')
+where id in (pg_temp.id('i13-1'), pg_temp.id('i13-2'));
+insert into ids select 'n13-base-1', pg_temp.base(pg_temp.id('b13'), 515, null);
+insert into ids select 'n13-assoc-1', pg_temp.assoc(pg_temp.id('b13'), 515);
+insert into ids select 'n13-base-2', pg_temp.base(pg_temp.id('b13'), 516, 'IT-516');
+insert into ids select 'n13-assoc-2', pg_temp.assoc(pg_temp.id('b13'), 516);
+select throws_ok(
+  $$update public.import_sessions set status = 'confirmed',
+      confirmed_by = 'b4400000-0000-0000-0000-000000000001' where id = pg_temp.id('s13')$$,
+  '55000', 'import session ' || pg_temp.id('s13') || ' has 1 item(s) whose base number or barcode was not created',
+  'a pata row without barcode cannot be confirmed even if the base number has no barcode'
 );
 
 -- Cancel and fail.

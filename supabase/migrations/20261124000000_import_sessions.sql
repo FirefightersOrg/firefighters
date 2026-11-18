@@ -555,7 +555,9 @@ begin
           and n.number_kind = 'base'
           and n.released_at is null
           and n.number_value = i.base_number
-          and (i.item_type <> 'pata' or n.barcode is not distinct from i.barcode)
+          -- A pata row must keep its barcode: two nulls are not a match (IS NOT DISTINCT FROM
+          -- would accept a base number without a barcode).
+          and (i.item_type <> 'pata' or (i.barcode is not null and n.barcode = i.barcode))
       );
     if v_count > 0 then
       raise exception 'import session % has % item(s) whose base number or barcode was not created', old.id, v_count
