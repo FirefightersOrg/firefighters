@@ -1,5 +1,5 @@
 begin;
-select plan(107);
+select plan(108);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner, which bypasses RLS)
@@ -130,6 +130,10 @@ select throws_ok($$select * from public.audit_log$$, '42501', null, 'anon cannot
 select throws_ok($$select public.has_permission('user.manage')$$, '42501', null, 'anon cannot call has_permission');
 reset role;
 
+-- Every profile the owner sees (fixtures plus any seeded users): the admin must see exactly these.
+create temporary table owner_profile_count as select count(*)::int as n from public.profiles;
+grant select on owner_profile_count to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Admin (a1)
 -- ---------------------------------------------------------------------------
@@ -141,6 +145,10 @@ select is(
    where id between '10000000-0000-0000-0000-000000000001'::uuid
                 and '10000000-0000-0000-0000-000000000005'::uuid),
   5, 'admin reads all fixture profiles'
+);
+select is(
+  (select count(*)::int from public.profiles), (select n from owner_profile_count),
+  'admin reads every profile, seeded users included (RLS hides none)'
 );
 select is(public.current_profile_id(), '10000000-0000-0000-0000-000000000001'::uuid, 'admin: current_profile_id is own profile');
 select ok(public.has_permission('user.manage'), 'admin: has_permission(user.manage)');
