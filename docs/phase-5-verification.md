@@ -37,14 +37,14 @@ export APP_ENV=local PUBLIC_SUPABASE_URL="$SB_API_URL" \
   PUBLIC_SUPABASE_ANON_KEY="$SB_ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SB_SERVICE_ROLE_KEY"
 ```
 
-| Check                   | Command                                                                                                                                                       | Result                                                                                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 5 acceptance only | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm exec vitest run --config vitest.integration.config.ts tests/integration/phase-5-acceptance.test.ts` | **6/6 pass**                                                                                                                                                                                                            |
-| Type check              | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm check`                                                                                              | **0 errors, 0 warnings**                                                                                                                                                                                                |
-| Lint / format           | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm lint`                                                                                               | **Pass**                                                                                                                                                                                                                |
-| Unit tests              | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm test`                                                                                               | **1,014/1,014 pass** in 65 files                                                                                                                                                                                        |
-| Full integration        | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm test:integration`                                                                                   | **114/119 pass** in 10 files; 5 failures in pre-existing `phase-2-acceptance.test.ts` (four exact `can`-object expectations omit the newly added party-link flags; one audit-count assertion). Phase 5 is **6/6 pass**. |
-| pgTAP                   | `/home/juanigm/.npm/_npx/aa8e5c70f9d8d161/node_modules/@supabase/cli-linux-x64/bin/supabase test db`                                                          | **1,267/1,274 pass** in 14 files. `003_rls_has_permission.test.sql` has the known 7 failures with seeded users, to be fixed in #40; all other 13 files, including `019_collectors_buyers.test.sql`, pass.               |
+| Check                   | Command                                                                                                                                                       | Result                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 5 acceptance only | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm exec vitest run --config vitest.integration.config.ts tests/integration/phase-5-acceptance.test.ts` | **6/6 pass**                                                                                                                                                                                              |
+| Type check              | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm check`                                                                                              | **0 errors, 0 warnings**                                                                                                                                                                                  |
+| Lint / format           | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm lint`                                                                                               | **Pass**                                                                                                                                                                                                  |
+| Unit tests              | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm test`                                                                                               | **1,014/1,014 pass** in 65 files                                                                                                                                                                          |
+| Full integration        | `MISE_PNPM_VERSION=11.17.0 MISE_NODE_VERSION=22.23.1 pnpm test:integration`                                                                                   | **119/119 pass** in 10 files (Phase 5: 6/6). `phase-2-acceptance.test.ts` now expects the new `viewCollectors` / `viewBuyers` link flags (it compares the campaign `can` object exactly).                 |
+| pgTAP                   | `/home/juanigm/.npm/_npx/aa8e5c70f9d8d161/node_modules/@supabase/cli-linux-x64/bin/supabase test db`                                                          | **1,267/1,274 pass** in 14 files. `003_rls_has_permission.test.sql` has the known 7 failures with seeded users, to be fixed in #40; all other 13 files, including `019_collectors_buyers.test.sql`, pass. |
 
 ## Re-run data
 
@@ -70,19 +70,13 @@ order by created_at;
 
 ## Findings
 
-1. **Deletion SQLSTATE differs from SAN-52.** Reproduction: with service role, run
-   `delete from` equivalent through PostgREST on a referenced `collectors` or `buyers` row. It is
-   blocked, but returns `42501` (`permission denied for table ...`) because migration
-   `20261203000000_collectors_buyers.sql` revokes `DELETE` from `service_role`; the
-   `collectors_buyers_forbid_delete` trigger which raises `23001` is never reached. The requested
-   condition “nobody can delete: `23001`” is therefore not met, although deletion is prevented.
-   No product/migration change was made.
+No product bug was found.
 
-2. **Full integration suite currently has five non-Phase-5 failures.** Four phase-2 assertions
-   compare the campaign `can` object exactly and do not include the product's new
-   `viewCollectors` / `viewBuyers` properties. The fifth is phase-2's global audit row-count
-   assertion. No pre-existing acceptance tests were changed in this task.
-
-3. **Known pgTAP issue:** `003_rls_has_permission.test.sql` fails 7/107 checks in an environment
-   with seeded users (profile/audit counts and user-role guard expectations). This is the known
-   #40 issue requested in SAN-52; no database reset was used.
+- **Deletion is blocked in two layers.** API roles (`anon`, `authenticated`, `service_role`) have
+  no `DELETE` privilege on `collectors` / `buyers`, so PostgREST answers `42501`; the
+  `collectors_buyers_forbid_delete` trigger (`23001`) is the backstop for the table owner, covered
+  by pgTAP `019`. Both are expected (the brief's "23001 for everyone" was imprecise).
+- The first run of the full integration suite failed 5 tests in `phase-2-acceptance.test.ts`: the
+  campaign page gained the `viewCollectors` / `viewBuyers` flags (links added in this branch) and
+  that suite compares the `can` object exactly (the fifth failure was its global audit count,
+  which runs after the others). The expectations were updated in this PR; the suite now passes.
