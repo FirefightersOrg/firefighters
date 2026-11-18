@@ -355,17 +355,15 @@ export async function listImportSessions(
 	}
 }
 
-/** The last staged row of a session (the scan just added), or null. */
-export async function getLastImportItem(
+/** One staged row by id, or null when it does not exist or is not visible to the caller. */
+export async function getImportItem(
 	supabase: SupabaseClient,
-	sessionId: string
+	itemId: string
 ): Promise<RepositoryResult<ImportItem | null>> {
 	const { data, error } = await supabase
 		.from('import_session_items')
 		.select(IMPORT_ITEM_COLUMNS)
-		.eq('import_session_id', sessionId)
-		.order('row_number', { ascending: false })
-		.limit(1)
+		.eq('id', itemId)
 		.maybeSingle()
 		.overrideTypes<ImportItemRow | null, { merge: false }>();
 	if (error) return { data: null, error };
