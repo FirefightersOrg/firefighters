@@ -57,6 +57,8 @@ function renderPage(
 		page?: number;
 		total?: number;
 		canCreate?: boolean;
+		canImport?: boolean;
+		canScan?: boolean;
 	} = {}
 ) {
 	const bonds = options.bonds ?? [bond()];
@@ -73,7 +75,11 @@ function renderPage(
 			pageCount: Math.max(1, Math.ceil(total / 25))
 		},
 		filtered: Object.values(values).some(Boolean),
-		can: { create: options.canCreate ?? false }
+		can: {
+			create: options.canCreate ?? false,
+			importFile: options.canImport ?? false,
+			scan: options.canScan ?? false
+		}
 	};
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 	const props = { data, form: null, params: { id: CAMPAIGN_ID } } as any;
@@ -123,18 +129,20 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toContain('Clear filters');
 	});
 
-	it('quick actions: create only when allowed; barcode and assignment disabled with their phase', () => {
+	it('quick actions: create, scan and import only when allowed; assignment disabled with its phase', () => {
 		const viewer = renderPage();
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/new"`);
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/pata/new"`);
-		expect(viewer).toMatch(
-			/<button type="button"[^>]*\sdisabled=""[^>]*aria-describedby="barcode-action-note"[^>]*>\s*Load by barcode/
-		);
+		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
+		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/import"`);
 		expect(viewer).toMatch(
 			/<button type="button"[^>]*\sdisabled=""[^>]*aria-describedby="assign-action-note"[^>]*>\s*Assign to collector/
 		);
-		expect(viewer).toContain('Phase 4');
 		expect(viewer).toContain('Phase 6');
+
+		const importer = renderPage({ canScan: true, canImport: true });
+		expect(importer).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
+		expect(importer).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/import"`);
 
 		const operator = renderPage({ canCreate: true });
 		expect(operator).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/new"`);

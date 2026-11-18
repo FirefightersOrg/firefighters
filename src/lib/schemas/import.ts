@@ -150,3 +150,44 @@ export const importCancelSessionSchema = z.object({
 export type ImportCancelSessionInput = z.output<typeof importCancelSessionSchema>;
 
 export const importSessionIdSchema = z.object({ sessionId: sessionIdField });
+
+/**
+ * SAN-46: retype a staged row from the preview (`import_session_update_item`). Unlike staging,
+ * the base number is required: the operator is correcting the row by hand.
+ */
+export const importUpdateItemSchema = z
+	.object({
+		itemId: itemIdField,
+		itemType: z.enum(['simple', 'pata'], { message: 'Choose simple or pata' }),
+		groupKey: codeField('Pata group'),
+		baseNumber: baseNumberField.refine((value) => value !== null, {
+			message: 'Type the base number'
+		}),
+		barcode: codeField('Barcode')
+	})
+	.superRefine((row, ctx) => {
+		if (row.itemType === 'pata' && row.groupKey === null) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['groupKey'],
+				message: 'A pata row needs its grupo_pata'
+			});
+		}
+		if (row.itemType === 'simple' && row.groupKey !== null) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['groupKey'],
+				message: 'Only pata rows have a grupo_pata'
+			});
+		}
+	});
+export type ImportUpdateItemInput = z.output<typeof importUpdateItemSchema>;
+
+/** SAN-47 rollback of a confirmed import: the reason is required. */
+export const importRollbackSchema = z.object({
+	sessionId: sessionIdField,
+	reason: optionalText('Reason', IMPORT_REASON_MAX_LENGTH).refine((value) => value !== null, {
+		message: 'A reason is required'
+	})
+});
+export type ImportRollbackInput = z.output<typeof importRollbackSchema>;

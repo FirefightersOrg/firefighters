@@ -20,7 +20,9 @@ import type {
 	ImportAddScanInput,
 	ImportCancelSessionInput,
 	ImportRemoveItemInput,
+	ImportRollbackInput,
 	ImportSessionCreateInput,
+	ImportUpdateItemInput,
 	StagedImportRowInput
 } from '$lib/schemas/import';
 
@@ -485,4 +487,124 @@ export async function stageImportFile(
 	await addImportItems(supabase, { sessionId, rows }, ctx);
 	const summary = await validateImportSession(supabase, sessionId, ctx);
 	return { ...summary, rowCount: parsed.rows.length };
+}
+
+// ---------------------------------------------------------------------------
+// SAN-46 / SAN-47: row correction, confirmation and rollback
+// ---------------------------------------------------------------------------
+
+export const IMPORT_CONFIRM_MESSAGES = {
+	notValidated: 'Validate the import before confirming it.',
+	stale:
+		'Some rows are no longer valid (a number or code was taken after validation). Review the errors and validate again.',
+	notRollbackable:
+		'This import cannot be rolled back: some of its bonds were delivered, sold, grouped or annulled.',
+	notConfirmed: 'Only a confirmed import that was not rolled back yet can be rolled back.'
+} as const;
+
+/** Friendlier texts for the confirmation/rollback refusals (the generic mapping keeps ids). */
+function remapConfirmError(err: unknown): never {
+	if (err instanceof ImportServiceError && err.kind === 'conflict') {
+		const message = (err.cause as PostgrestLikeError | undefined)?.message ?? '';
+		if (message.startsWith('only a validated import session can be confirmed')) {
+			throw new ImportServiceError('conflict', IMPORT_CONFIRM_MESSAGES.notValidated, {
+				cause: err.cause
+			});
+		}
+		if (/bond\(s\) that cannot be rolled back/.test(message)) {
+			throw new ImportServiceError('conflict', IMPORT_CONFIRM_MESSAGES.notRollbackable, {
+				cause: err.cause
+			});
+		}
+		if (/^import session \S+ cannot be rolled back/.test(message)) {
+			throw new ImportServiceError('conflict', IMPORT_CONFIRM_MESSAGES.notConfirmed, {
+				cause: err.cause
+			});
+		}
+	}
+	throw err;
+}
+
+/**
+ * Retypes the fields of a live row of an open session and revalidates it
+ * (`import_session_update_item`). Also clears a parser error: the values were typed again.
+ */
+export async function updateImportItem(
+	supabase: SupabaseClient,
+	input: ImportUpdateItemInput,
+	ctx: ImportRequestContext = {}
+): Promise<ImportSessionSummary> {
+	const data = await callImportRpc(
+		supabase,
+		'import_session_update_item',
+		null,
+		{
+			p_item_id: input.itemId,
+			p_item_type: input.itemType,
+			p_group_key: input.groupKey,
+			p_base_number: input.baseNumber,
+			p_barcode: input.barcode,
+			p_request_id: ctx.requestId ?? null
+		},
+		ctx
+	);
+	return summaryOf('import_session_update_item', data, ctx);
+}
+
+export interface ImportConfirmation {
+	/** False when a number or code was taken after validation: no bond was created. */
+	confirmed: boolean;
+	summary: ImportSessionSummary;
+}
+
+/**
+ * Creates every bond of a validated session in one transaction (`import_session_confirm`). The
+ * database revalidates first: a stale session goes back to draft and reports `confirmed: false`.
+ */
+export async function confirmImportSession(
+	supabase: SupabaseClient,
+	sessionId: string,
+	ctx: ImportRequestContext = {}
+): Promise<ImportConfirmation> {
+	let data: unknown;
+	try {
+		data = await callImportRpc(
+			supabase,
+			'import_session_confirm',
+			null,
+			{ p_session_id: sessionId, p_request_id: ctx.requestId ?? null },
+			ctx
+		);
+	} catch (err) {
+		remapConfirmError(err);
+	}
+	const summary = summaryOf('import_session_confirm', data, ctx);
+	const reported = (data as Record<string, unknown>).confirmed;
+	return { confirmed: reported !== false && summary.status === 'confirmed', summary };
+}
+
+/**
+ * Functional rollback of a confirmed import (`import_session_rollback`, `bond.annul`): annuls its
+ * bonds and releases their numbers and codes, only while every bond is still available.
+ */
+export async function rollBackImportSession(
+	supabase: SupabaseClient,
+	input: ImportRollbackInput,
+	ctx: ImportRequestContext = {}
+): Promise<void> {
+	try {
+		await callImportRpc(
+			supabase,
+			'import_session_rollback',
+			'bond.annul',
+			{
+				p_session_id: input.sessionId,
+				p_reason: input.reason,
+				p_request_id: ctx.requestId ?? null
+			},
+			ctx
+		);
+	} catch (err) {
+		remapConfirmError(err);
+	}
 }

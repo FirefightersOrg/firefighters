@@ -249,3 +249,30 @@ The pattern is a Postgres ARE. JavaScript `RegExp` applies it only when it stays
 ### Instant preview (`validateImportBatch`)
 
 A pure mirror of `import_session_revalidate` + `import_session_check_groups` over the live rows, with the same codes, messages and precedence: `parse_*` (kept) → `missing_type` → `missing_base_number` → `missing_barcode` (pata) → `missing_group` → `number_out_of_range` → `number_conflict` → `number_in_use` → `duplicate_barcode` → `barcode_in_use` (row barcode, then pata code) → `duplicate_barcode` (pata code used as a row barcode) → `incomplete_pata` (only when validating). Without the campaign's live data it skips the `*_in_use` checks. `summarizeImportItems` gives the counts of `import_session_summary`. The database is authoritative; `tests/integration/import-staging.test.ts` checks that both agree on every row, message and count.
+
+## Screens (SAN-46)
+
+Built on the app layer above (SAN-98); they add no parsing or validation of their own.
+
+- `/campaigns/[id]/bonds/import` uploads a `.csv` or `.xlsx` file through `stageImportFile`
+  (up to 5 MB) and lists the campaign's file imports. A file that cannot be read is reported on
+  the file field before any session is opened.
+- `/campaigns/[id]/bonds/scan` stages one code per scan into an open `barcode_scan` session
+  (`?session=`). Enter or Tab sends the code; the field is cleared at once (so a fast scanner never
+  loses the next code) and refocused, and a beep plus a coloured frame say whether the code was
+  staged cleanly. A pata is scanned with its `grupo_pata` filled in; campaigns whose codes do not
+  carry the base number (`barcodeNeedsManualNumber`) show a base number field.
+- `/campaigns/[id]/bonds/import/[sessionId]` is the preview of both: the seven metrics (simple
+  bonds, patas, base numbers, participating numbers, blocking errors, warnings, duplicates), rows
+  filtered by status, row correction and removal, Validate, Confirm (disabled while there is any
+  blocking error), Cancel and, with `bond.annul`, Roll back. Files need `bond.import`, scans
+  `bond.scan`.
+- **Row correction.** `import_session_update_item` (migration
+  `20261129000000_import_item_correction.sql`, service `updateImportItem`) retypes the type,
+  `grupo_pata`, base number and barcode of a live row of a draft/validated session and
+  revalidates it (audited as `import.update_item`, with the replaced fields). Unlike revalidation,
+  it also clears a parser error, since the operator typed the values again; `raw_value` keeps the
+  source row. This closes the "no item correction RPC" gap noted for SAN-98.
+- **Confirm and rollback services** (`confirmImportSession`, `rollBackImportSession`) wrap the
+  SAN-47 functions: a confirmation that finds a number taken after validation reports
+  `confirmed: false` and the session goes back to draft.

@@ -37,7 +37,8 @@ export const IMPORT_SESSION_COLUMNS = [
 	'cancel_reason',
 	'failed_at',
 	'failure_reason',
-	'rolled_back_at'
+	'rolled_back_at',
+	'rollback_reason'
 ].join(', ');
 
 export interface ImportSessionRow {
@@ -57,6 +58,7 @@ export interface ImportSessionRow {
 	failed_at: string | null;
 	failure_reason: string | null;
 	rolled_back_at: string | null;
+	rollback_reason: string | null;
 }
 
 export interface ImportSession {
@@ -76,6 +78,7 @@ export interface ImportSession {
 	failedAt: string | null;
 	failureReason: string | null;
 	rolledBackAt: string | null;
+	rollbackReason: string | null;
 }
 
 export const IMPORT_ITEM_COLUMNS = [
@@ -160,7 +163,8 @@ export function mapImportSessionRow(row: ImportSessionRow): ImportSession {
 		cancelReason: row.cancel_reason,
 		failedAt: row.failed_at,
 		failureReason: row.failure_reason,
-		rolledBackAt: row.rolled_back_at
+		rolledBackAt: row.rolled_back_at,
+		rollbackReason: row.rollback_reason
 	};
 }
 
@@ -319,4 +323,55 @@ export async function getExistingCampaignData(
 		},
 		error: null
 	};
+}
+
+// ---------------------------------------------------------------------------
+// SAN-46: session history and scan feedback
+// ---------------------------------------------------------------------------
+
+/** Sessions listed on the import and scan pages (newest first). */
+export const IMPORT_SESSION_LIST_LIMIT = 50;
+
+/** The latest sessions of a campaign, of the given sources (newest first). */
+export async function listImportSessions(
+	supabase: SupabaseClient,
+	campaignId: string,
+	sources: readonly ImportSourceType[] = IMPORT_SOURCE_TYPES
+): Promise<RepositoryResult<ImportSession[]>> {
+	const { data, error } = await supabase
+		.from('import_sessions')
+		.select(IMPORT_SESSION_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.in('source_type', [...sources])
+		.order('created_at', { ascending: false })
+		.order('id', { ascending: true })
+		.limit(IMPORT_SESSION_LIST_LIMIT)
+		.overrideTypes<ImportSessionRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		return { data: (data ?? []).map(mapImportSessionRow), error: null };
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
+}
+
+/** The last staged row of a session (the scan just added), or null. */
+export async function getLastImportItem(
+	supabase: SupabaseClient,
+	sessionId: string
+): Promise<RepositoryResult<ImportItem | null>> {
+	const { data, error } = await supabase
+		.from('import_session_items')
+		.select(IMPORT_ITEM_COLUMNS)
+		.eq('import_session_id', sessionId)
+		.order('row_number', { ascending: false })
+		.limit(1)
+		.maybeSingle()
+		.overrideTypes<ImportItemRow | null, { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		return { data: data ? mapImportItemRow(data) : null, error: null };
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
 }
