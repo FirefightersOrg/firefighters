@@ -1,0 +1,94 @@
+<script lang="ts">
+	/* eslint-disable svelte/no-navigation-without-resolve */
+	import { resolve } from '$app/paths';
+	import BuyerForm from '$lib/components/buyers/BuyerForm.svelte';
+	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import { cardClass } from '$lib/components/campaigns/styles';
+	import { buyerDisplayName, buyerIdentification, BUYER_TYPE_LABELS } from '$lib/domain/parties';
+	import type { PageProps } from './$types';
+	let { data, form }: PageProps = $props();
+	const collectorHref = (collectorId: string) =>
+		`/campaigns/${data.campaign.id}/collectors/${collectorId}`;
+</script>
+
+<svelte:head
+	><title>{buyerDisplayName(data.buyer)} - {data.campaign.name} - Firefighters</title></svelte:head
+>
+<div class="space-y-6">
+	<nav class="text-sm">
+		<a class="text-blue-700 underline" href={resolve('/campaigns/[id]', { id: data.campaign.id })}
+			>← {data.campaign.name}</a
+		>
+		/
+		<a
+			class="text-blue-700 underline"
+			href={resolve('/campaigns/[id]/buyers', {
+				id: data.campaign.id
+			})}>Buyers</a
+		>
+	</nav>
+	<h1 class="text-2xl font-bold">{buyerDisplayName(data.buyer)}</h1>
+	{#if form?.message}<FormAlert
+			kind={form.success ? 'success' : 'error'}
+			message={form.message}
+		/>{/if}
+	<section class={cardClass}>
+		<h2 class="mb-4 text-lg font-semibold">General data</h2>
+		{#if data.canManage}<BuyerForm
+				campaignId={data.campaign.id}
+				buyer={data.buyer}
+				collectors={data.collectors}
+				{form}
+			/>{:else}<dl class="grid gap-3 sm:grid-cols-2">
+				<div>
+					<dt class="text-slate-500">Type</dt>
+					<dd>{BUYER_TYPE_LABELS[data.buyer.type]}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Identification</dt>
+					<dd>{buyerIdentification(data.buyer) ?? '—'}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Phone</dt>
+					<dd>{data.buyer.phone ?? '—'}</dd>
+				</div>
+				<div>
+					<dt class="text-slate-500">Usual collector</dt>
+					<dd>
+						{#if data.collector}<a
+								class="text-blue-700 underline"
+								href={collectorHref(data.collector.id)}>{data.collector.displayName}</a
+							>{:else}—{/if}
+					</dd>
+				</div>
+			</dl>{/if}
+	</section>
+	<section class={cardClass}>
+		<h2 class="text-lg font-semibold">Purchased bonds in this campaign</h2>
+		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 7: sales and buyer assignment.</p>
+	</section>
+	<section class={cardClass}>
+		<h2 class="text-lg font-semibold">Installments and debt</h2>
+		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 7/8: sales and installments.</p>
+	</section>
+	<section class={cardClass}>
+		<h2 class="text-lg font-semibold">Prizes</h2>
+		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 12: prizes.</p>
+	</section>
+	<section class={cardClass}>
+		<h2 class="text-lg font-semibold">Historical numbers</h2>
+		<p class="mt-2 text-sm text-slate-500">
+			No historical numbers yet. Legacy-data migration is post-MVP.
+		</p>
+	</section>
+	<section class={cardClass}>
+		<h2 class="text-lg font-semibold">Audit</h2>
+		{#if data.audit}<ul class="mt-2 text-sm">
+				{#each data.audit.entries as entry (entry.id)}<li class="border-t py-2">
+						{entry.action} — {entry.actorName ?? 'Unknown'} — {entry.createdAt}
+					</li>{:else}<li class="text-slate-500">No audit entries.</li>{/each}
+			</ul>{:else}<p class="mt-2 text-sm text-slate-500">
+				You do not have permission to view audit history.
+			</p>{/if}
+	</section>
+</div>

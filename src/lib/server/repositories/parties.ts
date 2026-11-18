@@ -179,6 +179,24 @@ export async function listActiveCollectorOptions(
 	};
 }
 
+/** Visible collectors for a rendered buyer page, keyed by id. One query avoids list N+1 calls. */
+export async function getCollectorsByIds(
+	supabase: SupabaseClient,
+	ids: readonly string[]
+): Promise<RepositoryResult<Map<string, Pick<Collector, 'id' | 'displayName'>>>> {
+	if (ids.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('collectors')
+		.select('id, display_name')
+		.in('id', [...new Set(ids)])
+		.overrideTypes<{ id: string; display_name: string }[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: new Map((data ?? []).map((c) => [c.id, { id: c.id, displayName: c.display_name }])),
+		error: null
+	};
+}
+
 /**
  * Buyers matching a search over names, phone, document number and tax id (every word must
  * match a column), by last/business name.
