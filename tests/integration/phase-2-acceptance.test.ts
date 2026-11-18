@@ -1106,7 +1106,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			target = await getCampaign(targetId);
 		});
 
-		it('seeded grants: campaign.view for operator/treasurer/read-only, nothing for collector; commissions admin-only', async () => {
+		it('seeded grants: campaign.view for operator/treasurer/read-only, nothing for collector; rule management admin-only', async () => {
 			const campaignAndCommission = (u: SignedInUser) =>
 				u.permissions
 					.filter((p) => p.startsWith('campaign.') || p.startsWith('commission.'))
@@ -1125,10 +1125,12 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			]);
 			expect(campaignAndCommission(users.operator)).toEqual(['campaign.view']);
 			expect(campaignAndCommission(users['read-only'])).toEqual(['campaign.view']);
-			// The treasurer may adjust commissions (later phase) but not view or manage the rules.
+			// The treasurer may adjust commissions (later phase) and, since SAN-93, view the rules
+			// (commission.adjust implies commission.view), but not manage them.
 			expect(campaignAndCommission(users.treasurer)).toEqual([
 				'campaign.view',
-				'commission.adjust'
+				'commission.adjust',
+				'commission.view'
 			]);
 			expect(campaignAndCommission(users.collector)).toEqual([]);
 		});
@@ -1149,7 +1151,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					editDates: false,
 					editRules: false,
 					transitions: [],
-					viewCommissions: false,
+					// SAN-93: the treasurer holds commission.view (implied by commission.adjust).
+					viewCommissions: role === 'treasurer',
 					// SAN-26: every one of these roles has bond.view (bonds list link).
 					viewBonds: true,
 					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
@@ -1240,9 +1243,14 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				expect(leaked).toEqual([]);
 			});
 
-			it('cannot see or manage commission rules (no commission.view / commission.rule_manage)', async () => {
+			it('cannot manage commission rules; only the treasurer can see them (SAN-93)', async () => {
 				const caller = users[role];
-				await expect(loadCommissions(caller, targetId)).rejects.toMatchObject({ status: 403 });
+				const canView = role === 'treasurer';
+				if (canView) {
+					await expect(loadCommissions(caller, targetId)).resolves.toBeDefined();
+				} else {
+					await expect(loadCommissions(caller, targetId)).rejects.toMatchObject({ status: 403 });
+				}
 
 				const createId = rid(`${role}-rule-create`);
 				expect(
@@ -1269,13 +1277,22 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					message: 'permission denied: commission.rule_manage is required'
 				});
 
-				// RLS hides every rule (commission.view), without an error.
+				// RLS shows the rules only with commission.view, and never errors.
 				const { data: visible, error: selectError } = await caller.client
 					.from('commission_rules')
 					.select('id')
-					.limit(1);
+					.order('id');
 				expect(selectError).toBeNull();
-				expect(visible).toEqual([]);
+				if (canView) {
+					const { data: all, error: allError } = await serviceClient
+						.from('commission_rules')
+						.select('id')
+						.order('id');
+					expect(allError).toBeNull();
+					expect(visible).toEqual(all);
+				} else {
+					expect(visible).toEqual([]);
+				}
 
 				await expectNoAudit(createId);
 				await expectNoAudit(rpcId);
