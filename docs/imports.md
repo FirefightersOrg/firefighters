@@ -192,10 +192,14 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
   `import.confirm` (source, file name, counts and summary) plus one `bond.create` per bond (with
   `import_session_id`), so the bond record shows how it was loaded.
 - **Rollback (SAN-47).** `import_session_rollback(session_id, reason, request_id)` annuls the
-  import's bonds (`bond.annul`, admin only, reason required, campaign `draft` or `active`, only if
-  every bond is still `available` and ungrouped), which frees their numbers and codes, and then
-  marks the session as rolled back (it stays `confirmed`). It audits `import.rollback` on the
-  session and one `bond.annul` per bond, with the same shape as a manual annulment.
+  import's `available` bonds (`bond.annul`, admin only, reason required, campaign `draft` or
+  `active`), which frees their numbers and codes, and then marks the session as rolled back (it
+  stays `confirmed`). Bonds already annulled by hand are skipped as they are: they keep their own
+  reason, author, `bond.annul` entry and numbers (a bond annulled from `sold` keeps its numbers
+  held). Any other unavailable bond (delivered, sold, returned, lost, closed) or one in an active
+  manual pata blocks the whole rollback. It audits `import.rollback` on the session (with
+  `bonds_annulled` and `bonds_skipped`) and one `bond.annul` per annulled bond, with the same shape
+  as a manual annulment.
 - **Permissions.** Import data is readable with `bond.import` or `bond.scan`. The operator has both (`bond.scan` added in SAN-44).
 - **Staging and validation (SAN-45).** `import_session_create`, `import_session_add_items`,
   `import_session_add_scan`, `import_session_remove_item`, `import_session_validate` and
