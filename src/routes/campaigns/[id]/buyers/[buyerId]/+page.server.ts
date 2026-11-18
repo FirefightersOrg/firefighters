@@ -67,7 +67,22 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		campaign: campaignResult.data,
 		buyer,
 		collector: collectorResult.data,
-		collectors: optionsResult.data ?? [],
+		collectors: [
+			...(optionsResult.data ?? []),
+			...(collectorResult.data &&
+			!optionsResult.data?.some((option) => option.id === collectorResult.data!.id)
+				? [
+						{
+							id: collectorResult.data.id,
+							displayName: `${collectorResult.data.displayName}${collectorResult.data.status === 'inactive' ? ' (inactive)' : ''}`
+						}
+					]
+				: [])
+		],
+		usualCollectorNotVisible: Boolean(buyer.usualCollectorId && !collectorResult.data),
+		canViewCollectors:
+			hasPermissionIn(locals.permissions, 'collector.view') ||
+			hasPermissionIn(locals.permissions, 'collector.manage'),
 		campaignBonds: campaignBondsResult.data ?? [],
 		historicalBonds: historicalBondsResult.data ?? [],
 		canManage: hasPermissionIn(locals.permissions, 'buyer.manage'),
@@ -94,6 +109,21 @@ export const actions: Actions = {
 			return fail(404, { success: false, values: {}, errors: {}, message: 'Buyer not found.' });
 		const formData = await request.formData();
 		const values = buyerValues(formData);
+		const current = await getBuyer(locals.supabase, params.buyerId);
+		if (current.error) return partyFailure(current.error, values);
+		if (!current.data)
+			return fail(404, { success: false, values, errors: {}, message: 'Buyer not found.' });
+		const keepCollector = values.usualCollectorId === '__keep__';
+		if (keepCollector && !current.data.usualCollectorId)
+			return fail(400, {
+				success: false,
+				values,
+				errors: { usualCollectorId: ['There is no usual collector to keep.'] },
+				message: 'Please correct the highlighted fields.'
+			});
+		const valuesToValidate = keepCollector
+			? { ...values, usualCollectorId: current.data.usualCollectorId }
+			: values;
 		const campaign = await getCampaignById(locals.supabase, params.id);
 		if (campaign.error) return partyFailure(campaign.error, values);
 		if (!campaign.data)
@@ -104,12 +134,16 @@ export const actions: Actions = {
 				message: CAMPAIGN_MESSAGES.notFound
 			});
 		const updatedAt = String(formData.get('updatedAt') ?? '');
+		if (!z.iso.datetime({ offset: true }).safeParse(updatedAt).success)
+			return fail(400, {
+				success: false,
+				values,
+				errors: { updatedAt: ['Invalid update version. Refresh the page and try again.'] },
+				message: 'Please correct the highlighted fields.'
+			});
 		const checked = formData.get('createAnyway') === 'on';
-		const parsed = validateBuyer(values);
+		const parsed = validateBuyer(valuesToValidate);
 		if ('failure' in parsed) return parsed.failure;
-		const current = await getBuyer(locals.supabase, params.buyerId);
-		if (current.error || !current.data)
-			return partyFailure(current.error ?? new Error('not found'), values);
 		const idChanged =
 			parsed.data.documentNumber !== current.data.documentNumber ||
 			parsed.data.taxId !== current.data.taxId;

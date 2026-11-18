@@ -1,13 +1,17 @@
 <script lang="ts">
-	/* eslint-disable svelte/no-navigation-without-resolve */
 	import { resolve } from '$app/paths';
+	import type { ResolvedPathname } from '$app/types';
 	import { buyerDisplayName, buyerIdentification, BUYER_TYPE_LABELS } from '$lib/domain/parties';
 	import { cardClass, inputClass, primaryButtonClass } from '$lib/components/campaigns/styles';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	const href = $derived(resolve('/campaigns/[id]/buyers', { id: data.campaign.id }));
-	const collectorHref = (collectorId: string) =>
-		`/campaigns/${data.campaign.id}/collectors/${collectorId}`;
+	function pageLink(page: number): ResolvedPathname {
+		const pairs = Object.entries(data.query).filter(([, value]) => value);
+		if (page > 1) pairs.push(['page', String(page)]);
+		const search = pairs.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+		return (search ? `${href}?${search}` : href) as ResolvedPathname;
+	}
 	const collector = (id: string | null) => data.collectors.find((c) => c.id === id);
 </script>
 
@@ -58,21 +62,21 @@
 								></td
 							><td>{BUYER_TYPE_LABELS[buyer.type]}</td><td>{buyerIdentification(buyer) ?? '—'}</td
 							><td>{buyer.phone ?? '—'}</td><td
-								>{#if collector(buyer.usualCollectorId)}<a
-										class="text-blue-700 underline"
-										href={collectorHref(collector(buyer.usualCollectorId)!.id)}
-										>{collector(buyer.usualCollectorId)!.displayName}</a
-									>{:else}—{/if}</td
+								>{collector(buyer.usualCollectorId)?.displayName ?? '—'}</td
 							></tr
 						>{/each}</tbody
 				>
 			</table>
 		</div>{/if}
 	{#if data.pagination.pageCount > 1}<nav class="flex justify-between text-sm">
+			{#if data.pagination.page > 1}<a
+					class="text-blue-700 underline"
+					href={pageLink(data.pagination.page - 1)}>← Previous</a
+				>{:else}<span></span>{/if}
 			<span>Page {data.pagination.page} of {data.pagination.pageCount}</span
 			>{#if data.pagination.page < data.pagination.pageCount}<a
 					class="text-blue-700 underline"
-					href={`${href}?page=${data.pagination.page + 1}`}>Next →</a
-				>{/if}
+					href={pageLink(data.pagination.page + 1)}>Next →</a
+				>{:else}<span></span>{/if}
 		</nav>{/if}
 </div>

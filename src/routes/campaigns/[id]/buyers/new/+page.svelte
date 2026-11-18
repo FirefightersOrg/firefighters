@@ -15,6 +15,11 @@
 	<h1 class="text-2xl font-bold">New buyer</h1>
 	{#if form?.message}<FormAlert message={form.message} />{/if}
 	<section class={cardClass}>
-		<BuyerForm campaignId={data.campaign.id} collectors={data.collectors} {form} />
+		<BuyerForm
+			campaignId={data.campaign.id}
+			collectors={data.collectors}
+			canViewCollectors={data.canViewCollectors}
+			{form}
+		/>
 	</section>
 </div>

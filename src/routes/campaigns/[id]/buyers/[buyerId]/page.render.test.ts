@@ -17,10 +17,10 @@ function page(campaignBonds: unknown[] = []) {
 					businessName: null,
 					documentNumber: '123',
 					taxId: null,
-					phone: null,
-					address: null,
+					phone: '555-0100',
+					address: 'Main Street 1',
 					usualCollectorId: null,
-					notes: null,
+					notes: 'Call after noon',
 					updatedAt: ''
 				},
 				collector: null,
@@ -54,5 +54,13 @@ describe('buyer record page', () => {
 		const body = page();
 		expect(body).toContain('No bonds purchased in this campaign.');
 		expect(body).toContain('No historical numbers.');
+	});
+	it('shows all buyer contact details to read-only users', () => {
+		const body = page();
+		expect(body).toContain('Lovelace, Ada');
+		expect(body).toContain('123');
+		expect(body).toContain('555-0100');
+		expect(body).toContain('Main Street 1');
+		expect(body).toContain('Call after noon');
 	});
 });

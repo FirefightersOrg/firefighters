@@ -43,11 +43,16 @@ const fields = (overrides: Record<string, string> = {}) => ({
 	updatedAt: buyer.updated_at,
 	...overrides
 });
-function setup(rpc: { data: unknown; error: unknown } = { data: false, error: null }) {
+function setup(
+	rpc: { data: unknown; error: unknown } = { data: false, error: null },
+	currentBuyer:
+		| typeof buyer
+		| (Omit<typeof buyer, 'usual_collector_id'> & { usual_collector_id: string | null }) = buyer
+) {
 	const mock = mockSupabase({
 		tables: {
 			campaigns: { data: campaignRow(), error: null },
-			buyers: { data: buyer, error: null },
+			buyers: { data: currentBuyer, error: null },
 			collectors: { data: [], error: null },
 			bonds: { data: [], error: null }
 		},
@@ -109,5 +114,45 @@ describe('/campaigns/[id]/buyers/[buyerId]', () => {
 		const stale = setup({ data: null, error: { code: 'PT409', message: 'stale' } });
 		const conflict = (await actions.update(event(stale.locals))) as ActionFailure;
 		expect(conflict.status).toBe(409);
+	});
+
+	it('returns field errors for invalid input, versions, and ids', async () => {
+		const invalid = (await actions.update(
+			event(setup().locals, fields({ businessName: '' }))
+		)) as ActionFailure;
+		expect(invalid.status).toBe(400);
+		expect(invalid.data).toMatchObject({
+			message: 'Please correct the highlighted fields.',
+			errors: { businessName: ['Enter a business name.'] }
+		});
+		const version = (await actions.update(
+			event(setup().locals, fields({ updatedAt: 'not-a-date' }))
+		)) as ActionFailure;
+		expect(version.status).toBe(400);
+		expect(version.data.errors).toMatchObject({ updatedAt: expect.any(Array) });
+		const badId = (await actions.update({
+			...event(setup().locals),
+			params: { id: CAMPAIGN_ID, buyerId: 'nope' }
+		})) as ActionFailure;
+		expect(badId.status).toBe(404);
+	});
+
+	it('keeps a hidden usual collector only for buyers that already have one', async () => {
+		const collectorId = 'c0000000-0000-4000-8000-000000000001';
+		const current = { ...buyer, usual_collector_id: collectorId };
+		const valid = setup(undefined, current);
+		const result = await actions.update(
+			event(valid.locals, fields({ usualCollectorId: '__keep__' }))
+		);
+		expect(result).toMatchObject({ success: true });
+		expect(valid.rpc).toHaveBeenCalledWith(
+			'buyer_update',
+			expect.objectContaining({ p_usual_collector_id: collectorId })
+		);
+		const invalid = (await actions.update(
+			event(setup().locals, fields({ usualCollectorId: '__keep__' }))
+		)) as ActionFailure;
+		expect(invalid.status).toBe(400);
+		expect(invalid.data.errors).toMatchObject({ usualCollectorId: expect.any(Array) });
 	});
 });

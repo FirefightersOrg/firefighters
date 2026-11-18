@@ -14,7 +14,12 @@ export function validateBuyer(values: ReturnType<typeof buyerValues>) {
 	const parsed = buyerSchema.safeParse(values);
 	if (parsed.success) return { data: parsed.data };
 	return {
-		failure: fail(400, { success: false, values, errors: parsed.error.flatten().fieldErrors })
+		failure: fail(400, {
+			success: false,
+			values,
+			errors: parsed.error.flatten().fieldErrors,
+			message: 'Please correct the highlighted fields.'
+		})
 	};
 }
 
@@ -24,7 +29,7 @@ export function partyFailure(err: unknown, values: Record<string, unknown>) {
 			success: false,
 			values,
 			errors: err.field ? { [err.field]: [err.message] } : {},
-			message: err.field ? undefined : err.message
+			message: err.field ? 'Please correct the highlighted fields.' : err.message
 		});
 	}
 	console.error('[buyers] action failed', err);

@@ -19,15 +19,19 @@ const buyer = {
 	createdAt: '',
 	updatedAt: ''
 };
-function page(buyers = [buyer]) {
+function page(
+	buyers = [buyer],
+	query = { q: '', type: '' },
+	pagination = { page: 1, pageSize: 25, total: buyers.length, pageCount: 1 }
+) {
 	return render(Page, {
 		props: {
 			data: {
 				campaign: { id, name: 'Campaign', status: 'draft' },
 				buyers,
 				collectors: [],
-				query: { q: '', type: '' },
-				pagination: { page: 1, pageSize: 25, total: buyers.length, pageCount: 1 },
+				query,
+				pagination,
 				can: { manage: true }
 			},
 			form: null,
@@ -43,4 +47,19 @@ describe('buyers page', () => {
 		expect(body).toContain(`href="/campaigns/${id}/buyers/${buyer.id}"`);
 	});
 	it('renders the empty state', () => expect(page([])).toContain('No buyers match these filters.'));
+	it('keeps filters in pagination links', () => {
+		const body = page(
+			[buyer],
+			{ q: 'Ada Lovelace', type: 'individual' },
+			{
+				page: 2,
+				pageSize: 25,
+				total: 75,
+				pageCount: 3
+			}
+		);
+		expect(body).toContain('q=Ada%20Lovelace&amp;type=individual');
+		expect(body).toContain('page=3');
+		expect(body).toContain('← Previous');
+	});
 });
