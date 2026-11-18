@@ -184,9 +184,13 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
 - **Confirmation (SAN-47).** `import_session_confirm(session_id, request_id)` requires the session's
   permission (`bond.import` for files, `bond.scan` for scans), a `validated` session and a `draft` or
   `active` campaign. It revalidates under lock: if a number or code was taken after validation, it
-  returns the fresh summary with `confirmed: false` and the session goes back to `draft` (no bonds
-  are created). Otherwise it creates every bond in one transaction and audits `import.confirm` plus
-  one `bond.create` per bond (with `import_session_id`), so the bond record shows how it was loaded.
+  returns the fresh summary with `confirmed: false`, the session goes back to `draft` (no bonds are
+  created) and the rejection is audited as `import.confirm_rejected`. A concurrent confirmation of
+  overlapping numbers that commits in between hits a unique index; that is caught and reported the
+  same way instead of a raw 23505. Otherwise it creates every bond in one transaction, returns the
+  summary with `confirmed: true`, `bonds_created` and `numbers_created`, and audits
+  `import.confirm` (source, file name, counts and summary) plus one `bond.create` per bond (with
+  `import_session_id`), so the bond record shows how it was loaded.
 - **Rollback (SAN-47).** `import_session_rollback(session_id, reason, request_id)` annuls the
   import's bonds (`bond.annul`, admin only, reason required, campaign `draft` or `active`, only if
   every bond is still `available` and ungrouped), which frees their numbers and codes, and then
