@@ -60,6 +60,8 @@ Campaign actions and the permission each one requires (enforced by the `campaign
 | `bond.mark_lost` | Record loss.                     |
 | `bond.annul`     | Annul bonds.                     |
 
+Import sessions and their items (Phase 4) are readable with `bond.import` or `bond.scan`. The operator received `bond.scan` in SAN-44 (`20261125000000_operator_bond_scan.sql`).
+
 ### Buyers and collectors
 
 | Permission                | Description                 |
@@ -126,6 +128,7 @@ Campaign actions and the permission each one requires (enforced by the `campaign
 | `bond.view`              |   yes |      yes |       yes |       own |       yes |
 | `bond.create`            |   yes |      yes |        no |        no |        no |
 | `bond.import`            |   yes |      yes |        no |        no |        no |
+| `bond.scan`              |   yes |      yes |        no |        no |        no |
 | `bond.assign`            |   yes |      yes |        no |        no |        no |
 | `buyer.manage`           |   yes |      yes |        no |        no |        no |
 | `collector.manage`       |   yes |       no |        no |        no |        no |

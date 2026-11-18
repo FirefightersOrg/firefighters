@@ -16,6 +16,8 @@
 import { z } from 'zod';
 import {
 	BARCODE_MODES,
+	BARCODE_PATTERN_MAX_LENGTH,
+	barcodeModeUsesPattern,
 	CAMPAIGN_TRANSITION_TARGETS,
 	campaignDayEnd,
 	campaignDayStart
@@ -59,7 +61,8 @@ export const CAMPAIGN_RULES_FIELDS = [
 	'simpleBondValue',
 	'installmentCount',
 	...CAMPAIGN_NUMBERING_FIELDS,
-	'barcodeMode'
+	'barcodeMode',
+	'barcodePattern'
 ] as const;
 export const CAMPAIGN_CREATE_FIELDS = [
 	...CAMPAIGN_GENERAL_FIELDS,
@@ -205,7 +208,21 @@ const rulesShape = {
 		),
 	installmentCount: wholeNumber('Number of installments', { min: 1 }),
 	...numberingShape,
-	barcodeMode: z.enum(BARCODE_MODES, { message: 'Choose how barcodes are read' })
+	barcodeMode: z.enum(BARCODE_MODES, { message: 'Choose how barcodes are read' }),
+	// Optional regex (blank = none). Whether it compiles as a Postgres regex is checked by the
+	// database (JavaScript and Postgres regex syntax differ). The field is only rendered for the
+	// modes that use it, so it may be missing: missing or blank = no pattern.
+	barcodePattern: z
+		.string()
+		.trim()
+		// Count code points, like Postgres `char_length`, not UTF-16 code units: an emoji is one
+		// character in the database but two in JavaScript.
+		.refine(
+			(value) => [...value].length <= BARCODE_PATTERN_MAX_LENGTH,
+			`Barcode pattern must be at most ${BARCODE_PATTERN_MAX_LENGTH} characters`
+		)
+		.optional()
+		.transform((value) => (value ? value : null))
 };
 
 // ---------------------------------------------------------------------------
@@ -280,6 +297,19 @@ function refineInstallments(
 	}
 }
 
+function refineBarcodePattern(
+	value: { barcodeMode: string; barcodePattern: string | null },
+	ctx: RefinementCtx
+) {
+	if (value.barcodePattern !== null && !barcodeModeUsesPattern(value.barcodeMode)) {
+		ctx.addIssue({
+			code: 'custom',
+			path: ['barcodePattern'],
+			message: 'A barcode pattern is only used with the internal or external/legacy code modes'
+		});
+	}
+}
+
 function refineDates(
 	value: { startsOn: string | null; endsOn: string | null },
 	ctx: RefinementCtx
@@ -314,6 +344,7 @@ function toRulesOutput(value: {
 	associatedNumberOffset: number;
 	overflowPolicy: string;
 	barcodeMode: (typeof BARCODE_MODES)[number];
+	barcodePattern: string | null;
 }) {
 	return {
 		/** Two-decimal string, e.g. "60000.00". */
@@ -325,7 +356,9 @@ function toRulesOutput(value: {
 		maxNumber: value.maxNumber,
 		associatedNumberOffset: value.associatedNumberOffset,
 		overflowPolicy: value.overflowPolicy as OverflowPolicy,
-		barcodeMode: value.barcodeMode
+		barcodeMode: value.barcodeMode,
+		/** Regex whose first capture group is the base number, or null. */
+		barcodePattern: value.barcodePattern
 	};
 }
 
@@ -360,6 +393,7 @@ export const campaignRulesSchema = z
 	.superRefine((value, ctx) => {
 		refineNumbering(value, ctx);
 		refineInstallments(value, ctx);
+		refineBarcodePattern(value, ctx);
 	})
 	.transform((value) => ({
 		...toRulesOutput(value),
@@ -393,6 +427,7 @@ export const campaignRulesUpdateSchema = z
 	.superRefine((value, ctx) => {
 		refineNumbering(value, ctx);
 		refineInstallments(value, ctx);
+		refineBarcodePattern(value, ctx);
 	})
 	.transform((value) => ({
 		...toRulesOutput(value),
@@ -408,6 +443,7 @@ export const campaignCreateSchema = z
 		refineDates(value, ctx);
 		refineNumbering(value, ctx);
 		refineInstallments(value, ctx);
+		refineBarcodePattern(value, ctx);
 	})
 	.transform((value) => ({ ...toGeneralOutput(value), ...toRulesOutput(value) }));
 

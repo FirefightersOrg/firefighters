@@ -171,3 +171,15 @@ Void import through audited process.
 ```
 
 Voiding must mark created bonds as voided if they have no sales, payments, or settlements. If they already have operations, it requires specific administrative correction.
+
+## Decisions (SAN-44)
+
+Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_sessions.sql`, `20261125000000_operator_bond_scan.sql`. Details in `docs/data-model.md` (`import_sessions`, `import_session_items`, `bonds`, `bond_numbers`) and `docs/state-machines.md` (Import session).
+
+- **Barcode modes.** `base_number`: the barcode is the base number. `manual_mapping`: the operator types the base number when scanning. `internal_code` / `external_legacy_code`: the campaign defines a regular expression (`campaigns.barcode_pattern`) whose first capture group is the base number; without a pattern they behave like `manual_mapping`. The pattern is a campaign rule: only for those two modes, validated by the database (compiles as a Postgres regex, has a capture group, at most 200 characters), editable only while the campaign is `draft` and frozen once it has bonds.
+- **Sources.** `barcode_scan`, `csv_file`, `excel_file` (`legacy_system_export` is post-MVP). File imports use the columns `tipo_bono,grupo_pata,numero_base,barcode` (CSV and `.xlsx`; parsing in SAN-45) and keep the original file name on the session.
+- **Staging.** Rows and scans are staged in `import_session_items`; erroneous rows are soft-removed (`removed_at`), never deleted. Sessions are never deleted either: they are cancelled, marked failed, or (once confirmed) rolled back.
+- **Bonds only on confirmation.** Bonds are created when the session is confirmed, directly as `available` (never `created`), with `bonds.import_session_id` set (immutable). Each item records the bond it created. Confirmation certifies the mapping and completeness: one simple bond per simple item; one printed pata per `grupo_pata`, with one row per unit; no unlinked bond; and, per unit, the base and associated numbers with each row's base number (and its barcode for a pata row).
+- **Patas and barcodes.** Rows sharing a `grupo_pata` form one printed pata: the pata bond's `barcode` is the `grupo_pata`, and each row's barcode is kept on its base number (`bond_numbers.barcode`). A barcode identifies one live thing per campaign across bonds and base numbers; codes are freed only when a bond is annulled from `available` (and its numbers are released), like participating numbers.
+- **Rollback (SAN-47).** Rolling back a confirmed import annuls its bonds (`bond.annul`, admin only, reason required, only if none was delivered, sold or grouped), which frees their numbers and codes, and then marks the session as rolled back (it stays `confirmed`).
+- **Permissions.** Import data is readable with `bond.import` or `bond.scan`. The operator has both (`bond.scan` added in SAN-44).

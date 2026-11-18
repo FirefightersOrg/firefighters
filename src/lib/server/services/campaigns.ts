@@ -118,7 +118,19 @@ const CONSTRAINT_MESSAGES: Record<string, { field: CampaignFormField; message: s
 		message: 'Associated number offset must not exceed the maximum number.'
 	},
 	campaigns_overflow_policy_check: { field: 'overflowPolicy', message: 'Unknown overflow policy.' },
-	campaigns_barcode_mode_check: { field: 'barcodeMode', message: 'Unknown barcode mode.' }
+	campaigns_barcode_mode_check: { field: 'barcodeMode', message: 'Unknown barcode mode.' },
+	campaigns_barcode_pattern_format: {
+		field: 'barcodePattern',
+		message: 'Barcode pattern must be at most 200 characters, without surrounding spaces.'
+	},
+	campaigns_barcode_pattern_mode: {
+		field: 'barcodePattern',
+		message: 'A barcode pattern is only used with the internal or external/legacy code modes.'
+	},
+	campaigns_barcode_pattern_valid: {
+		field: 'barcodePattern',
+		message: 'Barcode pattern must be a valid regular expression with a capture group.'
+	}
 };
 
 const COLUMN_FIELDS: Record<string, CampaignFormField> = {
@@ -129,7 +141,8 @@ const COLUMN_FIELDS: Record<string, CampaignFormField> = {
 	max_number: 'maxNumber',
 	associated_number_offset: 'associatedNumberOffset',
 	overflow_policy: 'overflowPolicy',
-	barcode_mode: 'barcodeMode'
+	barcode_mode: 'barcodeMode',
+	barcode_pattern: 'barcodePattern'
 };
 
 function statusLabel(status: string): string {
@@ -166,6 +179,9 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			}
 			if (message.startsWith('simple bond value')) {
 				return err('validation', `${capitalize(message)}.`, 'simpleBondValue');
+			}
+			if (message.startsWith('barcode pattern')) {
+				return err('validation', `${capitalize(message)}.`, 'barcodePattern');
 			}
 			if (message.startsWith('installment count')) {
 				return err('validation', `${capitalize(message)}.`, 'installmentCount');
@@ -313,6 +329,7 @@ export async function createCampaign(
 			p_associated_number_offset: input.associatedNumberOffset,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
+			p_barcode_pattern: input.barcodePattern,
 			p_starts_at: input.startsAt,
 			p_ends_at: input.endsAt,
 			p_request_id: ctx.requestId ?? null
@@ -378,6 +395,8 @@ export async function updateCampaignRules(
 			p_associated_number_offset: input.associatedNumberOffset,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
+			// Full replacement: null clears the pattern.
+			p_barcode_pattern: input.barcodePattern,
 			p_expected_updated_at: input.expectedUpdatedAt,
 			p_request_id: ctx.requestId ?? null,
 			p_reason: input.reason ?? null

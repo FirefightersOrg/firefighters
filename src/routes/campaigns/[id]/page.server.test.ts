@@ -423,6 +423,7 @@ describe('/campaigns/[id]', () => {
 				p_associated_number_offset: 4871,
 				p_overflow_policy: 'reject',
 				p_barcode_mode: 'internal_code',
+				p_barcode_pattern: null,
 				p_expected_updated_at: VERSION,
 				p_request_id: 'req-test',
 				p_reason: null

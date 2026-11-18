@@ -91,6 +91,12 @@
 				<dt class="text-xs font-medium text-slate-500">Barcode mode</dt>
 				<dd class="mt-0.5">{BARCODE_MODE_LABELS[campaign.barcodeMode]}</dd>
 			</div>
+			{#if campaign.barcodePattern}
+				<div>
+					<dt class="text-xs font-medium text-slate-500">Barcode pattern</dt>
+					<dd class="mt-0.5 font-mono break-all">{campaign.barcodePattern}</dd>
+				</div>
+			{/if}
 			<div>
 				<dt class="text-xs font-medium text-slate-500">Simple bond value</dt>
 				<dd class="mt-0.5 tabular-nums">{formatMoney(campaign.simpleBondValue)}</dd>

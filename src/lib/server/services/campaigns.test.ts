@@ -330,6 +330,7 @@ describe('campaign service', () => {
 			p_associated_number_offset: 4871,
 			p_overflow_policy: 'reject',
 			p_barcode_mode: 'base_number',
+			p_barcode_pattern: null,
 			p_starts_at: '2027-03-01T00:00:00-03:00',
 			p_ends_at: null,
 			p_request_id: 'req-1'
@@ -411,10 +412,42 @@ describe('campaign service', () => {
 			p_associated_number_offset: 4871,
 			p_overflow_policy: 'reject',
 			p_barcode_mode: 'manual_mapping',
+			p_barcode_pattern: null,
 			p_expected_updated_at: VERSION,
 			p_request_id: null,
 			p_reason: null
 		});
+	});
+
+	it('updateCampaignRules sends the barcode pattern (SAN-44)', async () => {
+		const { supabase, rpc } = rpcClient({ data: true });
+		const input = campaignRulesSchema.parse({
+			simpleBondValue: '60000',
+			installmentCount: '10',
+			numberDigits: '4',
+			maxNumber: '9999',
+			associatedNumberOffset: '4871',
+			overflowPolicy: 'reject',
+			barcodeMode: 'internal_code',
+			barcodePattern: ' ^BC-(\\d+)$ ',
+			expectedUpdatedAt: VERSION
+		});
+		await updateCampaignRules(supabase, CAMPAIGN_ID, input);
+		expect(rpc).toHaveBeenCalledWith(
+			'campaign_update_rules',
+			expect.objectContaining({ p_barcode_pattern: '^BC-(\\d+)$' })
+		);
+	});
+
+	it('maps an invalid barcode pattern to its field', () => {
+		const err = mapCampaignRpcError({
+			code: '22023',
+			message:
+				'barcode pattern must be a valid regular expression with a capture group for the base number'
+		});
+		expect(err.kind).toBe('validation');
+		expect(err.field).toBe('barcodePattern');
+		expect(err.message).toMatch(/^Barcode pattern must be a valid regular expression/);
 	});
 
 	it('updateCampaignRules passes the audit reason', async () => {

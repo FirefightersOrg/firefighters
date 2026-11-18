@@ -33,7 +33,8 @@ Fields:
 - `max_number` (integer, default 9999)
 - `associated_number_offset` (integer, default 4871)
 - `overflow_policy` (text, default `reject`; only `reject` for now)
-- `barcode_mode` (text, required, no default): `base_number`, `internal_code`, `external_legacy_code`, `manual_mapping`
+- `barcode_mode` (text, required, no default): `base_number`, `internal_code`, `external_legacy_code`, `manual_mapping` (semantics in `docs/imports.md`)
+- `barcode_pattern` (text, optional, SAN-44): only for `internal_code` / `external_legacy_code`; a Postgres regular expression whose first capture group is the base number (null: the operator types the base number, like `manual_mapping`)
 - `created_by` (profile, nullable for system actions, `on delete restrict`)
 - `created_at`, `updated_at` (set by the database)
 
@@ -43,6 +44,7 @@ Constraints:
 - `simple_bond_value` and `installment_value` are not `NaN`. Postgres `numeric` accepts `'NaN'` and treats it as greater than every number and equal to itself, so it would otherwise pass `> 0` and the exact-installment check; `±Infinity` is already rejected by `numeric(14,2)`.
 - `max_number` fits in `number_digits` (`max_number < 10^number_digits`); 5-digit campaigns use `number_digits = 5`, `max_number = 99999`.
 - `associated_number_offset <= max_number` (otherwise no base number is valid).
+- `barcode_pattern` (SAN-44, `20261123000000_campaign_barcode_pattern.sql`): at most 200 characters, not blank, no surrounding whitespace (`campaigns_barcode_pattern_format`); null unless `barcode_mode` is `internal_code` or `external_legacy_code` (`campaigns_barcode_pattern_mode`); compiles as a Postgres (ARE) regex with at least one capture group (`campaigns_barcode_pattern_valid`, via `campaign_barcode_pattern_valid()`; embedded options such as a leading `(?i)` are not supported).
 - `installment_value * installment_count = simple_bond_value` exactly. `installment_value` is a stored column, not generated: a price that does not divide evenly (60000 in 7 installments) is rejected instead of rounded.
 
 Rules (enforced by triggers for every role, including `service_role`):
@@ -50,8 +52,8 @@ Rules (enforced by triggers for every role, including `service_role`):
 - New campaigns start in `draft`.
 - Status changes only follow `docs/state-machines.md` (`draft -> active -> closing -> closed`, `draft -> annulled`, `active -> annulled`). Anything else fails with `23514`.
 - Activating requires both `starts_at` and `ends_at`; once activated, neither date can be cleared (`23514`).
-- Edit windows depend on the status before the update: numbering, installment and `barcode_mode` rules only while `draft`; dates while `draft` or `active`; name until `closed`/`annulled`. Closed and annulled campaigns are immutable. Edits outside the window fail with `55000`.
-- Once a campaign has any bond (annulled ones included), its numbering, value/installment and `barcode_mode` rules are frozen even while `draft` (`campaigns_rules_frozen_with_bonds`, SAN-22; `55000` `campaign rules cannot be changed once the campaign has bonds`). Name and dates keep their normal windows, and the campaign can still be activated.
+- Edit windows depend on the status before the update: numbering, installment, `barcode_mode` and `barcode_pattern` rules only while `draft`; dates while `draft` or `active`; name until `closed`/`annulled`. Closed and annulled campaigns are immutable. Edits outside the window fail with `55000`.
+- Once a campaign has any bond (annulled ones included), its numbering, value/installment, `barcode_mode` and `barcode_pattern` rules are frozen even while `draft` (`campaigns_rules_frozen_with_bonds`, SAN-22; `55000` `campaign rules cannot be changed once the campaign has bonds`). Name and dates keep their normal windows, and the campaign can still be activated.
 - `id`, `created_at` and `created_by` never change. `updated_at` is set on every update.
 - Several campaigns can be `active` at the same time.
 - Campaigns are never deleted (annul instead): no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner too.
@@ -60,9 +62,10 @@ Access: `authenticated` can only `SELECT`, and RLS limits it to `campaign.view`.
 
 Write functions (`20261117000000_campaign_rpcs.sql`, SECURITY DEFINER, executable by `authenticated` only; they act as `auth.uid()`'s active profile):
 
-- `campaign_create(p_name, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_starts_at, p_ends_at, p_request_id, p_reason) returns uuid` (`campaign.create`).
+- `campaign_create(p_name, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_starts_at, p_ends_at, p_request_id, p_reason, p_barcode_pattern) returns uuid` (`campaign.create`).
 - `campaign_update(p_id, p_name, p_starts_at, p_ends_at, p_expected_updated_at, p_request_id, p_reason) returns boolean` (`campaign.update`).
-- `campaign_update_rules(p_id, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_expected_updated_at, p_request_id, p_reason) returns boolean` (`campaign.update_rules`; draft only).
+- `campaign_update_rules(p_id, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_expected_updated_at, p_request_id, p_reason, p_barcode_pattern) returns boolean` (`campaign.update_rules`; draft only).
+- `p_barcode_pattern` (SAN-44) is the last parameter, default null, so existing positional callers keep working. It is trimmed (blank = null) and validated with `22023` (`barcode pattern is only used with the internal code or external legacy code barcode modes`, `... must be at most 200 characters`, `... must be a valid regular expression with a capture group for the base number`). `campaign_update_rules` is still a full replacement: omitting the pattern clears it.
 - `campaign_transition(p_id, p_to_status, p_reason, p_request_id)`: `active` needs `campaign.update_rules`; `closing`, `closed` and `annulled` need `campaign.close`; annulling needs a reason, the other transitions accept an optional one (stored in the audit log).
 
 `installment_value` is always computed by these functions (`simple_bond_value / installment_count`, rejected with `22023` unless exact to the cent). Updates are full replacements of their fields; a call that changes nothing returns `false` and writes no audit row. Audit actions: `campaign.create` (new value: full snapshot), `campaign.update` / `campaign.update_rules` (old and new value: only the changed fields), `campaign.transition` (old and new `status`). Errors: `42501` no active profile or permission, `22023` invalid input, `P0002` not found, `23514` / `55000` from the constraints and the write guard above, `PT409` stale version (below).
@@ -192,12 +195,13 @@ Fields:
 - `annulled_at`, `annulled_by` (profile), `annul_reason`: set together, only when `annulled` (CHECK `bonds_annulment_consistent`)
 - `annulled_from_status`: the status the bond was annulled from (`available` or `sold`). Set by the database when the bond is annulled (callers cannot set it), present only when `annulled` (same CHECK), immutable afterwards (`23001`). Decides whether the bond's numbers can be released (see `bond_numbers`)
 - `created_by` (profile, nullable for system/import actions), `created_at`, `updated_at` (set by the database)
+- `import_session_id` (SAN-44, nullable): the import session that created the bond (null for manual entry). Composite FK `(import_session_id, campaign_id)` to `import_sessions (id, campaign_id)`, so the session belongs to the bond's campaign. Set only on insert, and only while the session is `validated` (`55000` otherwise); immutable (`23001`, trigger `bonds_guard_write_import_session`). The rollback of an import (SAN-47) finds its bonds through it.
 
 Rules (constraints and the `bonds_guard_write` trigger, for every role):
 
 - A simple bond is always `printed` and has `commercial_unit_count = 1`. A pata has `commercial_unit_count = N >= 2` (its number of base numbers) and is `printed` or `manual_grouping`.
 - `total_value = campaigns.simple_bond_value * commercial_unit_count`, checked on insert (`23514`). The rules it depends on are frozen once the campaign has bonds.
-- Bonds are created only while the campaign is `draft` or `active` (`55000` otherwise), in `available` (manual entry of simple bonds and printed patas) or `created` (reserved for Phase 4 imports), with `financial_status_snapshot = no_payments`.
+- Bonds are created only while the campaign is `draft` or `active` (`55000` otherwise), in `available` (manual entry of simple bonds and printed patas, and every bond created by an import), with `financial_status_snapshot = no_payments`. A bond with `import_session_id` cannot start in `created` (`23514`): `created` is reserved for future phases, not for imports.
 - `commercial_status` changes follow `docs/state-machines.md` (Bond), including `available -> annulled` for a bond loaded by mistake (`23514` otherwise). `annulled_at` and `annulled_from_status` are set by the database.
 - `id`, `campaign_id`, `kind`, `origin`, `commercial_unit_count`, `total_value`, `created_at`, `created_by` never change (`23001`).
 - `annulled` and `closed` bonds are immutable except for `financial_status_snapshot` (`55000`).
@@ -236,6 +240,7 @@ Fields:
 - `source_base_number_id`: for `associated`, the base number it derives from (required, same bond: composite FK to `bond_numbers (id, bond_id)`); null for `base`
 - `created_at` (set by the database)
 - `released_at`, `released_by` (profile): set together when the number is released (see below)
+- `barcode` (text, optional, SAN-44): the barcode of an imported row, kept with its base number (only `base` numbers, CHECK `bond_numbers_barcode_base_only`; not blank, no surrounding whitespace). An imported pata stores its `grupo_pata` as the pata bond's `barcode` and each row's barcode here. Immutable (`23001`)
 
 Rules (constraints and the `bond_numbers_guard_write` trigger):
 
@@ -247,6 +252,8 @@ Rules (constraints and the `bond_numbers_guard_write` trigger):
 - Never deleted.
 
 Uniqueness (deviation from the original design): instead of a plain unique `(campaign_id, number_value)`, uniqueness applies to numbers that were **not released** (partial unique index `bond_numbers_campaign_number_key ... where released_at is null`). When a bond loaded by mistake is annulled, its numbers are released (`released_at`, `released_by`; allowed only once the bond is `annulled` **and** its `annulled_from_status` is `available`, `55000` otherwise): the rows stay as history and the same number can be entered again on a new bond. A bond annulled from `sold` (annulled sale, Phase 10) keeps its numbers held: they are never released and no other bond can take them. A participating number therefore still points to at most one live bond per campaign.
+
+Barcode namespace (SAN-44): a barcode identifies at most one live thing per campaign, across `bonds.barcode` and `bond_numbers.barcode`. Live means, for a bond, not annulled from `available` (the predicate of `bonds_campaign_barcode_key`) and, for a number, not released (partial unique index `bond_numbers_campaign_barcode_key ... where barcode is not null and released_at is null`). Across the two tables the triggers `bonds_guard_write_barcode` / `bond_numbers_guard_write_barcode` (`campaign_barcode_guard()`) take a transaction advisory lock on (campaign, barcode) and look for a live holder in the other table, so concurrent writers serialize; a conflict is `23505` `barcode X is already used by bond <id>` (constraint `campaign_barcode_unique`, `DETAIL` `{"barcode": …, "bond_id": …}`). `bond_create` / `bond_group_into_pata` report it like any duplicate barcode (`bond_raise_duplicate` also looks among bond numbers). Freeing follows the number-release rule: codes of a bond annulled from `available` and of released numbers can be used again; codes of a bond annulled from `sold` stay held.
 
 Notes:
 
@@ -669,33 +676,50 @@ Rules:
 
 ### import_sessions
 
-Loading sessions by barcode, file, or old system.
+Bond loads by barcode scan or file (CSV / Excel). Implemented in `20261124000000_import_sessions.sql` (SAN-44); decisions in `docs/imports.md`, states in `docs/state-machines.md`.
 
-Suggested fields:
+Fields:
 
-- `id`
-- `campaign_id`
-- `source_type`
-- `status`
-- `created_by`
-- `created_at`
-- `confirmed_at`
-- `notes`
+- `id`, `campaign_id` (FK `campaigns`, `on delete restrict`; unique `(id, campaign_id)` is the target of `bonds.import_session_id`)
+- `source_type`: `barcode_scan`, `csv_file`, `excel_file` (`legacy_system_export` is post-MVP)
+- `status`: `draft` (default), `validated`, `confirmed`, `cancelled`, `failed`
+- `file_name`: original file name; required for `csv_file` / `excel_file`, null for `barcode_scan` (not blank, trimmed, at most 255 characters)
+- `notes` (optional, not blank, at most 2000 characters)
+- `created_by` (profile, required), `created_at`, `updated_at` (set by the database)
+- `validated_at`; `confirmed_at`, `confirmed_by`; `cancelled_at`, `cancelled_by`, `cancel_reason` (optional); `failed_at`, `failed_by` (optional, null for system actions), `failure_reason` (required when failed); `rolled_back_at`, `rolled_back_by`, `rollback_reason` (functional rollback of a confirmed import). The `*_at` columns are set by the database on the transition; callers set the `*_by` and reason columns. CHECKs keep them consistent with `status`.
+
+Rules (constraints and the `import_sessions_guard_write` trigger, for every role):
+
+- Created only in `draft`, only while the campaign is `draft` or `active` (`55000`).
+- `id`, `campaign_id`, `source_type`, `file_name`, `created_by`, `created_at` never change (`23001`).
+- Transitions (`23514` otherwise): `draft -> validated`, `validated -> draft`, `validated -> confirmed`, `draft|validated -> cancelled`, `draft|validated -> failed`.
+- `-> validated` needs at least one live (not removed) item and none `pending` or `error`; `-> validated` and `-> confirmed` need the campaign `draft` or `active` (`55000`).
+- `-> confirmed` needs every live item linked to the bond it created (`created_bond_id`) and that bond must be the right one: a `simple` item maps one-to-one to a simple bond whose `barcode` is the item barcode; all rows of a `grupo_pata` map to one printed pata with one row per unit and the `grupo_pata` as its barcode; no bond of the session can be left without a live item. Every bond must still be `available` and have its complete set of base and associated numbers (one per unit), with each row's `base_number` (and its `barcode` for a pata row) present on the base number (`55000` otherwise). A validated session that already has bonds (inside the confirming transaction) cannot go back to draft, be cancelled or fail (`55000`).
+- `confirmed`, `cancelled` and `failed` are final (`55000`). A confirmed session only accepts the rollback marker, once, when none of its bonds is still live (all annulled).
+- Never deleted: no API role has `DELETE`/`TRUNCATE`, and a trigger blocks the owner (`23001`).
 
 ### import_session_items
 
-Items of an import session.
+Staged rows (file) or scans of an import session (SAN-44).
 
-Suggested fields:
+Fields:
 
-- `id`
-- `import_session_id`
-- `raw_value`
-- `parsed_value`
-- `barcode`
-- `item_type`
-- `status`
-- `error_message`
+- `id`, `import_session_id` (FK, `on delete restrict`: sessions are never deleted, so no cascade)
+- `row_number` (integer >= 1, unique per session): file row or scan order
+- `raw_value` (required, at most 2000 characters), `parsed_value` (jsonb object, optional)
+- `barcode`, `item_type` (`simple`, `pata`), `group_key` (the `grupo_pata`; required for `pata`, null for `simple`), `base_number` (>= 0)
+- `status`: `pending` (default), `valid`, `warning`, `error`; `error_code` (`snake_case`) and `error_message`: required message for `error` / `warning`, none for `pending` / `valid`; `valid` / `warning` need `item_type` and `base_number`
+- `created_bond_id`: the bond created on confirmation (a pata: the same bond for all its rows). Composite FK `(created_bond_id, import_session_id)` to `bonds (id, import_session_id)`: always a bond of the same session. Set once (`23001` afterwards), only while the session is `validated`, only on a `valid`/`warning`, not removed item
+- `removed_at` (set by the database), `removed_by`, `remove_reason` (optional): soft removal of an erroneous row
+- `created_at`, `updated_at` (set by the database)
+
+Rules (constraints and the `import_session_items_guard_write` trigger):
+
+- Items are added and changed only while the session is `draft` or `validated` (`55000`); the trigger locks the session row, so item writes serialize with its transitions. Adding or editing an item of a `validated` session moves the session back to `draft` (linking `created_bond_id` does not).
+- `id`, `import_session_id`, `row_number`, `created_at` never change (`23001`). Removed items and items linked to a bond are immutable (`55000`).
+- Never deleted (soft removal instead); a trigger blocks `DELETE`/`TRUNCATE`.
+
+Access (both tables): `authenticated` can only `SELECT`, with `bond.import` **or** `bond.scan` (RLS). Writes go through audited SQL functions (SAN-45 staging and validation, SAN-47 confirmation and rollback). `service_role` has `SELECT`, `INSERT` and `UPDATE`; `anon` nothing.
 
 ### legacy_migration_staging
 
@@ -725,7 +749,9 @@ Suggested fields:
 - `collector_ledger_entries(collector_id, campaign_id, occurred_at)`.
 - `draw_roster_entries(draw_roster_id, number_value)`.
 - `import_sessions(campaign_id, status)`.
-- `import_session_items(import_session_id, status)`.
+- `import_session_items(import_session_id, status)`; also `(import_session_id, group_key)`, `(import_session_id, barcode)` and `(created_bond_id, import_session_id)`.
+- `bond_numbers(campaign_id, barcode)` unique where `barcode IS NOT NULL AND released_at IS NULL`.
+- `bonds(import_session_id)` where not null.
 - `bond_groups(pata_bond_id)`.
 - `bond_groups(member_bond_id)`.
 - `bond_groups(member_bond_id)` where `ungrouped_at IS NULL` (active memberships only).

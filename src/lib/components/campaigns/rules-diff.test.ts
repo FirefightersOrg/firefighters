@@ -19,6 +19,7 @@ const campaign: Campaign = {
 	associatedNumberOffset: 4871,
 	overflowPolicy: 'reject',
 	barcodeMode: 'base_number',
+	barcodePattern: null,
 	createdBy: null,
 	createdAt: '2026-11-16T12:00:00+00:00',
 	updatedAt: '2026-11-16T12:00:00+00:00'
@@ -84,6 +85,37 @@ describe('diffCampaignRules', () => {
 				to: 'Internal code'
 			}
 		]);
+	});
+
+	it('lists a barcode pattern change, and clears it for modes that do not use one', () => {
+		const withPattern: Campaign = {
+			...campaign,
+			barcodeMode: 'internal_code',
+			barcodePattern: '^BC-(\\d+)$'
+		};
+		expect(
+			diffCampaignRules(
+				campaign,
+				values({ barcodeMode: 'internal_code', barcodePattern: '^X(\\d+)' })
+			)
+		).toContainEqual({
+			field: 'barcodePattern',
+			label: 'Barcode pattern',
+			from: '(empty)',
+			to: '^X(\\d+)'
+		});
+		expect(
+			diffCampaignRules(withPattern, {
+				...rulesValuesOf(withPattern),
+				barcodeMode: 'manual_mapping'
+			})
+		).toContainEqual({
+			field: 'barcodePattern',
+			label: 'Barcode pattern',
+			from: '^BC-(\\d+)$',
+			to: '(empty)'
+		});
+		expect(diffCampaignRules(withPattern, rulesValuesOf(withPattern))).toEqual([]);
 	});
 
 	it('includes the calculated installment value when it changes', () => {

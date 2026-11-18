@@ -58,7 +58,7 @@ select has_table('public', 'campaigns', 'campaigns table exists');
 select columns_are('public', 'campaigns', array[
   'id', 'name', 'status', 'starts_at', 'ends_at', 'simple_bond_value', 'installment_count',
   'installment_value', 'number_digits', 'max_number', 'associated_number_offset', 'overflow_policy',
-  'barcode_mode', 'created_by', 'created_at', 'updated_at'
+  'barcode_mode', 'barcode_pattern', 'created_by', 'created_at', 'updated_at'
 ], 'campaigns has exactly the expected columns');
 select col_type_is('public', 'campaigns', 'id', 'uuid', 'id is uuid');
 select col_type_is('public', 'campaigns', 'name', 'text', 'name is text');
@@ -79,8 +79,8 @@ select col_type_is('public', 'campaigns', 'updated_at', 'timestamp with time zon
 select set_eq(
   $$select column_name::text from information_schema.columns
     where table_schema = 'public' and table_name = 'campaigns' and is_nullable = 'YES'$$,
-  array['starts_at', 'ends_at', 'created_by'],
-  'only starts_at, ends_at and created_by are nullable'
+  array['starts_at', 'ends_at', 'created_by', 'barcode_pattern'],
+  'only starts_at, ends_at, created_by and barcode_pattern (SAN-44) are nullable'
 );
 select col_default_is('public', 'campaigns', 'status', 'draft'::text, 'status defaults to draft');
 select col_default_is('public', 'campaigns', 'number_digits', 4, 'number_digits defaults to 4');

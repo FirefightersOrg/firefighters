@@ -66,7 +66,7 @@ sold -> closed
 
 Rules:
 
-- Manually entered simple bonds and printed patas start as `available`; `created` is reserved for bonds created by imports (Phase 4).
+- Manually entered simple bonds and printed patas start as `available`. Imported bonds are created only when their import session is confirmed, also directly as `available` (SAN-44 decision); `created` is currently unused.
 - A bond loaded by mistake is annulled (`available -> annulled`: only while available, not while delivered to a collector) with a reason and audit; annulling requires `bond.annul`. Its participating numbers are released so they can be entered again, and the annulled bond and its numbers stay as history. The database records the status a bond was annulled from (`annulled_from_status`); only bonds annulled from `available` release their numbers.
 - `sold -> annulled` (annulling a sale) is Phase 10: the bond's numbers stay held (never released), so no other bond can take them.
 - `annulled`, `lost` and `closed` have no outgoing transitions; annulled and closed bonds are immutable (except the recalculated financial status).
@@ -77,6 +77,40 @@ Rules:
 - A sold bond cannot be reassigned directly.
 - A bond with confirmed payments can only be corrected with audited annulment.
 - Loss must record responsible party, date, and reason.
+
+## Import session
+
+Implemented in SAN-44 (`import_sessions`, see `docs/data-model.md` and `docs/imports.md`).
+
+States:
+
+```txt
+draft
+validated
+confirmed
+cancelled
+failed
+```
+
+Transitions:
+
+```txt
+draft -> validated
+validated -> draft
+validated -> confirmed
+draft -> cancelled
+validated -> cancelled
+draft -> failed
+validated -> failed
+```
+
+Rules:
+
+- A session is created in `draft`, only for a `draft` or `active` campaign.
+- Validating requires at least one live item and no item `pending` or in `error` (erroneous rows are fixed or soft-removed first). Adding or editing items of a `validated` session returns it to `draft`.
+- Confirming requires a `draft`/`active` campaign and every live item linked to the bond it created: a `simple` item maps one-to-one to a simple bond, all rows of a `grupo_pata` map to one printed pata with one row per unit, and no bond of the session is left unlinked. Every bond must be `available` with a complete set of base and associated numbers (one per unit) and the base number (and pata barcode) announced by each row. Bonds are created (as `available`) only in the confirming transaction; an import bond cannot start in `created`.
+- `confirmed`, `cancelled` and `failed` are final. A confirmed import is never deleted: its functional rollback annuls its bonds (SAN-47) and then records `rolled_back_at`, `rolled_back_by` and a reason on the still-confirmed session.
+- Cancelling records who cancelled (reason optional); failing records the failure reason.
 
 ## Bond financial status
 

@@ -20,7 +20,7 @@ join public.roles r on r.id = rp.role_id
 join public.permissions p on p.id = rp.permission_id;
 
 select is((select count(*)::int from _rp where role_name = 'admin'), 44, 'admin has all 44 permissions');
-select is((select count(*)::int from _rp where role_name = 'operator'), 10, 'operator has 10 permissions');
+select is((select count(*)::int from _rp where role_name = 'operator'), 11, 'operator has 11 permissions (bond.scan added in SAN-44)');
 select is((select count(*)::int from _rp where role_name = 'treasurer'), 12, 'treasurer has 12 permissions');
 select is((select count(*)::int from _rp where role_name = 'read-only'), 3, 'read-only has 3 permissions');
 select is((select count(*)::int from _rp where role_name = 'collector'), 0, 'collector has no permissions');
@@ -34,7 +34,7 @@ select is(
 );
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'operator'),
-  array['bond.assign', 'bond.create', 'bond.import', 'bond.view', 'buyer.manage', 'campaign.view',
+  array['bond.assign', 'bond.create', 'bond.import', 'bond.scan', 'bond.view', 'buyer.manage', 'campaign.view',
         'draw.load_winner', 'payment.create', 'sale.create', 'settlement.create'],
   'operator grants match the matrix'
 );

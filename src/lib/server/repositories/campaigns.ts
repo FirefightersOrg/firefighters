@@ -30,6 +30,7 @@ export const CAMPAIGN_COLUMNS = [
 	'associated_number_offset',
 	'overflow_policy',
 	'barcode_mode',
+	'barcode_pattern',
 	'created_by',
 	'created_at',
 	'updated_at'
@@ -49,6 +50,7 @@ export interface CampaignRow {
 	associated_number_offset: number;
 	overflow_policy: string;
 	barcode_mode: string;
+	barcode_pattern: string | null;
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
@@ -81,6 +83,7 @@ export function mapCampaignRow(row: CampaignRow): Campaign {
 			'overflow_policy'
 		),
 		barcodeMode: oneOf<BarcodeMode>(BARCODE_MODES, row.barcode_mode, 'barcode_mode'),
+		barcodePattern: row.barcode_pattern,
 		createdBy: row.created_by,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at

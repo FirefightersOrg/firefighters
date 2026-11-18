@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { BARCODE_MODE_LABELS, BARCODE_MODES } from '$lib/domain/campaigns';
+	import {
+		BARCODE_MODE_LABELS,
+		BARCODE_MODES,
+		barcodeModeUsesPattern
+	} from '$lib/domain/campaigns';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
 	import FieldError from './FieldError.svelte';
 	import InstallmentFields from './InstallmentFields.svelte';
@@ -56,4 +60,29 @@
 		</select>
 		<FieldError id="barcodeMode-error" errors={errors.barcodeMode} />
 	</div>
+
+	{#if barcodeModeUsesPattern(values.barcodeMode)}
+		<div>
+			<label for="barcodePattern" class={labelClass}>Barcode pattern (optional)</label>
+			<input
+				id="barcodePattern"
+				name="barcodePattern"
+				type="text"
+				autocomplete="off"
+				spellcheck="false"
+				placeholder="^BC-(\d+)$"
+				bind:value={values.barcodePattern}
+				aria-invalid={errors.barcodePattern ? 'true' : undefined}
+				aria-describedby={errors.barcodePattern
+					? 'barcodePattern-help barcodePattern-error'
+					: 'barcodePattern-help'}
+				class="{inputClass} font-mono"
+			/>
+			<p id="barcodePattern-help" class="mt-1 text-xs text-slate-500">
+				A regular expression whose first group in parentheses is the base number. Leave it empty to
+				type the base number when scanning.
+			</p>
+			<FieldError id="barcodePattern-error" errors={errors.barcodePattern} />
+		</div>
+	{/if}
 </div>

@@ -1,4 +1,9 @@
-import { BARCODE_MODE_LABELS, type BarcodeMode, type Campaign } from '$lib/domain/campaigns';
+import {
+	BARCODE_MODE_LABELS,
+	barcodeModeUsesPattern,
+	type BarcodeMode,
+	type Campaign
+} from '$lib/domain/campaigns';
 import { previewInstallmentValue } from '$lib/domain/installments';
 import { formatCents, formatMoney, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
 import type { CampaignRulesValues } from './types';
@@ -93,6 +98,17 @@ export function diffCampaignRules(campaign: Campaign, values: CampaignRulesValue
 			label: 'Barcode mode',
 			from: barcodeLabel(campaign.barcodeMode),
 			to: barcodeLabel(values.barcodeMode)
+		});
+	}
+
+	// The pattern field is only submitted for modes that use it; otherwise the pattern is cleared.
+	const pattern = barcodeModeUsesPattern(values.barcodeMode) ? values.barcodePattern.trim() : '';
+	if (pattern !== (campaign.barcodePattern ?? '')) {
+		changes.push({
+			field: 'barcodePattern',
+			label: 'Barcode pattern',
+			from: campaign.barcodePattern ?? EMPTY,
+			to: pattern || EMPTY
 		});
 	}
 

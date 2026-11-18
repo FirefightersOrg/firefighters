@@ -59,8 +59,70 @@ describe('campaignCreateSchema', () => {
 			maxNumber: 9999,
 			associatedNumberOffset: 4871,
 			overflowPolicy: 'reject',
-			barcodeMode: 'base_number'
+			barcodeMode: 'base_number',
+			barcodePattern: null
 		});
+	});
+
+	it('takes a barcode pattern only for the internal / external code modes (SAN-44)', () => {
+		const withPattern = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'external_legacy_code',
+			barcodePattern: '  ^LEG(\\d+)$ '
+		});
+		expect(withPattern.barcodePattern).toBe('^LEG(\\d+)$');
+		const blank = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: '   '
+		});
+		expect(blank.barcodePattern).toBeNull();
+		const wrongMode = campaignCreateSchema.safeParse({
+			...general,
+			...rules,
+			barcodePattern: '^(\\d+)$'
+		});
+		expect(wrongMode.success).toBe(false);
+		if (!wrongMode.success) {
+			expect(campaignFieldErrors(wrongMode.error).barcodePattern?.[0]).toMatch(
+				/only used with the internal or external\/legacy code modes/
+			);
+		}
+	});
+
+	it('counts the barcode pattern in code points, like Postgres (SAN-44)', () => {
+		// 101 emoji + "(\d+)" is 106 code points but 209 UTF-16 units: the database accepts it,
+		// so the client must accept it too.
+		const emojiHeavy = `${'😀'.repeat(101)}(\\d+)`;
+		expect([...emojiHeavy].length).toBe(106);
+		const parsed = campaignCreateSchema.parse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: emojiHeavy
+		});
+		expect(parsed.barcodePattern).toBe(emojiHeavy);
+		const atLimit = `${'😀'.repeat(195)}(\\d+)`;
+		expect([...atLimit].length).toBe(200);
+		expect(
+			campaignCreateSchema.parse({
+				...general,
+				...rules,
+				barcodeMode: 'internal_code',
+				barcodePattern: atLimit
+			}).barcodePattern
+		).toBe(atLimit);
+		const overLimit = `${'😀'.repeat(196)}(\\d+)`;
+		expect([...overLimit].length).toBe(201);
+		const tooLong = campaignCreateSchema.safeParse({
+			...general,
+			...rules,
+			barcodeMode: 'internal_code',
+			barcodePattern: overLimit
+		});
+		expect(tooLong.success).toBe(false);
 	});
 
 	it('allows a draft without dates', () => {
