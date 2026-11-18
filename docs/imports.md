@@ -196,3 +196,46 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
   `manual_mapping` requires the operator to type it. `internal_code` and
   `external_legacy_code` use the first capture group of `barcode_pattern`; without a pattern they
   behave as `manual_mapping`. Every scan remains a staged row, including an unrecognized one.
+
+## App layer (SAN-45)
+
+Code: `src/lib/domain/barcodes.ts`, `src/lib/domain/csv.ts`, `src/lib/domain/imports.ts`, `src/lib/server/imports/parse-file.ts`, `src/lib/schemas/import.ts`, `src/lib/server/repositories/imports.ts`, `src/lib/server/services/imports.ts`. It calls the functions of `20261126000000_import_staging.sql` and adds no SQL.
+
+### Upload flow
+
+`stageImportFile` parses the file, reads the campaign rules, interprets every row (`interpretImportRow`), creates the session (`import_session_create`), stages the rows in batches of 1,000 (`import_session_add_items`; each batch is its own transaction and `import.stage` audit row) and validates (`import_session_validate`). It returns the summary of `import_session_validate` (camelCase) plus `rowCount`. A file that cannot be read fails before anything is written.
+
+### File format
+
+- `.csv` or `.xlsx` (first worksheet). Excel 97-2003 `.xls` is not supported.
+- Header row with the columns `tipo_bono,grupo_pata,numero_base,barcode`, in any order. Accepted aliases (case, accents, spaces and hyphens ignored): `tipo`, `tipo_de_bono`, `bond_type`, `type`, `kind`; `grupo`, `pata`, `grupo_de_pata`, `pata_group`, `group`, `group_key`; `numero`, `nro_base`, `base_number`, `number`, `base`; `codigo_barras`, `codigo_de_barras`, `codigo`, `bar_code`, `code`. Other columns are ignored.
+- CSV: UTF-8 with or without BOM (invalid UTF-8 is read as Windows-1252), delimiter `,` or `;` (detected from the header), RFC 4180 quoting. Values are trimmed; blank rows are skipped.
+- `.xlsx`: numeric cells with a zero-padding format (`0000`) keep their padding; other numbers are written plainly (68). Formulas use their cached result.
+- Limits: 5 MB per file, 5,000 data rows per file, 500 characters per value.
+- The row number of an item is the file row (header = row 1), so messages point at the spreadsheet row.
+
+### Row interpretation (`interpretImportRow`)
+
+The barcode is read per `barcode_mode` exactly like `import_session_add_scan` reads a scan (same codes and messages): `base_number` takes the barcode as the number (1 to 10 digits; `parse_code_not_a_number`), `manual_mapping` and the pattern modes without a pattern need `numero_base` (`parse_base_number_required`), the pattern modes take the first capture group (`parse_code_not_recognized`). The range is checked by the database (`number_out_of_range`). The first problem wins; a row with a `parse_*` error is staged without a base number.
+
+| Code                          | When                                                                                         |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `parse_invalid_type`          | `tipo_bono` is not `simple` / `pata` (an empty type is left to the database: `missing_type`) |
+| `parse_barcode_too_long`      | barcode over 200 characters                                                                  |
+| `parse_simple_with_group`     | a simple row with `grupo_pata`                                                               |
+| `parse_missing_group`         | a pata row without `grupo_pata` (staged without type: the database rejects such a payload)   |
+| `parse_group_too_long`        | `grupo_pata` over 200 characters                                                             |
+| `parse_invalid_base_number`   | `numero_base` is not 1 to 10 digits                                                          |
+| `parse_code_not_a_number`     | `base_number` mode: the barcode is not a number                                              |
+| `parse_code_not_recognized`   | pattern modes: no match, or the capture is not a number                                      |
+| `parse_base_number_required`  | the barcode does not carry the number and `numero_base` is empty                             |
+| `parse_base_number_mismatch`  | `numero_base` and the number in the barcode differ                                           |
+| `parse_pattern_not_supported` | the campaign pattern cannot be applied in JavaScript (see below) and `numero_base` is empty  |
+
+A row without barcode takes `numero_base`; a row with neither is left to the database (`missing_base_number`).
+
+The pattern is a Postgres ARE. JavaScript `RegExp` applies it only when it stays inside the common subset (literals, `^ $ . \d \s`, bracket expressions like `[0-9A-Z]`, `(...)`, `(?:...)`, `(?=...)`, alternation, greedy quantifiers, `{m,n}`). Patterns using `\b` (a backspace in ARE), `\y \m \M \A \Z`, POSIX classes (`[[:digit:]]`), `***` directors, embedded options `(?i)`, lookbehind, lazy quantifiers or back references are not applied by the app: such file rows need `numero_base` (scans are resolved by the database).
+
+### Instant preview (`validateImportBatch`)
+
+A pure mirror of `import_session_revalidate` + `import_session_check_groups` over the live rows, with the same codes, messages and precedence: `parse_*` (kept) → `missing_type` → `missing_base_number` → `missing_barcode` (pata) → `missing_group` → `number_out_of_range` → `number_conflict` → `number_in_use` → `duplicate_barcode` → `barcode_in_use` (row barcode, then pata code) → `duplicate_barcode` (pata code used as a row barcode) → `incomplete_pata` (only when validating). Without the campaign's live data it skips the `*_in_use` checks. `summarizeImportItems` gives the counts of `import_session_summary`. The database is authoritative; `tests/integration/import-staging.test.ts` checks that both agree on every row, message and count.
