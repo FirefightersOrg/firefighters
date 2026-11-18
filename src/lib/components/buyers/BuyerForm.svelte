@@ -20,7 +20,14 @@
 			| null
 			| undefined;
 	} = $props();
-	let type = $state(buyer?.type ?? form?.values?.type ?? 'individual');
+	// Initial value only (afterwards the select owns it). A refused submit keeps what was chosen.
+	function initialType() {
+		const submitted = form?.values?.type;
+		return typeof submitted === 'string' && submitted !== ''
+			? submitted
+			: (buyer?.type ?? 'individual');
+	}
+	let type = $state(initialType());
 	const value = (name: string, fallback = '') => {
 		const candidate = form?.values?.[name];
 		return typeof candidate === 'string' ? candidate : fallback;
