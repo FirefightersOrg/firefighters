@@ -5,6 +5,7 @@ import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { assignBondsToCollector } from '$lib/server/services/deliveries';
 import { registerSale } from '$lib/server/services/sales';
 import { buildInstallmentSchedule } from '$lib/domain/sales';
+import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 
@@ -178,6 +179,33 @@ describe('sale registration (local Supabase)', () => {
 				due_date: dueDate,
 				amount: Number(amount)
 			}))
+		);
+
+		// The repository reads the same sale, its active plan and its installments (as the operator).
+		const active = await getActiveSaleForBond(operator.client, installmentBondId);
+		expect(active.error).toBeNull();
+		expect(active.data?.sale).toMatchObject({
+			id: saleId,
+			paymentMode: 'installments',
+			totalAmount: '120000.00'
+		});
+		expect(active.data?.plan).toMatchObject({
+			installmentCount: 10,
+			totalAmount: '120000.00',
+			status: 'active'
+		});
+		const installments = await listInstallmentsForSale(operator.client, saleId);
+		expect(
+			installments.data?.map((i) => [i.installmentNumber, i.dueDate, i.amount, i.status])
+		).toEqual(
+			buildInstallmentSchedule({
+				paymentMode: 'installments',
+				firstDueDate,
+				totalAmount: '120000.00',
+				installmentCount: 10,
+				installmentValue: '6000.00',
+				commercialUnitCount: 2
+			}).map(({ number, dueDate, amount }) => [number, dueDate, amount, 'pending'])
 		);
 	});
 	it('maps rejected sales and permits only sale.create callers', async () => {

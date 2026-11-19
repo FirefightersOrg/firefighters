@@ -75,8 +75,9 @@ export async function getActiveSaleForBond(
 	if (error) return { data: null, error };
 	const sale = data?.[0];
 	if (!sale) return { data: null, error: null };
-	const plan = sale.payment_plans[0];
-	if (!plan) return { data: null, error: new Error('Active sale has no payment plan') };
+	// A corrected sale may keep annulled plans: only the active one is the sale's plan.
+	const plan = sale.payment_plans.find((candidate) => candidate.status === 'active');
+	if (!plan) return { data: null, error: new Error('Active sale has no active payment plan') };
 	return {
 		data: {
 			sale: mapSaleRow(sale),
@@ -92,14 +93,17 @@ export async function getActiveSaleForBond(
 		error: null
 	};
 }
+/** The installments of a sale's active payment plan, by number. */
 export async function listInstallmentsForSale(
 	supabase: SupabaseClient,
 	saleId: string
 ): Promise<RepositoryResult<Installment[]>> {
 	const { data, error } = await supabase
 		.from('installments')
-		.select('*, payment_plans!inner(sale_id)')
+		.select('*, payment_plans!inner(sale_id, status)')
 		.eq('payment_plans.sale_id', saleId)
+		// The installments of the sale's active plan (annulled plans keep theirs as history).
+		.eq('payment_plans.status', 'active')
 		.order('installment_number')
 		.overrideTypes<InstallmentRow[], { merge: false }>();
 	return error ? { data: null, error } : { data: (data ?? []).map(mapInstallmentRow), error: null };
