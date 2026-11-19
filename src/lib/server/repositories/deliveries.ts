@@ -10,6 +10,7 @@ import {
 	type DeliveryNoteReason
 } from '$lib/domain/deliveries';
 import type { RepositoryResult } from './campaigns';
+import { mapBondListRow, BOND_LIST_COLUMNS, type BondListEntry, type BondListRow } from './bonds';
 
 /**
  * Read access to delivery notes and bond custody history under the caller's RLS (bond.view or a
@@ -112,6 +113,8 @@ export async function listDeliveryNotes(
 	options: {
 		collectorId?: string | null;
 		noteNumber?: number | null;
+		from?: string | null;
+		to?: string | null;
 		page?: number;
 		pageSize?: number;
 	} = {}
@@ -126,6 +129,8 @@ export async function listDeliveryNotes(
 		.eq('campaign_id', campaignId);
 	if (options.collectorId) query = query.eq('collector_id', options.collectorId);
 	if (options.noteNumber) query = query.eq('note_number', options.noteNumber);
+	if (options.from) query = query.gte('issued_at', options.from);
+	if (options.to) query = query.lte('issued_at', `${options.to}T23:59:59.999Z`);
 	const { data, error, count } = await query
 		.order('note_number', { ascending: false })
 		.range((page - 1) * pageSize, page * pageSize - 1)
@@ -175,4 +180,59 @@ export async function listBondAssignments(
 		.overrideTypes<AssignmentRow[], { merge: false }>();
 	if (error) return { data: null, error };
 	return wrap(() => (data ?? []).map(mapAssignmentRow));
+}
+
+/** Available campaign bonds matching a participating number, barcode or internal code. */
+export async function findAvailableBonds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	options: {
+		number?: number | null;
+		code?: string | null;
+		from?: number | null;
+		to?: number | null;
+	}
+): Promise<RepositoryResult<BondListEntry[]>> {
+	let query = supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.eq('commercial_status', 'available')
+		// Members of a manual pata are delivered with their pata, never alone.
+		.is('group_pata_id', null);
+	if (options.number != null) {
+		query = query.or(
+			`base_numbers.cs.{${options.number}},associated_numbers.cs.{${options.number}}`
+		);
+	}
+	if (options.code)
+		query = query.or(
+			`barcode.eq."${options.code.replace(/["\\]/g, '\\$&')}",internal_code.eq."${options.code.replace(/["\\]/g, '\\$&')}"`
+		);
+	if (options.from != null) query = query.gte('sort_number', options.from);
+	if (options.to != null) query = query.lte('sort_number', options.to);
+	const { data, error } = await query
+		.order('sort_number', { ascending: true })
+		.limit(500)
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return wrap(() => (data ?? []).map(mapBondListRow));
+}
+
+/** Bonds of the campaign by id, as list entries (for a note's detail). */
+export async function listBondEntriesByIds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	ids: readonly string[]
+): Promise<RepositoryResult<BondListEntry[]>> {
+	if (ids.length === 0) return { data: [], error: null };
+	const { data, error } = await supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.in('id', [...ids])
+		.order('sort_number', { ascending: true })
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return wrap(() => (data ?? []).map(mapBondListRow));
 }
