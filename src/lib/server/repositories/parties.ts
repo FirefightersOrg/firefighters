@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BOND_LIST_COLUMNS, mapBondListRow, type BondListEntry, type BondListRow } from './bonds';
 import {
 	BUYER_TYPES,
 	COLLECTOR_STATUSES,
@@ -50,6 +51,27 @@ export interface BuyerRow {
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
+}
+
+export interface CollectorProfileOption {
+	id: string;
+	fullName: string;
+	email: string;
+}
+
+interface BuyerBondRow {
+	id: string;
+	campaign_id: string;
+	bond_numbers: { number_value: number; number_kind: string }[];
+	campaigns: { name: string; number_digits: number } | null;
+}
+
+export interface BuyerBondNumber {
+	id: string;
+	campaignId: string;
+	campaignName: string;
+	campaignNumberDigits: number;
+	baseNumbers: number[];
 }
 
 function oneOf<T extends string>(values: readonly T[], value: string, what: string): T {
@@ -179,6 +201,117 @@ export async function listActiveCollectorOptions(
 	};
 }
 
+/** Active login profiles not already linked to a collector, for the collector form. */
+export async function listAvailableCollectorProfileOptions(
+	supabase: SupabaseClient
+): Promise<RepositoryResult<CollectorProfileOption[]>> {
+	const { data: profiles, error: profileError } = await supabase
+		.from('profiles')
+		.select('id, full_name, email')
+		.eq('status', 'active')
+		.order('full_name', { ascending: true })
+		.limit(1000)
+		.overrideTypes<{ id: string; full_name: string; email: string }[], { merge: false }>();
+	if (profileError) return { data: null, error: profileError };
+	const { data: linked, error: linkedError } = await supabase
+		.from('collectors')
+		.select('user_profile_id')
+		.not('user_profile_id', 'is', null)
+		.overrideTypes<{ user_profile_id: string }[], { merge: false }>();
+	if (linkedError) return { data: null, error: linkedError };
+	const linkedIds = new Set((linked ?? []).map((row) => row.user_profile_id));
+	return {
+		data: (profiles ?? [])
+			.filter((profile) => !linkedIds.has(profile.id))
+			.map((profile) => ({ id: profile.id, fullName: profile.full_name, email: profile.email })),
+		error: null
+	};
+}
+
+/** Visible collectors for a rendered buyer page, keyed by id. One query avoids list N+1 calls. */
+export async function getCollectorsByIds(
+	supabase: SupabaseClient,
+	ids: readonly string[]
+): Promise<RepositoryResult<Map<string, Pick<Collector, 'id' | 'displayName'>>>> {
+	if (ids.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('collectors')
+		.select('id, display_name')
+		.in('id', [...new Set(ids)])
+		.overrideTypes<{ id: string; display_name: string }[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: new Map((data ?? []).map((c) => [c.id, { id: c.id, displayName: c.display_name }])),
+		error: null
+	};
+}
+
+/**
+ * Assigned bond counts for the collectors shown on one page: one exact `head` count per
+ * collector (at most a page of them), so no row cap can make a count come out short.
+ */
+export async function countAssignedBondsByCollector(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorIds: readonly string[]
+): Promise<RepositoryResult<Map<string, number>>> {
+	const results = await Promise.all(
+		collectorIds.map((collectorId) =>
+			supabase
+				.from('bonds')
+				.select('id', { count: 'exact', head: true })
+				.eq('campaign_id', campaignId)
+				.eq('current_collector_id', collectorId)
+				.overrideTypes<null, { merge: false }>()
+		)
+	);
+	const counts = new Map<string, number>();
+	for (const [i, result] of results.entries()) {
+		if (result.error) return { data: null, error: result.error };
+		counts.set(collectorIds[i], result.count ?? 0);
+	}
+	return { data: counts, error: null };
+}
+
+/** Most assigned bonds the collector record lists (the total is always exact). */
+export const ASSIGNED_BONDS_LIMIT = 200;
+
+/** This campaign's bonds currently held by a collector, by number, with the exact total. */
+export async function listAssignedBondsForCollector(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorId: string
+): Promise<RepositoryResult<{ items: BondListEntry[]; total: number }>> {
+	const { data, error, count } = await supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS, { count: 'exact' })
+		.eq('campaign_id', campaignId)
+		.eq('current_collector_id', collectorId)
+		.order('sort_number', { ascending: true })
+		.limit(ASSIGNED_BONDS_LIMIT)
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: { items: (data ?? []).map(mapBondListRow), total: count ?? data?.length ?? 0 },
+		error: null
+	};
+}
+
+/** A profile's display name, or null when it cannot be read (RLS) or does not exist. */
+export async function getProfileName(
+	supabase: SupabaseClient,
+	profileId: string
+): Promise<RepositoryResult<string | null>> {
+	const { data, error } = await supabase
+		.from('profiles')
+		.select('full_name, email')
+		.eq('id', profileId)
+		.maybeSingle()
+		.overrideTypes<{ full_name: string | null; email: string } | null, { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: data ? data.full_name || data.email : null, error: null };
+}
+
 /**
  * Buyers matching a search over names, phone, document number and tax id (every word must
  * match a column), by last/business name.
@@ -232,6 +365,43 @@ export async function getBuyer(
 		.overrideTypes<BuyerRow | null, { merge: false }>();
 	if (error) return { data: null, error };
 	return wrap(() => (data ? mapBuyerRow(data) : null));
+}
+
+/**
+ * Bonds currently assigned to a buyer. The campaign and base numbers are embedded in the same
+ * query, so the buyer record never turns into an N+1 lookup.
+ */
+export async function listBuyerBonds(
+	supabase: SupabaseClient,
+	buyerId: string,
+	options: { campaignId?: string; excludeCampaignId?: string } = {}
+): Promise<RepositoryResult<BuyerBondNumber[]>> {
+	let query = supabase
+		.from('bonds')
+		.select(
+			'id, campaign_id, bond_numbers(number_value, number_kind), campaigns!inner(name, number_digits)'
+		)
+		.eq('current_buyer_id', buyerId);
+	if (options.campaignId) query = query.eq('campaign_id', options.campaignId);
+	if (options.excludeCampaignId) query = query.neq('campaign_id', options.excludeCampaignId);
+	const { data, error } = await query
+		.order('campaign_id', { ascending: true })
+		.order('id', { ascending: true })
+		.overrideTypes<BuyerBondRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: (data ?? []).map((bond) => ({
+			id: bond.id,
+			campaignId: bond.campaign_id,
+			campaignName: bond.campaigns?.name ?? 'Unknown campaign',
+			campaignNumberDigits: bond.campaigns?.number_digits ?? 4,
+			baseNumbers: (bond.bond_numbers ?? [])
+				.filter((number) => number.number_kind === 'base')
+				.map((number) => number.number_value)
+				.sort((a, b) => a - b)
+		})),
+		error: null
+	};
 }
 
 /** Other buyers with the same document number or tax id (possible duplicates to warn about). */

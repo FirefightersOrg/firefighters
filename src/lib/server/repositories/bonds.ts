@@ -597,7 +597,7 @@ export interface BondListFilters {
 	financialStatus?: BondFinancialStatus | null;
 }
 
-interface BondListRow {
+export interface BondListRow {
 	id: string;
 	campaign_id: string;
 	kind: string;

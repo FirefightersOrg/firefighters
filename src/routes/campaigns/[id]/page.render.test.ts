@@ -36,7 +36,9 @@ const can = {
 	transitions: [],
 	viewCommissions: false,
 	viewBonds: false,
-	loadBonds: false
+	loadBonds: false,
+	viewCollectors: false,
+	viewBuyers: false
 };
 
 function renderPage(
@@ -164,5 +166,16 @@ describe('campaign page: bonds', () => {
 		const href = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"';
 		expect(renderPage(campaign(), null, { can: { viewBonds: true } })).toContain(href);
 		expect(renderPage(campaign())).not.toContain(href);
+	});
+
+	it('links to collectors and buyers only for users who can read them', () => {
+		const collectors = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/collectors"';
+		const buyers = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/buyers"';
+		const none = renderPage(campaign(), null);
+		expect(none).not.toContain(collectors);
+		expect(none).not.toContain(buyers);
+		const both = renderPage(campaign(), null, { can: { viewCollectors: true, viewBuyers: true } });
+		expect(both).toContain(collectors);
+		expect(both).toContain(buyers);
 	});
 });
