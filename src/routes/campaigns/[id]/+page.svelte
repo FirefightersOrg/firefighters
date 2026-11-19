@@ -44,7 +44,7 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions || data.can.loadBonds || data.can.viewBonds}
+		{#if data.can.viewCommissions || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
 				{#if data.can.viewBonds}
 					<a
@@ -60,6 +60,30 @@
 					<a
 						href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
 						class="font-medium text-blue-700 hover:underline">Load a pata →</a
+					>
+				{/if}
+				{#if data.can.viewCollectors}
+					<a
+						href={resolve('/campaigns/[id]/collectors', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Collectors →</a
+					>
+				{/if}
+				{#if data.can.viewBuyers}
+					<a
+						href={resolve('/campaigns/[id]/buyers', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Buyers →</a
+					>
+				{/if}
+				{#if data.can.viewDeliveries}
+					<a
+						href={resolve('/campaigns/[id]/deliveries', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Deliveries →</a
+					>
+				{/if}
+				{#if data.can.viewSales}
+					<a
+						href={resolve('/campaigns/[id]/sales', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Sales →</a
 					>
 				{/if}
 				{#if data.can.viewCommissions}

@@ -4,6 +4,8 @@
 
 Prerequisites: Node 22+, [pnpm](https://pnpm.io), Docker (running), and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started).
 
+Optional: with [mise](https://mise.jdx.dev), `mise trust && mise install` installs the pinned Node and pnpm versions (`mise.toml`).
+
 ```bash
 pnpm install
 cp .env.example .env   # then paste the keys printed by `supabase start` / `supabase status`

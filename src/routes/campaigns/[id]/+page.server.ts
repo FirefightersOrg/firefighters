@@ -97,7 +97,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			transitions: availableCampaignTransitions(campaign.status, permissions),
 			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
 			viewBonds: hasPermissionIn(permissions, 'bond.view'),
-			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status)
+			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status),
+			// Reading needs X.view or X.manage (same rule as the RLS of collectors / buyers).
+			viewCollectors:
+				hasPermissionIn(permissions, 'collector.view') ||
+				hasPermissionIn(permissions, 'collector.manage'),
+			viewBuyers:
+				hasPermissionIn(permissions, 'buyer.view') || hasPermissionIn(permissions, 'buyer.manage'),
+			viewDeliveries:
+				hasPermissionIn(permissions, 'bond.view') || hasPermissionIn(permissions, 'bond.assign'),
+			viewSales:
+				hasPermissionIn(permissions, 'sale.view') ||
+				hasPermissionIn(permissions, 'sale.create') ||
+				hasPermissionIn(permissions, 'bond.view')
 		}
 	};
 };

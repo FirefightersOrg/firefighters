@@ -77,6 +77,7 @@ Sections:
 - Participating numbers.
 - Barcode.
 - Current collector.
+- Assignment history (deliveries, reassignments, returns and losses, with their notes; Return, Reassign and Mark lost actions).
 - Current buyer.
 - Sale.
 - Installments.
@@ -155,6 +156,15 @@ Must allow:
 - View debt.
 - View prizes.
 - View historical numbers if migrated.
+
+### Buyers (SAN-51)
+
+Routes: `/campaigns/[id]/buyers` lists buyers, `/new` creates one, and
+`/[buyerId]` shows and edits its record. The directory searches name, phone, document number,
+or tax ID and can filter by buyer type. Creation and updates warn about matching document or
+tax ID records before allowing confirmation. If an existing usual collector is not visible to
+the editor, the form keeps it selected rather than silently clearing it; an editor who cannot
+see collectors is told to ask an admin to set a new one.
 
 ### Sale
 

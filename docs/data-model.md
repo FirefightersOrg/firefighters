@@ -157,6 +157,14 @@ Suggested fields:
 - `status`
 - `created_at`
 
+Implemented in SAN-49 (`20261203000000_collectors_buyers.sql`, pgTAP `019`):
+
+- Global, not per campaign (the same people sell year after year). Never deleted: `status` is `active` or `inactive`; DELETE/TRUNCATE are rejected for every role (`23001`).
+- Text is stored trimmed (empty → null); `email` lowercased and checked; limits: name 200, phone 50, email 254, address 500.
+- `user_profile_id` (optional, unique) links the future collector login: that profile reads its own row without `collector.view` ("own" scope).
+- Writes only through `collector_create` / `collector_update` (`collector.manage`, audited as `collector.create` / `collector.update` with the changed keys; `collector_update` takes `p_expected_updated_at`, `PT409` when stale, and returns false for a no-op).
+- RLS: SELECT with `collector.view` or `collector.manage`, or the own row. `bonds.current_collector_id` and `commission_rules.applies_to_collector_id` now reference it.
+
 ### buyers
 
 Buyers.
@@ -175,6 +183,15 @@ Suggested fields:
 - `usual_collector_id`
 - `notes`
 - `created_at`
+
+Implemented in SAN-49 (same migration):
+
+- Global and never deleted. `type` is `individual` (needs a first or last name) or `business` (needs `business_name`). Limits: names 100/200, document and tax id 30, notes 2000.
+- `document_number` and `tax_id` have partial indexes but are **not unique**: legacy data has duplicate buyers that are normalised by hand, so the screens warn about possible duplicates instead.
+- `usual_collector_id` references `collectors` (any status, so it can stay as history).
+- Writes only through `buyer_create` / `buyer_update` (`buyer.manage`, audited as `buyer.create` / `buyer.update`, same concurrency rule as collectors).
+- RLS: SELECT with `buyer.view` or `buyer.manage` (SAN-93 gives every action permission its `.view`). `bonds.current_buyer_id` now references it.
+- App layer: `src/lib/domain/parties.ts`, `src/lib/server/repositories/parties.ts` (list/search/get), `src/lib/server/services/parties.ts` (writes).
 
 ### bonds
 
@@ -329,6 +346,15 @@ Suggested fields:
 - `delivery_note_id`
 - `bond_id`
 
+Implemented in SAN-53/54 (`20261204000000_bond_delivery.sql`, pgTAP `020`):
+
+- `bond_assignments` is the custody history. A `delivery` or `reassignment` row is the bond's custody while `active` (at most one active row per bond, unique index); it is closed as `returned`, `reassigned` or `lost` (the only update allowed, `returned_at` set by the database). `return` and `lost` rows are events; a loss stores `responsible_party`, `lost_on` and the reason in `notes`, and its `collector_id` is null when the bond was never delivered.
+- `delivery_notes` are numbered per campaign (`note_number`, serialised with an advisory lock) and record `reason` (`delivery` or `reassignment`: a reassignment issues a note for the new collector). Notes and their items are immutable; annulling a note is Phase 10.
+- Composite FKs keep notes, items, assignments and bonds in the same campaign. Nothing is deleted (`23001`).
+- Writes only through `bond_deliver` / `bond_reassign` (`bond.assign`), `bond_return` (`bond.return`: `delivered_to_collector → returned → available`, collector cleared) and `bond_mark_lost` (`bond.mark_lost`: available or delivered → `lost`, collector cleared; responsible party, a non-future date and a reason are required). A sold bond is never returned, reassigned or marked lost here (`55000`). Each bond change audits `bond.deliver` / `bond.reassign` / `bond.return` / `bond.mark_lost`, and each note `delivery_note.issue`.
+- RLS: readable with `bond.view` or a delivery permission; a collector's own login sees what was handed to it. With today's matrix the operator assigns (`bond.assign`) but returns and losses are admin-only.
+- App layer: `src/lib/domain/deliveries.ts`, `src/lib/server/repositories/deliveries.ts`, `src/lib/server/services/deliveries.ts`.
+
 ### sales
 
 Sale of a bond to a buyer.
@@ -374,6 +400,18 @@ Suggested fields:
 Constraints:
 
 - Unique `(payment_plan_id, installment_number)`.
+
+Rules (SAN-58, `20261205000000_sales.sql`):
+
+- A bond has at most one `active` sale (`sales.status`: `active`, `annulled`, `corrected`); a
+  sale's bond belongs to the sale's campaign. `payment_mode` is `full_payment` (a one-installment
+  plan) or `installments`. A sale has at most one `active` payment plan (1 to 120 installments).
+- New rows start `active` (installments `pending`). After that only the status changes: sale
+  `active -> annulled | corrected`, plan `active -> annulled`, installments as in
+  `docs/state-machines.md` "Installment". Amounts, dates and parties never change.
+- Nothing is deleted. Writes go through audited functions (`sale.create`, SAN-59; `sale.correct`,
+  Phase 10). Readers: `bond.view`, `sale.create`, `sale.correct`, and a collector's own login for
+  its sales.
 
 ### payments
 
@@ -739,6 +777,14 @@ SAN-45 write functions:
   validated session.
 - `import_session_summary(session_id)`: preview counts: simple bonds, patas, base and
   participating numbers, errors, warnings and duplicates.
+
+File rows reach `import_session_add_items` already interpreted by the app
+(`src/lib/domain/imports.ts`, `interpretImportRow`): `parsed_value` holds the four raw file fields
+(`tipo_bono`, `grupo_pata`, `numero_base`, `barcode`; trimmed, blank = null), and `item_type`,
+`group_key`, `base_number` and `barcode` are derived from them with the campaign's barcode rules.
+A row the parser cannot interpret is staged with a `parse_*` `error_code` (kept by revalidation)
+and no base number. Scans store `barcode`, `base_number`, `group_key` and `barcode_mode` in
+`parsed_value`. See `docs/imports.md` ("App layer (SAN-45)").
 
 ### legacy_migration_staging
 

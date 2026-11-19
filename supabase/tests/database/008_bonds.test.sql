@@ -134,13 +134,10 @@ select col_default_is('public', 'bonds', 'commercial_status', 'available', 'bond
 select col_default_is('public', 'bonds', 'financial_status_snapshot', 'no_payments', 'bonds.financial_status_snapshot defaults to no_payments');
 select col_default_is('public', 'bonds', 'commercial_unit_count', '1', 'bonds.commercial_unit_count defaults to 1');
 select ok(
-  not exists (
-    select 1 from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
-    where c.conrelid = 'public.bonds'::regclass and c.contype = 'f'
-      and a.attname in ('current_collector_id', 'current_buyer_id')
-  ),
-  'current_collector_id / current_buyer_id have no FK yet (Phase 5)'
+  (select count(*) = 2 from pg_constraint
+   where conrelid = 'public.bonds'::regclass and contype = 'f'
+     and conname in ('bonds_current_collector_fkey', 'bonds_current_buyer_fkey')),
+  'current_collector_id / current_buyer_id reference collectors / buyers (Phase 5, SAN-49)'
 );
 select col_is_null('public', 'bonds', 'current_collector_id', 'current_collector_id is nullable');
 select col_is_null('public', 'bonds', 'current_buyer_id', 'current_buyer_id is nullable');
@@ -1043,8 +1040,12 @@ select throws_ok(
   'truncate: bond_groups (owner)'
 );
 select throws_ok(
-  -- import_session_items (SAN-44) references bonds: include it so the FK does not fail first.
-  $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items$$,
+  -- Every table referencing bonds is listed so the FK check does not fail first:
+  -- import_session_items (SAN-44), delivery_note_items and bond_assignments (SAN-53), and the
+  -- sales tables (SAN-58).
+  $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items,
+    public.delivery_note_items, public.bond_assignments, public.installments,
+    public.payment_plans, public.sales$$,
   '23001', null,
   'truncate: bonds and bond_numbers (owner)'
 );
