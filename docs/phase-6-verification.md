@@ -33,9 +33,11 @@ export APP_ENV=local PUBLIC_SUPABASE_URL="$SB_API_URL" \
 | Phase 6 acceptance | `pnpm test:integration tests/integration/phase-6-acceptance.test.ts` | **6/6 pass**                                                                                          |
 | Type check         | `pnpm check`                                                         | **0 errors, 0 warnings**                                                                              |
 | Lint / format      | `pnpm lint`                                                          | **Pass**                                                                                              |
-| Unit tests         | `pnpm test`                                                          | **1,056/1,056 pass** in 73 files                                                                      |
+| Unit tests         | `pnpm test`                                                          | **1,056/1,056 pass** in 73 files (Node `v24.22.3`, from `node --version`)                             |
 | Full integration   | `pnpm test:integration`                                              | **134/134 pass** in 13 files                                                                          |
 | pgTAP              | `pnpm exec supabase test db`                                         | **1,323/1,330 pass** in 15 files; the 7 failures are the known shared-DB `003` failures fixed in #40. |
+
+TODO: re-run and update these results after #48's ICU-stable delivery-note test lands.
 
 ## Re-run data
 
@@ -52,7 +54,20 @@ where request_id like 'it-p6-<RUN_ID>-%' order by created_at;
 
 - **Sold-bond rejection is not acceptance-tested.** Phase 6 has no sale RPC, so a legitimate
   sold bond cannot be produced through the application before Phase 7. The suite proves the same
-  guard with a lost bond (return and reassign refused with 409); the sold case belongs to SAN-61.
+  guard with a lost bond (return and reassign refused with 409); pgTAP
+  [`020_bond_delivery`](../supabase/tests/database/020_bond_delivery.test.sql) does cover return,
+  reassignment and loss rejection after the owner writes a bond's status as `sold`. The application
+  acceptance case belongs to SAN-61.
+- **Collector-record bulk actions do not validate the source collector.** This stale-collector
+  action gap is being fixed by the [#47](https://github.com/FirefightersOrg/firefighters/pull/47) /
+  [#51](https://github.com/FirefightersOrg/firefighters/pull/51) follow-up; when it lands, C3
+  must cover a bond reassigned to another collector before a bulk action from the old collector.
+- **Manual pata acceptance is not covered.** There is no acceptance coverage for delivery,
+  printing member numbers, or return of a printed/manual pata.
+- **A collector's own-login route scope is not covered.** The `delivery_can_read` own-collector
+  policy is not exercised through a route-level acceptance test.
+- **Delivery in a draft campaign remains a product decision to confirm.** `bond_lock_campaign`
+  currently permits it, and this suite does not assert a final product decision.
 - **Current permissions intentionally deny the operator `bond.return` and `bond.mark_lost`.** The
   suite asserts 403 for both; this remains pending the product decision in issue #50 (proposed: give the operator `bond.return`).
 

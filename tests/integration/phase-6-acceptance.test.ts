@@ -107,10 +107,13 @@ async function auditFor(requestId: string) {
 	expect(error).toBeNull();
 	return data ?? [];
 }
-async function bond(barcode: string | null = null) {
-	const number = nextNumber++;
+async function bond(
+	barcode: string | null = null,
+	targetCampaignId = campaignId,
+	number = nextNumber++
+) {
 	const { data, error } = await users.admin.client.rpc('bond_create', {
-		p_campaign_id: campaignId,
+		p_campaign_id: targetCampaignId,
 		p_base_numbers: [number],
 		p_barcode: barcode,
 		p_request_id: rid(`bond-${number}`)
@@ -118,14 +121,19 @@ async function bond(barcode: string | null = null) {
 	if (error || typeof data !== 'string') throw new Error(`bond_create: ${error?.message}`);
 	return data;
 }
-async function deliver(ids: string[], collector = collectorId, notes = 'Phase 6 delivery') {
+async function deliver(
+	ids: string[],
+	collector = collectorId,
+	notes = 'Phase 6 delivery',
+	targetCampaignId = campaignId
+) {
 	const requestId = rid('deliver');
 	const out = await result(() =>
 		deliveryActions.deliver(
 			event(
 				users.operator,
-				`/campaigns/${campaignId}/deliveries/new?/deliver`,
-				{ id: campaignId },
+				`/campaigns/${targetCampaignId}/deliveries/new?/deliver`,
+				{ id: targetCampaignId },
 				{ collectorId: collector, bondIds: ids, notes },
 				requestId
 			)
@@ -141,6 +149,15 @@ async function deliver(ids: string[], collector = collectorId, notes = 'Phase 6 
 			.at(-1)!,
 		requestId
 	};
+}
+async function activateCampaign(id: string, requestId = rid('activate')) {
+	const { error } = await users.admin.client.rpc('campaign_transition', {
+		p_id: id,
+		p_to_status: 'active',
+		p_reason: null,
+		p_request_id: requestId
+	});
+	if (error) throw new Error(`campaign_transition: ${error.message}`);
 }
 const bondPath = (id: string) => `/campaigns/${campaignId}/bonds/${id}`;
 const collectorPath = (id: string) => `/campaigns/${campaignId}/collectors/${id}`;
@@ -161,11 +178,14 @@ beforeAll(async () => {
 		p_associated_number_offset: 4871,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
+		p_starts_at: '2026-01-01T00:00:00Z',
+		p_ends_at: '2027-01-01T00:00:00Z',
 		p_request_id: rid('campaign')
 	});
 	if (created.error || typeof created.data !== 'string')
 		throw new Error(`campaign_create: ${created.error?.message}`);
 	campaignId = created.data;
+	await activateCampaign(campaignId);
 	const base = {
 		phone: null,
 		email: null,
@@ -187,6 +207,14 @@ beforeAll(async () => {
 
 describe('Phase 6: delivery and printable delivery note', () => {
 	it('C1 delivers three available bonds through the route and writes complete custody/audit history', async () => {
+		const { data: previousNotes, error: previousNotesError } = await service
+			.from('delivery_notes')
+			.select('note_number')
+			.eq('campaign_id', campaignId)
+			.order('note_number', { ascending: false })
+			.limit(1);
+		expect(previousNotesError).toBeNull();
+		const previousMaxNoteNumber = previousNotes?.[0]?.note_number ?? 0;
 		const ids = await Promise.all([bond('P6-A'), bond(null), bond('P6-C')]);
 		const { noteId, requestId } = await deliver(ids);
 		const { data: bonds } = await service
@@ -209,7 +237,11 @@ describe('Phase 6: delivery and printable delivery note', () => {
 			.select('note_number, reason, collector_id')
 			.eq('id', noteId)
 			.single();
-		expect(note).toMatchObject({ note_number: 1, reason: 'delivery', collector_id: collectorId });
+		expect(note).toMatchObject({
+			note_number: previousMaxNoteNumber + 1,
+			reason: 'delivery',
+			collector_id: collectorId
+		});
 		const { data: assignments } = await service
 			.from('bond_assignments')
 			.select('bond_id, assignment_type, status, delivery_note_id')
@@ -244,12 +276,37 @@ describe('Phase 6: delivery and printable delivery note', () => {
 		);
 	});
 	it('C2 SSR-renders all printable note fields twice, including barcode and no-barcode bonds', async () => {
-		const withBarcode = await bond(`P6-BARCODE-${RUN_ID}`),
-			withoutBarcode = await bond();
-		const { noteId } = await deliver([withBarcode, withoutBarcode], collectorId, `Notes ${RUN_ID}`);
+		const printCampaignName = `[it-p6 ${RUN_ID}] printable`;
+		const { data: printCampaignId, error: printCampaignError } = await users.admin.client.rpc(
+			'campaign_create',
+			{
+				p_name: printCampaignName,
+				p_simple_bond_value: '60000',
+				p_installment_count: 10,
+				p_number_digits: 4,
+				p_max_number: 9999,
+				p_associated_number_offset: 4871,
+				p_overflow_policy: 'reject',
+				p_barcode_mode: 'base_number',
+				p_starts_at: '2026-01-01T00:00:00Z',
+				p_ends_at: '2027-01-01T00:00:00Z',
+				p_request_id: rid('printable-campaign')
+			}
+		);
+		if (printCampaignError || typeof printCampaignId !== 'string')
+			throw new Error(`campaign_create: ${printCampaignError?.message}`);
+		await activateCampaign(printCampaignId);
+		const withBarcode = await bond(`P6-BARCODE-${RUN_ID}`, printCampaignId, 100),
+			withoutBarcode = await bond(null, printCampaignId, 101);
+		const { noteId } = await deliver(
+			[withBarcode, withoutBarcode],
+			collectorId,
+			`Notes ${RUN_ID}`,
+			printCampaignId
+		);
 		const data = (await printLoad(
-			event(users.admin, `/campaigns/${campaignId}/deliveries/${noteId}/print`, {
-				id: campaignId,
+			event(users.admin, `/campaigns/${printCampaignId}/deliveries/${noteId}/print`, {
+				id: printCampaignId,
 				noteId
 			})
 		)) as {
@@ -272,15 +329,19 @@ describe('Phase 6: delivery and printable delivery note', () => {
 		const html = render(PrintPage, { props: { data, params: {} } as never }).body;
 		const doc = data.document;
 		for (const value of [
-			doc.institutionName,
-			doc.campaign,
-			doc.deliveryNoteNumber,
-			doc.date,
-			doc.collector,
-			doc.registeredBy,
-			...doc.baseAndAssociatedNumbers,
+			printCampaignName,
+			'Note 0001',
+			`Collector A ${RUN_ID}`,
+			users.operator.profile.full_name,
+			'0100 / 4971',
+			'0101 / 4972',
 			`P6-BARCODE-${RUN_ID}`,
-			doc.notes,
+			`Notes ${RUN_ID}`
+		])
+			expect(html.split(value).length - 1, value).toBe(2);
+		for (const value of [
+			doc.institutionName,
+			doc.date,
 			doc.collectorSignature,
 			doc.administrationSignature
 		])
