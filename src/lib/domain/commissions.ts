@@ -190,7 +190,11 @@ export function selectCommissionRule(
 	);
 }
 
-/** Round to cents exactly as PostgreSQL numeric `round(..., 2)` does for positive values. */
+/**
+ * Preview only: binary floating-point rounding may differ at half-cent boundaries.
+ * PostgreSQL numeric `round(..., 2)` in settlement_application_commission is authoritative
+ * for persisted settlement totals and ledger entries; never post this preview as money.
+ */
 export function calculateApplicationCommission(
 	rules: readonly CommissionRule[],
 	application: CommissionApplication

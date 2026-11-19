@@ -36,7 +36,10 @@ function mapError(error: RpcError) {
 			'You do not have permission to access the collector ledger.'
 		);
 	if (error.code === 'P0002')
-		return new CommissionLedgerServiceError('not_found', 'The requested collector was not found.');
+		return new CommissionLedgerServiceError(
+			'not_found',
+			'The requested campaign or collector was not found.'
+		);
 	if (['22023', '23514', '22003'].includes(error.code ?? ''))
 		return new CommissionLedgerServiceError(
 			'validation',
