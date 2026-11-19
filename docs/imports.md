@@ -181,7 +181,25 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
 - **Staging.** Rows and scans are staged in `import_session_items`; erroneous rows are soft-removed (`removed_at`), never deleted. Sessions are never deleted either: they are cancelled, marked failed, or (once confirmed) rolled back.
 - **Bonds only on confirmation.** Bonds are created when the session is confirmed, directly as `available` (never `created`), with `bonds.import_session_id` set (immutable). Each item records the bond it created. Confirmation certifies the mapping and completeness: one simple bond per simple item; one printed pata per `grupo_pata`, with one row per unit; no unlinked bond; and, per unit, the base and associated numbers with each row's base number (and its barcode for a pata row).
 - **Patas and barcodes.** Rows sharing a `grupo_pata` form one printed pata: the pata bond's `barcode` is the `grupo_pata`, and each row's barcode is kept on its base number (`bond_numbers.barcode`). A barcode identifies one live thing per campaign across bonds and base numbers; codes are freed only when a bond is annulled from `available` (and its numbers are released), like participating numbers.
-- **Rollback (SAN-47).** Rolling back a confirmed import annuls its bonds (`bond.annul`, admin only, reason required, only if none was delivered, sold or grouped), which frees their numbers and codes, and then marks the session as rolled back (it stays `confirmed`).
+- **Confirmation (SAN-47).** `import_session_confirm(session_id, request_id)` requires the session's
+  permission (`bond.import` for files, `bond.scan` for scans), a `validated` session and a `draft` or
+  `active` campaign. It revalidates under lock: if a number or code was taken after validation, it
+  returns the fresh summary with `confirmed: false`, the session goes back to `draft` (no bonds are
+  created) and the rejection is audited as `import.confirm_rejected`. A concurrent confirmation of
+  overlapping numbers that commits in between hits a unique index; that is caught and reported the
+  same way instead of a raw 23505. Otherwise it creates every bond in one transaction, returns the
+  summary with `confirmed: true`, `bonds_created` and `numbers_created`, and audits
+  `import.confirm` (source, file name, counts and summary) plus one `bond.create` per bond (with
+  `import_session_id`), so the bond record shows how it was loaded.
+- **Rollback (SAN-47).** `import_session_rollback(session_id, reason, request_id)` annuls the
+  import's `available` bonds (`bond.annul`, admin only, reason required, campaign `draft` or
+  `active`), which frees their numbers and codes, and then marks the session as rolled back (it
+  stays `confirmed`). Bonds already annulled by hand are skipped as they are: they keep their own
+  reason, author, `bond.annul` entry and numbers (a bond annulled from `sold` keeps its numbers
+  held). Any other unavailable bond (delivered, sold, returned, lost, closed) or one in an active
+  manual pata blocks the whole rollback. It audits `import.rollback` on the session (with
+  `bonds_annulled` and `bonds_skipped`) and one `bond.annul` per annulled bond, with the same shape
+  as a manual annulment.
 - **Permissions.** Import data is readable with `bond.import` or `bond.scan`. The operator has both (`bond.scan` added in SAN-44).
 - **Staging and validation (SAN-45).** `import_session_create`, `import_session_add_items`,
   `import_session_add_scan`, `import_session_remove_item`, `import_session_validate` and
