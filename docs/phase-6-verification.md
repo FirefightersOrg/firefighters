@@ -9,14 +9,14 @@ request IDs, and never attempts cleanup.
 
 ## Acceptance criteria
 
-| #   | Criterion                     | Evidence                                                                                                                                                                                                                                                                     | Result   |
-| --- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| C1  | Deliver three available bonds | Operator posts `deliveries/new?/deliver`; service-role checks delivered status, collector, active delivery assignments, note/items, sequential campaign note number, and `bond.deliver` plus `delivery_note.issue` audit rows. The bond-record load exposes custody history. | **Pass** |
-| C2  | Printable delivery note       | Loads the real print server module and SSR-renders `+page@.svelte`. Checks all 13 documented fields, a barcode and an absent-barcode row, and both original/duplicate copies.                                                                                                | **Pass** |
-| C3  | Return and reassign           | Exercises bond return/reassign and collector bulk reassign/return actions. Verifies available/cleared return state, returned/reassigned assignment history and reassignment notes. Operator's disallowed loss leaves data/audit unchanged.                                   | **Pass** |
-| C4  | Loss                          | Missing fields and a future date return 400 with no audit. A valid loss persists status, responsible party, date, reason and `bond.mark_lost` audit.                                                                                                                         | **Pass** |
-| C5  | Permissions                   | Operator delivers/reassigns but is 403 on return/loss. Treasurer/read-only can list notes but are 403 on delivery; denied writes have no audit row.                                                                                                                          | **Pass** |
-| C6  | Campaign window               | A campaign is activated, given available/delivered bonds, then transitioned to `closing`. Deliver, return, reassign and loss all return 409, emit no audit and leave statuses unchanged.                                                                                     | **Pass** |
+| #   | Criterion                     | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Result   |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| C1  | Deliver three available bonds | Operator posts `deliveries/new?/deliver`; service-role checks delivered status, collector, active delivery assignments, note/items, sequential campaign note number, and `bond.deliver` plus `delivery_note.issue` audit rows. The bond-record load exposes custody history.                                                                                                                                                                                                                                  | **Pass** |
+| C2  | Printable delivery note       | Loads the real print server module and SSR-renders `+page@.svelte`. Checks all 13 documented fields, a barcode and an absent-barcode row, and both original/duplicate copies.                                                                                                                                                                                                                                                                                                                                 | **Pass** |
+| C3  | Return and reassign           | Bond-record return and reassign, and collector-record bulk reassign and return, through the real actions: a return leaves the bond `available` with no collector, history `delivery(returned)` → `return`; a reassignment issues a `reassignment` note, changes the collector and marks the old assignment `reassigned`. A **lost** bond is refused (`409`) on return and on reassign, with no audit row and the row unchanged. An operator's loss attempt is 403 with no change. Sold bonds: see Known gaps. | **Pass** |
+| C4  | Loss                          | Missing fields and a future date return 400 with no audit. A valid loss persists status, responsible party, date, reason and `bond.mark_lost` audit.                                                                                                                                                                                                                                                                                                                                                          | **Pass** |
+| C5  | Permissions                   | Operator delivers and reassigns but gets 403 on return and loss. Treasurer and read-only **see the issued note** in the list (`can.deliver` false), get 403 on the `deliveries/new` page and on deliver, return, reassign and mark lost; no audit row for any denied request, and the bonds keep their status.                                                                                                                                                                                                | **Pass** |
+| C6  | Campaign window               | A campaign is activated, given available/delivered bonds, then transitioned to `closing`. Deliver, return, reassign and loss all return 409, emit no audit and leave statuses unchanged.                                                                                                                                                                                                                                                                                                                      | **Pass** |
 
 ## Commands and real results
 
@@ -28,14 +28,14 @@ export APP_ENV=local PUBLIC_SUPABASE_URL="$SB_API_URL" \
   PUBLIC_SUPABASE_ANON_KEY="$SB_ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SB_SERVICE_ROLE_KEY"
 ```
 
-| Check              | Command                                                              | Result                                                                                                                                                   |
-| ------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 6 acceptance | `pnpm test:integration tests/integration/phase-6-acceptance.test.ts` | **6/6 pass**                                                                                                                                             |
-| Type check         | `pnpm check`                                                         | **0 errors, 0 warnings**                                                                                                                                 |
-| Lint / format      | `pnpm lint`                                                          | **Fails only on `.claude-brief/brief-57.md`** (an ignored supplied brief that is not Prettier-formatted). The two SAN-57 files pass Prettier and ESLint. |
-| Unit tests         | `pnpm test`                                                          | **1,056/1,056 pass** in 73 files                                                                                                                         |
-| Full integration   | `pnpm test:integration`                                              | **134/134 pass** in 13 files                                                                                                                             |
-| pgTAP              | `pnpm exec supabase test db`                                         | **1,323/1,330 pass** in 15 files; the 7 failures are the known shared-DB `003` failures fixed in #40.                                                    |
+| Check              | Command                                                              | Result                                                                                                |
+| ------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Phase 6 acceptance | `pnpm test:integration tests/integration/phase-6-acceptance.test.ts` | **6/6 pass**                                                                                          |
+| Type check         | `pnpm check`                                                         | **0 errors, 0 warnings**                                                                              |
+| Lint / format      | `pnpm lint`                                                          | **Pass**                                                                                              |
+| Unit tests         | `pnpm test`                                                          | **1,056/1,056 pass** in 73 files                                                                      |
+| Full integration   | `pnpm test:integration`                                              | **134/134 pass** in 13 files                                                                          |
+| pgTAP              | `pnpm exec supabase test db`                                         | **1,323/1,330 pass** in 15 files; the 7 failures are the known shared-DB `003` failures fixed in #40. |
 
 ## Re-run data
 
@@ -51,10 +51,10 @@ where request_id like 'it-p6-<RUN_ID>-%' order by created_at;
 ## Known gaps
 
 - **Sold-bond rejection is not acceptance-tested.** Phase 6 has no sale RPC, so a legitimate
-  sold bond cannot be produced through the application before Phase 7. The suite instead proves
-  a denied custody attempt leaves a delivered bond unchanged.
+  sold bond cannot be produced through the application before Phase 7. The suite proves the same
+  guard with a lost bond (return and reassign refused with 409); the sold case belongs to SAN-61.
 - **Current permissions intentionally deny the operator `bond.return` and `bond.mark_lost`.** The
-  suite asserts 403 for both; this remains pending the product decision in issue #50 / SAN-93.
+  suite asserts 403 for both; this remains pending the product decision in issue #50 (proposed: give the operator `bond.return`).
 
 ## Notes
 

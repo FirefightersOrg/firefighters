@@ -3,7 +3,10 @@ import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { render } from 'svelte/server';
-import { actions as deliveryActions } from '../../src/routes/campaigns/[id]/deliveries/new/+page.server';
+import {
+	actions as deliveryActions,
+	load as newDeliveryLoad
+} from '../../src/routes/campaigns/[id]/deliveries/new/+page.server';
 import { load as notesLoad } from '../../src/routes/campaigns/[id]/deliveries/+page.server';
 import {
 	load as bondLoad,
@@ -398,6 +401,61 @@ describe('Phase 6: delivery and printable delivery note', () => {
 		expect(
 			(await service.from('bonds').select('commercial_status').eq('id', reassigned).single()).data
 		).toEqual(before.data);
+
+		// A bond that is no longer with a collector (lost) cannot be returned or reassigned: 409,
+		// unchanged, no audit. (A sold bond cannot be produced before Phase 7; see Known gaps.)
+		const lost = await bond();
+		await deliver([lost]);
+		expect(
+			await result(() =>
+				bondActions.markLost(
+					event(
+						users.admin,
+						`${bondPath(lost)}?/markLost`,
+						{ id: campaignId, bondId: lost },
+						{ responsibleParty: 'Ana', lostOn: '2026-11-01', reason: 'rain' },
+						rid('lost-setup')
+					)
+				)
+			)
+		).toMatchObject({ success: true });
+		const lostBefore = (
+			await service
+				.from('bonds')
+				.select('commercial_status, current_collector_id, updated_at')
+				.eq('id', lost)
+				.single()
+		).data;
+		for (const [action, fields] of [
+			['return', {}],
+			['reassign', { collectorId: otherCollectorId }]
+		] as const) {
+			const requestId = rid(`lost-${action}`);
+			expect(
+				await result(() =>
+					bondActions[action](
+						event(
+							users.admin,
+							`${bondPath(lost)}?/${action}`,
+							{ id: campaignId, bondId: lost },
+							fields,
+							requestId
+						)
+					)
+				),
+				action
+			).toMatchObject({ status: 409 });
+			expect(await auditFor(requestId)).toEqual([]);
+		}
+		expect(
+			(
+				await service
+					.from('bonds')
+					.select('commercial_status, current_collector_id, updated_at')
+					.eq('id', lost)
+					.single()
+			).data
+		).toEqual(lostBefore);
 	});
 	it('C4 validates loss fields before RPC and persists a valid loss with its audit', async () => {
 		const id = await bond();
@@ -465,27 +523,72 @@ describe('Phase 6: delivery and printable delivery note', () => {
 	});
 	it('C5 applies the current route permission matrix without denied-request audit rows', async () => {
 		const id = await bond();
-		await deliver([id]);
+		const { noteId } = await deliver([id]);
+		const free = await bond();
 		for (const user of [users.treasurer, users['read-only']]) {
+			// They can read the notes (bond.view)...
+			expect(
+				await notesLoad(event(user, `/campaigns/${campaignId}/deliveries`, { id: campaignId }))
+			).toMatchObject({
+				notes: expect.arrayContaining([expect.objectContaining({ id: noteId })]),
+				can: { deliver: false }
+			});
+			// ...but cannot open the delivery screen nor write anything.
 			expect(
 				await result(() =>
+					newDeliveryLoad(
+						event(user, `/campaigns/${campaignId}/deliveries/new`, { id: campaignId })
+					)
+				)
+			).toBe(403);
+			const attempts: [string, () => unknown][] = [];
+			const deliverRequest = rid(`${user.role}-deliver`);
+			attempts.push([
+				deliverRequest,
+				() =>
 					deliveryActions.deliver(
 						event(
 							user,
 							`/campaigns/${campaignId}/deliveries/new?/deliver`,
 							{ id: campaignId },
-							{ collectorId, bondIds: [id] },
-							rid(`${user.role}-deliver`)
+							{ collectorId, bondIds: [free] },
+							deliverRequest
 						)
 					)
-				)
-			).toMatchObject({ status: 403 });
-			expect(
-				await result(() =>
-					notesLoad(event(user, `/campaigns/${campaignId}/deliveries`, { id: campaignId }))
-				)
-			).not.toBe(403);
+			]);
+			for (const [action, fields] of [
+				['return', {}],
+				['reassign', { collectorId: otherCollectorId }],
+				['markLost', { responsibleParty: 'X', lostOn: '2026-01-01', reason: 'x' }]
+			] as const) {
+				const requestId = rid(`${user.role}-${action}`);
+				attempts.push([
+					requestId,
+					() =>
+						bondActions[action](
+							event(
+								user,
+								`${bondPath(id)}?/${action}`,
+								{ id: campaignId, bondId: id },
+								fields,
+								requestId
+							)
+						)
+				]);
+			}
+			for (const [requestId, attempt] of attempts) {
+				expect(await result(attempt), requestId).toMatchObject({ status: 403 });
+				expect(await auditFor(requestId), requestId).toEqual([]);
+			}
 		}
+		expect(
+			(await service.from('bonds').select('id, commercial_status').in('id', [id, free])).data
+		).toEqual(
+			expect.arrayContaining([
+				{ id, commercial_status: 'delivered_to_collector' },
+				{ id: free, commercial_status: 'available' }
+			])
+		);
 		for (const [action, fields] of [
 			['return', {}],
 			['markLost', { responsibleParty: 'X', lostOn: '2026-01-01', reason: 'x' }]
