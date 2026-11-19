@@ -62,7 +62,15 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 }
 
 function renderPage(loaded: BondRecord, form: Record<string, unknown> | null = null) {
-	const data = { campaign, record: loaded };
+	const data = {
+		campaign,
+		record: loaded,
+		custody: {
+			history: [],
+			collectors: [],
+			can: { returnBond: false, reassign: false, markLost: false }
+		}
+	};
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 	const props = { data, form, params: { id: CAMPAIGN_ID, bondId: loaded.general.id } } as any;
 	return render(Page, { props }).body;
@@ -229,13 +237,14 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('This campaign is closed.');
 		expect(body).not.toContain('action="?/annul"');
 	});
-	it('renders the 13 numbered sections in order, with an index of anchors', () => {
+	it('renders the 14 numbered sections in order, with an index of anchors', () => {
 		const body = renderPage(record());
 		const titles = [
 			'General data',
 			'Participating numbers',
 			'Barcode',
 			'Current collector',
+			'Assignment history',
 			'Current buyer',
 			'Sale',
 			'Installments',
@@ -251,6 +260,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			'numbers',
 			'barcode',
 			'collector',
+			'custody',
 			'buyer',
 			'sale',
 			'installments',
@@ -365,5 +375,41 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('Not in a pata.');
 		expect(body).toContain('Wrong bonds');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
+	});
+});
+
+describe('bond sale sections', () => {
+	it('links its active sale and shows pending installments', () => {
+		const data = {
+			campaign,
+			record: record(),
+			custody: {
+				history: [],
+				collectors: [],
+				can: { returnBond: false, reassign: false, markLost: false }
+			},
+			sale: {
+				sale: {
+					id: 'a0000000-0000-0000-0000-000000000009',
+					paymentMode: 'installments',
+					totalAmount: '60000.00'
+				}
+			},
+			installments: [
+				{
+					id: 'i',
+					installmentNumber: 1,
+					dueDate: '2027-01-01',
+					amount: '6000.00',
+					status: 'pending'
+				}
+			]
+		};
+		const body = render(Page, {
+			props: { data, form: null, params: { id: CAMPAIGN_ID, bondId: BOND_ID } } as never
+		}).body;
+		expect(body).toContain('Active sale');
+		expect(body).toContain('/sales/a0000000-0000-0000-0000-000000000009');
+		expect(body).toContain('2027-01-01');
 	});
 });

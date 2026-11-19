@@ -1370,9 +1370,9 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			expect(renderList(filtered)).toContain(`data-bond-id="${a.m4}"`);
 		});
 
-		it('the record renders its 13 sections; audit for audit.view, a note otherwise', async () => {
+		it('the record renders its 14 sections (SAN-55 adds Assignment history); audit for audit.view, a note otherwise', async () => {
 			const titles = BOND_RECORD_SECTIONS.map((s) => s.title);
-			expect(titles).toHaveLength(13);
+			expect(titles).toHaveLength(14);
 			const byRole: Record<string, string> = {};
 			for (const role of ['admin', 'operator', 'treasurer', 'read-only'] as const) {
 				const loaded = await record(users[role], A, a.s600);
