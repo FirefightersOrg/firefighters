@@ -631,7 +631,9 @@ Rule:
 - Implemented in SAN-67 (`20261216000000_commission_ledger.sql`): entries are append-only.
   Their amount is positive `numeric(12,2)` (not `NaN`); their seven types and the three statuses
   are defined in `docs/state-machines.md`. A recorded entry can only become `annulled` (with
-  actor, timestamp and a required trimmed reason) or `compensated`; all historical fields are
+  actor, timestamp and a required trimmed `annul_reason`, at most 1000 characters) or `compensated`.
+  The original `reason` is immutable, including during annulment; `annul_reason`, `annulled_by`
+  and `annulled_at` must all be null for non-annulled entries. All historical fields are
   immutable. Optional settlement/payment references must match the entry campaign and collector.
   Readers need `collector.ledger.view` or `collector.ledger.adjust`, while a collector login can
   read only its own rows. Future SAN-68/69 audited functions own all writes.
