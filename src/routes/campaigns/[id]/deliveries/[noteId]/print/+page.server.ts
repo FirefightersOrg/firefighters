@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import { requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { buildPrintableDeliveryNote } from '$lib/server/documents/delivery-note';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
@@ -14,13 +14,11 @@ const isUuid = (value: string) => z.guid().safeParse(value).success;
 /**
  * /campaigns/[id]/deliveries/[noteId]/print: the printable bond delivery note (SAN-56), in two
  * copies (original for administration, duplicate for the collector). Requires `campaign.view` and
- * `bond.view` or `bond.assign`.
+ * `bond.view`.
  */
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
-	if (!hasPermissionIn(locals.permissions, 'bond.assign')) {
-		requirePermissionIn(locals.permissions, 'bond.view');
-	}
+	requirePermissionIn(locals.permissions, 'bond.view');
 	if (!isUuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!isUuid(params.noteId)) error(404, { message: NOTE_NOT_FOUND });
 
@@ -32,8 +30,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!note.data) error(404, { message: NOTE_NOT_FOUND });
 
-	const bonds = await listDeliveryNoteBonds(locals.supabase, params.noteId);
+	const bonds = await listDeliveryNoteBonds(
+		locals.supabase,
+		params.noteId,
+		note.data.note.issuedAt
+	);
 	if (bonds.error) fail500(locals, params.noteId, bonds.error);
+	if (bonds.data.length !== note.data.note.bondCount) {
+		fail500(
+			locals,
+			params.noteId,
+			new Error(`expected ${note.data.note.bondCount} bonds, read ${bonds.data.length}`)
+		);
+	}
 
 	return {
 		document: buildPrintableDeliveryNote(campaign.data, note.data.note, bonds.data)

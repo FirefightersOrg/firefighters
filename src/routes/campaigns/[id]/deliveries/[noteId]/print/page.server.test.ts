@@ -33,8 +33,11 @@ describe('/campaigns/[id]/deliveries/[noteId]/print', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
-	it('requires bond.view or bond.assign', async () => {
+	it('requires bond.view, including for bond.assign users', async () => {
 		await expect(load(event(setup(['campaign.view'])))).rejects.toMatchObject({ status: 403 });
+		await expect(load(event(setup(['campaign.view', 'bond.assign'])))).rejects.toMatchObject({
+			status: 403
+		});
 	});
 
 	it('404 for a malformed note id or a note of another campaign', async () => {
@@ -65,11 +68,41 @@ describe('/campaigns/[id]/deliveries/[noteId]/print', () => {
 			error: null
 		});
 		vi.mocked(listDeliveryNoteBonds).mockResolvedValue({ data: [], error: null });
-		const data = (await load(event(setup(['campaign.view', 'bond.assign']))))!;
+		const data = (await load(event(setup())))!;
 		expect(data.document).toMatchObject({
 			deliveryNoteNumber: 'Note 0003',
 			collector: 'Ana',
 			bondCount: 0
 		});
+	});
+
+	it('logs and fails when RLS hides a bond on the note', async () => {
+		vi.mocked(getDeliveryNote).mockResolvedValue({
+			data: {
+				note: {
+					id: NOTE_ID,
+					campaignId: CAMPAIGN_ID,
+					noteNumber: 3,
+					collectorId: 'c',
+					collectorName: 'Ana',
+					status: 'issued',
+					reason: 'delivery',
+					issuedAt: '2026-11-18T15:30:00Z',
+					createdBy: 'u',
+					createdByName: 'Op',
+					notes: null,
+					bondCount: 1
+				},
+				bondIds: ['b']
+			},
+			error: null
+		});
+		vi.mocked(listDeliveryNoteBonds).mockResolvedValue({ data: [], error: null });
+
+		await expect(load(event(setup()))).rejects.toMatchObject({ status: 500 });
+		expect(console.error).toHaveBeenCalledWith(
+			'[deliveries] print load failed',
+			expect.objectContaining({ noteId: NOTE_ID, error: expect.any(Error) })
+		);
 	});
 });

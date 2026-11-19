@@ -8,6 +8,8 @@ describe('printable delivery note page', () => {
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
 			deliveryNoteNumber: 'Note 0007',
+			reason: 'delivery' as const,
+			status: 'issued' as const,
 			date: '18/11/26, 12:30',
 			collector: 'Ana Pérez',
 			registeredBy: 'Operator One',
@@ -46,5 +48,59 @@ describe('printable delivery note page', () => {
 		}
 		expect(body.split('Collector signature').length - 1).toBe(2);
 		expect(body.split('Administration signature').length - 1).toBe(2);
+	});
+
+	it('labels reassignment notes and marks annulled copies', () => {
+		const document = {
+			institutionName: 'Bomberos Test',
+			campaign: 'Bono 2027',
+			deliveryNoteNumber: 'Note 0008',
+			reason: 'reassignment' as const,
+			status: 'annulled' as const,
+			date: '18/11/26, 12:30',
+			collector: 'Ana Pérez',
+			registeredBy: 'Operator One',
+			deliveredBonds: [],
+			type: '',
+			baseAndAssociatedNumbers: [],
+			barcode: [],
+			notes: null,
+			collectorSignature: 'Collector signature',
+			administrationSignature: 'Administration signature',
+			bondCount: 0,
+			unitCount: 0
+		};
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+		const body = render(Page, { props: { data: { document }, params: {} } as any }).body;
+		expect(body.split('Reassignment').length - 1).toBe(2);
+		expect(body.split('ANNULLED').length - 1).toBe(2);
+	});
+
+	it('labels return notes and has the collector attest to handing bonds back', () => {
+		const document = {
+			institutionName: 'Bomberos Test',
+			campaign: 'Bono 2027',
+			deliveryNoteNumber: 'Note 0009',
+			reason: 'return' as const,
+			status: 'issued' as const,
+			date: '18/11/26, 12:30',
+			collector: 'Ana Pérez',
+			registeredBy: 'Operator One',
+			deliveredBonds: [],
+			type: '',
+			baseAndAssociatedNumbers: [],
+			barcode: [],
+			notes: null,
+			collectorSignature: 'Collector signature',
+			administrationSignature: 'Administration signature',
+			bondCount: 0,
+			unitCount: 0
+		};
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+		const body = render(Page, { props: { data: { document }, params: {} } as any }).body;
+
+		expect(body.split('Bond return note').length - 1).toBe(2);
+		expect(body.split('I HANDED the bonds back').length - 1).toBe(2);
+		expect(body).not.toContain('Bond delivery note');
 	});
 });

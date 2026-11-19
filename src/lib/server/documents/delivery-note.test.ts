@@ -77,7 +77,13 @@ describe('buildPrintableDeliveryNote', () => {
 			bondCount: 1,
 			unitCount: 1
 		});
-		expect(doc.date).toBe('18/11/26, 12:30 p. m.');
+		expect(doc.date).toBe(
+			new Intl.DateTimeFormat('es-AR', {
+				dateStyle: 'short',
+				timeStyle: 'short',
+				timeZone: 'America/Argentina/Buenos_Aires'
+			}).format(new Date(note.issuedAt))
+		);
 		expect(doc.deliveredBonds).toEqual([
 			{
 				type: 'Simple',
@@ -129,5 +135,22 @@ describe('buildPrintableDeliveryNote', () => {
 		]);
 		expect(doc.barcode).toEqual(['P1', 'P1-100', 'P1-101']);
 		expect(doc).toMatchObject({ bondCount: 2, unitCount: 4, notes: null });
+	});
+
+	it('sorts printed bonds and manual pata members by base number', () => {
+		const manual: DeliveryNoteBond = {
+			id: 'm',
+			kind: 'pata',
+			commercialUnitCount: 2,
+			barcode: null,
+			numbers: [],
+			members: [simple(201, 4871), simple(200, 4871)]
+		};
+		const doc = buildPrintableDeliveryNote(campaign(4), note, [simple(68, 4871), manual], 'X');
+
+		expect(doc.deliveredBonds.map((bond) => bond.numbers.map((number) => number.base))).toEqual([
+			['0068'],
+			['0200', '0201']
+		]);
 	});
 });
