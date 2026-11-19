@@ -214,6 +214,19 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
   `manual_mapping` requires the operator to type it. `internal_code` and
   `external_legacy_code` use the first capture group of `barcode_pattern`; without a pattern they
   behave as `manual_mapping`. Every scan remains a staged row, including an unrecognized one.
+- **Server-side base number (SAN-100).** `import_session_add_items` does not trust the
+  `base_number` of a file row. When the row has a barcode and the campaign has a rule
+  (`base_number`, or a pattern mode with a pattern), the number is checked with
+  `import_check_code`, the same check as a correction (`import_session_update_item`). A number that
+  does not match the barcode, or a barcode that does not follow the rule, is staged as an error row
+  with `parse_base_number_mismatch`, `parse_code_not_a_number` or `parse_code_not_recognized`. A
+  row with a barcode and no number gets the number derived from the barcode. In `manual_mapping`,
+  and in a pattern mode without a pattern, the client's value is kept (it is typed). Rows that
+  already carry an error from the parser are staged as sent.
+- **Repeated numbers (SAN-100).** `duplicate_number`: another live row of the session has the same
+  base number. `number_conflict`: the base number only meets another row's associated number (or
+  its own, when the offset is 0). `number_in_use`: a bond of the campaign already holds the number.
+  `duplicate_number` is checked first. The summary counts all three among its duplicates.
 
 ## App layer (SAN-45)
 
@@ -256,7 +269,7 @@ The pattern is a Postgres ARE. JavaScript `RegExp` applies it only when it stays
 
 ### Instant preview (`validateImportBatch`)
 
-A pure mirror of `import_session_revalidate` + `import_session_check_groups` over the live rows, with the same codes, messages and precedence: `parse_*` (kept) → `missing_type` → `missing_base_number` → `missing_barcode` (pata) → `missing_group` → `number_out_of_range` → `number_conflict` → `number_in_use` → `duplicate_barcode` → `barcode_in_use` (row barcode, then pata code) → `duplicate_barcode` (pata code used as a row barcode) → `incomplete_pata` (only when validating). Without the campaign's live data it skips the `*_in_use` checks. `summarizeImportItems` gives the counts of `import_session_summary`. The database is authoritative; `tests/integration/import-staging.test.ts` checks that both agree on every row, message and count.
+A pure mirror of `import_session_revalidate` + `import_session_check_groups` over the live rows, with the same codes, messages and precedence: `parse_*` (kept) → `missing_type` → `missing_base_number` → `missing_barcode` (pata) → `missing_group` → `number_out_of_range` → `duplicate_number` → `number_conflict` → `number_in_use` → `duplicate_barcode` → `barcode_in_use` (row barcode, then pata code) → `duplicate_barcode` (pata code used as a row barcode) → `incomplete_pata` (only when validating). Without the campaign's live data it skips the `*_in_use` checks. `summarizeImportItems` gives the counts of `import_session_summary`. The database is authoritative; `tests/integration/import-staging.test.ts` checks that both agree on every row, message and count.
 
 ## Screens (SAN-46)
 

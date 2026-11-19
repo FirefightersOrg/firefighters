@@ -116,6 +116,9 @@ begin
   if jsonb_typeof(p_applications) <> 'array' or jsonb_array_length(p_applications) = 0 then
     raise exception 'applications are required' using errcode = 'invalid_parameter_value';
   end if;
+  if p_payment_date > v_today then
+    raise exception 'payment date cannot be in the future' using errcode = 'invalid_parameter_value';
+  end if;
   insert into public.payments (
     campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount,
     payment_method, payment_date, status, created_by
@@ -125,7 +128,8 @@ begin
     p_amount, p_payment_method, coalesce(p_payment_date, v_today), 'pending_in_settlement', v_actor
   )
   returning id into v_id;
-  for x in select value from jsonb_array_elements(p_applications) loop
+  -- Lock installments in a stable order (by id) so concurrent adds cannot deadlock.
+  for x in select value from jsonb_array_elements(p_applications) order by value ->> 'installment_id' loop
     begin
       v_installment := (x ->> 'installment_id')::uuid;
       v_applied := (x ->> 'amount_applied')::numeric;
@@ -163,11 +167,13 @@ begin
     raise exception 'a trimmed annulment reason of at most 1000 characters is required'
       using errcode = 'invalid_parameter_value';
   end if;
-  select * into v_payment from public.payments where id = p_payment_id for update;
+  -- Lock order matches settlement_add_payment / settlement_close: settlement first, then payment.
+  select * into v_payment from public.payments where id = p_payment_id;
   if not found then
     raise exception 'payment % not found', p_payment_id using errcode = 'no_data_found';
   end if;
   select * into v_set from public.settlements where id = v_payment.settlement_id for update;
+  select * into v_payment from public.payments where id = p_payment_id for update;
   if v_payment.status <> 'pending_in_settlement' or v_set.status <> 'open' then
     raise exception 'only a pending payment in an open settlement can be removed'
       using errcode = 'object_not_in_prerequisite_state';
@@ -329,7 +335,7 @@ begin
     'bond_financial_status_from_installments(uuid)',
     'settlement_close(uuid,text)'
   ] loop
-    execute format('revoke execute on function public.%s from public, anon', f);
+    execute format('revoke execute on function public.%s from public, anon, service_role', f);
   end loop;
 end $$;
 
