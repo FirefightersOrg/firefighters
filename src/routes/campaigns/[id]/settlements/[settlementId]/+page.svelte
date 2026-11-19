@@ -10,6 +10,7 @@
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
 	import { formatMoney } from '$lib/domain/money';
+	import { formatCampaignDate } from '$lib/domain/campaigns';
 	import { PAYMENT_METHOD_LABELS, SETTLEMENT_STATUS_LABELS } from '$lib/domain/payments';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
@@ -39,7 +40,7 @@
 			<span>{SETTLEMENT_STATUS_LABELS[data.settlement.status]}</span>
 		</div>
 		<p class="text-sm text-slate-500">
-			{data.settlement.collectorName} · opened {data.settlement.openedAt.slice(0, 10)}
+			{data.settlement.collectorName} · opened {formatCampaignDate(data.settlement.openedAt)}
 		</p>
 	</div>
 	{#if form?.message}<FormAlert
@@ -136,7 +137,7 @@
 									<input type="hidden" name="paymentId" value={p.id} /><input
 										class={inputClass}
 										name="reason"
-										maxlength={data.reasonMax}
+										aria-label={`Reason required (maximum ${data.reasonMax} characters)`}
 										placeholder="Reason required"
 									/><button class={secondaryButtonClass}>Remove</button>
 								</form>

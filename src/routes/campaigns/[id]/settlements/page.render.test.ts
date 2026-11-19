@@ -14,7 +14,7 @@ const data = (create: boolean) => ({
 			settlementNumber: 5,
 			collectorName: 'Ana',
 			status: 'closed',
-			openedAt: '2026-01-01',
+			openedAt: '2026-01-01T02:59:59Z',
 			closedAt: '2026-01-02',
 			totals: { totalAmount: '12.00' }
 		}
@@ -24,6 +24,7 @@ describe('settlements list render', () => {
 	it('renders rows and filters', () => {
 		const body = render(Page, { props: { data: data(true), params: { id } } as any }).body;
 		expect(body).toContain('Ana');
+		expect(body).toContain('Dec 31, 2025');
 		expect(body).toContain('Settlement');
 		expect(body).toContain('name="status"');
 		expect(body).toContain('/settlements/new');

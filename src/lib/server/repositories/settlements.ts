@@ -1,9 +1,22 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { toDecimalString } from '$lib/domain/money';
+import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
 import type { SettlementStatus } from '$lib/domain/payments';
 import type { RepositoryResult } from './campaigns';
 
 type Row = Record<string, unknown>;
+// Stay below PostgREST's max-rows and never treat its default 1000-row response as complete.
+const PAGE_SIZE = 500;
+async function readPages(
+	fetchPage: (from: number, to: number) => PromiseLike<RepositoryResult<Row[]>>
+): Promise<RepositoryResult<Row[]>> {
+	const rows: Row[] = [];
+	for (let from = 0; ; from += PAGE_SIZE) {
+		const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1);
+		if (error) return { data: null, error };
+		rows.push(...(data ?? []));
+		if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
+	}
+}
 const money = (value: unknown) => toDecimalString(value as string | number);
 const name = (party: unknown) =>
 	(party as { display_name?: string } | null)?.display_name ?? 'Unknown collector';
@@ -64,11 +77,12 @@ export async function listSettlements(
 		.eq('campaign_id', campaignId);
 	if (filters.collectorId) query = query.eq('collector_id', filters.collectorId);
 	if (filters.status) query = query.eq('status', filters.status);
-	if (filters.from) query = query.gte('opened_at', `${filters.from}T00:00:00`);
-	if (filters.to) query = query.lte('opened_at', `${filters.to}T23:59:59.999`);
-	const { data, error } = await query
-		.order('settlement_number', { ascending: false })
-		.overrideTypes<Row[], { merge: false }>();
+	if (filters.from) query = query.gte('opened_at', `${filters.from}T00:00:00-03:00`);
+	if (filters.to) query = query.lte('opened_at', `${filters.to}T23:59:59.999999-03:00`);
+	query = query.order('settlement_number', { ascending: false }).order('id');
+	const { data, error } = await readPages((from, to) =>
+		query.range(from, to).overrideTypes<Row[], { merge: false }>()
+	);
 	if (error) return { data: null, error };
 	return {
 		data: (data ?? []).map((row) => ({
@@ -96,7 +110,7 @@ export async function getSettlement(
 	client: SupabaseClient,
 	campaignId: string,
 	id: string
-): Promise<RepositoryResult<SettlementDetail>> {
+): Promise<RepositoryResult<SettlementDetail | null>> {
 	const { data, error } = await client
 		.from('settlements')
 		.select('*, collectors(display_name)')
@@ -104,7 +118,7 @@ export async function getSettlement(
 		.eq('id', id)
 		.maybeSingle()
 		.overrideTypes<Row | null, { merge: false }>();
-	if (error || !data) return { data: null, error: error ?? new Error('Settlement not found.') };
+	if (error || !data) return { data: null, error };
 	const row = data as unknown as Row;
 	return {
 		data: {
@@ -144,12 +158,16 @@ export async function getSettlementTotals(
 		: { data: totals((data as unknown as Row[] | null)?.[0] ?? {}), error: null };
 }
 export async function listSettlementPayments(client: SupabaseClient, id: string) {
-	const { data, error } = await client
-		.from('payments')
-		.select('id,amount,payment_method,payment_date,status,sales(bond_id)')
-		.eq('settlement_id', id)
-		.order('created_at', { ascending: false })
-		.overrideTypes<Row[], { merge: false }>();
+	const { data, error } = await readPages((from, to) =>
+		client
+			.from('payments')
+			.select('id,amount,payment_method,payment_date,status,sales(bond_id)')
+			.eq('settlement_id', id)
+			.order('created_at', { ascending: false })
+			.order('id')
+			.range(from, to)
+			.overrideTypes<Row[], { merge: false }>()
+	);
 	return error
 		? { data: null, error }
 		: {
@@ -165,14 +183,18 @@ export async function listSettlementPayments(client: SupabaseClient, id: string)
 			};
 }
 export async function listBondPayments(client: SupabaseClient, bondId: string) {
-	const { data, error } = await client
-		.from('payments')
-		.select(
-			'id,amount,payment_method,payment_date,status,settlement_id,sales!inner(bond_id),settlements(settlement_number)'
-		)
-		.eq('sales.bond_id', bondId)
-		.order('payment_date', { ascending: false })
-		.overrideTypes<Row[], { merge: false }>();
+	const { data, error } = await readPages((from, to) =>
+		client
+			.from('payments')
+			.select(
+				'id,amount,payment_method,payment_date,status,settlement_id,sales!inner(bond_id),settlements(settlement_number)'
+			)
+			.eq('sales.bond_id', bondId)
+			.order('payment_date', { ascending: false })
+			.order('id')
+			.range(from, to)
+			.overrideTypes<Row[], { merge: false }>()
+	);
 	return error
 		? { data: null, error }
 		: {
@@ -195,42 +217,77 @@ export async function listCollectorPaymentCandidates(
 	campaignId: string,
 	collectorId: string
 ) {
-	const { data, error } = await client
-		.from('installments')
-		.select(
-			'id,installment_number,due_date,amount,status,payment_plans!inner(sales!inner(id,bond_id,buyer_id,collector_id,campaign_id,status,buyers(first_name,last_name,business_name),bonds(bond_numbers(number_value,number_kind))))'
-		)
-		.eq('payment_plans.sales.campaign_id', campaignId)
-		.eq('payment_plans.sales.collector_id', collectorId)
-		.eq('payment_plans.sales.status', 'active')
-		.in('status', ['pending', 'overdue'])
-		.order('due_date')
-		.overrideTypes<Row[], { merge: false }>();
+	const { data, error } = await readPages((from, to) =>
+		client
+			.from('installments')
+			.select(
+				'id,installment_number,due_date,amount,status,payment_plans!inner(sales!inner(id,bond_id,buyer_id,collector_id,campaign_id,status,buyers(first_name,last_name,business_name),bonds(bond_numbers(number_value,number_kind))))'
+			)
+			.eq('payment_plans.sales.campaign_id', campaignId)
+			.eq('payment_plans.sales.collector_id', collectorId)
+			.eq('payment_plans.sales.status', 'active')
+			.in('status', ['pending', 'overdue'])
+			.order('due_date')
+			.order('id')
+			.range(from, to)
+			.overrideTypes<Row[], { merge: false }>()
+	);
 	if (error) return { data: null, error };
+	// Page applications as a top-level resource too: embedded to-many relations can
+	// themselves be truncated. Match the database's balance rule (all non-annulled payments).
+	const applications = await readPages((from, to) =>
+		client
+			.from('payment_installments')
+			.select(
+				'payment_id,installment_id,amount_applied,payments!inner(status),installments!inner(status,payment_plans!inner(sales!inner(campaign_id,collector_id,status)))'
+			)
+			.neq('payments.status', 'annulled')
+			.eq('installments.payment_plans.sales.campaign_id', campaignId)
+			.eq('installments.payment_plans.sales.collector_id', collectorId)
+			.eq('installments.payment_plans.sales.status', 'active')
+			.in('installments.status', ['pending', 'overdue'])
+			.order('payment_id')
+			.order('installment_id')
+			.range(from, to)
+			.overrideTypes<Row[], { merge: false }>()
+	);
+	if (applications.error) return { data: null, error: applications.error };
+	const applied = new Map<string, number>();
+	for (const application of applications.data ?? []) {
+		const id = application.installment_id as string;
+		applied.set(id, (applied.get(id) ?? 0) + parseMoneyToCents(money(application.amount_applied))!);
+	}
 	return {
-		data: (data ?? []).map((row) => {
-			const plan = row.payment_plans as Row;
-			const sale = plan.sales as Row;
-			const buyer = sale.buyers as Row | null;
-			const bond = sale.bonds as Row | null;
-			const numbers = ((bond?.bond_numbers as Row[] | null) ?? [])
-				.filter((n) => n.number_kind === 'base')
-				.map((n) => n.number_value)
-				.join(', ');
-			return {
-				id: row.id as string,
-				saleId: sale.id as string,
-				bond: numbers,
-				buyer:
-					buyer?.business_name ||
-					[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
-					'Unknown buyer',
-				dueDate: row.due_date as string,
-				amount: money(row.amount),
-				status: row.status as string,
-				number: row.installment_number as number
-			};
-		}),
+		data: (data ?? [])
+			.map((row) => {
+				const plan = row.payment_plans as Row;
+				const sale = plan.sales as Row;
+				const buyer = sale.buyers as Row | null;
+				const bond = sale.bonds as Row | null;
+				const numbers = ((bond?.bond_numbers as Row[] | null) ?? [])
+					.filter((n) => n.number_kind === 'base')
+					.map((n) => n.number_value)
+					.join(', ');
+				return {
+					id: row.id as string,
+					saleId: sale.id as string,
+					bond: numbers,
+					buyer:
+						buyer?.business_name ||
+						[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
+						'Unknown buyer',
+					dueDate: row.due_date as string,
+					amount: centsToDecimalString(
+						Math.max(
+							0,
+							parseMoneyToCents(money(row.amount))! - (applied.get(row.id as string) ?? 0)
+						)
+					),
+					status: row.status as string,
+					number: row.installment_number as number
+				};
+			})
+			.filter((candidate) => candidate.amount !== '0.00'),
 		error: null
 	};
 }

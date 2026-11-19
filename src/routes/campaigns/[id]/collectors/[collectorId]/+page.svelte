@@ -12,7 +12,7 @@
 	} from '$lib/components/campaigns/styles';
 	import { BOND_COMMERCIAL_STATUS_LABELS } from '$lib/domain/bonds';
 	import { deliveryNoteLabel } from '$lib/domain/deliveries';
-	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { campaignNumberingConfig, formatCampaignDate } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
 	import { formatMoney } from '$lib/domain/money';
@@ -328,8 +328,8 @@
 									})}>#{settlement.settlementNumber}</a
 								></td
 							><td>{settlement.status}</td><td>{formatMoney(settlement.totals.totalAmount)}</td><td
-								>{settlement.openedAt.slice(0, 10)}{settlement.closedAt
-									? ` — ${settlement.closedAt.slice(0, 10)}`
+								>{formatCampaignDate(settlement.openedAt)}{settlement.closedAt
+									? ` — ${formatCampaignDate(settlement.closedAt)}`
 									: ''}</td
 							></tr
 						>{/each}</tbody
