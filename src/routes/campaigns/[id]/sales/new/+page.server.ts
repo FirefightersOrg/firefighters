@@ -1,10 +1,14 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { getBuyer, listBuyers } from '$lib/server/repositories/parties';
+import { getBuyer, getCollectorsByIds, listBuyers } from '$lib/server/repositories/parties';
 import { findBondsForSale } from '$lib/server/repositories/sales';
 import { campaignNumberingConfig } from '$lib/domain/campaigns';
 import { parseCampaignNumber } from '$lib/domain/numbering';
@@ -19,6 +23,7 @@ import {
 } from '$lib/server/buyers/route-helpers';
 import { findBuyersByIdentification } from '$lib/server/repositories/parties';
 import { buyerDisplayName } from '$lib/domain/parties';
+import { saleRegisterSchema } from '$lib/schemas/sale';
 
 const uuid = (value: string) => z.guid().safeParse(value).success;
 const field = (form: FormData, name: string) => String(form.get(name) ?? '').trim();
@@ -26,8 +31,31 @@ const argentinaToday = () =>
 	new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(
 		new Date()
 	);
+const addDays = (date: string, days: number) => {
+	const [year, month, day] = date.split('-').map(Number);
+	return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
+export const firstDueDateBounds = (today = argentinaToday()) => ({
+	min: addDays(today, -31),
+	max: addDays(today, 365)
+});
+const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
+	const { min, max } = firstDueDateBounds(today);
+	return saleRegisterSchema
+		.extend({ campaignId: z.literal(campaignId), firstDueDate: z.iso.date() })
+		.superRefine(({ firstDueDate }, context) => {
+			if (firstDueDate < min || firstDueDate > max)
+				context.addIssue({
+					code: 'custom',
+					path: ['firstDueDate'],
+					message: `Choose a date between ${min} and ${max}.`
+				});
+		});
+};
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Could not load permissions.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'sale.create');
 	const [campaign, buyers] = await Promise.all([
@@ -39,13 +67,18 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		buyers: buyers.data?.items ?? [],
+		buyerSearch: url.searchParams.get('buyer') ?? '',
+		buyerTotal: buyers.data?.total ?? 0,
 		canCreateBuyer: hasPermissionIn(locals.permissions, 'buyer.manage'),
-		today: argentinaToday()
+		today: argentinaToday(),
+		firstDueDateBounds: firstDueDateBounds()
 	};
 };
 
 export const actions: Actions = {
 	lookup: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'lookup', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		requirePermissionIn(locals.permissions, 'sale.create');
 		const query = field(await request.formData(), 'query');
@@ -72,9 +105,28 @@ export const actions: Actions = {
 		);
 		if (result.error)
 			return fail(500, { form: 'lookup', errors: {}, message: 'Could not search bonds.' });
-		return { form: 'lookup', success: true, found: result.data, query, errors: {} };
+		const collectors = await getCollectorsByIds(
+			locals.supabase,
+			result.data.flatMap((bond) => (bond.collectorId ? [bond.collectorId] : []))
+		);
+		if (collectors.error)
+			return fail(500, { form: 'lookup', errors: {}, message: 'Could not load collectors.' });
+		return {
+			form: 'lookup',
+			success: true,
+			found: result.data.map((bond) => ({
+				...bond,
+				collectorName: bond.collectorId
+					? (collectors.data?.get(bond.collectorId)?.displayName ?? 'Unknown collector')
+					: null
+			})),
+			query,
+			errors: {}
+		};
 	},
 	createBuyer: async ({ request, locals, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'buyer', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'buyer.manage'))
 			return fail(403, {
@@ -117,6 +169,8 @@ export const actions: Actions = {
 		}
 	},
 	register: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'sale', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'sale.create'))
 			return fail(403, {
@@ -131,13 +185,17 @@ export const actions: Actions = {
 			paymentMode: field(form, 'paymentMode'),
 			firstDueDate: field(form, 'firstDueDate')
 		};
+		const parsed = saleFormSchema(params.id).safeParse({ campaignId: params.id, ...values });
 		const errors: Record<string, string[]> = {};
+		if (!parsed.success)
+			for (const issue of parsed.error.issues) {
+				const name = String(issue.path.at(-1));
+				if (name !== 'campaignId') (errors[name] ??= []).push(issue.message);
+			}
 		if (!uuid(values.bondId)) errors.bondId = ['Choose a delivered bond.'];
 		if (!uuid(values.buyerId)) errors.buyerId = ['Choose a buyer.'];
 		if (!PAYMENT_MODES.includes(values.paymentMode as PaymentMode))
 			errors.paymentMode = ['Choose a payment mode.'];
-		if (!z.iso.date().safeParse(values.firstDueDate).success)
-			errors.firstDueDate = ['Choose the first due date.'];
 		if (Object.keys(errors).length)
 			return fail(400, {
 				form: 'sale',

@@ -73,9 +73,15 @@
 				class={inputClass}
 				id="financialStatus"
 				name="financialStatus"
-				><option value="">All</option><option value="no_payments">No payments</option><option
-					value="overdue">Overdue</option
-				><option value="partial_payments">Partial payments</option><option value="up_to_date"
+				><option value="">All</option><option
+					value="no_payments"
+					selected={data.filters.financialStatus === 'no_payments'}>No payments</option
+				><option value="overdue" selected={data.filters.financialStatus === 'overdue'}
+					>Overdue</option
+				><option
+					value="partial_payments"
+					selected={data.filters.financialStatus === 'partial_payments'}>Partial payments</option
+				><option value="up_to_date" selected={data.filters.financialStatus === 'up_to_date'}
 					>Up to date</option
 				></select
 			>

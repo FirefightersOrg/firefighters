@@ -61,8 +61,8 @@
 				<dd>{formatMoney(data.sale.sale.totalAmount)}</dd>
 			</div>
 			<div>
-				<dt>Financial status</dt>
-				<dd>{data.financialStatus.replaceAll('_', ' ')}</dd>
+				<dt>Financial status snapshot</dt>
+				<dd>{data.financialStatusSnapshot.replaceAll('_', ' ')}</dd>
 			</div>
 		</dl>
 	</section>

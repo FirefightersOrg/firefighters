@@ -1,6 +1,10 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
@@ -11,6 +15,8 @@ import { PAYMENT_MODES, type PaymentMode } from '$lib/domain/sales';
 const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value);
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Could not load permissions.' });
 	requireCampaignViewer(locals, url);
 	if (
 		!hasPermissionIn(locals.permissions, 'sale.view') &&

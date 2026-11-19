@@ -15,8 +15,11 @@ function page(form: any = null) {
 					installmentValue: '6000.00'
 				},
 				buyers: [{ id: 'b', type: 'individual', firstName: 'Ada', lastName: 'Lovelace' }],
+				buyerSearch: '',
+				buyerTotal: 31,
 				canCreateBuyer: true,
-				today: '2027-01-01'
+				today: '2027-01-01',
+				firstDueDateBounds: { min: '2026-12-01', max: '2028-01-01' }
 			},
 			form,
 			params: { id }
@@ -30,6 +33,21 @@ describe('sale registration page', () => {
 		expect(body).toContain('Create a buyer');
 		expect(body).toContain('Confirm sale');
 		expect(body).toContain('firstDueDate');
+		expect(body).toContain('Showing first 1 of 31');
+		expect(body).toContain('min="2026-12-01"');
+	});
+	it('renders field errors with their accessible descriptions', () => {
+		const body = page({
+			form: 'sale',
+			errors: {
+				bondId: ['Choose a bond.'],
+				buyerId: ['Choose a buyer.'],
+				firstDueDate: ['Bad date.']
+			}
+		});
+		expect(body).toContain('bondId-error');
+		expect(body).toContain('aria-describedby="buyerId-error"');
+		expect(body).toContain('Bad date.');
 	});
 	it('renders lookup refusal and buyer duplicate warning', () => {
 		expect(page({ form: 'lookup', found: [] }).toString()).toContain(

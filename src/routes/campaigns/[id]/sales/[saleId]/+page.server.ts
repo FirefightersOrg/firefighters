@@ -1,13 +1,19 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getSaleDetail } from '$lib/server/repositories/sales';
 import { calculateFinancialStatus } from '$lib/domain/financial-status';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Could not load permissions.' });
 	requireCampaignViewer(locals, url);
 	if (
 		!hasPermissionIn(locals.permissions, 'sale.view') &&
@@ -29,6 +35,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		sale: sale.data,
+		financialStatusSnapshot: sale.data.financialStatus,
 		financialStatus: calculateFinancialStatus({
 			saleStatus: sale.data.sale.status,
 			planStatus: sale.data.plan.status,
@@ -37,6 +44,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			installments: sale.data.installments.map((item) => ({
 				...item,
 				number: item.installmentNumber,
+				// TODO(Phase 8, payments): use actual applied amounts after payment allocation is implemented.
 				appliedAmount: '0.00'
 			}))
 		})

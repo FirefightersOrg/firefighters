@@ -30,6 +30,9 @@ describe('sale detail', () => {
 	it('requires sale or bond viewing', async () => {
 		await expect(load(event(['campaign.view']) as never)).rejects.toMatchObject({ status: 403 });
 	});
+	it('returns 500 when permissions are unavailable', async () => {
+		await expect(load(event(null as never) as never)).rejects.toMatchObject({ status: 500 });
+	});
 	it('returns 404 for malformed, missing, or out-of-campaign sales', async () => {
 		await expect(load(event(['campaign.view', 'sale.view'], 'bad') as never)).rejects.toMatchObject(
 			{ status: 404 }

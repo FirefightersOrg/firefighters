@@ -28,6 +28,20 @@ const clientOptions = { auth: { autoRefreshToken: false, persistSession: false }
 const RUN_ID = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 8)}`;
 let seq = 0;
 const rid = (label: string) => `it-sales-ui-${RUN_ID}-${++seq}-${label}`;
+const argentinaDate = (days = 0) => {
+	const parts = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Argentina/Buenos_Aires',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	}).formatToParts(new Date());
+	const value = Object.fromEntries(
+		parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value])
+	);
+	return new Date(Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day) + days))
+		.toISOString()
+		.slice(0, 10);
+};
 
 interface Caller {
 	user: User;
@@ -241,7 +255,7 @@ describe('sale screens (local Supabase)', () => {
 				bondId: bonds.free,
 				buyerId,
 				paymentMode: 'full_payment',
-				firstDueDate: '2026-12-10'
+				firstDueDate: argentinaDate(1)
 			})
 		).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
 	});
@@ -251,7 +265,7 @@ describe('sale screens (local Supabase)', () => {
 			bondId: bonds.cash,
 			buyerId,
 			paymentMode: 'full_payment',
-			firstDueDate: '2026-12-10'
+			firstDueDate: argentinaDate(1)
 		});
 		const saleId = /\/sales\/([0-9a-f-]{36})$/.exec(String(registered.redirect))?.[1];
 		expect(saleId).toBeDefined();
@@ -300,9 +314,16 @@ describe('sale screens (local Supabase)', () => {
 			bondId: bonds.plan,
 			buyerId: inlineBuyer,
 			paymentMode: 'installments',
-			firstDueDate: '2027-01-31'
+			firstDueDate: argentinaDate(2)
 		});
 		expect(String(registered.redirect)).toMatch(/\/sales\/[0-9a-f-]{36}$/);
+		const saleId = /\/sales\/([0-9a-f-]{36})$/.exec(String(registered.redirect))?.[1];
+		const detail = (await saleLoad(
+			event(admin, { id: campaignId, saleId: saleId! }, `/campaigns/${campaignId}/sales/${saleId}`)
+		)) as { sale: { installments: { installmentNumber: number }[] } };
+		expect(detail.sale.installments.map((installment) => installment.installmentNumber)).toEqual([
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+		]);
 
 		const buyerRecord = (await buyerLoad(
 			event(
@@ -318,10 +339,12 @@ describe('sale screens (local Supabase)', () => {
 		expect(buyerRecord.sales.map((s) => s.bondId)).toEqual([bonds.plan]);
 		expect(buyerRecord.installmentsTotal).toBe(10);
 		expect(buyerRecord.installments[0]).toMatchObject({
-			dueDate: '2027-01-31',
+			dueDate: argentinaDate(2),
 			amount: '6000.00'
 		});
-		expect(buyerRecord.installments[1].dueDate).toBe('2027-02-28');
+		expect(buyerRecord.installments.map((installment) => installment.dueDate)).toEqual(
+			[...buyerRecord.installments].map((installment) => installment.dueDate).sort()
+		);
 
 		const collectorRecord = (await collectorLoad(
 			event(
@@ -353,7 +376,7 @@ describe('sale screens (local Supabase)', () => {
 				bondId: bonds.cash,
 				buyerId,
 				paymentMode: 'full_payment',
-				firstDueDate: '2026-12-10'
+				firstDueDate: argentinaDate(1)
 			})
 		).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
 	});

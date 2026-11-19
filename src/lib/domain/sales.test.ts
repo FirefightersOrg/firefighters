@@ -43,6 +43,21 @@ describe('sales domain', () => {
 			{ number: 3, dueDate: '2027-03-31', amount: '100.00' }
 		]);
 	});
+	it('uses both commercial units for a pata installment preview', () => {
+		expect(
+			buildInstallmentSchedule({
+				paymentMode: 'installments',
+				firstDueDate: '2027-01-01',
+				totalAmount: '400.00',
+				installmentCount: 2,
+				installmentValue: '100.00',
+				commercialUnitCount: 2
+			})
+		).toEqual([
+			{ number: 1, dueDate: '2027-01-01', amount: '200.00' },
+			{ number: 2, dueDate: '2027-02-01', amount: '200.00' }
+		]);
+	});
 
 	it('allows exactly the documented installment transitions', () => {
 		const allowed = INSTALLMENT_STATUSES.flatMap((from) =>

@@ -10,6 +10,7 @@ describe('sale detail page', () => {
 				data: {
 					campaign: { id: campaign, name: 'Campaign' },
 					financialStatus: 'overdue',
+					financialStatusSnapshot: 'overdue',
 					sale: {
 						bondId: 'b',
 						bondNumbers: ['0068'],

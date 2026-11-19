@@ -5,6 +5,7 @@ vi.mock('$lib/server/repositories/campaigns', async (o) => ({
 }));
 vi.mock('$lib/server/repositories/parties', () => ({
 	getBuyer: vi.fn(),
+	getCollectorsByIds: vi.fn(),
 	listBuyers: vi.fn(),
 	findBuyersByIdentification: vi.fn()
 }));
@@ -14,8 +15,13 @@ vi.mock('$lib/server/services/sales', async (o) => ({
 	registerSale: vi.fn()
 }));
 vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
-import { actions, load } from './+page.server';
-import { getBuyer, listBuyers, findBuyersByIdentification } from '$lib/server/repositories/parties';
+import { actions, firstDueDateBounds, load } from './+page.server';
+import {
+	getBuyer,
+	getCollectorsByIds,
+	listBuyers,
+	findBuyersByIdentification
+} from '$lib/server/repositories/parties';
 import { findBondsForSale } from '$lib/server/repositories/sales';
 import { getCampaignById, mapCampaignRow } from '$lib/server/repositories/campaigns';
 import { registerSale, SaleServiceError } from '$lib/server/services/sales';
@@ -53,6 +59,7 @@ beforeEach(() => {
 	vi.mocked(listBuyers).mockResolvedValue({ data: { items: [] }, error: null } as never);
 	vi.mocked(getBuyer).mockResolvedValue({ data: { id: BUYER }, error: null } as never);
 	vi.mocked(findBuyersByIdentification).mockResolvedValue({ data: [], error: null } as never);
+	vi.mocked(getCollectorsByIds).mockResolvedValue({ data: new Map(), error: null } as never);
 	vi.mocked(findBondsForSale).mockResolvedValue({
 		data: [{ id: BOND, sellable: true, reason: null }],
 		error: null
@@ -68,6 +75,17 @@ describe('new sale', () => {
 			} as never)
 		).rejects.toMatchObject({ status: 403 });
 		expect(await run('register', ['campaign.view'], {})).toMatchObject({ status: 403 });
+	});
+	it('returns 500 when permissions could not be loaded', async () => {
+		await expect(
+			load({
+				locals: makeLocals({ permissions: null }),
+				params: { id: CAMPAIGN_ID },
+				url: new URL(url)
+			} as never)
+		).rejects.toMatchObject({ status: 500 });
+		for (const action of ['lookup', 'createBuyer', 'register'] as const)
+			expect(await run(action, null as never, {})).toMatchObject({ status: 500 });
 	});
 	it('lookup accepts number/barcode and reports unavailable matches', async () => {
 		expect(await run('lookup', ['campaign.view', 'sale.create'], {})).toMatchObject({
@@ -87,6 +105,39 @@ describe('new sale', () => {
 		} as never);
 		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '2' })).toMatchObject({
 			found: [{ sellable: false, reason: 'It is already sold.' }]
+		});
+	});
+	it('accepts due dates from -31 through +365 Buenos Aires days only', async () => {
+		const { min, max } = firstDueDateBounds();
+		const date = (value: string, days: number) => {
+			const [year, month, day] = value.split('-').map(Number);
+			return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+		};
+		const fields = (firstDueDate: string) => ({
+			bondId: BOND,
+			buyerId: BUYER,
+			paymentMode: 'full_payment',
+			firstDueDate
+		});
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], fields(date(min, -1)))
+		).toMatchObject({
+			status: 400,
+			data: { errors: { firstDueDate: expect.any(Array) } }
+		});
+		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
+		expect(await run('register', ['campaign.view', 'sale.create'], fields(min))).toMatchObject({
+			status: 303
+		});
+		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
+		expect(await run('register', ['campaign.view', 'sale.create'], fields(max))).toMatchObject({
+			status: 303
+		});
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], fields(date(max, 1)))
+		).toMatchObject({
+			status: 400,
+			data: { errors: { firstDueDate: expect.any(Array) } }
 		});
 	});
 	it('creates buyers only for managers, validates, warns duplicates and selects success', async () => {

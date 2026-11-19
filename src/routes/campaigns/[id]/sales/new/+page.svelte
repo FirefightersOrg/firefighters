@@ -11,12 +11,17 @@
 	import { PAYMENT_MODE_LABELS, buildInstallmentSchedule } from '$lib/domain/sales';
 	import { formatMoney } from '$lib/domain/money';
 	import { buyerDisplayName } from '$lib/domain/parties';
+	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let selectedBond = $state('');
 	let selectedBuyer = $state('');
 	let mode = $state('full_payment');
 	let due = $state('');
+	const errors = $derived((form?.errors ?? {}) as Record<string, string[]>);
+	const selectedCandidate = $derived(
+		form?.form === 'lookup' ? form.found?.find((bond) => bond.id === selectedBond) : undefined
+	);
 	$effect(() => {
 		if (!due) due = data.today;
 	});
@@ -28,10 +33,10 @@
 			? buildInstallmentSchedule({
 					paymentMode: mode as 'full_payment' | 'installments',
 					firstDueDate: due,
-					totalAmount: data.campaign.simpleBondValue,
+					totalAmount: selectedCandidate?.totalValue ?? data.campaign.simpleBondValue,
 					installmentCount: data.campaign.installmentCount,
 					installmentValue: data.campaign.installmentValue,
-					commercialUnitCount: 1
+					commercialUnitCount: selectedCandidate?.commercialUnitCount ?? 1
 				})
 			: []
 	);
@@ -51,8 +56,11 @@
 				class={inputClass}
 				name="query"
 				placeholder="Base number, associated number or code"
+				aria-invalid={form?.form === 'lookup' && errors.query ? 'true' : undefined}
+				aria-describedby={form?.form === 'lookup' && errors.query ? 'query-error' : undefined}
 			/><button class={primaryButtonClass}>Search</button>
 		</form>
+		<FieldError id="query-error" errors={form?.form === 'lookup' ? errors.query : undefined} />
 		{#if form?.form === 'lookup'}<div class="space-y-2">
 				{#each form.found ?? [] as bond (bond.id)}
 					{#if bond.sellable}<label class="block"
@@ -71,7 +79,25 @@
 	</section>
 	<section class="{cardClass} space-y-5">
 		<h2 class="font-semibold">3. Buyer</h2>
-		<select class={inputClass} bind:value={selectedBuyer}
+		<form method="GET" class="flex gap-2">
+			<label class="sr-only" for="buyer-search">Search buyers</label>
+			<input
+				class={inputClass}
+				id="buyer-search"
+				name="buyer"
+				value={data.buyerSearch}
+				placeholder="Search buyers"
+			/>
+			<button class={secondaryButtonClass}>Search</button>
+		</form>
+		{#if data.buyerTotal > data.buyers.length}<p class="text-sm text-slate-500">
+				Showing first {data.buyers.length} of {data.buyerTotal} — refine the search.
+			</p>{/if}
+		<select
+			class={inputClass}
+			bind:value={selectedBuyer}
+			aria-invalid={form?.form === 'sale' && errors.buyerId ? 'true' : undefined}
+			aria-describedby={form?.form === 'sale' && errors.buyerId ? 'buyerId-error' : undefined}
 			><option value="">Choose buyer</option
 			>{#if form?.form === 'buyer' && form.success && form.buyerId && !data.buyers.some((b) => b.id === form.buyerId)}<option
 					value={form.buyerId}>{form.buyerName}</option
@@ -79,6 +105,7 @@
 					>{buyerDisplayName(buyer)}</option
 				>{/each}</select
 		>
+		<FieldError id="buyerId-error" errors={form?.form === 'sale' ? errors.buyerId : undefined} />
 		{#if data.canCreateBuyer}<details class="rounded border p-3 text-sm">
 				<summary class="cursor-pointer font-medium">Create a buyer</summary>
 				<form
@@ -113,21 +140,50 @@
 	<form method="POST" action="?/register" use:enhance class="{cardClass} space-y-5">
 		<input type="hidden" name="bondId" value={selectedBond} />
 		<input type="hidden" name="buyerId" value={selectedBuyer} />
+		<FieldError id="bondId-error" errors={form?.form === 'sale' ? errors.bondId : undefined} />
+		<h2 class="font-semibold">4. Confirmed collector</h2>
 		<p class="text-sm text-slate-500">
-			The collector is confirmed from the bond’s current custody and cannot be changed here. If it
-			differs from the buyer’s usual collector, the bond’s confirmed collector records this sale.
+			{#if selectedCandidate?.collectorName}
+				{selectedCandidate.collectorName}. The sale is recorded under the collector holding the
+				bond.
+			{:else}
+				Select a bond to see its collector. The sale is recorded under the collector holding the
+				bond.
+			{/if}
 		</p>
 		<h2 class="font-semibold">5. Modality</h2>
-		<select class={inputClass} name="paymentMode" bind:value={mode}
+		<select
+			class={inputClass}
+			name="paymentMode"
+			bind:value={mode}
+			aria-invalid={form?.form === 'sale' && errors.paymentMode ? 'true' : undefined}
+			aria-describedby={form?.form === 'sale' && errors.paymentMode
+				? 'paymentMode-error'
+				: undefined}
 			>{#each Object.entries(PAYMENT_MODE_LABELS) as [value, label] (value)}<option {value}
 					>{label}</option
 				>{/each}</select
-		><label class={labelClass} for="firstDueDate">First due date</label><input
+		>
+		<FieldError
+			id="paymentMode-error"
+			errors={form?.form === 'sale' ? errors.paymentMode : undefined}
+		/>
+		<label class={labelClass} for="firstDueDate">First due date</label><input
 			class={inputClass}
 			id="firstDueDate"
 			name="firstDueDate"
 			type="date"
 			bind:value={due}
+			min={data.firstDueDateBounds.min}
+			max={data.firstDueDateBounds.max}
+			aria-invalid={form?.form === 'sale' && errors.firstDueDate ? 'true' : undefined}
+			aria-describedby={form?.form === 'sale' && errors.firstDueDate
+				? 'firstDueDate-error'
+				: undefined}
+		/>
+		<FieldError
+			id="firstDueDate-error"
+			errors={form?.form === 'sale' ? errors.firstDueDate : undefined}
 		/>
 		<h2 class="font-semibold">6. Schedule preview</h2>
 		{#if schedule.length}<table class="text-sm">

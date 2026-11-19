@@ -239,7 +239,9 @@ export async function getSaleDetail(
 				status: plan.status,
 				createdAt: plan.created_at
 			},
-			installments: plan.installments.map(mapInstallmentRow)
+			installments: plan.installments
+				.map(mapInstallmentRow)
+				.sort((a, b) => a.installmentNumber - b.installmentNumber)
 		},
 		error: null
 	};
@@ -253,6 +255,8 @@ export interface SaleCandidate {
 	associatedNumbers: number[];
 	commercialStatus: string;
 	collectorId: string | null;
+	totalValue: string;
+	commercialUnitCount: number;
 	sellable: boolean;
 	/** Why it cannot be sold (null when sellable). */
 	reason: string | null;
@@ -281,7 +285,7 @@ export async function findBondsForSale(
 	let query = supabase
 		.from('bond_list')
 		.select(
-			'id, kind, commercial_status, current_collector_id, group_pata_id, base_numbers, associated_numbers, sort_number'
+			'id, kind, commercial_status, current_collector_id, group_pata_id, base_numbers, associated_numbers, sort_number, total_value, commercial_unit_count'
 		)
 		.eq('campaign_id', campaignId);
 	if (options.id) query = query.eq('id', options.id);
@@ -305,6 +309,8 @@ export async function findBondsForSale(
 				group_pata_id: string | null;
 				base_numbers: number[] | null;
 				associated_numbers: number[] | null;
+				total_value: string | number;
+				commercial_unit_count: number;
 			}[],
 			{ merge: false }
 		>();
@@ -320,6 +326,8 @@ export async function findBondsForSale(
 				associatedNumbers: row.associated_numbers ?? [],
 				commercialStatus: row.commercial_status,
 				collectorId: row.current_collector_id,
+				totalValue: toDecimalString(row.total_value),
+				commercialUnitCount: row.commercial_unit_count,
 				sellable: delivered && !grouped,
 				reason: grouped
 					? 'It belongs to a manual pata: sell the pata instead.'

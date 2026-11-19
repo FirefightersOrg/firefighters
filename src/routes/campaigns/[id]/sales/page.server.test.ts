@@ -33,6 +33,9 @@ describe('sales list load', () => {
 	it('requires sale.view, sale.create, or bond.view', async () => {
 		await expect(load(event(['campaign.view']) as never)).rejects.toMatchObject({ status: 403 });
 	});
+	it('returns 500 when permissions are unavailable', async () => {
+		await expect(load(event(null as never) as never)).rejects.toMatchObject({ status: 500 });
+	});
 	it('passes supported filters and pagination to the query', async () => {
 		const out = (await load(
 			event(
