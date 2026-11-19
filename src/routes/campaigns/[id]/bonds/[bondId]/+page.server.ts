@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { buildBondRecord } from '$lib/server/bonds/record';
 import {
@@ -26,6 +26,17 @@ import {
 } from '$lib/server/repositories/audit-log';
 import type { RepositoryResult } from '$lib/server/repositories/campaigns';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
+import { listBondAssignments } from '$lib/server/repositories/deliveries';
+import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import {
+	DeliveryServiceError,
+	markBondLost,
+	reassignBondsToCollector,
+	returnBondsFromCollector
+} from '$lib/server/services/deliveries';
+import { requireActiveUser } from '$lib/server/auth/guards';
+import { canLoadBonds } from '$lib/domain/campaigns';
+import { fail, redirect } from '@sveltejs/kit';
 import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bonds';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$lib/schemas/bond';
@@ -34,7 +45,7 @@ import { readFormFields } from '$lib/schemas/campaign';
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
 /**
- * /campaigns/[id]/bonds/[bondId]: the bond record, with the 13 sections of docs/screens.md
+ * /campaigns/[id]/bonds/[bondId]: the bond record, with the 14 sections of docs/screens.md
  * "Bond record". General data (with the manual pata composition and ungroup history),
  * participating numbers padded with the campaign's digit count, barcode and audit come from the
  * database; collector, buyer, sale, installments, payments, settlements, commissions, draws and
@@ -107,8 +118,39 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (auditResult?.error) fail500(auditResult.error);
 	const auditEntries = auditResult?.data ?? [];
 
+	// Custody (SAN-55): history, and which custody actions apply to this bond now.
+	const status = bond.commercialStatus;
+	const open = canLoadBonds(campaign.status);
+	const can = {
+		returnBond:
+			open &&
+			status === 'delivered_to_collector' &&
+			hasPermissionIn(locals.permissions, 'bond.return'),
+		reassign:
+			open &&
+			status === 'delivered_to_collector' &&
+			hasPermissionIn(locals.permissions, 'bond.assign'),
+		markLost:
+			open &&
+			(status === 'available' || status === 'delivered_to_collector') &&
+			hasPermissionIn(locals.permissions, 'bond.mark_lost')
+	};
+	const [historyResult, collectorsResult] = await Promise.all([
+		listBondAssignments(locals.supabase, bond.id),
+		can.reassign
+			? listActiveCollectorOptions(locals.supabase)
+			: Promise.resolve({ data: [], error: null })
+	]);
+	if (historyResult.error) fail500(historyResult.error);
+	if (collectorsResult.error) fail500(collectorsResult.error);
+
 	return {
 		campaign,
+		custody: {
+			history: historyResult.data ?? [],
+			collectors: (collectorsResult.data ?? []).filter((c) => c.id !== bond.currentCollectorId),
+			can
+		},
 		record: buildBondRecord({
 			campaign,
 			bond,
@@ -209,5 +251,186 @@ export const actions: Actions = {
 			errors: {}
 		};
 		return result;
-	}
+	},
+	return: returnAction,
+	reassign: reassignAction,
+	markLost: markLostAction
 };
+
+// ---------------------------------------------------------------------------
+// Custody actions (SAN-55): return, reassign, mark lost
+// ---------------------------------------------------------------------------
+
+export interface CustodyFormResult {
+	form: 'custody';
+	action: 'return' | 'reassign' | 'markLost';
+	success: boolean;
+	message: string;
+	errors: Record<string, string[]>;
+	values?: Record<string, string>;
+}
+
+function custodyFailure(
+	action: CustodyFormResult['action'],
+	status: number,
+	message: string,
+	extra: { errors?: Record<string, string[]>; values?: Record<string, string> } = {}
+) {
+	const data: CustodyFormResult = {
+		form: 'custody',
+		action,
+		success: false,
+		message,
+		errors: extra.errors ?? {},
+		values: extra.values
+	};
+	return fail(status, data);
+}
+
+function custodyServiceFailure(
+	action: CustodyFormResult['action'],
+	err: unknown,
+	values?: Record<string, string>
+) {
+	if (!(err instanceof DeliveryServiceError)) throw err;
+	const field = err.field && err.field !== 'bondIds' ? err.field : undefined;
+	return custodyFailure(action, err.status, err.message, {
+		errors: field ? { [field]: [err.message] } : {},
+		values
+	});
+}
+
+/** Active user, permission, and a bond of this campaign (else a fail()). */
+async function custodyPreflight(
+	locals: App.Locals,
+	url: URL,
+	params: { id: string; bondId: string },
+	action: CustodyFormResult['action'],
+	permission: 'bond.return' | 'bond.assign' | 'bond.mark_lost'
+) {
+	requireActiveUser(locals, url.pathname);
+	if (!hasPermissionIn(locals.permissions, permission)) {
+		return custodyFailure(action, 403, BOND_MESSAGES.permission);
+	}
+	if (!isUuid(params.id) || !isUuid(params.bondId)) {
+		return custodyFailure(action, 404, BOND_MESSAGES.bondNotFound);
+	}
+	const { data: campaignId, error: loadError } = await getBondCampaignId(
+		locals.supabase,
+		params.bondId
+	);
+	if (loadError) {
+		console.error('[bonds] custody scope check failed', {
+			requestId: locals.requestId,
+			error: loadError
+		});
+		return custodyFailure(action, 500, 'Could not load the bond. Please try again.');
+	}
+	if (campaignId !== params.id) return custodyFailure(action, 404, BOND_MESSAGES.bondNotFound);
+	return null;
+}
+
+const field = (formData: FormData, name: string) => {
+	const v = formData.get(name);
+	return typeof v === 'string' ? v.trim() : '';
+};
+
+const custodyCtx = (locals: App.Locals) => ({
+	requestId: locals.requestId,
+	permissions: locals.permissions
+});
+
+async function returnAction({ request, locals, params, url }: RequestEvent) {
+	const denied = await custodyPreflight(locals, url, params, 'return', 'bond.return');
+	if (denied) return denied;
+	const notes = field(await request.formData(), 'notes');
+	if (notes.length > 2000) {
+		return custodyFailure('return', 400, 'Notes are limited to 2000 characters.', {
+			errors: { notes: ['Notes are limited to 2000 characters.'] }
+		});
+	}
+	try {
+		await returnBondsFromCollector(
+			locals.supabase,
+			{ campaignId: params.id, bondIds: [params.bondId], notes: notes || null },
+			custodyCtx(locals)
+		);
+	} catch (err) {
+		return custodyServiceFailure('return', err, { notes });
+	}
+	const result: CustodyFormResult = {
+		form: 'custody',
+		action: 'return',
+		success: true,
+		message: 'Bond returned: it is available again.',
+		errors: {}
+	};
+	return result;
+}
+
+async function reassignAction({ request, locals, params, url }: RequestEvent) {
+	const denied = await custodyPreflight(locals, url, params, 'reassign', 'bond.assign');
+	if (denied) return denied;
+	const formData = await request.formData();
+	const collectorId = field(formData, 'collectorId');
+	const notes = field(formData, 'notes');
+	const values = { collectorId, notes };
+	if (!isUuid(collectorId)) {
+		return custodyFailure('reassign', 400, 'Choose the new collector.', {
+			errors: { collectorId: ['Choose the new collector.'] },
+			values
+		});
+	}
+	let noteId: string;
+	try {
+		noteId = await reassignBondsToCollector(
+			locals.supabase,
+			{ campaignId: params.id, collectorId, bondIds: [params.bondId], notes: notes || null },
+			custodyCtx(locals)
+		);
+	} catch (err) {
+		return custodyServiceFailure('reassign', err, values);
+	}
+	redirect(303, `/campaigns/${params.id}/deliveries/${noteId}`);
+}
+
+async function markLostAction({ request, locals, params, url }: RequestEvent) {
+	const denied = await custodyPreflight(locals, url, params, 'markLost', 'bond.mark_lost');
+	if (denied) return denied;
+	const formData = await request.formData();
+	const values = {
+		responsibleParty: field(formData, 'responsibleParty'),
+		lostOn: field(formData, 'lostOn'),
+		reason: field(formData, 'reason')
+	};
+	const errors: Record<string, string[]> = {};
+	if (!values.responsibleParty) errors.responsibleParty = ['Who was responsible is required.'];
+	else if (values.responsibleParty.length > 200)
+		errors.responsibleParty = ['At most 200 characters.'];
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(values.lostOn)) errors.lostOn = ['Pick the date of the loss.'];
+	if (!values.reason) errors.reason = ['A reason is required.'];
+	else if (values.reason.length > 2000) errors.reason = ['At most 2000 characters.'];
+	if (Object.keys(errors).length) {
+		return custodyFailure('markLost', 400, 'Please correct the highlighted fields.', {
+			errors,
+			values
+		});
+	}
+	try {
+		await markBondLost(
+			locals.supabase,
+			{ campaignId: params.id, bondId: params.bondId, ...values },
+			custodyCtx(locals)
+		);
+	} catch (err) {
+		return custodyServiceFailure('markLost', err, values);
+	}
+	const result: CustodyFormResult = {
+		form: 'custody',
+		action: 'markLost',
+		success: true,
+		message: 'Bond marked lost.',
+		errors: {}
+	};
+	return result;
+}

@@ -3,6 +3,7 @@
 	import BondStatusBadge from '$lib/components/bonds/BondStatusBadge.svelte';
 	import BondActionsSection from '$lib/components/bonds/record/BondActionsSection.svelte';
 	import BondAuditSection from '$lib/components/bonds/record/BondAuditSection.svelte';
+	import BondCustodySection from '$lib/components/bonds/record/BondCustodySection.svelte';
 	import BondBarcodeSection from '$lib/components/bonds/record/BondBarcodeSection.svelte';
 	import BondGeneralSection from '$lib/components/bonds/record/BondGeneralSection.svelte';
 	import BondNumbersSection from '$lib/components/bonds/record/BondNumbersSection.svelte';
@@ -13,7 +14,7 @@
 	import type { PageProps } from './$types';
 
 	/**
-	 * Bond record: the 13 sections of docs/screens.md "Bond record", one component each, with an
+	 * Bond record: the 14 sections of docs/screens.md "Bond record", one component each, with an
 	 * index of anchors at the top. The actions (ungroup / annul) follow the general data.
 	 */
 	let { data, form }: PageProps = $props();
@@ -80,6 +81,13 @@
 	<BondNumbersSection campaignId={campaign.id} bondId={general.id} numbers={record.numbers} />
 	<BondBarcodeSection barcode={record.barcode} />
 	<BondPartySection role="collector" party={record.collector} />
+	<BondCustodySection
+		campaignId={campaign.id}
+		history={data.custody.history}
+		collectors={data.custody.collectors}
+		can={data.custody.can}
+		form={form?.form === 'custody' ? form : null}
+	/>
 	<BondPartySection role="buyer" party={record.buyer} />
 	<BondPendingSection id="sale" />
 	<BondPendingSection id="installments" />
