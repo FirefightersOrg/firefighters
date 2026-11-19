@@ -8,14 +8,16 @@ import {
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 
-const uuid = z.string().uuid();
+const uuid = z.guid();
+/** numeric(12,2): positive, at most 2 decimals and below 10^10. */
+const money = z.coerce.number().positive().max(9_999_999_999.99).multipleOf(0.01);
 const notes = z.string().trim().min(1).max(SETTLEMENT_NOTES_MAX).nullable().optional();
-const application = z.object({ installmentId: uuid, amountApplied: z.coerce.number().positive() });
+const application = z.object({ installmentId: uuid, amountApplied: money });
 export const openSettlementSchema = z.object({ campaignId: uuid, collectorId: uuid, notes });
 export const addPaymentToSettlementSchema = z.object({
 	settlementId: uuid,
 	saleId: uuid,
-	amount: z.coerce.number().positive(),
+	amount: money,
 	paymentMethod: z.enum(PAYMENT_METHODS),
 	applications: z.array(application).min(1),
 	paymentDate: z.string().date().optional()
@@ -58,7 +60,8 @@ export function mapSettlementRpcError(error: RpcError) {
 		);
 	if (['22023', '23514'].includes(error.code ?? ''))
 		return new SettlementServiceError('validation', error.message || 'Invalid settlement data.');
-	if (['55000', '23505'].includes(error.code ?? ''))
+	// 23001 restrict_violation (immutable after draft), P0001 generic guard raise.
+	if (['55000', '23505', '23001', 'P0001'].includes(error.code ?? ''))
 		return new SettlementServiceError(
 			'conflict',
 			error.message || 'The settlement can no longer be changed.'
@@ -67,13 +70,19 @@ export function mapSettlementRpcError(error: RpcError) {
 		cause: error
 	});
 }
+/** Every call must say who is calling; unknown permissions fail closed. */
+export interface SettlementRequestContext {
+	requestId?: string | null;
+	/** The caller's permissions; `null` (could not load) fails closed with a 500. */
+	permissions: readonly string[] | null;
+}
 function requirePermission(
 	permissions: readonly string[] | null | undefined,
 	permission: PermissionCode
 ) {
-	if (permissions === null)
+	if (permissions == null)
 		throw new SettlementServiceError('internal', 'Something went wrong. Please try again.');
-	if (permissions != null && !hasPermissionIn(permissions, permission))
+	if (!hasPermissionIn(permissions, permission))
 		throw new SettlementServiceError(
 			'permission',
 			'You do not have permission to perform this action.'
@@ -98,7 +107,7 @@ async function rpc<T>(
 export async function openSettlement(
 	client: SupabaseClient,
 	input: OpenSettlementInput,
-	ctx: { requestId?: string | null; permissions?: readonly string[] | null } = {}
+	ctx: SettlementRequestContext
 ) {
 	const p = openSettlementSchema.safeParse(input);
 	if (!p.success)
@@ -114,7 +123,7 @@ export async function openSettlement(
 export async function addPaymentToSettlement(
 	client: SupabaseClient,
 	input: AddPaymentToSettlementInput,
-	ctx: { requestId?: string | null; permissions?: readonly string[] | null } = {}
+	ctx: SettlementRequestContext
 ) {
 	const p = addPaymentToSettlementSchema.safeParse(input);
 	if (!p.success)
@@ -136,7 +145,7 @@ export async function addPaymentToSettlement(
 export async function removePaymentFromSettlement(
 	client: SupabaseClient,
 	input: RemovePaymentFromSettlementInput,
-	ctx: { requestId?: string | null; permissions?: readonly string[] | null } = {}
+	ctx: SettlementRequestContext
 ) {
 	const p = removePaymentFromSettlementSchema.safeParse(input);
 	if (!p.success)
@@ -151,7 +160,7 @@ export async function removePaymentFromSettlement(
 export async function closeSettlement(
 	client: SupabaseClient,
 	input: { settlementId: string },
-	ctx: { requestId?: string | null; permissions?: readonly string[] | null } = {}
+	ctx: SettlementRequestContext
 ) {
 	const p = closeSettlementSchema.safeParse(input);
 	if (!p.success)

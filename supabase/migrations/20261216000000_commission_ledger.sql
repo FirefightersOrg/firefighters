@@ -33,6 +33,7 @@ create table public.collector_ledger_entries (
   reason text,
   annulled_by uuid references public.profiles (id) on delete restrict,
   annulled_at timestamptz,
+  annul_reason text,
   constraint collector_ledger_entries_amount_positive check (amount > 0 and amount <> 'NaN'::numeric),
   constraint collector_ledger_entries_type_check check (entry_type in (
     'commission_generated', 'commission_settled', 'cash_settled',
@@ -45,8 +46,11 @@ create table public.collector_ledger_entries (
     reason is null or (reason = btrim(reason) and reason <> '' and char_length(reason) <= 1000)
   ),
   constraint collector_ledger_entries_annulment_consistent check (
-    (status = 'annulled' and annulled_by is not null and annulled_at is not null and reason is not null)
-    or (status <> 'annulled' and annulled_by is null and annulled_at is null)
+    (status = 'annulled' and annulled_by is not null and annulled_at is not null and annul_reason is not null)
+    or (status <> 'annulled' and annulled_by is null and annulled_at is null and annul_reason is null)
+  ),
+  constraint collector_ledger_entries_annul_reason_format check (
+    annul_reason is null or (annul_reason = btrim(annul_reason) and annul_reason <> '' and char_length(annul_reason) <= 1000)
   )
 );
 
@@ -108,7 +112,7 @@ create function public.collector_ledger_entries_guard_insert() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   perform public.commission_ledger_check_references(new.campaign_id, new.collector_id, new.settlement_id, new.payment_id);
-  if new.status <> 'recorded' or new.annulled_by is not null or new.annulled_at is not null then
+  if new.status <> 'recorded' or new.annulled_by is not null or new.annulled_at is not null or new.annul_reason is not null then
     raise exception 'a new ledger entry must start recorded' using errcode = 'check_violation';
   end if;
   return new;
@@ -118,18 +122,15 @@ create function public.collector_ledger_entries_guard_update() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   if (new.id, new.campaign_id, new.collector_id, new.settlement_id, new.payment_id, new.entry_type,
-      new.direction, new.amount, new.occurred_at, new.created_by, new.created_at)
+      new.direction, new.amount, new.occurred_at, new.created_by, new.created_at, new.reason)
      is distinct from
      (old.id, old.campaign_id, old.collector_id, old.settlement_id, old.payment_id, old.entry_type,
-      old.direction, old.amount, old.occurred_at, old.created_by, old.created_at) then
+       old.direction, old.amount, old.occurred_at, old.created_by, old.created_at, old.reason) then
     raise exception 'ledger entry history is immutable' using errcode = 'restrict_violation';
   end if;
   if old.status <> 'recorded' or new.status not in ('annulled', 'compensated') then
     raise exception 'ledger entry status can only change from recorded to annulled or compensated'
       using errcode = 'check_violation';
-  end if;
-  if new.status = 'compensated' and new.reason is distinct from old.reason then
-    raise exception 'compensated ledger entry reason is immutable' using errcode = 'restrict_violation';
   end if;
   return new;
 end; $$;

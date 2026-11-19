@@ -42,10 +42,15 @@ export interface LedgerBalanceEntry {
 	status: LedgerStatus;
 }
 
-/** Non-annulled credits less non-annulled debits; amounts are unsigned. */
+/**
+ * Presentation-only mirror of non-annulled credits less debits (unsigned numeric(12,2) amounts).
+ * Sum integer cents to avoid fractional drift; database numeric remains authoritative
+ * for financial decisions (large aggregate balances can exceed JS safe integers).
+ */
 export const calculateLedgerBalance = (entries: readonly LedgerBalanceEntry[]) =>
 	entries.reduce((balance, entry) => {
 		if (entry.status === 'annulled') return balance;
 		const amount = typeof entry.amount === 'string' ? Number(entry.amount) : entry.amount;
-		return balance + (entry.direction === 'collector_credit' ? amount : -amount);
-	}, 0);
+		const cents = Math.round(amount * 100);
+		return balance + (entry.direction === 'collector_credit' ? cents : -cents);
+	}, 0) / 100;

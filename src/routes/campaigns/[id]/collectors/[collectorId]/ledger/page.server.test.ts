@@ -102,6 +102,29 @@ describe('/campaigns/[id]/collectors/[collectorId]/ledger load', () => {
 		expect(data?.can).toEqual({ adjustCommission: false, adjustLedger: false });
 	});
 
+	it('returns annulled adjustments with both reasons and excludes their amount from the balance', async () => {
+		const { locals } = setup(VIEW, {
+			data: [
+				{
+					...ledgerRows[0],
+					entry_type: 'adjustment_in_favor_of_collector',
+					status: 'annulled',
+					reason: 'Missed commission',
+					annul_reason: 'Entered twice',
+					running_balance: '0.00'
+				}
+			],
+			error: null
+		});
+		const data = await load(loadEvent(locals));
+		expect(data?.entries[0]).toMatchObject({
+			status: 'annulled',
+			reason: 'Missed commission',
+			annulReason: 'Entered twice'
+		});
+		expect(data?.balance).toBe(0);
+	});
+
 	it('maps a database permission refusal to 403 and other errors to 500', async () => {
 		await expect(
 			load(loadEvent(setup(VIEW, { data: null, error: { code: '42501' } }).locals))

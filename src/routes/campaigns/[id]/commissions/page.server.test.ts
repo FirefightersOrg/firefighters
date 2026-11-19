@@ -286,6 +286,20 @@ describe('/campaigns/[id]/commissions', () => {
 			expect(viewer.collectors).toEqual([]);
 		});
 
+		it('load: uses a neutral collector label when the active list omits the collector (including RLS)', async () => {
+			const { supabase } = mockDb({
+				special: {
+					data: [ruleRow({ applies_to_collector_id: 'c0000000-0000-4000-8000-000000000009' })],
+					error: null
+				},
+				collectors: { data: [], error: null }
+			});
+			const data = (await load(loadEvent(makeLocals({ supabase, permissions: MANAGER })))) as {
+				specialRules: { collectorName: string }[];
+			};
+			expect(data.specialRules[0].collectorName).toBe('Collector');
+		});
+
 		it('create: calls commission_rule_create with canonical values', async () => {
 			const { supabase, rpc } = mockDb({ rpc: { data: RULE_ID, error: null } });
 			const result = await runAction('create', makeLocals({ supabase, permissions: MANAGER }), {

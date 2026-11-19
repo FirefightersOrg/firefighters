@@ -239,8 +239,8 @@ describe('validateImportBatch (mirror of import_session_revalidate / _check_grou
 		expect(codes(result)).toEqual([
 			[2, 'valid', null],
 			[3, 'error', 'number_out_of_range'],
-			[4, 'error', 'number_conflict'],
-			[5, 'error', 'number_conflict'],
+			[4, 'error', 'duplicate_number'],
+			[5, 'error', 'duplicate_number'],
 			[6, 'error', 'number_in_use'],
 			[7, 'valid', null],
 			[8, 'error', 'barcode_in_use'],
@@ -252,8 +252,8 @@ describe('validateImportBatch (mirror of import_session_revalidate / _check_grou
 		expect(result.items.map((i) => i.errorMessage)).toEqual([
 			null,
 			'Number 5129 does not fit the campaign (maximum 9999).',
-			'This number (or its associated number) is repeated in the import.',
-			'This number (or its associated number) is repeated in the import.',
+			'Base number 0020 is repeated in the import.',
+			'Base number 0020 is repeated in the import.',
 			'Number 0100 is already used by a bond of this campaign.',
 			null,
 			'Barcode LIVE-100 is already used in this campaign.',
@@ -330,7 +330,7 @@ describe('validateImportBatch (mirror of import_session_revalidate / _check_grou
 		);
 		expect(codes(result)).toEqual([
 			[2, 'error', 'parse_x'],
-			[3, 'error', 'number_conflict']
+			[3, 'error', 'duplicate_number']
 		]);
 		const barcodes = validateImportBatch(
 			[
