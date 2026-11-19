@@ -1,6 +1,6 @@
 /**
  * View model of the bond record page (`/campaigns/[id]/bonds/[bondId]`), built on the server by
- * `buildBondRecord` ($lib/server/bonds/record.ts). One part per section component (the 13
+ * `buildBondRecord` ($lib/server/bonds/record.ts). One part per section component (the 14
  * sections of docs/screens.md "Bond record"); sections whose data arrives in later phases render
  * an empty state from the bond alone.
  */
@@ -138,12 +138,13 @@ export interface BondRecord {
 	actions: BondRecordActions;
 }
 
-/** The 13 sections of docs/screens.md "Bond record", in order (anchor id and title). */
+/** The 14 sections of docs/screens.md "Bond record", in order (anchor id and title). */
 export const BOND_RECORD_SECTIONS = [
 	{ id: 'general', title: 'General data' },
 	{ id: 'numbers', title: 'Participating numbers' },
 	{ id: 'barcode', title: 'Barcode' },
 	{ id: 'collector', title: 'Current collector' },
+	{ id: 'custody', title: 'Assignment history' },
 	{ id: 'buyer', title: 'Current buyer' },
 	{ id: 'sale', title: 'Sale' },
 	{ id: 'installments', title: 'Installments' },
