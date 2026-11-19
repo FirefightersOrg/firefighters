@@ -1,7 +1,11 @@
-import { json, redirect, type Handle } from '@sveltejs/kit';
+import { error, json, redirect, type Handle } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/supabase/server';
 import { getUserPermissions } from '$lib/server/auth/permissions';
-import { decideRouteAccess, mayEndLeftoverSession } from '$lib/server/auth/route-guard';
+import {
+	SERVICE_UNAVAILABLE_MESSAGE,
+	decideRouteAccess,
+	mayEndLeftoverSession
+} from '$lib/server/auth/route-guard';
 import { endSession, hasSupabaseAuthCookie } from '$lib/server/auth/session';
 import type { UserProfile } from './app';
 
@@ -65,7 +69,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		if (profileResult.error) {
 			profileLookupFailed = true;
-			console.error('[hooks] profile lookup failed; treating request as anonymous', {
+			console.error('[hooks] profile lookup failed; non-public routes answer 503', {
 				requestId: event.locals.requestId,
 				error: profileResult.error
 			});
@@ -112,11 +116,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 		sessionExpired:
 			!authenticated &&
 			!profileLookupFailed &&
-			(leftoverSession || hasSupabaseAuthCookie(event.cookies))
+			(leftoverSession || hasSupabaseAuthCookie(event.cookies)),
+		profileLookupFailed
 	});
 
 	if (access.kind === 'redirect') {
 		redirect(303, access.location);
+	}
+	if (access.kind === 'unavailable') {
+		// Outage, not a deactivation: keep the session and do not send the user to /login.
+		if (access.api) {
+			return json(
+				{ message: SERVICE_UNAVAILABLE_MESSAGE, code: 'service_unavailable' },
+				{ status: 503 }
+			);
+		}
+		error(503, SERVICE_UNAVAILABLE_MESSAGE);
 	}
 	if (access.kind === 'unauthorized') {
 		return json({ message: 'Unauthorized', code: 'unauthenticated' }, { status: 401 });

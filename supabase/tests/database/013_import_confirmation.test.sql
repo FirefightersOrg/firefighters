@@ -47,7 +47,7 @@ with c as (
   insert into public.campaigns
     (name, simple_bond_value, installment_count, installment_value, barcode_mode,
      starts_at, ends_at)
-  select v.name, 60000, 10, 6000, 'base_number', '2026-03-01 00:00-03', '2026-12-31 23:59:59-03'
+  select v.name, 60000, 10, 6000, 'manual_mapping', '2026-03-01 00:00-03', '2026-12-31 23:59:59-03'
   from (values ('Confirm'), ('Closing')) as v (name)
   returning id, name
 )
