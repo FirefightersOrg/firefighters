@@ -27,7 +27,7 @@ grant execute on function public.my_rpc(uuid, text) to authenticated;
 - Functions created before this migration keep the ACLs their migrations set.
 - Only `postgres`'s defaults are changed. Migrations run as `postgres`, which cannot change `supabase_admin`'s defaults, so functions created by `supabase_admin` (platform internals, extensions) keep the platform defaults.
 - pgTAP helpers in `pg_temp` are also created without `PUBLIC` `EXECUTE`. Grant them to the roles the test switches to (`grant execute on function pg_temp.act_as(int) to authenticated, anon;`).
-- pgTAP `022_default_function_privileges.test.sql` checks the default ACLs and that a new function cannot be called without a grant.
+- pgTAP `024_default_function_privileges.test.sql` checks the default ACLs and that a new function cannot be called without a grant.
 
 ## Main entities
 
