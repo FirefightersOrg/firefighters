@@ -5,6 +5,7 @@
 	import { cardClass } from '$lib/components/campaigns/styles';
 	import { buyerDisplayName, buyerIdentification, BUYER_TYPE_LABELS } from '$lib/domain/parties';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
+	import { formatCents, formatMoney, parseMoneyToCents } from '$lib/domain/money';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
@@ -18,6 +19,13 @@
 				})
 			)
 			.join(', ');
+	// Exact cents (no floating point), over the installments listed on the record.
+	const pendingCents = $derived(
+		(data.installments ?? []).reduce(
+			(total, item) => total + (parseMoneyToCents(item.amount) ?? 0),
+			0
+		)
+	);
 </script>
 
 <svelte:head
@@ -84,20 +92,55 @@
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Purchased bonds in this campaign</h2>
 		<ul class="mt-2 text-sm">
-			{#each data.campaignBonds as bond (bond.id)}<li class="border-t py-2">
+			{#each data.sales as sale (sale.sale.id)}<li class="border-t py-2">
+					<a
+						class="text-blue-700 underline"
+						href={resolve('/campaigns/[id]/sales/[saleId]', {
+							id: data.campaign.id,
+							saleId: sale.sale.id
+						})}>Sale</a
+					>
+					—
 					<a
 						class="text-blue-700 underline"
 						href={resolve('/campaigns/[id]/bonds/[bondId]', {
 							id: data.campaign.id,
-							bondId: bond.id
-						})}>{baseNumbers(bond) || 'No base number'}</a
+							bondId: sale.bondId
+						})}>{sale.bondNumbers.join(', ') || 'No base number'}</a
 					>
-				</li>{:else}<li class="text-slate-500">No bonds purchased in this campaign.</li>{/each}
+				</li>{:else}{#each data.campaignBonds as bond (bond.id)}<li class="border-t py-2">
+						<a
+							class="text-blue-700 underline"
+							href={resolve('/campaigns/[id]/bonds/[bondId]', {
+								id: data.campaign.id,
+								bondId: bond.id
+							})}>{baseNumbers(bond) || 'No base number'}</a
+						>
+					</li>{:else}<li class="text-slate-500">
+						No bonds purchased in this campaign.
+					</li>{/each}{/each}
 		</ul>
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Installments and debt</h2>
-		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 7/8: sales and installments.</p>
+		<p class="mt-2 text-sm">
+			Total pending: {formatCents(
+				pendingCents
+			)}{#if (data.installmentsTotal ?? 0) > (data.installments ?? []).length}
+				(of the first {(data.installments ?? []).length} of {data.installmentsTotal} pending installments){/if}
+		</p>
+		<ul class="mt-2 text-sm">
+			{#each data.installments ?? [] as installment (installment.id)}<li class="border-t py-2">
+					<a
+						class="text-blue-700 underline"
+						href={resolve('/campaigns/[id]/sales/[saleId]', {
+							id: data.campaign.id,
+							saleId: installment.saleId
+						})}>Sale</a
+					>
+					— {installment.dueDate} — {formatMoney(installment.amount)} — {installment.status}
+				</li>{:else}<li class="text-slate-500">No pending installments.</li>{/each}
+		</ul>
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Prizes</h2>

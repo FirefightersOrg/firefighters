@@ -77,6 +77,7 @@ Sections:
 - Participating numbers.
 - Barcode.
 - Current collector.
+- Assignment history (deliveries, reassignments, returns and losses, with their notes; Return, Reassign and Mark lost actions).
 - Current buyer.
 - Sale.
 - Installments.

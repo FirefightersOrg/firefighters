@@ -7,6 +7,7 @@ import {
 	canEditCampaignDates,
 	canEditCampaignName,
 	canEditCampaignRules,
+	canDeliverBonds,
 	canLoadBonds,
 	CAMPAIGN_STATUSES,
 	CAMPAIGN_TRANSITION_PERMISSIONS,
@@ -64,6 +65,7 @@ describe('campaign status machine', () => {
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignRules)).toEqual(['draft']);
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignDates)).toEqual(['draft', 'active']);
 		expect(CAMPAIGN_STATUSES.filter(canLoadBonds)).toEqual(['draft', 'active']);
+		expect(CAMPAIGN_STATUSES.filter(canDeliverBonds)).toEqual(['active']);
 		expect(CAMPAIGN_STATUSES.filter(canEditCampaignName)).toEqual(['draft', 'active', 'closing']);
 	});
 

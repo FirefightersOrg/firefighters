@@ -64,3 +64,43 @@ describe('buyer record page', () => {
 		expect(body).toContain('Call after noon');
 	});
 });
+
+describe('buyer sale sections', () => {
+	it('links purchased sales and pending installments', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id: campaignId, name: 'Campaign' },
+					buyer: {
+						id: 'b',
+						type: 'individual',
+						firstName: 'Ada',
+						lastName: 'Lovelace',
+						businessName: null,
+						documentNumber: null,
+						taxId: null,
+						phone: null,
+						address: null,
+						usualCollectorId: null,
+						notes: null
+					},
+					collector: null,
+					collectors: [],
+					canManage: false,
+					campaignBonds: [],
+					historicalBonds: [],
+					audit: null,
+					sales: [{ sale: { id: 's' }, bondId, bondNumbers: ['0068'] }],
+					installments: [
+						{ id: 'i', saleId: 's', dueDate: '2027-01-01', amount: '6000.00', status: 'pending' }
+					]
+				},
+				form: null,
+				params: {}
+			} as never
+		}).body;
+		expect(body).toContain(`/sales/s`);
+		expect(body).toContain('2027-01-01');
+		expect(body).toContain('Total pending');
+	});
+});
