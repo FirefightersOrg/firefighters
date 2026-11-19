@@ -4,7 +4,7 @@ import { createClient, type SupabaseClient, type User } from '@supabase/supabase
 import { actions as newActions } from '../../src/routes/campaigns/[id]/collectors/new/+page.server';
 import { load as listLoad } from '../../src/routes/campaigns/[id]/collectors/+page.server';
 import { actions as recordActions } from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.server';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
 
@@ -50,7 +50,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: (await getUserPermissions(client)) ?? []
+		permissions: await loadPermissions(client)
 	};
 }
 

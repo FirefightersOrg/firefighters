@@ -235,6 +235,17 @@ Rule:
 - All bulk loading must go through preview and validation.
 - Imports from the old system must go through staging.
 
+### Import staging and validation (SAN-45)
+
+- Database (merged): `20261126000000_import_staging.sql` (`import_session_create`, `_add_items`, `_add_scan`, `_remove_item`, `_validate`, `_cancel`, `_summary`). `import_session_validate` is authoritative: it re-reads the campaign rules and the live bonds.
+- `src/lib/domain/barcodes.ts`: reads the base number a barcode carries per `barcode_mode` like `import_session_add_scan` (`readBarcode`) and compiles the campaign pattern for JavaScript only when it means the same as in Postgres (`compileBarcodePattern`).
+- `src/lib/domain/csv.ts`: RFC 4180 reader (BOM, `,`/`;` detection, quotes, quoted line breaks).
+- `src/lib/domain/imports.ts`: header aliases and limits (`rowsFromTable`), file row → staged row with `parse_*` codes (`interpretImportRow`), instant-preview mirror of the database validation (`validateImportBatch`) and its summary (`summarizeImportItems`).
+- `src/lib/server/imports/parse-file.ts`: CSV / `.xlsx` (first sheet, `exceljs`) → rows, with size and row limits.
+- `src/lib/schemas/import.ts`, `src/lib/server/repositories/imports.ts`, `src/lib/server/services/imports.ts` (`ImportServiceError`, `stageImportFile` = parse + interpret + create + add in batches of 1,000 + validate).
+- `tests/integration/import-staging.test.ts` checks that the TypeScript validator and `import_session_validate` agree on every row, message and count.
+- Details and codes: `docs/imports.md` ("App layer (SAN-45)").
+
 ## Settlements and commissions
 
 Settlement closing is a critical operation.
