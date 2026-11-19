@@ -346,6 +346,15 @@ Suggested fields:
 - `delivery_note_id`
 - `bond_id`
 
+Implemented in SAN-53/54 (`20261204000000_bond_delivery.sql`, pgTAP `020`):
+
+- `bond_assignments` is the custody history. A `delivery` or `reassignment` row is the bond's custody while `active` (at most one active row per bond, unique index); it is closed as `returned`, `reassigned` or `lost` (the only update allowed, `returned_at` set by the database). `return` and `lost` rows are events; a loss stores `responsible_party`, `lost_on` and the reason in `notes`, and its `collector_id` is null when the bond was never delivered.
+- `delivery_notes` are numbered per campaign (`note_number`, serialised with an advisory lock) and record `reason` (`delivery` or `reassignment`: a reassignment issues a note for the new collector). Notes and their items are immutable; annulling a note is Phase 10.
+- Composite FKs keep notes, items, assignments and bonds in the same campaign. Nothing is deleted (`23001`).
+- Writes only through `bond_deliver` / `bond_reassign` (`bond.assign`), `bond_return` (`bond.return`: `delivered_to_collector → returned → available`, collector cleared) and `bond_mark_lost` (`bond.mark_lost`: available or delivered → `lost`, collector cleared; responsible party, a non-future date and a reason are required). A sold bond is never returned, reassigned or marked lost here (`55000`). Each bond change audits `bond.deliver` / `bond.reassign` / `bond.return` / `bond.mark_lost`, and each note `delivery_note.issue`.
+- RLS: readable with `bond.view` or a delivery permission; a collector's own login sees what was handed to it. With today's matrix the operator assigns (`bond.assign`) but returns and losses are admin-only.
+- App layer: `src/lib/domain/deliveries.ts`, `src/lib/server/repositories/deliveries.ts`, `src/lib/server/services/deliveries.ts`.
+
 ### sales
 
 Sale of a bond to a buyer.
