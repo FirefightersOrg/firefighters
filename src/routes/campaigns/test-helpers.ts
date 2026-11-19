@@ -127,17 +127,19 @@ export function mockSupabase(
 
 export function makeLocals(options: {
 	signedIn?: boolean;
-	permissions?: string[];
+	/** `null` simulates a failed permissions load (the hook sets it when my_permissions fails). */
+	permissions?: string[] | null;
 	supabase?: SupabaseClient;
 }): App.Locals {
 	const signedIn = options.signedIn ?? true;
+	const permissions = options.permissions === undefined ? ADMIN_PERMISSIONS : options.permissions;
 	return {
 		supabase: options.supabase ?? mockSupabase().supabase,
 		safeGetSession: vi.fn(),
 		session: null,
 		user: signedIn ? ({ id: profile.auth_user_id } as User) : null,
 		profile: signedIn ? profile : null,
-		permissions: signedIn ? (options.permissions ?? ADMIN_PERMISSIONS) : [],
+		permissions: signedIn ? permissions : [],
 		requestId: 'req-test'
 	};
 }

@@ -117,7 +117,10 @@ describe('/campaigns/[id]/deliveries/new', () => {
 		expect(await act('lookup', locals(), { from: '0050', to: '0010' })).toMatchObject({
 			status: 400
 		});
-		vi.mocked(findAvailableBonds).mockResolvedValue({ data: [], error: null });
+		vi.mocked(findAvailableBonds).mockResolvedValue({
+			data: { items: [], truncated: false },
+			error: null
+		});
 		await act('lookup', locals(), { query: '0068' });
 		expect(vi.mocked(findAvailableBonds).mock.calls[0][2]).toEqual({ number: 68 });
 		await act('lookup', locals(), { query: 'ABC-1' });

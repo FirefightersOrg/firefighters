@@ -1,11 +1,10 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { canLoadBonds, campaignNumberingConfig } from '$lib/domain/campaigns';
+import { canDeliverBonds, campaignNumberingConfig } from '$lib/domain/campaigns';
 import { DELIVERY_MAX_BONDS, DELIVERY_NOTES_MAX_LENGTH } from '$lib/domain/deliveries';
 import { parseCampaignNumber } from '$lib/domain/numbering';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
-import { campaignLockedMessage } from '$lib/server/bonds/route-helpers';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import {
 	bondOption,
@@ -23,7 +22,7 @@ import { DELIVERY_MESSAGES, assignBondsToCollector } from '$lib/server/services/
 
 /**
  * /campaigns/[id]/deliveries/new: deliver available bonds to a collector (`bond.assign`, campaign
- * draft or active). Bonds are added by number (base or associated), by base-number range or by
+ * active). Bonds are added by number (base or associated), by base-number range or by
  * barcode/internal code (`?/lookup`), reviewed, and delivered in one note (`?/deliver`).
  */
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -45,8 +44,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		canSeeCollectors:
 			hasPermissionIn(locals.permissions, 'collector.view') ||
 			hasPermissionIn(locals.permissions, 'collector.manage'),
-		canDeliver: canLoadBonds(campaign.status),
-		lockedMessage: canLoadBonds(campaign.status) ? null : campaignLockedMessage(campaign.status)
+		canDeliver: canDeliverBonds(campaign.status),
+		lockedMessage: canDeliverBonds(campaign.status)
+			? null
+			: 'Bonds can be delivered to collectors only while the campaign is active.'
 	};
 };
 
@@ -65,8 +66,13 @@ async function actionCampaign(locals: App.Locals, url: URL, id: string) {
 		return { failure: deliveryFailure(500, DELIVERY_MESSAGES.internal) };
 	}
 	if (!campaign.data) return { failure: deliveryFailure(404, CAMPAIGN_MESSAGES.notFound) };
-	if (!canLoadBonds(campaign.data.status)) {
-		return { failure: deliveryFailure(409, campaignLockedMessage(campaign.data.status)) };
+	if (!canDeliverBonds(campaign.data.status)) {
+		return {
+			failure: deliveryFailure(
+				409,
+				'Bonds can be delivered to collectors only while the campaign is active.'
+			)
+		};
 	}
 	return { campaign: campaign.data };
 }
@@ -131,10 +137,11 @@ export const actions: Actions = {
 		}
 		const result: DeliveryFormResult = {
 			success: true,
-			message: bonds.data.length ? undefined : 'No available bond matches.',
+			message: bonds.data.items.length ? undefined : 'No available bond matches.',
 			errors: {},
 			values,
-			found: bonds.data.map((b) => bondOption(b, found.campaign))
+			found: bonds.data.items.map((b) => bondOption(b, found.campaign)),
+			truncated: bonds.data.truncated
 		};
 		return result;
 	},

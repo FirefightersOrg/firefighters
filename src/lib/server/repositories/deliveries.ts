@@ -18,6 +18,7 @@ import { mapBondListRow, BOND_LIST_COLUMNS, type BondListEntry, type BondListRow
  * functions (services/deliveries.ts).
  */
 export const DELIVERY_NOTES_PAGE_SIZE = 25;
+export const AVAILABLE_BONDS_LIMIT = 500;
 
 interface NoteRow {
 	id: string;
@@ -129,8 +130,9 @@ export async function listDeliveryNotes(
 		.eq('campaign_id', campaignId);
 	if (options.collectorId) query = query.eq('collector_id', options.collectorId);
 	if (options.noteNumber) query = query.eq('note_number', options.noteNumber);
-	if (options.from) query = query.gte('issued_at', options.from);
-	if (options.to) query = query.lte('issued_at', `${options.to}T23:59:59.999Z`);
+	const bounds = deliveryDateBounds(options);
+	if (bounds.from) query = query.gte('issued_at', bounds.from);
+	if (bounds.to) query = query.lt('issued_at', bounds.to);
 	const { data, error, count } = await query
 		.order('note_number', { ascending: false })
 		.range((page - 1) * pageSize, page * pageSize - 1)
@@ -281,7 +283,7 @@ export async function findAvailableBonds(
 		from?: number | null;
 		to?: number | null;
 	}
-): Promise<RepositoryResult<BondListEntry[]>> {
+): Promise<RepositoryResult<{ items: BondListEntry[]; truncated: boolean }>> {
 	let query = supabase
 		.from('bond_list')
 		.select(BOND_LIST_COLUMNS)
@@ -302,10 +304,35 @@ export async function findAvailableBonds(
 	if (options.to != null) query = query.lte('sort_number', options.to);
 	const { data, error } = await query
 		.order('sort_number', { ascending: true })
-		.limit(500)
+		.limit(AVAILABLE_BONDS_LIMIT + 1)
 		.overrideTypes<BondListRow[], { merge: false }>();
 	if (error) return { data: null, error };
-	return wrap(() => (data ?? []).map(mapBondListRow));
+	return wrap(() => ({
+		items: (data ?? []).slice(0, AVAILABLE_BONDS_LIMIT).map(mapBondListRow),
+		truncated: (data?.length ?? 0) > AVAILABLE_BONDS_LIMIT
+	}));
+}
+
+/** Buenos Aires has a fixed UTC-3 offset and no daylight saving time. */
+function argentinaDayStart(day: string): string {
+	return `${day}T00:00:00-03:00`;
+}
+
+function nextDay(day: string): string {
+	const date = new Date(`${day}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + 1);
+	return date.toISOString().slice(0, 10);
+}
+
+/** Half-open Buenos Aires day bounds for delivery note filters. */
+export function deliveryDateBounds(options: { from?: string | null; to?: string | null }): {
+	from: string | null;
+	to: string | null;
+} {
+	return {
+		from: options.from ? argentinaDayStart(options.from) : null,
+		to: options.to ? argentinaDayStart(nextDay(options.to)) : null
+	};
 }
 
 /** Bonds of the campaign by id, as list entries (for a note's detail). */

@@ -10,7 +10,7 @@ import {
 	actions as bondEntryActions,
 	load as bondEntryLoad
 } from '../../src/routes/campaigns/[id]/bonds/new/+page.server';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { getBondById } from '$lib/server/repositories/bonds';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -64,7 +64,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 

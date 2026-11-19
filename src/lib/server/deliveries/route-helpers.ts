@@ -18,6 +18,8 @@ export interface DeliveryFormResult {
 	values?: Record<string, string>;
 	/** Bonds found by a lookup, to add to the selection. */
 	found?: DeliveryBondOption[];
+	/** The lookup has more matches than can be selected in one delivery. */
+	truncated?: boolean;
 }
 
 /** A bond as the delivery screens show it. */

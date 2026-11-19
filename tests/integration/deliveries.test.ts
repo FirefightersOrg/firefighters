@@ -17,6 +17,7 @@ import {
 	load as collectorLoad
 } from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.server';
 import { getUserPermissions } from '$lib/server/auth/permissions';
+import { listDeliveryNotes } from '$lib/server/repositories/deliveries';
 import { createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -58,7 +59,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: (await getUserPermissions(client)) ?? []
 	};
 }
 
@@ -128,9 +129,17 @@ beforeAll(async () => {
 		p_associated_number_offset: 4871,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
+		p_starts_at: '2026-01-01T03:00:00Z',
+		p_ends_at: '2027-12-31T03:00:00Z',
 		p_request_id: rid('campaign')
 	});
 	campaignId = c.data as string;
+	const activated = await admin.client.rpc('campaign_transition', {
+		p_id: campaignId,
+		p_to_status: 'active',
+		p_request_id: rid('activate')
+	});
+	if (activated.error) throw new Error(activated.error.message);
 	for (const n of [20, 21, 22, 23]) {
 		await admin.client.rpc('bond_create', {
 			p_campaign_id: campaignId,
@@ -224,6 +233,17 @@ describe('delivery screens (local Supabase)', () => {
 			notes: { noteNumber: number; bondCount: number }[];
 		};
 		expect(filtered.notes).toEqual([expect.objectContaining({ noteNumber: 1, bondCount: 3 })]);
+		const todayInArgentina = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'America/Argentina/Buenos_Aires',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		})
+			.formatToParts(new Date())
+			.reduce((date, part) => ({ ...date, [part.type]: part.value }), {} as Record<string, string>);
+		const today = `${todayInArgentina.year}-${todayInArgentina.month}-${todayInArgentina.day}`;
+		const onToday = await listDeliveryNotes(admin.client, campaignId, { from: today, to: today });
+		expect(onToday.data?.items).toContainEqual(expect.objectContaining({ noteNumber: 1 }));
 		const none = (await listLoad(
 			event(admin, { id: campaignId }, base(), { search: '?number=99' })
 		)) as { notes: unknown[] };
@@ -292,40 +312,40 @@ describe('custody from the bond and collector records (local Supabase)', () => {
 		expect(record.custody.history.map((a) => a.assignmentType)).toEqual(['delivery']);
 		expect(record.custody.can).toEqual({ returnBond: true, reassign: true, markLost: true });
 
-		// The operator can reassign but not return or mark lost (current matrix).
+		// The operator can return and reassign, but not mark a bond lost.
 		const operatorView = (await bondLoad(
 			event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]))
 		)) as { custody: { can: Record<string, boolean> } };
 		expect(operatorView.custody.can).toEqual({
-			returnBond: false,
+			returnBond: true,
 			reassign: true,
 			markLost: false
 		});
 		expect(
 			await run(
-				bondActions.return as (e: never) => unknown,
+				bondActions.markLost as (e: never) => unknown,
 				event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
-					action: 'return',
-					fields: {}
+					action: 'markLost',
+					fields: { responsibleParty: 'Ana', lostOn: '2026-11-10', reason: 'rain' }
 				})
 			)
 		).toMatchObject({ status: 403 });
 
-		expect(
-			await run(
-				bondActions.return as (e: never) => unknown,
-				event(admin, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
-					action: 'return',
-					fields: { notes: 'came back' }
-				})
-			)
-		).toMatchObject({ success: true, action: 'return' });
+		// The return issues a return note and opens it (the collector's receipt).
+		const returnedBond = await run(
+			bondActions.return as (e: never) => unknown,
+			event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
+				action: 'return',
+				fields: { notes: 'came back', fromCollectorId: collectorId }
+			})
+		);
+		expect(String(returnedBond.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
 
 		const reassigned = await run(
 			bondActions.reassign as (e: never) => unknown,
 			event(operator, { id: campaignId, bondId: bonds[1] }, bondPath(bonds[1]), {
 				action: 'reassign',
-				fields: { collectorId: otherCollectorId }
+				fields: { collectorId: otherCollectorId, fromCollectorId: collectorId }
 			})
 		);
 		expect(String(reassigned.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
@@ -393,24 +413,36 @@ describe('custody from the bond and collector records (local Supabase)', () => {
 			)
 		).toMatchObject({ status: 400, data: { errors: { targetCollectorId: expect.any(Array) } } });
 
+		// A stale collector A cannot return a bond reassigned to B: the RPC leaves it untouched.
 		expect(
 			await run(
 				collectorActions.returnBonds as (e: never) => unknown,
-				event(
-					admin,
-					{ id: campaignId, collectorId: otherCollectorId },
-					collectorPath(otherCollectorId),
-					{
-						action: 'returnBonds',
-						fields: { bondIds: [bonds[1], bonds[3]] }
-					}
-				)
+				event(operator, { id: campaignId, collectorId }, collectorPath(collectorId), {
+					action: 'returnBonds',
+					fields: { bondIds: [bonds[3]] }
+				})
 			)
-		).toMatchObject({
-			form: 'custody',
-			success: true,
-			message: expect.stringContaining('2 bonds')
-		});
+		).toMatchObject({ status: 409, data: { errors: { bondIds: expect.any(Array) } } });
+		const stillWithBeto = await serviceClient
+			.from('bonds')
+			.select('current_collector_id')
+			.eq('id', bonds[3])
+			.single();
+		expect(stillWithBeto.data?.current_collector_id).toBe(otherCollectorId);
+
+		const returned = await run(
+			collectorActions.returnBonds as (e: never) => unknown,
+			event(
+				operator,
+				{ id: campaignId, collectorId: otherCollectorId },
+				collectorPath(otherCollectorId),
+				{
+					action: 'returnBonds',
+					fields: { bondIds: [bonds[1], bonds[3]] }
+				}
+			)
+		);
+		expect(String(returned.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
 		const empty = (await collectorLoad(
 			event(
 				admin,

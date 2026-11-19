@@ -24,7 +24,7 @@ import {
 import RecordPage from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.svelte';
 import { BOND_RECORD_SECTIONS, type BondRecord } from '$lib/components/bonds/record/types';
 import type { Campaign } from '$lib/domain/campaigns';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import type { BondFormResult } from '$lib/server/bonds/route-helpers';
 import type { BondListItem } from '$lib/server/bonds/list';
 import { BOND_MESSAGES } from '$lib/server/services/bonds';
@@ -166,7 +166,7 @@ async function signIn(role: RoleName, email: string, password: string): Promise<
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 
@@ -1436,11 +1436,17 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			expect(bondPerms('operator')).toEqual(
 				expect.arrayContaining(['bond.view', 'bond.create', 'campaign.view'])
 			);
+			expect(bondPerms('operator')).toContain('bond.return');
+			expect(bondPerms('operator')).not.toContain('bond.mark_lost');
+			expect(bondPerms('operator')).toContain('bond.return');
+			expect(bondPerms('operator')).not.toContain('bond.mark_lost');
+			expect(bondPerms('operator')).toContain('bond.return');
+			expect(bondPerms('operator')).not.toContain('bond.mark_lost');
 			expect(bondPerms('operator')).not.toContain('bond.annul');
 			expect(bondPerms('operator')).not.toContain('audit.view');
 			expect(bondPerms('treasurer')).toEqual(['audit.view', 'bond.view', 'campaign.view']);
 			expect(bondPerms('read-only')).toEqual(['bond.view', 'campaign.view']);
-			expect(bondPerms('collector')).toEqual([]);
+			expect(bondPerms('collector')).toEqual(['campaign.view']);
 		});
 
 		it('pages: who can open the list, the record and the entry forms', async () => {

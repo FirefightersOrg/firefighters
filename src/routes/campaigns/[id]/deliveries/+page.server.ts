@@ -1,13 +1,14 @@
 import { error } from '@sveltejs/kit';
+import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import { canLoadBonds } from '$lib/domain/campaigns';
+import { canDeliverBonds } from '$lib/domain/campaigns';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { isUuid, loadDeliveryCampaign } from '$lib/server/deliveries/route-helpers';
 import { listDeliveryNotes } from '$lib/server/repositories/deliveries';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const isDate = (value: string) => z.iso.date().safeParse(value).success;
 
 /**
  * /campaigns/[id]/deliveries: the campaign's delivery notes, newest first, filterable by collector
@@ -33,8 +34,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		listDeliveryNotes(locals.supabase, campaign.id, {
 			collectorId: isUuid(collector) ? collector : null,
 			noteNumber,
-			from: DATE.test(from) ? from : null,
-			to: DATE.test(to) ? to : null,
+			from: isDate(from) ? from : null,
+			to: isDate(to) ? to : null,
 			page
 		}),
 		listActiveCollectorOptions(locals.supabase)
@@ -59,7 +60,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		filters: { collector, number: numberText, from, to },
 		collectors: collectors.data,
 		can: {
-			deliver: hasPermissionIn(locals.permissions, 'bond.assign') && canLoadBonds(campaign.status)
+			deliver:
+				hasPermissionIn(locals.permissions, 'bond.assign') && canDeliverBonds(campaign.status)
 		}
 	};
 };
