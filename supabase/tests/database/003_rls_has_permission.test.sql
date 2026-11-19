@@ -1,5 +1,5 @@
 begin;
-select plan(107);
+select plan(108);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test owner, which bypasses RLS)
@@ -25,6 +25,15 @@ from (values
   ('10000000-0000-0000-0000-000000000005', 'admin')
 ) as v (profile_id, role_name)
 join public.roles r on r.name = v.role_name;
+
+-- Keep a1 as the only active user.manage holder for the lockout guard checks.
+-- This is inside the test transaction, so seeded users are restored by rollback.
+update public.profiles p
+set status = 'inactive'
+where p.status = 'active'
+  and p.id not between '10000000-0000-0000-0000-000000000001'::uuid
+                   and '10000000-0000-0000-0000-000000000005'::uuid
+  and public.has_permission_for_user(p.auth_user_id, 'user.manage');
 
 insert into public.audit_log (id, actor_user_id, action, entity_type, entity_id)
 values ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'seed.fixture', 'profile', 'x');
@@ -121,17 +130,34 @@ select throws_ok($$select * from public.audit_log$$, '42501', null, 'anon cannot
 select throws_ok($$select public.has_permission('user.manage')$$, '42501', null, 'anon cannot call has_permission');
 reset role;
 
+-- Every profile the owner sees (fixtures plus any seeded users): the admin must see exactly these.
+create temporary table owner_profile_count as select count(*)::int as n from public.profiles;
+grant select on owner_profile_count to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Admin (a1)
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 
-select is((select count(*)::int from public.profiles), 5, 'admin reads all profiles');
+select is(
+  (select count(*)::int from public.profiles
+   where id between '10000000-0000-0000-0000-000000000001'::uuid
+                and '10000000-0000-0000-0000-000000000005'::uuid),
+  5, 'admin reads all fixture profiles'
+);
+select is(
+  (select count(*)::int from public.profiles), (select n from owner_profile_count),
+  'admin reads every profile, seeded users included (RLS hides none)'
+);
 select is(public.current_profile_id(), '10000000-0000-0000-0000-000000000001'::uuid, 'admin: current_profile_id is own profile');
 select ok(public.has_permission('user.manage'), 'admin: has_permission(user.manage)');
 select is(cardinality(public.my_permissions()), 47, 'admin: my_permissions returns 47 codes');
-select is((select count(*)::int from public.audit_log), 1, 'admin reads audit_log (audit.view)');
+select is(
+  (select count(*)::int from public.audit_log
+   where id = '20000000-0000-0000-0000-000000000001'::uuid),
+  1, 'admin reads fixture audit_log (audit.view)'
+);
 select lives_ok(
   $$insert into public.profiles (auth_user_id, full_name, email) values ('00000000-0000-0000-0000-000000000006', 'Spare', 'rls-user-6@example.com')$$,
   'admin can insert a profile'
