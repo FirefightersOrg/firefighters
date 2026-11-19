@@ -5,7 +5,8 @@
 		cardClass,
 		inputClass,
 		labelClass,
-		primaryButtonClass
+		primaryButtonClass,
+		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
 	import { PAYMENT_MODE_LABELS, buildInstallmentSchedule } from '$lib/domain/sales';
 	import { formatMoney } from '$lib/domain/money';
@@ -13,10 +14,14 @@
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let selectedBond = $state('');
+	let selectedBuyer = $state('');
 	let mode = $state('full_payment');
 	let due = $state('');
 	$effect(() => {
 		if (!due) due = data.today;
+	});
+	$effect(() => {
+		if (form?.form === 'buyer' && form.success && form.buyerId) selectedBuyer = form.buyerId;
 	});
 	const schedule = $derived.by(() =>
 		selectedBond
@@ -59,16 +64,50 @@
 					</p>{/each}
 			</div>{/if}
 	</section>
-	<form method="POST" action="?/register" use:enhance class="{cardClass} space-y-5">
-		<input type="hidden" name="bondId" value={selectedBond} />
+	<section class="{cardClass} space-y-5">
 		<h2 class="font-semibold">3. Buyer</h2>
-		<select class={inputClass} name="buyerId"
+		<select class={inputClass} bind:value={selectedBuyer}
 			><option value="">Choose buyer</option>{#each data.buyers as buyer (buyer.id)}<option
 					value={buyer.id}>{buyerDisplayName(buyer)}</option
 				>{/each}</select
 		>
+		{#if data.canCreateBuyer}<details class="rounded border p-3 text-sm">
+				<summary class="cursor-pointer font-medium">Create a buyer</summary>
+				<form
+					method="POST"
+					action="?/createBuyer"
+					use:enhance
+					class="mt-3 grid gap-2 sm:grid-cols-2"
+				>
+					<select class={inputClass} name="type"
+						><option value="individual">Individual</option><option value="business">Business</option
+						></select
+					>
+					<input class={inputClass} name="firstName" placeholder="First name" />
+					<input class={inputClass} name="lastName" placeholder="Last name" />
+					<input class={inputClass} name="businessName" placeholder="Business name" />
+					<input class={inputClass} name="documentNumber" placeholder="Document number" />
+					<input class={inputClass} name="taxId" placeholder="Tax ID" />
+					<input class={inputClass} name="phone" placeholder="Phone" />
+					<input class={inputClass} name="address" placeholder="Address" />
+					<input type="hidden" name="usualCollectorId" value="" />
+					<input type="hidden" name="notes" value="" />
+					{#if form?.form === 'buyer' && form.duplicates}<label class="sm:col-span-2"
+							><input type="checkbox" name="createAnyway" /> {form.message}</label
+						>{/if}
+					<button class={secondaryButtonClass}>Create buyer</button>
+					{#if form?.form === 'buyer' && form.message}<p class="text-red-700">
+							{form.message}
+						</p>{/if}
+				</form>
+			</details>{/if}
+	</section>
+	<form method="POST" action="?/register" use:enhance class="{cardClass} space-y-5">
+		<input type="hidden" name="bondId" value={selectedBond} />
+		<input type="hidden" name="buyerId" value={selectedBuyer} />
 		<p class="text-sm text-slate-500">
-			The collector is confirmed from the bond’s current custody and cannot be changed here.
+			The collector is confirmed from the bond’s current custody and cannot be changed here. If it
+			differs from the buyer’s usual collector, the bond’s confirmed collector records this sale.
 		</p>
 		<h2 class="font-semibold">5. Modality</h2>
 		<select class={inputClass} name="paymentMode" bind:value={mode}

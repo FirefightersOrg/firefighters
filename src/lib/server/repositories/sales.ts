@@ -281,3 +281,108 @@ export async function findDeliveredBondsForSale(
 				error: null
 			};
 }
+
+export interface RecordInstallment {
+	id: string;
+	saleId: string;
+	bondId: string;
+	bondNumbers: number[];
+	buyerName?: string;
+	dueDate: string;
+	amount: string;
+	status: Installment['status'];
+}
+interface CollectorInstallmentRow {
+	id: string;
+	due_date: string;
+	amount: string | number;
+	status: Installment['status'];
+	payment_plans: {
+		sales: {
+			id: string;
+			bond_id: string;
+			bonds: { bond_numbers: { number_value: number; number_kind: string }[] } | null;
+			buyers: SaleListRow['buyers'];
+		};
+	};
+}
+
+/** Active sales for a buyer in one campaign, including their current installments. */
+export async function listBuyerSalesAndInstallments(
+	supabase: SupabaseClient,
+	campaignId: string,
+	buyerId: string
+): Promise<RepositoryResult<{ sales: SaleListItem[]; installments: RecordInstallment[] }>> {
+	const sales = await listSales(supabase, campaignId, { pageSize: 200 });
+	if (sales.error) return { data: null, error: sales.error };
+	const mine = sales.data!.items.filter((item) => item.sale.buyerId === buyerId);
+	const details = await Promise.all(
+		mine.map((item) => getSaleDetail(supabase, campaignId, item.sale.id))
+	);
+	const failed = details.find((item) => item.error);
+	if (failed?.error) return { data: null, error: failed.error };
+	return {
+		data: {
+			sales: mine,
+			installments: details.flatMap((detail) =>
+				(detail.data?.installments ?? [])
+					.filter(
+						(installment) => installment.status === 'pending' || installment.status === 'overdue'
+					)
+					.map((installment) => ({
+						id: installment.id,
+						saleId: detail.data!.sale.id,
+						bondId: detail.data!.bondId,
+						bondNumbers: detail.data!.bondNumbers,
+						dueDate: installment.dueDate,
+						amount: installment.amount,
+						status: installment.status
+					}))
+			)
+		},
+		error: null
+	};
+}
+
+/** Pending/overdue installments for sales recorded through a collector (bounded record view). */
+export async function listCollectorPendingInstallments(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorId: string,
+	limit = 200
+): Promise<RepositoryResult<{ items: RecordInstallment[]; total: number }>> {
+	const { data, error, count } = await supabase
+		.from('installments')
+		.select(
+			'id,due_date,amount,status,payment_plans!inner(sales!inner(id,bond_id,campaign_id,collector_id,bonds!inner(bond_numbers(number_value,number_kind)),buyers(first_name,last_name,business_name)))',
+			{ count: 'exact' }
+		)
+		.eq('payment_plans.sales.campaign_id', campaignId)
+		.eq('payment_plans.sales.collector_id', collectorId)
+		.in('status', ['pending', 'overdue'])
+		.order('due_date')
+		.limit(limit)
+		.overrideTypes<CollectorInstallmentRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: {
+			total: count ?? 0,
+			items: (data ?? []).map((row) => {
+				const sale = row.payment_plans.sales;
+				return {
+					id: row.id,
+					saleId: sale.id,
+					bondId: sale.bond_id,
+					bondNumbers: (sale.bonds?.bond_numbers ?? [])
+						.filter((number) => number.number_kind === 'base')
+						.map((number) => number.number_value),
+					buyerName: buyerName(sale.buyers),
+					dueDate: row.due_date,
+					amount: toDecimalString(row.amount),
+					status: row.status
+				};
+			})
+		},
+		error: null
+	};
+}

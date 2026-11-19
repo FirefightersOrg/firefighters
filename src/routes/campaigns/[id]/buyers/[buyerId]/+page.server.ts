@@ -17,6 +17,7 @@ import {
 	listBuyerBonds
 } from '$lib/server/repositories/parties';
 import { updateBuyer } from '$lib/server/services/parties';
+import { listBuyerSalesAndInstallments } from '$lib/server/repositories/sales';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	buyerValues,
@@ -43,7 +44,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!buyerResult.data) error(404, { message: 'Buyer not found.' });
 	const buyer = buyerResult.data;
-	const [collectorResult, auditResult, campaignBondsResult, historicalBondsResult] =
+	const [collectorResult, auditResult, campaignBondsResult, historicalBondsResult, salesResult] =
 		await Promise.all([
 			buyer.usualCollectorId
 				? getCollector(locals.supabase, buyer.usualCollectorId)
@@ -54,13 +55,15 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					})
 				: Promise.resolve(null),
 			listBuyerBonds(locals.supabase, buyer.id, { campaignId: campaignResult.data.id }),
-			listBuyerBonds(locals.supabase, buyer.id, { excludeCampaignId: campaignResult.data.id })
+			listBuyerBonds(locals.supabase, buyer.id, { excludeCampaignId: campaignResult.data.id }),
+			listBuyerSalesAndInstallments(locals.supabase, campaignResult.data.id, buyer.id)
 		]);
 	if (
 		collectorResult.error ||
 		auditResult?.error ||
 		campaignBondsResult.error ||
-		historicalBondsResult.error
+		historicalBondsResult.error ||
+		salesResult.error
 	)
 		error(500, { message: 'Could not load the buyer. Please try again.' });
 	return {
@@ -85,6 +88,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			hasPermissionIn(locals.permissions, 'collector.manage'),
 		campaignBonds: campaignBondsResult.data ?? [],
 		historicalBonds: historicalBondsResult.data ?? [],
+		sales: salesResult.data?.sales ?? [],
+		installments: salesResult.data?.installments ?? [],
 		canManage: hasPermissionIn(locals.permissions, 'buyer.manage'),
 		audit: auditResult
 			? {

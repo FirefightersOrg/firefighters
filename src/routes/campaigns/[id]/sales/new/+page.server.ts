@@ -8,6 +8,15 @@ import { getBuyer, listBuyers } from '$lib/server/repositories/parties';
 import { findDeliveredBondsForSale } from '$lib/server/repositories/sales';
 import { registerSale, SaleServiceError } from '$lib/server/services/sales';
 import { PAYMENT_MODES, type PaymentMode } from '$lib/domain/sales';
+import { createBuyer } from '$lib/server/services/parties';
+import {
+	buyerValues,
+	duplicateFailure,
+	partyFailure,
+	validateBuyer
+} from '$lib/server/buyers/route-helpers';
+import { findBuyersByIdentification } from '$lib/server/repositories/parties';
+import { buyerDisplayName } from '$lib/domain/parties';
 
 const uuid = (value: string) => z.guid().safeParse(value).success;
 const field = (form: FormData, name: string) => String(form.get(name) ?? '').trim();
@@ -44,6 +53,38 @@ export const actions: Actions = {
 		if (result.error)
 			return fail(500, { form: 'lookup', errors: {}, message: 'Could not search bonds.' });
 		return { form: 'lookup', success: true, found: result.data, query, errors: {} };
+	},
+	createBuyer: async ({ request, locals, url }) => {
+		requireCampaignViewer(locals, url);
+		if (!hasPermissionIn(locals.permissions, 'buyer.manage'))
+			return fail(403, {
+				form: 'buyer',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const form = await request.formData();
+		const values = buyerValues(form);
+		const parsed = validateBuyer(values);
+		if ('failure' in parsed) return { ...(parsed.failure!.data ?? {}), form: 'buyer' };
+		const duplicates = await findBuyersByIdentification(locals.supabase, parsed.data);
+		if (duplicates.error) return partyFailure(duplicates.error, values);
+		if ((duplicates.data?.length ?? 0) > 0 && form.get('createAnyway') !== 'on')
+			return {
+				...duplicateFailure(
+					values,
+					duplicates.data!.map((buyer) => ({ id: buyer.id, name: buyerDisplayName(buyer) }))
+				).data,
+				form: 'buyer'
+			};
+		try {
+			const buyerId = await createBuyer(locals.supabase, parsed.data, {
+				requestId: locals.requestId,
+				permissions: locals.permissions
+			});
+			return { form: 'buyer', success: true, buyerId, message: 'Buyer created.', errors: {} };
+		} catch (err) {
+			return { ...partyFailure(err, values).data, form: 'buyer' };
+		}
 	},
 	register: async ({ request, locals, params, url }) => {
 		requireCampaignViewer(locals, url);

@@ -107,6 +107,7 @@ interface CampaignPageData {
 		viewCollectors: boolean;
 		viewBuyers: boolean;
 		viewDeliveries: boolean;
+		viewSales: boolean;
 	};
 }
 
@@ -515,7 +516,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				// SAN-52: campaign links to collectors / buyers.
 				viewCollectors: true,
 				viewBuyers: true,
-				viewDeliveries: true
+				viewDeliveries: true,
+				viewSales: true
 			});
 
 			const audit = await expectOneAudit(requestId, {
@@ -1173,7 +1175,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					viewCollectors: role === 'operator',
 					viewBuyers: role === 'operator',
 					// SAN-55: every one of these roles has bond.view.
-					viewDeliveries: true
+					viewDeliveries: true,
+					viewSales: true
 				});
 
 				await expect(

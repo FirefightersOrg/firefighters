@@ -24,6 +24,7 @@ import { DELIVERY_MAX_BONDS } from '$lib/domain/deliveries';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { listActiveAssignmentNotes } from '$lib/server/repositories/deliveries';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import { listCollectorPendingInstallments } from '$lib/server/repositories/sales';
 import {
 	DeliveryServiceError,
 	reassignBondsToCollector,
@@ -49,7 +50,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collectorResult.data) error(404, { message: notFound });
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
-	const [bonds, buyers, profiles, audit] = await Promise.all([
+	const [bonds, buyers, profiles, audit, installments] = await Promise.all([
 		listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
 		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
 		listAvailableCollectorProfileOptions(locals.supabase),
@@ -57,9 +58,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			? listAuditEntriesForEntities(locals.supabase, 'collector', [params.collectorId], {
 					limit: AUDIT_ENTRIES_LIMIT + 1
 				})
-			: Promise.resolve(null)
+			: Promise.resolve(null),
+		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId)
 	]);
-	if (bonds.error || buyers.error || profiles.error || audit?.error)
+	if (bonds.error || buyers.error || profiles.error || audit?.error || installments.error)
 		error(500, { message: 'Could not load the collector. Please try again.' });
 	const collector = collectorResult.data;
 	const assigned = bonds.data?.items ?? [];
@@ -106,6 +108,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		bondsTotal: bonds.data?.total ?? 0,
 		buyers: buyers.data?.items ?? [],
 		buyersTotal: buyers.data?.total ?? 0,
+		installments: installments.data?.items ?? [],
+		installmentsTotal: installments.data?.total ?? 0,
 		profiles: profileOptions,
 		can: { manage: hasPermissionIn(locals.permissions, 'collector.manage'), audit: auditAllowed },
 		audit: auditAllowed
