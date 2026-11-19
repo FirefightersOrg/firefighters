@@ -1,23 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
+vi.mock('$lib/server/repositories/campaigns', async (o) => ({
+	...(await o<typeof import('$lib/server/repositories/campaigns')>()),
+	getCampaignById: vi.fn()
+}));
 vi.mock('$lib/server/repositories/parties', () => ({
 	getBuyer: vi.fn(),
 	listBuyers: vi.fn(),
 	findBuyersByIdentification: vi.fn()
 }));
-vi.mock('$lib/server/repositories/sales', () => ({ findDeliveredBondsForSale: vi.fn() }));
+vi.mock('$lib/server/repositories/sales', () => ({ findBondsForSale: vi.fn() }));
 vi.mock('$lib/server/services/sales', async (o) => ({
 	...(await o<typeof import('$lib/server/services/sales')>()),
 	registerSale: vi.fn()
 }));
 vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
 import { actions, load } from './+page.server';
-import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getBuyer, listBuyers, findBuyersByIdentification } from '$lib/server/repositories/parties';
-import { findDeliveredBondsForSale } from '$lib/server/repositories/sales';
+import { findBondsForSale } from '$lib/server/repositories/sales';
+import { getCampaignById, mapCampaignRow } from '$lib/server/repositories/campaigns';
 import { registerSale, SaleServiceError } from '$lib/server/services/sales';
 import { createBuyer } from '$lib/server/services/parties';
-import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
+import { CAMPAIGN_ID, campaignRow, makeLocals } from '../../../test-helpers';
 const BOND = 'b0000000-0000-0000-0000-000000000001',
 	BUYER = 'a0000000-0000-0000-0000-000000000001';
 const url = `http://localhost/campaigns/${CAMPAIGN_ID}/sales/new`;
@@ -43,12 +46,15 @@ const run = async (
 	}
 };
 beforeEach(() => {
-	vi.mocked(getCampaignById).mockResolvedValue({ data: { id: CAMPAIGN_ID }, error: null } as never);
+	vi.mocked(getCampaignById).mockResolvedValue({
+		data: mapCampaignRow(campaignRow({ status: 'active' })),
+		error: null
+	} as never);
 	vi.mocked(listBuyers).mockResolvedValue({ data: { items: [] }, error: null } as never);
 	vi.mocked(getBuyer).mockResolvedValue({ data: { id: BUYER }, error: null } as never);
 	vi.mocked(findBuyersByIdentification).mockResolvedValue({ data: [], error: null } as never);
-	vi.mocked(findDeliveredBondsForSale).mockResolvedValue({
-		data: [{ id: BOND }],
+	vi.mocked(findBondsForSale).mockResolvedValue({
+		data: [{ id: BOND, sellable: true, reason: null }],
 		error: null
 	} as never);
 });
@@ -68,10 +74,19 @@ describe('new sale', () => {
 			status: 400
 		});
 		await run('lookup', ['campaign.view', 'sale.create'], { query: 'BC-1' });
-		expect(findDeliveredBondsForSale).toHaveBeenCalledWith(expect.anything(), CAMPAIGN_ID, 'BC-1');
-		vi.mocked(findDeliveredBondsForSale).mockResolvedValueOnce({ data: [], error: null } as never);
+		expect(findBondsForSale).toHaveBeenLastCalledWith(expect.anything(), CAMPAIGN_ID, {
+			code: 'BC-1'
+		});
+		await run('lookup', ['campaign.view', 'sale.create'], { query: '0068' });
+		expect(findBondsForSale).toHaveBeenLastCalledWith(expect.anything(), CAMPAIGN_ID, {
+			number: 68
+		});
+		vi.mocked(findBondsForSale).mockResolvedValueOnce({
+			data: [{ id: BOND, sellable: false, reason: 'It is already sold.' }],
+			error: null
+		} as never);
 		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '2' })).toMatchObject({
-			found: []
+			found: [{ sellable: false, reason: 'It is already sold.' }]
 		});
 	});
 	it('creates buyers only for managers, validates, warns duplicates and selects success', async () => {

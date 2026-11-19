@@ -5,7 +5,9 @@ import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissio
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getBuyer, listBuyers } from '$lib/server/repositories/parties';
-import { findDeliveredBondsForSale } from '$lib/server/repositories/sales';
+import { findBondsForSale } from '$lib/server/repositories/sales';
+import { campaignNumberingConfig } from '$lib/domain/campaigns';
+import { parseCampaignNumber } from '$lib/domain/numbering';
 import { registerSale, SaleServiceError } from '$lib/server/services/sales';
 import { PAYMENT_MODES, type PaymentMode } from '$lib/domain/sales';
 import { createBuyer } from '$lib/server/services/parties';
@@ -49,7 +51,25 @@ export const actions: Actions = {
 		const query = field(await request.formData(), 'query');
 		if (!query)
 			return fail(400, { form: 'lookup', errors: { query: ['Enter a bond number or code.'] } });
-		const result = await findDeliveredBondsForSale(locals.supabase, params.id, query);
+		const campaign = await getCampaignById(locals.supabase, params.id);
+		if (campaign.error || !campaign.data)
+			return fail(campaign.error ? 500 : 404, {
+				form: 'lookup',
+				errors: {},
+				message: campaign.error ? 'Could not search bonds.' : 'Campaign not found.'
+			});
+		// A campaign number ("0068" or "68") searches base/associated numbers; anything else is a code.
+		let number: number | null;
+		try {
+			number = parseCampaignNumber(query, campaignNumberingConfig(campaign.data));
+		} catch {
+			number = null;
+		}
+		const result = await findBondsForSale(
+			locals.supabase,
+			params.id,
+			number !== null ? { number } : { code: query.slice(0, 200) }
+		);
 		if (result.error)
 			return fail(500, { form: 'lookup', errors: {}, message: 'Could not search bonds.' });
 		return { form: 'lookup', success: true, found: result.data, query, errors: {} };
@@ -82,9 +102,18 @@ export const actions: Actions = {
 				requestId: locals.requestId,
 				permissions: locals.permissions
 			});
-			return { form: 'buyer', success: true, buyerId, message: 'Buyer created.', errors: {} };
+			return {
+				form: 'buyer',
+				success: true,
+				buyerId,
+				// The new buyer may not be among the listed buyers: the page adds it to the options.
+				buyerName: buyerDisplayName(parsed.data),
+				message: 'Buyer created.',
+				errors: {}
+			};
 		} catch (err) {
-			return { ...partyFailure(err, values).data, form: 'buyer' };
+			const failure = partyFailure(err, values);
+			return fail(failure.status, { ...failure.data, form: 'buyer' });
 		}
 	},
 	register: async ({ request, locals, params, url }) => {
@@ -123,7 +152,7 @@ export const actions: Actions = {
 			return fail(404, { form: 'sale', values, errors: {}, message: 'Campaign not found.' });
 		const [buyer, bond] = await Promise.all([
 			getBuyer(locals.supabase, values.buyerId),
-			findDeliveredBondsForSale(locals.supabase, params.id, values.bondId)
+			findBondsForSale(locals.supabase, params.id, { id: values.bondId })
 		]);
 		if (buyer.error || bond.error)
 			return fail(500, { form: 'sale', values, errors: {}, message: 'Could not validate sale.' });
@@ -136,11 +165,16 @@ export const actions: Actions = {
 			});
 		// The server-side RPC remains authoritative; this prevents a hand-crafted form from showing
 		// a misleading collector confirmation before it reaches the database.
-		if (!bond.data.some((item) => item.id === values.bondId))
+		const candidate = bond.data.find((item) => item.id === values.bondId);
+		if (!candidate?.sellable)
 			return fail(409, {
 				form: 'sale',
 				values,
-				errors: { bondId: ['This bond is not delivered to a collector and cannot be sold.'] },
+				errors: {
+					bondId: [
+						candidate?.reason ?? 'This bond is not delivered to a collector and cannot be sold.'
+					]
+				},
 				message: 'Bond is not available for sale.'
 			});
 		let saleId: string;

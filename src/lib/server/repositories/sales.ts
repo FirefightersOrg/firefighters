@@ -157,6 +157,7 @@ export async function listSales(
 	campaignId: string,
 	options: {
 		collectorId?: string | null;
+		buyerId?: string | null;
 		buyerSearch?: string | null;
 		paymentMode?: Sale['paymentMode'] | null;
 		financialStatus?: FinancialStatus | null;
@@ -168,14 +169,18 @@ export async function listSales(
 > {
 	const page = Math.max(1, options.page ?? 1);
 	const pageSize = options.pageSize ?? 25;
+	// A buyer search filters through the embedded buyer, which must then be an inner join (an
+	// outer embed would only blank the buyer and still return every sale).
+	const buyerEmbed = options.buyerSearch ? 'buyers!inner' : 'buyers';
 	let query = supabase
 		.from('sales')
 		.select(
-			'*, buyers(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(number_value,number_kind))',
+			`*, ${buyerEmbed}(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(number_value,number_kind))`,
 			{ count: 'exact' }
 		)
 		.eq('campaign_id', campaignId);
 	if (options.collectorId) query = query.eq('collector_id', options.collectorId);
+	if (options.buyerId) query = query.eq('buyer_id', options.buyerId);
 	if (options.paymentMode) query = query.eq('payment_mode', options.paymentMode);
 	if (options.financialStatus)
 		query = query.eq('bonds.financial_status_snapshot', options.financialStatus);
@@ -240,46 +245,91 @@ export async function getSaleDetail(
 	};
 }
 
-export async function findDeliveredBondsForSale(
+/** A bond found by the sale flow's search, sellable or not (with the reason it cannot be sold). */
+export interface SaleCandidate {
+	id: string;
+	kind: 'simple' | 'pata';
+	baseNumbers: number[];
+	associatedNumbers: number[];
+	commercialStatus: string;
+	collectorId: string | null;
+	sellable: boolean;
+	/** Why it cannot be sold (null when sellable). */
+	reason: string | null;
+}
+
+const NOT_SELLABLE: Record<string, string> = {
+	available: 'It has not been delivered to a collector yet: deliver it first.',
+	created: 'It has not been delivered to a collector yet: deliver it first.',
+	returned: 'It was returned and is not with a collector.',
+	sold: 'It is already sold.',
+	lost: 'It was marked lost.',
+	annulled: 'It was annulled.',
+	closed: 'It is closed.'
+};
+
+/**
+ * Bonds of the campaign matching a base or associated number, an exact barcode / internal code, or
+ * an id, in any status, so the flow can say why a bond cannot be sold. `sale_register` remains the
+ * authoritative check.
+ */
+export async function findBondsForSale(
 	supabase: SupabaseClient,
 	campaignId: string,
-	queryText: string
-): Promise<RepositoryResult<{ id: string; collectorId: string; baseNumbers: number[] }[]>> {
-	// Kept deliberately small: this lookup is only a guided-flow search, while sale_register is
-	// the authoritative availability check.
+	options: { number?: number | null; code?: string | null; id?: string | null }
+): Promise<RepositoryResult<SaleCandidate[]>> {
 	let query = supabase
-		.from('bonds')
+		.from('bond_list')
 		.select(
-			'id,campaign_id,current_collector_id,commercial_status,group_pata_id,bond_numbers(number_value,number_kind)'
+			'id, kind, commercial_status, current_collector_id, group_pata_id, base_numbers, associated_numbers, sort_number'
 		)
-		.eq('campaign_id', campaignId)
-		.eq('commercial_status', 'delivered_to_collector')
-		.is('group_pata_id', null)
-		.limit(30);
-	const number = Number(queryText);
-	if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(queryText)) query = query.eq('id', queryText);
-	else if (Number.isInteger(number)) query = query.eq('bond_numbers.number_value', number);
-	const { data, error } = await query.overrideTypes<
-		{
-			id: string;
-			current_collector_id: string;
-			bond_numbers: { number_value: number; number_kind: string }[];
-		}[],
-		{ merge: false }
-	>();
-	return error
-		? { data: null, error }
-		: {
-				data: (data ?? []).map((row) => ({
-					id: row.id,
-					collectorId: row.current_collector_id,
-					baseNumbers: row.bond_numbers
-						.filter((number) => number.number_kind === 'base')
-						.map((number) => number.number_value)
-						.sort((a, b) => a - b)
-				})),
-				error: null
+		.eq('campaign_id', campaignId);
+	if (options.id) query = query.eq('id', options.id);
+	else if (options.number != null)
+		query = query.or(
+			`base_numbers.cs.{${options.number}},associated_numbers.cs.{${options.number}}`
+		);
+	else if (options.code) {
+		const code = options.code.replaceAll('"', '');
+		query = query.or(`barcode.eq."${code}",internal_code.eq."${code}"`);
+	} else return { data: [], error: null };
+	const { data, error } = await query
+		.order('sort_number', { ascending: true })
+		.limit(30)
+		.overrideTypes<
+			{
+				id: string;
+				kind: 'simple' | 'pata';
+				commercial_status: string;
+				current_collector_id: string | null;
+				group_pata_id: string | null;
+				base_numbers: number[] | null;
+				associated_numbers: number[] | null;
+			}[],
+			{ merge: false }
+		>();
+	if (error) return { data: null, error };
+	return {
+		data: (data ?? []).map((row) => {
+			const grouped = row.group_pata_id !== null;
+			const delivered = row.commercial_status === 'delivered_to_collector';
+			return {
+				id: row.id,
+				kind: row.kind,
+				baseNumbers: row.base_numbers ?? [],
+				associatedNumbers: row.associated_numbers ?? [],
+				commercialStatus: row.commercial_status,
+				collectorId: row.current_collector_id,
+				sellable: delivered && !grouped,
+				reason: grouped
+					? 'It belongs to a manual pata: sell the pata instead.'
+					: delivered
+						? null
+						: (NOT_SELLABLE[row.commercial_status] ?? 'It cannot be sold in its current status.')
 			};
+		}),
+		error: null
+	};
 }
 
 export interface RecordInstallment {
@@ -307,82 +357,96 @@ interface CollectorInstallmentRow {
 	};
 }
 
-/** Active sales for a buyer in one campaign, including their current installments. */
+/** Most rows the buyer and collector records list (their totals are always exact). */
+export const RECORD_LIST_LIMIT = 200;
+
+function mapRecordInstallment(row: CollectorInstallmentRow): RecordInstallment {
+	const sale = row.payment_plans.sales;
+	return {
+		id: row.id,
+		saleId: sale.id,
+		bondId: sale.bond_id,
+		bondNumbers: (sale.bonds?.bond_numbers ?? [])
+			.filter((number) => number.number_kind === 'base')
+			.map((number) => number.number_value)
+			.sort((x, y) => x - y),
+		buyerName: buyerName(sale.buyers),
+		dueDate: row.due_date,
+		amount: toDecimalString(row.amount),
+		status: row.status
+	};
+}
+
+/** Pending and overdue installments of ACTIVE sales and plans, filtered in the database. */
+async function listOpenInstallments(
+	supabase: SupabaseClient,
+	campaignId: string,
+	filter: { buyerId?: string; collectorId?: string },
+	limit: number
+): Promise<RepositoryResult<{ items: RecordInstallment[]; total: number }>> {
+	let query = supabase
+		.from('installments')
+		.select(
+			'id,due_date,amount,status,payment_plans!inner(status,sales!inner(id,bond_id,campaign_id,collector_id,buyer_id,status,bonds!inner(bond_numbers(number_value,number_kind)),buyers(first_name,last_name,business_name)))',
+			{ count: 'exact' }
+		)
+		.eq('payment_plans.status', 'active')
+		.eq('payment_plans.sales.status', 'active')
+		.eq('payment_plans.sales.campaign_id', campaignId)
+		.in('status', ['pending', 'overdue']);
+	if (filter.buyerId) query = query.eq('payment_plans.sales.buyer_id', filter.buyerId);
+	if (filter.collectorId) query = query.eq('payment_plans.sales.collector_id', filter.collectorId);
+	const { data, error, count } = await query
+		.order('due_date')
+		.order('id')
+		.limit(limit)
+		.overrideTypes<CollectorInstallmentRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return {
+		data: { items: (data ?? []).map(mapRecordInstallment), total: count ?? 0 },
+		error: null
+	};
+}
+
+/**
+ * A buyer's sales in one campaign (newest first) and the pending/overdue installments of the
+ * active ones, each bounded to RECORD_LIST_LIMIT rows with exact totals.
+ */
 export async function listBuyerSalesAndInstallments(
 	supabase: SupabaseClient,
 	campaignId: string,
 	buyerId: string
-): Promise<RepositoryResult<{ sales: SaleListItem[]; installments: RecordInstallment[] }>> {
-	const sales = await listSales(supabase, campaignId, { pageSize: 200 });
+): Promise<
+	RepositoryResult<{
+		sales: SaleListItem[];
+		salesTotal: number;
+		installments: RecordInstallment[];
+		installmentsTotal: number;
+	}>
+> {
+	const [sales, installments] = await Promise.all([
+		listSales(supabase, campaignId, { buyerId, pageSize: RECORD_LIST_LIMIT }),
+		listOpenInstallments(supabase, campaignId, { buyerId }, RECORD_LIST_LIMIT)
+	]);
 	if (sales.error) return { data: null, error: sales.error };
-	const mine = sales.data!.items.filter((item) => item.sale.buyerId === buyerId);
-	const details = await Promise.all(
-		mine.map((item) => getSaleDetail(supabase, campaignId, item.sale.id))
-	);
-	const failed = details.find((item) => item.error);
-	if (failed?.error) return { data: null, error: failed.error };
+	if (installments.error) return { data: null, error: installments.error };
 	return {
 		data: {
-			sales: mine,
-			installments: details.flatMap((detail) =>
-				(detail.data?.installments ?? [])
-					.filter(
-						(installment) => installment.status === 'pending' || installment.status === 'overdue'
-					)
-					.map((installment) => ({
-						id: installment.id,
-						saleId: detail.data!.sale.id,
-						bondId: detail.data!.bondId,
-						bondNumbers: detail.data!.bondNumbers,
-						dueDate: installment.dueDate,
-						amount: installment.amount,
-						status: installment.status
-					}))
-			)
+			sales: sales.data!.items,
+			salesTotal: sales.data!.total,
+			installments: installments.data!.items,
+			installmentsTotal: installments.data!.total
 		},
 		error: null
 	};
 }
 
-/** Pending/overdue installments for sales recorded through a collector (bounded record view). */
+/** Pending/overdue installments of active sales made through a collector (bounded record view). */
 export async function listCollectorPendingInstallments(
 	supabase: SupabaseClient,
 	campaignId: string,
 	collectorId: string,
-	limit = 200
+	limit = RECORD_LIST_LIMIT
 ): Promise<RepositoryResult<{ items: RecordInstallment[]; total: number }>> {
-	const { data, error, count } = await supabase
-		.from('installments')
-		.select(
-			'id,due_date,amount,status,payment_plans!inner(sales!inner(id,bond_id,campaign_id,collector_id,bonds!inner(bond_numbers(number_value,number_kind)),buyers(first_name,last_name,business_name)))',
-			{ count: 'exact' }
-		)
-		.eq('payment_plans.sales.campaign_id', campaignId)
-		.eq('payment_plans.sales.collector_id', collectorId)
-		.in('status', ['pending', 'overdue'])
-		.order('due_date')
-		.limit(limit)
-		.overrideTypes<CollectorInstallmentRow[], { merge: false }>();
-	if (error) return { data: null, error };
-	return {
-		data: {
-			total: count ?? 0,
-			items: (data ?? []).map((row) => {
-				const sale = row.payment_plans.sales;
-				return {
-					id: row.id,
-					saleId: sale.id,
-					bondId: sale.bond_id,
-					bondNumbers: (sale.bonds?.bond_numbers ?? [])
-						.filter((number) => number.number_kind === 'base')
-						.map((number) => number.number_value),
-					buyerName: buyerName(sale.buyers),
-					dueDate: row.due_date,
-					amount: toDecimalString(row.amount),
-					status: row.status
-				};
-			})
-		},
-		error: null
-	};
+	return listOpenInstallments(supabase, campaignId, { collectorId }, limit);
 }

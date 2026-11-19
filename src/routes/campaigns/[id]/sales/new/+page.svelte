@@ -54,11 +54,16 @@
 			/><button class={primaryButtonClass}>Search</button>
 		</form>
 		{#if form?.form === 'lookup'}<div class="space-y-2">
-				{#each form.found ?? [] as bond (bond.id)}<label class="block"
-						><input type="radio" bind:group={selectedBond} value={bond.id} /> Bond {bond.baseNumbers.join(
-							', '
-						)} — delivered (collector confirmed)</label
-					>{:else}<p class="text-sm text-slate-500">
+				{#each form.found ?? [] as bond (bond.id)}
+					{#if bond.sellable}<label class="block"
+							><input type="radio" bind:group={selectedBond} value={bond.id} /> Bond {bond.baseNumbers.join(
+								', '
+							)}{bond.associatedNumbers.length ? ` / ${bond.associatedNumbers.join(', ')}` : ''} — delivered,
+							can be sold</label
+						>{:else}<p class="text-sm text-slate-600">
+							Bond {bond.baseNumbers.join(', ')} cannot be sold: {bond.reason}
+						</p>{/if}
+				{:else}<p class="text-sm text-slate-500">
 						No delivered bond matches. Available bonds must be delivered first; sold, lost, annulled
 						and grouped member bonds cannot be sold.
 					</p>{/each}
@@ -67,8 +72,11 @@
 	<section class="{cardClass} space-y-5">
 		<h2 class="font-semibold">3. Buyer</h2>
 		<select class={inputClass} bind:value={selectedBuyer}
-			><option value="">Choose buyer</option>{#each data.buyers as buyer (buyer.id)}<option
-					value={buyer.id}>{buyerDisplayName(buyer)}</option
+			><option value="">Choose buyer</option
+			>{#if form?.form === 'buyer' && form.success && form.buyerId && !data.buyers.some((b) => b.id === form.buyerId)}<option
+					value={form.buyerId}>{form.buyerName}</option
+				>{/if}{#each data.buyers as buyer (buyer.id)}<option value={buyer.id}
+					>{buyerDisplayName(buyer)}</option
 				>{/each}</select
 		>
 		{#if data.canCreateBuyer}<details class="rounded border p-3 text-sm">

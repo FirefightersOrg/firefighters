@@ -1,56 +1,132 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { isRedirect } from '@sveltejs/kit';
+import { load as listLoad } from '../../src/routes/campaigns/[id]/sales/+page.server';
+import {
+	actions as newActions,
+	load as newLoad
+} from '../../src/routes/campaigns/[id]/sales/new/+page.server';
+import { load as saleLoad } from '../../src/routes/campaigns/[id]/sales/[saleId]/+page.server';
+import { load as bondLoad } from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.server';
+import { load as buyerLoad } from '../../src/routes/campaigns/[id]/buyers/[buyerId]/+page.server';
+import { load as collectorLoad } from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.server';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
-import { assignBondsToCollector } from '$lib/server/services/deliveries';
-import { registerSale } from '$lib/server/services/sales';
-import { buildInstallmentSchedule } from '$lib/domain/sales';
-import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
+import type { UserProfile } from '../../src/app';
 
-const { supabaseUrl, anonKey, seedEnv } = inject('integrationEnv');
-const config = resolveSeedConfig(seedEnv);
-const run = randomUUID().slice(0, 8);
+/**
+ * SAN-60: the sale screens and the sale/installment sections of the bond, buyer and collector
+ * records, through the real route code against the local Supabase. Every run creates its own
+ * active campaign, collector, buyer and bonds.
+ */
+
+const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
+const seedConfig = resolveSeedConfig(seedEnv);
+const clientOptions = { auth: { autoRefreshToken: false, persistSession: false } };
+const RUN_ID = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 8)}`;
+let seq = 0;
+const rid = (label: string) => `it-sales-ui-${RUN_ID}-${++seq}-${label}`;
+
 interface Caller {
+	user: User;
 	client: SupabaseClient;
+	profile: UserProfile;
 	permissions: string[];
 }
-async function signIn(email: string, password: string): Promise<Caller> {
-	const client = createClient(supabaseUrl, anonKey, {
-		auth: { autoRefreshToken: false, persistSession: false }
-	});
-	const { data, error } = await client.auth.signInWithPassword({ email, password });
-	if (error || !data.session) throw new Error(`Unable to sign in as ${email}`);
-	const scoped = createClient(supabaseUrl, anonKey, {
-		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
-	});
-	return { client: scoped, permissions: await loadPermissions(scoped) };
-}
-const ctx = (caller: Caller, label: string) => ({
-	permissions: caller.permissions,
-	requestId: `it-sale-${run}-${label}`
-});
+type Result = Record<string, unknown> & {
+	status?: number;
+	data?: Record<string, unknown>;
+	redirect?: string;
+};
+
+let serviceClient: SupabaseClient;
 let admin: Caller;
 let operator: Caller;
 let treasurer: Caller;
 let campaignId: string;
 let collectorId: string;
 let buyerId: string;
-let bondId: string;
-let installmentBondId: string;
+const bonds: Record<string, string> = {};
+
+async function signIn(email: string, password: string): Promise<Caller> {
+	const anon = createClient(supabaseUrl, anonKey, clientOptions);
+	const { data, error } = await anon.auth.signInWithPassword({ email, password });
+	if (error || !data.session) throw new Error(`Failed to sign in as ${email}`);
+	const client = createClient(supabaseUrl, anonKey, {
+		...clientOptions,
+		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
+	});
+	const { data: profile } = await serviceClient
+		.from('profiles')
+		.select('*')
+		.eq('auth_user_id', data.user.id)
+		.single();
+	return {
+		user: data.user,
+		client,
+		profile: profile as UserProfile,
+		permissions: await loadPermissions(client)
+	};
+}
+
+function event(
+	caller: Caller,
+	params: Record<string, string>,
+	path: string,
+	options: { action?: string; fields?: Record<string, string>; search?: string } = {}
+): never {
+	const url = new URL(
+		`http://localhost${path}${options.action ? `?/${options.action}` : (options.search ?? '')}`
+	);
+	let request = new Request(url);
+	if (options.fields) {
+		const body = new FormData();
+		for (const [k, v] of Object.entries(options.fields)) body.append(k, v);
+		request = new Request(url, { method: 'POST', body });
+	}
+	return {
+		locals: {
+			supabase: caller.client,
+			safeGetSession: async () => ({ session: null, user: caller.user }),
+			session: null,
+			user: caller.user,
+			profile: caller.profile,
+			permissions: caller.permissions,
+			requestId: rid('req')
+		},
+		params,
+		url,
+		request
+	} as never;
+}
+
+async function run(action: (e: never) => unknown, e: never): Promise<Result> {
+	try {
+		return (await action(e)) as Result;
+	} catch (err) {
+		if (!isRedirect(err)) throw err;
+		return { redirect: err.location };
+	}
+}
+
+const newPath = () => `/campaigns/${campaignId}/sales/new`;
+const act = (caller: Caller, action: string, fields: Record<string, string>) =>
+	run(
+		newActions[action as keyof typeof newActions] as (e: never) => unknown,
+		event(caller, { id: campaignId }, newPath(), { action, fields })
+	);
+
 beforeAll(async () => {
-	admin = await signIn(config.admin.email, config.admin.password);
-	operator = await signIn(
-		config.fixtures.find((f) => f.roleNames.includes('operator'))!.email,
-		config.fixtures.find((f) => f.roleNames.includes('operator'))!.password
-	);
-	treasurer = await signIn(
-		config.fixtures.find((f) => f.roleNames.includes('treasurer'))!.email,
-		config.fixtures.find((f) => f.roleNames.includes('treasurer'))!.password
-	);
-	const campaign = await admin.client.rpc('campaign_create', {
-		p_name: `it sale ${run}`,
+	serviceClient = createClient(supabaseUrl, serviceRoleKey, clientOptions);
+	admin = await signIn(seedConfig.admin.email, seedConfig.admin.password);
+	const f = (role: string) => seedConfig.fixtures.find((x) => x.roleNames.includes(role))!;
+	operator = await signIn(f('operator').email, f('operator').password);
+	treasurer = await signIn(f('treasurer').email, f('treasurer').password);
+
+	const c = await admin.client.rpc('campaign_create', {
+		p_name: `[it-sales-ui ${RUN_ID}] Sales`,
 		p_simple_bond_value: '60000.00',
 		p_installment_count: 10,
 		p_number_digits: 4,
@@ -58,35 +134,37 @@ beforeAll(async () => {
 		p_associated_number_offset: 4871,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
-		p_starts_at: '2027-03-01T00:00:00-03:00',
-		p_ends_at: '2027-12-31T23:59:59-03:00'
+		p_starts_at: '2026-01-01T03:00:00Z',
+		p_ends_at: '2027-12-31T03:00:00Z',
+		p_request_id: rid('campaign')
 	});
-	if (campaign.error) throw new Error(campaign.error.message);
-	campaignId = campaign.data as string;
-	const activation = await admin.client.rpc('campaign_transition', {
+	if (c.error) throw new Error(c.error.message);
+	campaignId = c.data as string;
+	const activated = await admin.client.rpc('campaign_transition', {
 		p_id: campaignId,
 		p_to_status: 'active',
-		p_request_id: ctx(admin, 'active').requestId
+		p_request_id: rid('activate')
 	});
-	if (activation.error) throw new Error(activation.error.message);
+	if (activated.error) throw new Error(activated.error.message);
+
 	collectorId = await createCollector(
 		admin.client,
 		{
-			displayName: `Collector ${run}`,
+			displayName: `Ana ${RUN_ID}`,
 			phone: null,
 			email: null,
 			address: null,
 			userProfileId: null,
 			status: 'active'
 		},
-		ctx(admin, 'collector')
+		{ requestId: rid('collector'), permissions: admin.permissions }
 	);
 	buyerId = await createBuyer(
 		admin.client,
 		{
 			type: 'individual',
-			firstName: 'Sale',
-			lastName: run,
+			firstName: 'Eva',
+			lastName: `Paz ${RUN_ID}`,
 			businessName: null,
 			documentNumber: null,
 			taxId: null,
@@ -95,186 +173,188 @@ beforeAll(async () => {
 			usualCollectorId: null,
 			notes: null
 		},
-		ctx(admin, 'buyer')
+		{ requestId: rid('buyer'), permissions: admin.permissions }
 	);
-	const bond = await admin.client.rpc('bond_create', {
+
+	for (const [key, number, barcode] of [
+		['cash', 30, 'BC-30'],
+		['plan', 31, null],
+		['free', 32, null]
+	] as const) {
+		const b = await admin.client.rpc('bond_create', {
+			p_campaign_id: campaignId,
+			p_base_numbers: [number],
+			p_barcode: barcode,
+			p_request_id: rid(`bond-${key}`)
+		});
+		if (b.error) throw new Error(b.error.message);
+		bonds[key] = b.data as string;
+	}
+	// cash and plan are delivered to Ana; free stays available (not sellable).
+	const delivered = await admin.client.rpc('bond_deliver', {
 		p_campaign_id: campaignId,
-		p_base_numbers: [123],
-		p_request_id: ctx(admin, 'bond').requestId
+		p_collector_id: collectorId,
+		p_bond_ids: [bonds.cash, bonds.plan],
+		p_notes: null,
+		p_request_id: rid('deliver')
 	});
-	if (bond.error) throw new Error(bond.error.message);
-	bondId = bond.data as string;
-	await assignBondsToCollector(
-		operator.client,
-		{ campaignId, collectorId, bondIds: [bondId] },
-		ctx(operator, 'deliver')
-	);
-	const installmentBond = await admin.client.rpc('bond_create', {
-		p_campaign_id: campaignId,
-		p_base_numbers: [124, 125],
-		p_request_id: ctx(admin, 'installment-bond').requestId
-	});
-	if (installmentBond.error) throw new Error(installmentBond.error.message);
-	installmentBondId = installmentBond.data as string;
-	await assignBondsToCollector(
-		operator.client,
-		{ campaignId, collectorId, bondIds: [installmentBondId] },
-		ctx(operator, 'deliver-installment')
-	);
+	if (delivered.error) throw new Error(delivered.error.message);
 });
-describe('sale registration (local Supabase)', () => {
-	it('creates a full-payment sale, plan, installment and sold bond', async () => {
-		const saleId = await registerSale(
-			operator.client,
-			{ campaignId, bondId, buyerId, paymentMode: 'full_payment', firstDueDate: '2027-01-31' },
-			ctx(operator, 'sale')
-		);
-		const { data: sale } = await admin.client
-			.from('sales')
-			.select('payment_mode, total_amount, collector_id')
-			.eq('id', saleId)
-			.single();
-		const { data: installments } = await admin.client
-			.from('installments')
-			.select('installment_number, due_date, amount, payment_plans!inner(sale_id)')
-			.eq('payment_plans.sale_id', saleId);
-		const { data: bond } = await admin.client
-			.from('bonds')
-			.select('commercial_status, current_buyer_id, financial_status_snapshot')
-			.eq('id', bondId)
-			.single();
-		expect(sale).toMatchObject({ payment_mode: 'full_payment', collector_id: collectorId });
-		expect(installments).toMatchObject([
-			{ installment_number: 1, due_date: '2027-01-31', amount: 60000 }
+
+describe('sale screens (local Supabase)', () => {
+	it('the treasurer cannot open the sale registration', async () => {
+		await expect(newLoad(event(treasurer, { id: campaignId }, newPath()))).rejects.toMatchObject({
+			status: 403
+		});
+		expect(await act(treasurer, 'register', { bondId: bonds.cash })).toMatchObject({
+			status: 403
+		});
+	});
+
+	it('the lookup finds only the matching bond and explains why it cannot be sold', async () => {
+		const byNumber = (await act(operator, 'lookup', { query: '0030' })) as {
+			found: { id: string; sellable: boolean }[];
+		};
+		expect(byNumber.found).toEqual([expect.objectContaining({ id: bonds.cash, sellable: true })]);
+		// 31 + 4871 = 4902: the associated number finds the same bond.
+		const byAssociated = (await act(operator, 'lookup', { query: '4902' })) as {
+			found: { id: string }[];
+		};
+		expect(byAssociated.found.map((b) => b.id)).toEqual([bonds.plan]);
+		const byCode = (await act(operator, 'lookup', { query: 'BC-30' })) as {
+			found: { id: string }[];
+		};
+		expect(byCode.found.map((b) => b.id)).toEqual([bonds.cash]);
+		const available = (await act(operator, 'lookup', { query: '0032' })) as {
+			found: { id: string; sellable: boolean; reason: string }[];
+		};
+		expect(available.found).toEqual([
+			expect.objectContaining({
+				id: bonds.free,
+				sellable: false,
+				reason: expect.stringContaining('deliver it first')
+			})
 		]);
-		expect(bond).toMatchObject({
-			commercial_status: 'sold',
-			current_buyer_id: buyerId,
-			financial_status_snapshot: 'no_payments'
-		});
-	});
-	it('creates the database installment schedule for a two-unit pata', async () => {
-		const firstDueDate = '2027-01-31';
-		const saleId = await registerSale(
-			operator.client,
-			{ campaignId, bondId: installmentBondId, buyerId, paymentMode: 'installments', firstDueDate },
-			ctx(operator, 'installments')
-		);
-		const { data, error } = await admin.client
-			.from('installments')
-			.select('installment_number, due_date, amount, payment_plans!inner(sale_id)')
-			.eq('payment_plans.sale_id', saleId)
-			.order('installment_number');
-		if (error) throw error;
-		expect(data).toMatchObject(
-			buildInstallmentSchedule({
-				paymentMode: 'installments',
-				firstDueDate,
-				totalAmount: '120000.00',
-				installmentCount: 10,
-				installmentValue: '6000.00',
-				commercialUnitCount: 2
-			}).map(({ number, dueDate, amount }) => ({
-				installment_number: number,
-				due_date: dueDate,
-				amount: Number(amount)
-			}))
-		);
-
-		// The repository reads the same sale, its active plan and its installments (as the operator).
-		const active = await getActiveSaleForBond(operator.client, installmentBondId);
-		expect(active.error).toBeNull();
-		expect(active.data?.sale).toMatchObject({
-			id: saleId,
-			paymentMode: 'installments',
-			totalAmount: '120000.00'
-		});
-		expect(active.data?.plan).toMatchObject({
-			installmentCount: 10,
-			totalAmount: '120000.00',
-			status: 'active'
-		});
-		const installments = await listInstallmentsForSale(operator.client, saleId);
+		// Registering it anyway is refused on the bond field, before the database.
 		expect(
-			installments.data?.map((i) => [i.installmentNumber, i.dueDate, i.amount, i.status])
-		).toEqual(
-			buildInstallmentSchedule({
-				paymentMode: 'installments',
-				firstDueDate,
-				totalAmount: '120000.00',
-				installmentCount: 10,
-				installmentValue: '6000.00',
-				commercialUnitCount: 2
-			}).map(({ number, dueDate, amount }) => [number, dueDate, amount, 'pending'])
-		);
+			await act(operator, 'register', {
+				bondId: bonds.free,
+				buyerId,
+				paymentMode: 'full_payment',
+				firstDueDate: '2026-12-10'
+			})
+		).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
 	});
-	it('maps rejected sales and permits only sale.create callers', async () => {
-		await expect(
-			registerSale(
-				operator.client,
-				{ campaignId, bondId, buyerId, paymentMode: 'full_payment' },
-				ctx(operator, 'again')
-			)
-		).rejects.toMatchObject({ kind: 'conflict', field: 'bondId' });
-		await expect(
-			registerSale(
-				operator.client,
-				{
-					campaignId,
-					bondId: await createDeliveredBond(126),
-					buyerId: crypto.randomUUID(),
-					paymentMode: 'full_payment'
-				},
-				ctx(operator, 'unknown-buyer')
-			)
-		).rejects.toMatchObject({ kind: 'not_found', field: 'buyerId' });
-		await expect(
-			registerSale(
-				treasurer.client,
-				{ campaignId, bondId: installmentBondId, buyerId, paymentMode: 'full_payment' },
-				ctx(treasurer, 'forbidden')
-			)
-		).rejects.toMatchObject({ kind: 'permission' });
-		const draft = await admin.client.rpc('campaign_create', {
-			p_name: `it sale draft ${run}`,
-			p_simple_bond_value: '60000.00',
-			p_installment_count: 10,
-			p_number_digits: 4,
-			p_max_number: 9999,
-			p_associated_number_offset: 4871,
-			p_overflow_policy: 'reject',
-			p_barcode_mode: 'base_number',
-			p_starts_at: '2027-03-01T00:00:00-03:00',
-			p_ends_at: '2027-12-31T23:59:59-03:00'
+
+	it('the operator registers a full-payment sale and the detail and bond record show it', async () => {
+		const registered = await act(operator, 'register', {
+			bondId: bonds.cash,
+			buyerId,
+			paymentMode: 'full_payment',
+			firstDueDate: '2026-12-10'
 		});
-		if (draft.error) throw draft.error;
-		await expect(
-			registerSale(
-				operator.client,
-				{
-					campaignId: draft.data as string,
-					bondId: installmentBondId,
-					buyerId,
-					paymentMode: 'full_payment'
-				},
-				ctx(operator, 'draft')
+		const saleId = /\/sales\/([0-9a-f-]{36})$/.exec(String(registered.redirect))?.[1];
+		expect(saleId).toBeDefined();
+
+		const detail = (await saleLoad(
+			event(admin, { id: campaignId, saleId: saleId! }, `/campaigns/${campaignId}/sales/${saleId}`)
+		)) as {
+			sale: { sale: { paymentMode: string; totalAmount: string }; installments: unknown[] };
+			financialStatus: string;
+		};
+		expect(detail.sale.sale).toMatchObject({
+			paymentMode: 'full_payment',
+			totalAmount: '60000.00'
+		});
+		expect(detail.sale.installments).toHaveLength(1);
+		expect(detail.financialStatus).toBe('no_payments');
+
+		const bondRecord = (await bondLoad(
+			event(
+				admin,
+				{ id: campaignId, bondId: bonds.cash },
+				`/campaigns/${campaignId}/bonds/${bonds.cash}`
 			)
-		).rejects.toMatchObject({ kind: 'conflict', field: 'campaignId' });
+		)) as { sale: { sale: { id: string } } | null; installments: unknown[] };
+		expect(bondRecord.sale?.sale.id).toBe(saleId);
+		expect(bondRecord.installments).toHaveLength(1);
+	});
+
+	it('creates a buyer inline, sells in installments, and the records and list show the debt', async () => {
+		const created = await act(operator, 'createBuyer', {
+			type: 'individual',
+			firstName: 'Inline',
+			lastName: `Buyer ${RUN_ID}`,
+			businessName: '',
+			documentNumber: '',
+			taxId: '',
+			phone: '',
+			address: '',
+			usualCollectorId: '',
+			notes: ''
+		});
+		expect(created).toMatchObject({ form: 'buyer', success: true, buyerId: expect.any(String) });
+		const inlineBuyer = created.buyerId as string;
+
+		const registered = await act(operator, 'register', {
+			bondId: bonds.plan,
+			buyerId: inlineBuyer,
+			paymentMode: 'installments',
+			firstDueDate: '2027-01-31'
+		});
+		expect(String(registered.redirect)).toMatch(/\/sales\/[0-9a-f-]{36}$/);
+
+		const buyerRecord = (await buyerLoad(
+			event(
+				admin,
+				{ id: campaignId, buyerId: inlineBuyer },
+				`/campaigns/${campaignId}/buyers/${inlineBuyer}`
+			)
+		)) as {
+			sales: { bondId: string }[];
+			installments: { dueDate: string; amount: string }[];
+			installmentsTotal: number;
+		};
+		expect(buyerRecord.sales.map((s) => s.bondId)).toEqual([bonds.plan]);
+		expect(buyerRecord.installmentsTotal).toBe(10);
+		expect(buyerRecord.installments[0]).toMatchObject({
+			dueDate: '2027-01-31',
+			amount: '6000.00'
+		});
+		expect(buyerRecord.installments[1].dueDate).toBe('2027-02-28');
+
+		const collectorRecord = (await collectorLoad(
+			event(
+				admin,
+				{ id: campaignId, collectorId },
+				`/campaigns/${campaignId}/collectors/${collectorId}`
+			)
+		)) as { installmentsTotal: number };
+		// The full payment (1) and the installment plan (10) were both sold through Ana.
+		expect(collectorRecord.installmentsTotal).toBe(11);
+
+		const plans = (await listLoad(
+			event(admin, { id: campaignId }, `/campaigns/${campaignId}/sales`, {
+				search: '?paymentMode=installments'
+			})
+		)) as { sales: { bondId: string }[] };
+		expect(plans.sales.map((s) => s.bondId)).toEqual([bonds.plan]);
+		const byBuyer = (await listLoad(
+			event(admin, { id: campaignId }, `/campaigns/${campaignId}/sales`, {
+				search: `?buyer=${encodeURIComponent('Inline')}`
+			})
+		)) as { sales: { bondId: string }[] };
+		expect(byBuyer.sales.map((s) => s.bondId)).toEqual([bonds.plan]);
+	});
+
+	it('selling the same bond twice is refused on the bond field', async () => {
+		expect(
+			await act(operator, 'register', {
+				bondId: bonds.cash,
+				buyerId,
+				paymentMode: 'full_payment',
+				firstDueDate: '2026-12-10'
+			})
+		).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
 	});
 });
-
-async function createDeliveredBond(baseNumber: number): Promise<string> {
-	const bond = await admin.client.rpc('bond_create', {
-		p_campaign_id: campaignId,
-		p_base_numbers: [baseNumber],
-		p_request_id: ctx(admin, `bond-${baseNumber}`).requestId
-	});
-	if (bond.error) throw bond.error;
-	const id = bond.data as string;
-	await assignBondsToCollector(
-		operator.client,
-		{ campaignId, collectorId, bondIds: [id] },
-		ctx(operator, `deliver-${baseNumber}`)
-	);
-	return id;
-}

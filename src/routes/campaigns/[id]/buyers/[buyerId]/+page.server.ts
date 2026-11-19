@@ -89,7 +89,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		campaignBonds: campaignBondsResult.data ?? [],
 		historicalBonds: historicalBondsResult.data ?? [],
 		sales: salesResult.data?.sales ?? [],
+		salesTotal: salesResult.data?.salesTotal ?? 0,
 		installments: salesResult.data?.installments ?? [],
+		installmentsTotal: salesResult.data?.installmentsTotal ?? 0,
 		canManage: hasPermissionIn(locals.permissions, 'buyer.manage'),
 		audit: auditResult
 			? {

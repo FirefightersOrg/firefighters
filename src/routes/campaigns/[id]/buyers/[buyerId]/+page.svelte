@@ -5,7 +5,7 @@
 	import { cardClass } from '$lib/components/campaigns/styles';
 	import { buyerDisplayName, buyerIdentification, BUYER_TYPE_LABELS } from '$lib/domain/parties';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
-	import { formatMoney } from '$lib/domain/money';
+	import { formatCents, formatMoney, parseMoneyToCents } from '$lib/domain/money';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
@@ -19,6 +19,13 @@
 				})
 			)
 			.join(', ');
+	// Exact cents (no floating point), over the installments listed on the record.
+	const pendingCents = $derived(
+		(data.installments ?? []).reduce(
+			(total, item) => total + (parseMoneyToCents(item.amount) ?? 0),
+			0
+		)
+	);
 </script>
 
 <svelte:head
@@ -117,9 +124,10 @@
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Installments and debt</h2>
 		<p class="mt-2 text-sm">
-			Total pending: {formatMoney(
-				(data.installments ?? []).reduce((total, item) => total + Number(item.amount), 0).toFixed(2)
-			)}
+			Total pending: {formatCents(
+				pendingCents
+			)}{#if (data.installmentsTotal ?? 0) > (data.installments ?? []).length}
+				(of the first {(data.installments ?? []).length} of {data.installmentsTotal} pending installments){/if}
 		</p>
 		<ul class="mt-2 text-sm">
 			{#each data.installments ?? [] as installment (installment.id)}<li class="border-t py-2">
