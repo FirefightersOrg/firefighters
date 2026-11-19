@@ -107,7 +107,9 @@ describe('/campaigns/[id]', () => {
 				transitions: ['active', 'annulled'],
 				viewCommissions: false,
 				viewBonds: false,
-				loadBonds: false
+				loadBonds: false,
+				viewCollectors: false,
+				viewBuyers: false
 			});
 		});
 
@@ -123,7 +125,9 @@ describe('/campaigns/[id]', () => {
 				transitions: ['closing', 'annulled'],
 				viewCommissions: false,
 				viewBonds: false,
-				loadBonds: false
+				loadBonds: false,
+				viewCollectors: false,
+				viewBuyers: false
 			});
 		});
 
@@ -139,7 +143,9 @@ describe('/campaigns/[id]', () => {
 				transitions: ['closed'],
 				viewCommissions: false,
 				viewBonds: false,
-				loadBonds: false
+				loadBonds: false,
+				viewCollectors: false,
+				viewBuyers: false
 			});
 		});
 
@@ -171,7 +177,9 @@ describe('/campaigns/[id]', () => {
 				transitions: [],
 				viewCommissions: false,
 				viewBonds: false,
-				loadBonds: false
+				loadBonds: false,
+				viewCollectors: false,
+				viewBuyers: false
 			});
 		});
 

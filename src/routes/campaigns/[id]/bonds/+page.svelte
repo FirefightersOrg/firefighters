@@ -78,13 +78,18 @@
 					class={secondaryButtonClass}>Create pata</a
 				>
 			{/if}
-			<button
-				type="button"
-				class={secondaryButtonClass}
-				disabled
-				aria-describedby="barcode-action-note">Load by barcode</button
-			>
-			<span id="barcode-action-note" class="text-xs text-slate-500">Phase 4</span>
+			{#if data.can.scan}
+				<a
+					href={resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}
+					class={secondaryButtonClass}>Scan bonds</a
+				>
+			{/if}
+			{#if data.can.importFile}
+				<a
+					href={resolve('/campaigns/[id]/bonds/import', { id: campaign.id })}
+					class={secondaryButtonClass}>Import file</a
+				>
+			{/if}
 			<button
 				type="button"
 				class={secondaryButtonClass}

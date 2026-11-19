@@ -73,7 +73,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		filtered: Object.values(query.values).some(Boolean),
 		// UI hints only: the SQL functions enforce permission and campaign status.
 		can: {
-			create: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status)
+			create: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status),
+			// Import pages also list past imports, so they are offered whatever the campaign status.
+			importFile: hasPermissionIn(permissions, 'bond.import'),
+			scan: hasPermissionIn(permissions, 'bond.scan')
 		}
 	};
 };
