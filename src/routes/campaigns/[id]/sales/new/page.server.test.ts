@@ -1,0 +1,132 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
+vi.mock('$lib/server/repositories/parties', () => ({
+	getBuyer: vi.fn(),
+	listBuyers: vi.fn(),
+	findBuyersByIdentification: vi.fn()
+}));
+vi.mock('$lib/server/repositories/sales', () => ({ findDeliveredBondsForSale: vi.fn() }));
+vi.mock('$lib/server/services/sales', async (o) => ({
+	...(await o<typeof import('$lib/server/services/sales')>()),
+	registerSale: vi.fn()
+}));
+vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
+import { actions, load } from './+page.server';
+import { getCampaignById } from '$lib/server/repositories/campaigns';
+import { getBuyer, listBuyers, findBuyersByIdentification } from '$lib/server/repositories/parties';
+import { findDeliveredBondsForSale } from '$lib/server/repositories/sales';
+import { registerSale, SaleServiceError } from '$lib/server/services/sales';
+import { createBuyer } from '$lib/server/services/parties';
+import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
+const BOND = 'b0000000-0000-0000-0000-000000000001',
+	BUYER = 'a0000000-0000-0000-0000-000000000001';
+const url = `http://localhost/campaigns/${CAMPAIGN_ID}/sales/new`;
+const e = (perms: string[], fields: Record<string, string>, action: keyof typeof actions) => {
+	const body = new FormData();
+	Object.entries(fields).forEach(([k, v]) => body.set(k, v));
+	return {
+		locals: makeLocals({ permissions: perms }),
+		params: { id: CAMPAIGN_ID },
+		url: new URL(url),
+		request: new Request(url + '?/' + action, { method: 'POST', body })
+	} as never;
+};
+const run = async (
+	a: keyof typeof actions,
+	x: Parameters<typeof e>[0],
+	f: Parameters<typeof e>[1]
+) => {
+	try {
+		return await (actions[a] as (event: never) => Promise<unknown>)(e(x, f, a));
+	} catch (err) {
+		return err;
+	}
+};
+beforeEach(() => {
+	vi.mocked(getCampaignById).mockResolvedValue({ data: { id: CAMPAIGN_ID }, error: null } as never);
+	vi.mocked(listBuyers).mockResolvedValue({ data: { items: [] }, error: null } as never);
+	vi.mocked(getBuyer).mockResolvedValue({ data: { id: BUYER }, error: null } as never);
+	vi.mocked(findBuyersByIdentification).mockResolvedValue({ data: [], error: null } as never);
+	vi.mocked(findDeliveredBondsForSale).mockResolvedValue({
+		data: [{ id: BOND }],
+		error: null
+	} as never);
+});
+describe('new sale', () => {
+	it('load and actions deny sale creation without sale.create', async () => {
+		await expect(
+			load({
+				locals: makeLocals({ permissions: ['campaign.view'] }),
+				params: { id: CAMPAIGN_ID },
+				url: new URL(url)
+			} as never)
+		).rejects.toMatchObject({ status: 403 });
+		expect(await run('register', ['campaign.view'], {})).toMatchObject({ status: 403 });
+	});
+	it('lookup accepts number/barcode and reports unavailable matches', async () => {
+		expect(await run('lookup', ['campaign.view', 'sale.create'], {})).toMatchObject({
+			status: 400
+		});
+		await run('lookup', ['campaign.view', 'sale.create'], { query: 'BC-1' });
+		expect(findDeliveredBondsForSale).toHaveBeenCalledWith(expect.anything(), CAMPAIGN_ID, 'BC-1');
+		vi.mocked(findDeliveredBondsForSale).mockResolvedValueOnce({ data: [], error: null } as never);
+		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '2' })).toMatchObject({
+			found: []
+		});
+	});
+	it('creates buyers only for managers, validates, warns duplicates and selects success', async () => {
+		expect(await run('createBuyer', ['campaign.view'], {})).toMatchObject({ status: 403 });
+		expect(
+			await run('createBuyer', ['campaign.view', 'buyer.manage'], { type: 'individual' })
+		).toMatchObject({ status: 400 });
+		vi.mocked(findBuyersByIdentification).mockResolvedValueOnce({
+			data: [{ id: BUYER, firstName: 'Ada', lastName: 'L' }],
+			error: null
+		} as never);
+		expect(
+			await run('createBuyer', ['campaign.view', 'buyer.manage'], {
+				type: 'individual',
+				firstName: 'Ada',
+				lastName: 'L',
+				documentNumber: '1'
+			})
+		).toMatchObject({ duplicates: expect.anything() });
+		vi.mocked(createBuyer).mockResolvedValue(BUYER);
+		expect(
+			await run('createBuyer', ['campaign.view', 'buyer.manage'], {
+				type: 'individual',
+				firstName: 'Ada',
+				lastName: 'L',
+				createAnyway: 'on'
+			})
+		).toMatchObject({ success: true, buyerId: BUYER });
+	});
+	it('validates register, maps service field failures, and preserves redirect', async () => {
+		expect(await run('register', ['campaign.view', 'sale.create'], {})).toMatchObject({
+			status: 400
+		});
+		vi.mocked(registerSale).mockRejectedValueOnce(
+			new SaleServiceError('conflict', 'Already sold.', { field: 'bondId' })
+		);
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], {
+				bondId: BOND,
+				buyerId: BUYER,
+				paymentMode: 'full_payment',
+				firstDueDate: '2027-01-01'
+			})
+		).toMatchObject({ status: 409, data: { errors: { bondId: ['Already sold.'] } } });
+		vi.mocked(registerSale).mockResolvedValueOnce('a0000000-0000-0000-0000-000000000009');
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], {
+				bondId: BOND,
+				buyerId: BUYER,
+				paymentMode: 'full_payment',
+				firstDueDate: '2027-01-01'
+			})
+		).toMatchObject({
+			status: 303,
+			location: `/campaigns/${CAMPAIGN_ID}/sales/a0000000-0000-0000-0000-000000000009`
+		});
+	});
+});

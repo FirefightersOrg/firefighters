@@ -65,7 +65,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const values = buyerValues(form);
 		const parsed = validateBuyer(values);
-		if ('failure' in parsed) return { ...(parsed.failure!.data ?? {}), form: 'buyer' };
+		if ('failure' in parsed)
+			return fail(parsed.failure!.status, { ...(parsed.failure!.data ?? {}), form: 'buyer' });
 		const duplicates = await findBuyersByIdentification(locals.supabase, parsed.data);
 		if (duplicates.error) return partyFailure(duplicates.error, values);
 		if ((duplicates.data?.length ?? 0) > 0 && form.get('createAnyway') !== 'on')

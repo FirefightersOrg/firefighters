@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { z } from 'zod';
 import type { PageServerLoad } from './$types';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
@@ -13,6 +14,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		!hasPermissionIn(locals.permissions, 'sale.create')
 	)
 		requirePermissionIn(locals.permissions, 'bond.view');
+	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
+		error(404, { message: 'Sale not found.' });
 	const [campaign, sale] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getSaleDetail(locals.supabase, params.id, params.saleId)
