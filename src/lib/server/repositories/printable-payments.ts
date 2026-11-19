@@ -27,7 +27,7 @@ const payment = (row: any): PaymentCertificateSource => ({
 			.join(', ') || '—',
 	amount: row.amount,
 	method: row.payment_method === 'cash' ? 'Cash' : 'Transfer',
-	paymentDate: `${row.payment_date}T12:00:00Z`,
+	paymentDate: row.payment_date,
 	createdAt: row.created_at,
 	registeredBy: row.profiles?.full_name ?? '—',
 	settlementNumber: row.settlements?.settlement_number ?? null
@@ -47,6 +47,10 @@ export async function getSettlementPrint(
 		.maybeSingle()
 		.overrideTypes<any, { merge: false }>();
 	if (error || !settlement) return { data: null, error };
+	// Known print limitations (SAN-65): only currently confirmed payments are listed for
+	// non-open settlements, while totals remain the closing snapshot. Later annulments
+	// can make the row sum differ. This query also inherits PostgREST's row cap (1000).
+	// See docs/documents.md before using these notes for historical reconciliation.
 	const { data: rows, error: paymentsError } = await supabase
 		.from('payments')
 		.select(paymentRows)
@@ -61,7 +65,7 @@ export async function getSettlementPrint(
 		commission: settlement.commission_amount,
 		commissionPaid: settlement.commission_paid_amount,
 		net: settlement.net_to_firefighters,
-		balance: '0.00'
+		balance: '0.00' // No historical balance snapshot is stored; not a reconstructed balance.
 	};
 	if (settlement.status === 'open') {
 		const { data, error: totalsError } = await supabase.rpc('settlement_totals', {

@@ -28,6 +28,13 @@ const date = (value: string) =>
 		timeStyle: 'short',
 		timeZone: 'America/Argentina/Buenos_Aires'
 	}).format(new Date(value));
+/** SQL date is a calendar day, not a timestamp: do not shift zones or invent a time. */
+const paymentDate = (value: string) => {
+	const [year, month, day] = value.split('-').map(Number);
+	return new Intl.DateTimeFormat('es-AR', { dateStyle: 'short' }).format(
+		new Date(year, month - 1, day)
+	);
+};
 /** Receipt numbers are stable: settlement number plus the first eight UUID characters, or PAYMENT-<id> when not settled. */
 export function buildPrintablePaymentCertificate(
 	campaign: Campaign,
@@ -49,7 +56,7 @@ export function buildPrintablePaymentCertificate(
 		campaign: campaign.name,
 		bond,
 		amount: formatMoney(source.amount),
-		paymentDate: date(source.paymentDate),
+		paymentDate: paymentDate(source.paymentDate),
 		createdAt: date(source.createdAt),
 		receiptNumber: source.settlementNumber
 			? `SET-${String(source.settlementNumber).padStart(4, '0')}-${shortId}`

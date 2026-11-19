@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
+import { hasPermissionIn, permissionsUnavailable } from '$lib/server/auth/permissions';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getSettlementPrint } from '$lib/server/repositories/printable-payments';
 import { buildPrintableSettlementDeliveryNote } from '$lib/server/documents/settlement-delivery-note';
@@ -14,8 +15,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		'settlement.update_open',
 		'settlement.close',
 		'settlement.correct'
-	];
-	if (!locals.permissions?.some((p) => allowed.includes(p)))
+	] as const;
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Permission check failed' });
+	if (!allowed.some((permission) => hasPermissionIn(locals.permissions, permission)))
 		error(403, { message: 'Permission denied.' });
 	if (!uuid(params.id) || !uuid(params.settlementId))
 		error(404, { message: 'Settlement not found.' });

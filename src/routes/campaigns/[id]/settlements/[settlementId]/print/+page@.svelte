@@ -15,6 +15,11 @@
 				<h1>Settlement delivery note</h1>
 				<p>{doc.campaign}</p>
 				{#if doc.preliminary}<p class="preliminary">PRELIMINARY / DRAFT — OPEN SETTLEMENT</p>{/if}
+				{#if doc.status === 'annulled'}
+					<p class="preliminary">ANULADA — ANNULLED SETTLEMENT — NOT VALID</p>
+				{:else if doc.status === 'corrected'}
+					<p class="preliminary">CORREGIDA — CORRECTED SETTLEMENT — NOT VALID</p>
+				{/if}
 			</div>
 			<div class="meta">
 				<p class="copy">{copy}</p>

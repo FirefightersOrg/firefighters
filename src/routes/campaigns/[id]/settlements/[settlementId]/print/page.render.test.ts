@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from './+page@.svelte';
+import type { PageProps } from './$types';
 const document = {
 	institutionName: 'Bomberos Test',
 	campaign: 'Bono 2027',
@@ -39,8 +40,7 @@ const document = {
 describe('settlement delivery note print page', () => {
 	it('renders all required fields twice including payment rows and signatures', () => {
 		const body = render(Page, {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
-			props: { data: { document }, params: {} } as any
+			props: { data: { document }, params: {} } as unknown as PageProps
 		}).body;
 		for (const text of [
 			'ORIGINAL – Administration',
@@ -70,9 +70,32 @@ describe('settlement delivery note print page', () => {
 	});
 	it('shows the preliminary label for an open settlement', () => {
 		const body = render(Page, {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
-			props: { data: { document }, params: {} } as any
+			props: { data: { document }, params: {} } as unknown as PageProps
 		}).body;
 		expect(body.split('PRELIMINARY / DRAFT — OPEN SETTLEMENT').length - 1).toBe(2);
+	});
+	it.each([
+		['annulled', 'ANULADA'],
+		['corrected', 'CORREGIDA']
+	] as const)('marks both copies of a %s settlement as invalid', (status, label) => {
+		const body = render(Page, {
+			props: {
+				data: { document: { ...document, status, preliminary: false } },
+				params: {}
+			} as unknown as PageProps
+		}).body;
+		expect(body.split(label).length - 1).toBe(2);
+		expect(body.split('NOT VALID').length - 1).toBe(2);
+		expect(body).not.toContain('PRELIMINARY / DRAFT');
+	});
+	it('does not mark closed settlements as drafts or invalid', () => {
+		const body = render(Page, {
+			props: {
+				data: { document: { ...document, status: 'closed', preliminary: false } },
+				params: {}
+			} as unknown as PageProps
+		}).body;
+		expect(body).not.toContain('NOT VALID');
+		expect(body).not.toContain('PRELIMINARY / DRAFT');
 	});
 });
