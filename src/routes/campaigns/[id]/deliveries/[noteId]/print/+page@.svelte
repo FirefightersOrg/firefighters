@@ -9,6 +9,11 @@
 	let { data }: PageProps = $props();
 	const doc = $derived(data.document);
 	const copies = ['ORIGINAL – Administration', 'DUPLICATE – Collector'];
+	const collectorSignature = $derived(
+		doc.reason === 'return'
+			? 'Collector signature — I HANDED the bonds back'
+			: doc.collectorSignature
+	);
 </script>
 
 <svelte:head>
@@ -24,7 +29,13 @@
 		<header>
 			<div>
 				<p class="institution">{doc.institutionName}</p>
-				<h1>{doc.reason === 'reassignment' ? 'Reassignment' : 'Bond delivery note'}</h1>
+				<h1>
+					{doc.reason === 'return'
+						? 'Bond return note'
+						: doc.reason === 'reassignment'
+							? 'Reassignment'
+							: 'Bond delivery note'}
+				</h1>
 				{#if doc.status === 'annulled'}<p class="annulled">ANNULLED</p>{/if}
 				<p>{doc.campaign}</p>
 			</div>
@@ -82,7 +93,7 @@
 		<p class="notes"><strong>Notes:</strong> {doc.notes ?? '—'}</p>
 
 		<div class="signatures">
-			<div><span class="line"></span>{doc.collectorSignature}<br /><small>Name and ID</small></div>
+			<div><span class="line"></span>{collectorSignature}<br /><small>Name and ID</small></div>
 			<div>
 				<span class="line"></span>{doc.administrationSignature}<br /><small>Name and ID</small>
 			</div>
