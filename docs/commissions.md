@@ -204,3 +204,27 @@ because settlements do not store which rule was applied to each payment applicat
 persist the applied rule id per application and block edits/annulments of applied rules (end-date
 the rule and create a new one instead). Manual adjustments must be written as difference rows and their matching ledger
 entries by the adjustment service; they never modify a rule or computed commission.
+
+## Special collector rules, adjustments and current account (SAN-69)
+
+Migration `20261218000000_collector_commissions_adjustments.sql`.
+
+- **Special rules:** `commission_rule_create` has a 10-argument overload with
+  `p_applies_to_collector_id`; the nine-argument general-rule call is unchanged. The collector must
+  be active, a rule's collector cannot be changed afterwards, and active special rules of the same
+  campaign + type (+ installment) + collector cannot overlap in validity (same rule as general
+  rules). Precedence is the SAN-68 order: collector-specific first.
+- **`commission_adjust`** (`commission.adjust`): tier-3 manual adjustment. It writes a
+  `commission_adjustments` difference row and the matching ledger entry
+  (`adjustment_in_favor_of_collector` → credit, `adjustment_in_favor_of_firefighters` → debit) and
+  never touches rules or computed commissions.
+- **`collector_ledger_adjust`** (`collector.ledger.adjust`): manual current-account credit or debit.
+- **`collector_ledger_annul_entry`** (`collector.ledger.adjust`): annuls a `recorded` entry (the
+  balance ignores it). Entries created by a closed settlement cannot be annulled; per
+  `docs/corrections.md` they are corrected with a compensating adjustment linked to the settlement.
+- Every write that can lower the balance takes the same advisory lock as `commission_settle`.
+- **`collector_ledger_entries_with_balance`**: entries in order with the running balance, gated like
+  the ledger RLS.
+- UI: special rules on `/campaigns/[id]/commissions` (and listed on the Collector Record), and the
+  Collector Current Account at `/campaigns/[id]/collectors/[collectorId]/ledger` with the manual
+  adjustment and annulment forms.

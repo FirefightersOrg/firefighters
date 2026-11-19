@@ -25,6 +25,8 @@ import { requireActiveUser } from '$lib/server/auth/guards';
 import { listActiveAssignmentNotes } from '$lib/server/repositories/deliveries';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { listCollectorPendingInstallments } from '$lib/server/repositories/sales';
+import { listCollectorCommissionRules } from '$lib/server/repositories/commission-rules';
+import { getCollectorLedgerBalance } from '$lib/server/services/commission-ledger';
 import {
 	DeliveryServiceError,
 	reassignBondsToCollector,
@@ -87,6 +89,25 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (notes.error || targets.error)
 		error(500, { message: 'Could not load the collector. Please try again.' });
 
+	// Current account and special commission rules (SAN-69).
+	const ledgerAllowed =
+		hasPermissionIn(locals.permissions, 'collector.ledger.view') ||
+		hasPermissionIn(locals.permissions, 'collector.ledger.adjust');
+	const rulesAllowed = hasPermissionIn(locals.permissions, 'commission.view');
+	const [balance, specialRules] = await Promise.all([
+		ledgerAllowed
+			? getCollectorLedgerBalance(locals.supabase, {
+					campaignId: params.id,
+					collectorId: params.collectorId
+				}).catch(() => null)
+			: Promise.resolve(null),
+		rulesAllowed
+			? listCollectorCommissionRules(locals.supabase, params.id, params.collectorId)
+			: Promise.resolve({ data: [], error: null })
+	]);
+	if (specialRules.error)
+		error(500, { message: 'Could not load the collector. Please try again.' });
+
 	const profileOptions = profiles.data ?? [];
 	if (collector.userProfileId) {
 		// The admin can read profiles; anyone else sees a generic label.
@@ -111,7 +132,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		installments: installments.data?.items ?? [],
 		installmentsTotal: installments.data?.total ?? 0,
 		profiles: profileOptions,
-		can: { manage: hasPermissionIn(locals.permissions, 'collector.manage'), audit: auditAllowed },
+		ledger: ledgerAllowed ? { balance: balance === null ? null : Number(balance) } : null,
+		specialRules: specialRules.data ?? [],
+		can: {
+			manage: hasPermissionIn(locals.permissions, 'collector.manage'),
+			audit: auditAllowed,
+			viewRules: rulesAllowed,
+			manageRules: hasPermissionIn(locals.permissions, 'commission.rule_manage')
+		},
 		audit: auditAllowed
 			? {
 					entries: (audit?.data ?? []).slice(0, AUDIT_ENTRIES_LIMIT),

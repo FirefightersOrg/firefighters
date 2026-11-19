@@ -125,4 +125,33 @@ describe('collector sale sections', () => {
 		expect(body).toContain('Ada');
 		expect(body).toContain(`/sales/s`);
 	});
+
+	it('shows the current account balance, its link and the special rules (SAN-69)', () => {
+		const body = page(false, {
+			ledger: { balance: 17.5 },
+			specialRules: [
+				{
+					id: 'r1',
+					ruleType: 'installment_first',
+					installmentNumber: null,
+					percentage: '20',
+					fixedAmount: null,
+					validFrom: '2026-01-01',
+					validTo: null,
+					status: 'active'
+				}
+			],
+			can: { manage: false, audit: false, viewRules: true, manageRules: true }
+		});
+		expect(body).toMatch(/data-testid="collector-balance"[^>]*>[^<]*17[.,]50/);
+		expect(body).toContain(`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}/ledger`);
+		expect(body).toContain('data-testid="special-rules"');
+		expect(body).toContain('Manage special rules');
+	});
+
+	it('hides the current account without ledger permissions', () => {
+		const body = page(false);
+		expect(body).toContain('You do not have permission to view the current account.');
+		expect(body).not.toContain('/ledger');
+	});
 });

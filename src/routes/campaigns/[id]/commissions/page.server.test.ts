@@ -50,6 +50,8 @@ function mockDb(
 		rules?: QueryResult;
 		rule?: QueryResult;
 		rpc?: QueryResult;
+		special?: QueryResult;
+		collectors?: QueryResult;
 	} = {}
 ) {
 	const campaign = options.campaign ?? { data: campaignRow(), error: null };
@@ -57,14 +59,30 @@ function mockDb(
 	const rule = options.rule ?? { data: ruleRow(), error: null };
 	const from = vi.fn((table: string) => {
 		let single = false;
+		let special = false;
 		const chain: Record<string, unknown> = {};
-		for (const key of ['select', 'eq', 'is', 'order']) chain[key] = vi.fn(() => chain);
+		for (const key of ['select', 'eq', 'is', 'order', 'limit']) chain[key] = vi.fn(() => chain);
+		// Special per-collector rules (SAN-69) are the `.not('applies_to_collector_id', 'is', null)` list.
+		chain.not = vi.fn(() => {
+			special = true;
+			return chain;
+		});
 		chain.maybeSingle = vi.fn(() => {
 			single = true;
 			return chain;
 		});
 		chain.overrideTypes = vi.fn(() =>
-			Promise.resolve(table === 'campaigns' ? campaign : single ? rule : rules)
+			Promise.resolve(
+				table === 'campaigns'
+					? campaign
+					: table === 'collectors'
+						? (options.collectors ?? { data: [], error: null })
+						: special
+							? (options.special ?? { data: [], error: null })
+							: single
+								? rule
+								: rules
+			)
 		);
 		return chain;
 	});
@@ -222,6 +240,50 @@ describe('/campaigns/[id]/commissions', () => {
 			});
 			expect(result.data.values).toMatchObject({ installmentNumber: '11' });
 			expect(rpc).not.toHaveBeenCalled();
+		});
+
+		it('create: a special rule passes the collector to commission_rule_create (SAN-69)', async () => {
+			const { supabase, rpc } = mockDb({ rpc: { data: RULE_ID, error: null } });
+			const collectorId = 'c0000000-0000-4000-8000-000000000009';
+			const result = await runAction('create', makeLocals({ supabase, permissions: MANAGER }), {
+				...ruleForm,
+				appliesToCollectorId: collectorId
+			});
+			expect(result).toMatchObject({ form: 'create', success: true });
+			expect(rpc).toHaveBeenCalledWith(
+				'commission_rule_create',
+				expect.objectContaining({ p_applies_to_collector_id: collectorId })
+			);
+		});
+
+		it('create: a general rule does not send a collector, and a bad collector id is a 400', async () => {
+			const { supabase, rpc } = mockDb({ rpc: { data: RULE_ID, error: null } });
+			await runAction('create', makeLocals({ supabase, permissions: MANAGER }), ruleForm);
+			expect(rpc.mock.calls[0][1]).not.toHaveProperty('p_applies_to_collector_id');
+			const bad = (await runAction('create', makeLocals({ supabase, permissions: MANAGER }), {
+				...ruleForm,
+				appliesToCollectorId: 'nope'
+			})) as ActionFailure;
+			expect(bad.status).toBe(400);
+			expect(bad.data.errors).toHaveProperty('appliesToCollectorId');
+		});
+
+		it('load: lists special rules with their collector and offers collectors to managers', async () => {
+			const collectorId = 'c0000000-0000-4000-8000-000000000009';
+			const { supabase } = mockDb({
+				special: { data: [ruleRow({ applies_to_collector_id: collectorId })], error: null },
+				collectors: { data: [{ id: collectorId, display_name: 'Ada' }], error: null }
+			});
+			const data = (await load(loadEvent(makeLocals({ supabase, permissions: MANAGER })))) as {
+				specialRules: { collectorName: string }[];
+				collectors: unknown[];
+			};
+			expect(data.specialRules.map((r) => r.collectorName)).toEqual(['Ada']);
+			expect(data.collectors).toHaveLength(1);
+			const viewer = (await load(
+				loadEvent(makeLocals({ supabase, permissions: [...ADMIN_PERMISSIONS, 'commission.view'] }))
+			)) as { collectors: unknown[] };
+			expect(viewer.collectors).toEqual([]);
 		});
 
 		it('create: calls commission_rule_create with canonical values', async () => {

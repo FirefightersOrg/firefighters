@@ -27,7 +27,9 @@
 	);
 	const editRule = $derived(
 		data.can.manage && editRuleId
-			? (data.rules.find((r) => r.id === editRuleId && r.status === 'active') ?? null)
+			? ([...data.rules, ...data.specialRules].find(
+					(r) => r.id === editRuleId && r.status === 'active'
+				) ?? null)
 			: null
 	);
 	const ruleFormResult = $derived(
@@ -173,6 +175,70 @@
 		{/if}
 	</section>
 
+	<section class={cardClass} aria-labelledby="special-rules-title">
+		<h2 id="special-rules-title" class="mb-1 text-base font-semibold">Special collector rules</h2>
+		<p class="mb-4 text-xs text-slate-500">
+			A special rule for a collector takes precedence over the general rules for that collector.
+		</p>
+		{#if data.specialRules.length === 0}
+			<p class="text-sm text-slate-600">No special collector rules.</p>
+		{:else}
+			<div class="-mx-6 overflow-x-auto">
+				<table class="min-w-full divide-y divide-slate-200 text-sm">
+					<thead>
+						<tr class="text-left text-xs font-medium text-slate-500">
+							<th scope="col" class="px-6 py-2">Collector</th>
+							<th scope="col" class="px-3 py-2">Type</th>
+							<th scope="col" class="px-3 py-2 text-right">Commission</th>
+							<th scope="col" class="px-3 py-2">Validity</th>
+							<th scope="col" class="px-3 py-2">Status</th>
+							{#if data.can.manage}
+								<th scope="col" class="px-6 py-2"><span class="sr-only">Actions</span></th>
+							{/if}
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#each data.specialRules as rule (rule.id)}
+							{@const annulled = rule.status === 'annulled'}
+							<tr id="rule-{rule.id}" class={[annulled && 'text-slate-500']}>
+								<td class="px-6 py-3 font-medium">{rule.collectorName}</td>
+								<td class="px-3 py-3">{formatCommissionRuleType(rule)}</td>
+								<td class="px-3 py-3 text-right whitespace-nowrap tabular-nums">
+									<span class={[annulled && 'line-through']}>{formatCommissionValue(rule)}</span>
+								</td>
+								<td class="px-3 py-3 whitespace-nowrap">{formatValidity(rule)}</td>
+								<td class="px-3 py-3">
+									{annulled
+										? 'Annulled'
+										: TIMING_LABELS[commissionRuleTiming(rule, data.today)].label}
+								</td>
+								{#if data.can.manage}
+									<td class="px-6 py-3 text-right whitespace-nowrap">
+										{#if !annulled}
+											<div class="flex justify-end gap-4">
+												<a
+													href="{listHref}?edit={rule.id}#edit-rule-title"
+													class="text-sm font-medium text-blue-700 hover:underline"
+													aria-label="Edit special rule for {rule.collectorName}">Edit</a
+												>
+												<AnnulRuleAction
+													ruleId={rule.id}
+													description="{rule.collectorName}: {formatCommissionRuleType(
+														rule
+													)}, {formatCommissionValue(rule)}"
+												/>
+											</div>
+										{/if}
+									</td>
+								{/if}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</section>
+
 	{#if data.can.manage}
 		<!-- Re-mount when switching between create and edit, between rules, or when a load brings a
 		     new version of the edited rule: its values and version must come from the same load. -->
@@ -182,6 +248,7 @@
 				installmentCount={campaign.installmentCount}
 				result={formResult}
 				campaignId={campaign.id}
+				collectors={data.collectors}
 			/>
 		{/key}
 	{:else if campaign.status === 'draft' || campaign.status === 'active'}

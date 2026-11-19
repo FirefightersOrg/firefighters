@@ -113,6 +113,35 @@ export async function listGeneralCommissionRules(
 }
 
 /**
+ * Special per-collector rules (SAN-69) of one campaign, optionally for one collector, in the same
+ * order as the general list. `campaignId` / `collectorId` must already be valid uuids.
+ */
+export async function listCollectorCommissionRules(
+	supabase: SupabaseClient,
+	campaignId: string,
+	collectorId?: string
+): Promise<RepositoryResult<CommissionRule[]>> {
+	let query = supabase
+		.from('commission_rules')
+		.select(COMMISSION_RULE_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.not('applies_to_collector_id', 'is', null);
+	if (collectorId) query = query.eq('applies_to_collector_id', collectorId);
+	const { data, error } = await query
+		.order('valid_from', { ascending: true })
+		.overrideTypes<CommissionRuleRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	try {
+		return {
+			data: (data ?? []).map(mapCommissionRuleRow).sort(compareCommissionRules),
+			error: null
+		};
+	} catch (err) {
+		return { data: null, error: err as Error };
+	}
+}
+
+/**
  * One rule by id, or `data: null` when it does not exist or is not visible to the caller.
  * `id` must already be a valid uuid.
  */
