@@ -35,7 +35,7 @@ import {
 	parseCampaignNumber,
 	validateNoOverflow
 } from '$lib/domain/numbering';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { COMMISSION_RULE_MESSAGES } from '$lib/server/services/commission-rules';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -153,7 +153,7 @@ async function signIn(role: RoleName, email: string, password: string): Promise<
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 

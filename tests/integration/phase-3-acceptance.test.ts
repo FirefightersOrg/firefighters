@@ -24,7 +24,7 @@ import {
 import RecordPage from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.svelte';
 import { BOND_RECORD_SECTIONS, type BondRecord } from '$lib/components/bonds/record/types';
 import type { Campaign } from '$lib/domain/campaigns';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import type { BondFormResult } from '$lib/server/bonds/route-helpers';
 import type { BondListItem } from '$lib/server/bonds/list';
 import { BOND_MESSAGES } from '$lib/server/services/bonds';
@@ -166,7 +166,7 @@ async function signIn(role: RoleName, email: string, password: string): Promise<
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 

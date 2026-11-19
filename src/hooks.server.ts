@@ -53,6 +53,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (user) {
 		// Independent queries: my_permissions() already returns [] for an inactive profile.
+		// `permissions` is null when loading them failed (logged by getUserPermissions).
 		const [profileResult, permissions] = await Promise.all([
 			event.locals.supabase
 				.from('profiles')
@@ -75,7 +76,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.session = session;
 			event.locals.user = user;
 			event.locals.profile = profile;
+			// null (load failed) is kept as is so permission checks answer 500, not 403.
 			event.locals.permissions = permissions;
+			if (permissions === null) {
+				console.error('[hooks] permissions lookup failed; permission checks will answer 500', {
+					requestId: event.locals.requestId,
+					profileId: profile.id
+				});
+			}
 		} else if (!profileResult.error) {
 			leftoverSession = true;
 		}

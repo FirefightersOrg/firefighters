@@ -170,6 +170,71 @@ describe('hooks.server handle', () => {
 		expect(event.locals.permissions).toEqual(['user.manage']);
 	});
 
+	describe('when loading the permissions fails', () => {
+		const activeProfile: UserProfile = {
+			id: 'prof-123',
+			auth_user_id: 'user-123',
+			full_name: 'John Firefighter',
+			email: 'john@firefighters.local',
+			status: 'active',
+			created_at: new Date().toISOString()
+		};
+
+		it('keeps the active user signed in, sets permissions to null and logs it', async () => {
+			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue(null);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: activeProfile
+			});
+
+			await handle({ event, resolve });
+
+			expect(event.locals.user).toEqual({ id: 'user-123' });
+			expect(event.locals.profile).toEqual(activeProfile);
+			expect(event.locals.permissions).toBeNull();
+			// Not a session problem: the request goes through and the permission check answers 500.
+			expect(resolve).toHaveBeenCalledOnce();
+			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+			expect(consoleError).toHaveBeenCalledWith(
+				'[hooks] permissions lookup failed; permission checks will answer 500',
+				expect.objectContaining({ requestId: event.locals.requestId, profileId: 'prof-123' })
+			);
+		});
+
+		it('still serves the public home page', async () => {
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue(null);
+			const { event, resolve } = createMockEvent({
+				path: '/',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: activeProfile
+			});
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(200);
+			expect(resolve).toHaveBeenCalledOnce();
+		});
+
+		it('leaves permissions as [] for a request that is not signed in', async () => {
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue(null);
+			const { event, resolve } = createMockEvent({
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-999' },
+				profile: { ...activeProfile, status: 'inactive' }
+			});
+
+			await handle({ event, resolve });
+
+			expect(event.locals.user).toBeNull();
+			expect(event.locals.permissions).toEqual([]);
+		});
+	});
+
 	it('treats a user with no profile as anonymous', async () => {
 		vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
 		const { event, resolve } = createMockEvent({
