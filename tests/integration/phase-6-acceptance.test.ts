@@ -16,7 +16,7 @@ import { actions as collectorActions } from '../../src/routes/campaigns/[id]/col
 import { load as printLoad } from '../../src/routes/campaigns/[id]/deliveries/[noteId]/print/+page.server';
 import PrintPage from '../../src/routes/campaigns/[id]/deliveries/[noteId]/print/+page@.svelte';
 import { createCollector } from '$lib/server/services/parties';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
 
@@ -61,7 +61,7 @@ async function signIn(role: Role, email: string, password: string): Promise<Call
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 function event<E>(
@@ -364,19 +364,20 @@ describe('Phase 6: delivery and printable delivery note', () => {
 						users.admin,
 						`${bondPath(returned)}?/return`,
 						{ id: campaignId, bondId: returned },
-						{ notes: 'returned' },
+						{ notes: 'returned', fromCollectorId: collectorId },
 						rid('return')
 					)
 				)
 			)
-		).toMatchObject({ success: true });
+			// The return issues a return note and opens it (#47 decision).
+		).toMatchObject({ redirect: expect.stringMatching(/\/deliveries\/[0-9a-f-]{36}$/) });
 		const reassignment = await result(() =>
 			bondActions.reassign(
 				event(
 					users.operator,
 					`${bondPath(reassigned)}?/reassign`,
 					{ id: campaignId, bondId: reassigned },
-					{ collectorId: otherCollectorId },
+					{ collectorId: otherCollectorId, fromCollectorId: collectorId },
 					rid('reassign')
 				)
 			)
@@ -406,7 +407,10 @@ describe('Phase 6: delivery and printable delivery note', () => {
 				)
 			)
 		);
-		expect(bulkReturn).toMatchObject({ success: true });
+		// A bulk return issues one return note and opens it.
+		expect(bulkReturn).toMatchObject({
+			redirect: expect.stringMatching(/\/deliveries\/[0-9a-f-]{36}$/)
+		});
 		expect(
 			(
 				await service
@@ -488,8 +492,8 @@ describe('Phase 6: delivery and printable delivery note', () => {
 				.single()
 		).data;
 		for (const [action, fields] of [
-			['return', {}],
-			['reassign', { collectorId: otherCollectorId }]
+			['return', { fromCollectorId: collectorId }],
+			['reassign', { collectorId: otherCollectorId, fromCollectorId: collectorId }]
 		] as const) {
 			const requestId = rid(`lost-${action}`);
 			expect(
@@ -650,8 +654,8 @@ describe('Phase 6: delivery and printable delivery note', () => {
 				{ id: free, commercial_status: 'available' }
 			])
 		);
+		// SAN-93 (#44): the operator returns bonds, but marking one lost stays admin-only.
 		for (const [action, fields] of [
-			['return', {}],
 			['markLost', { responsibleParty: 'X', lostOn: '2026-01-01', reason: 'x' }]
 		] as const) {
 			const requestId = rid(`operator-${action}`);
@@ -753,7 +757,7 @@ describe('Phase 6: delivery and printable delivery note', () => {
 							users.admin,
 							`/campaigns/${closingId}/bonds/${delivered}?/return`,
 							{ id: closingId, bondId: delivered },
-							{},
+							{ fromCollectorId: collectorId },
 							attempts[1][0]
 						)
 					)
@@ -766,7 +770,7 @@ describe('Phase 6: delivery and printable delivery note', () => {
 							users.operator,
 							`/campaigns/${closingId}/bonds/${delivered}?/reassign`,
 							{ id: closingId, bondId: delivered },
-							{ collectorId: otherCollectorId },
+							{ collectorId: otherCollectorId, fromCollectorId: collectorId },
 							attempts[2][0]
 						)
 					)
