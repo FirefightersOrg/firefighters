@@ -570,6 +570,13 @@ Suggested fields:
 Rule:
 
 - Every adjustment must generate a current account entry and audit.
+- Implemented in SAN-67 (`20261216000000_commission_ledger.sql`): adjustments are immutable,
+  direct DML is revoked, and future SAN-68/69 audited functions will check
+  `commission.adjust` / `commission.settle` / `collector.ledger.adjust`. `amount` is positive
+  `numeric(12,2)` (not `NaN`), the required reason is trimmed, non-blank and at most 1,000
+  characters, and `direction` is `in_favor_of_collector` or `in_favor_of_firefighters`.
+  Optional settlement and payment references are checked to belong to the adjustment's campaign
+  and collector. Readers need `commission.view`, `commission.adjust`, or `commission.settle`.
 
 Types:
 
@@ -606,6 +613,13 @@ Suggested fields:
 Rule:
 
 - Collector balance is calculated by summing non-annulled entries.
+- Implemented in SAN-67 (`20261216000000_commission_ledger.sql`): entries are append-only.
+  Their amount is positive `numeric(12,2)` (not `NaN`); their seven types and the three statuses
+  are defined in `docs/state-machines.md`. A recorded entry can only become `annulled` (with
+  actor, timestamp and a required trimmed reason) or `compensated`; all historical fields are
+  immutable. Optional settlement/payment references must match the entry campaign and collector.
+  Readers need `collector.ledger.view` or `collector.ledger.adjust`, while a collector login can
+  read only its own rows. Future SAN-68/69 audited functions own all writes.
 
 ### draws
 
