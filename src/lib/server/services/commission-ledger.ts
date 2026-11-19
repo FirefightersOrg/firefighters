@@ -194,6 +194,7 @@ export interface LedgerEntryView {
 	settlementId: string | null;
 	paymentId: string | null;
 	reason: string | null;
+	annulReason: string | null;
 	runningBalance: number;
 }
 
@@ -218,6 +219,7 @@ export async function listCollectorLedger(
 		settlementId: (r.settlement_id as string | null) ?? null,
 		paymentId: (r.payment_id as string | null) ?? null,
 		reason: (r.reason as string | null) ?? null,
+		annulReason: (r.annul_reason as string | null) ?? null,
 		runningBalance: Number(r.running_balance)
 	}));
 }

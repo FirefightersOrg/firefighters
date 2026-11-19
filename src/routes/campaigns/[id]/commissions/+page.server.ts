@@ -92,7 +92,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		rules,
 		specialRules: (specialResult.data ?? []).map((rule) => ({
 			...rule,
-			collectorName: collectorNames.get(rule.appliesToCollectorId ?? '') ?? 'Inactive collector'
+			collectorName: collectorNames.get(rule.appliesToCollectorId ?? '') ?? 'Collector'
 		})),
 		collectors: canManage ? collectors : [],
 		today: todayInArgentina(),

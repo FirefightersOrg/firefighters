@@ -29,8 +29,9 @@ begin
     if new.status is distinct from 'active' then raise exception 'new commission rules must start in active status (got %)', new.status using errcode = 'check_violation'; end if;
     new.created_at := now();
   end if;
-  -- A missing collector is reported by the foreign key; an existing one must be active.
-  if new.applies_to_collector_id is not null and exists (
+  -- Only creation requires an active collector; existing rules must remain editable/annullable.
+  -- A missing collector is reported by the foreign key; changing its id is forbidden above.
+  if tg_op = 'INSERT' and new.applies_to_collector_id is not null and exists (
     select 1 from public.collectors where id = new.applies_to_collector_id and status <> 'active'
   ) then raise exception 'collector must be active' using errcode = 'check_violation'; end if;
   select * into v_campaign from public.campaigns where id = new.campaign_id;
@@ -108,19 +109,19 @@ begin
   if v_old.status <> 'recorded' then raise exception 'only recorded ledger entries can be annulled' using errcode='object_not_in_prerequisite_state'; end if;
   if v_old.settlement_id is not null and exists(select 1 from public.settlements where id=v_old.settlement_id and status='closed') then raise exception 'closed-settlement entries must be corrected with a compensating adjustment' using errcode='object_not_in_prerequisite_state'; end if;
   if v_old.direction='collector_credit' then perform pg_advisory_xact_lock(hashtextextended(v_old.campaign_id::text || v_old.collector_id::text, 68)); end if;
-  update public.collector_ledger_entries set status='annulled',annulled_by=v_actor,annulled_at=now(),reason=v_reason where id=p_entry_id;
+  update public.collector_ledger_entries set status='annulled',annulled_by=v_actor,annulled_at=now(),annul_reason=v_reason where id=p_entry_id;
   insert into public.audit_log(actor_user_id,action,entity_type,entity_id,old_value,new_value,reason,request_id)
-  values(v_actor,'collector_ledger.annul','collector_ledger_entry',p_entry_id::text,jsonb_build_object('status','recorded'),jsonb_build_object('status','annulled'),v_reason,p_request_id);
+  values(v_actor,'collector_ledger.annul','collector_ledger_entry',p_entry_id::text,jsonb_build_object('status',v_old.status,'reason',v_old.reason,'annul_reason',v_old.annul_reason),jsonb_build_object('status','annulled','reason',v_old.reason,'annul_reason',v_reason),v_reason,p_request_id);
 end $$;
 
 create function public.collector_ledger_entries_with_balance(p_campaign_id uuid,p_collector_id uuid)
-returns table(id uuid,occurred_at timestamptz,entry_type text,direction text,amount numeric,status text,settlement_id uuid,payment_id uuid,reason text,running_balance numeric)
+returns table(id uuid,occurred_at timestamptz,entry_type text,direction text,amount numeric,status text,settlement_id uuid,payment_id uuid,reason text,annul_reason text,running_balance numeric)
 language plpgsql stable security definer set search_path = '' as $$
 begin
  if not (public.collector_ledger_can_read() or public.collector_ledger_is_own_collector(p_collector_id)) then raise exception 'permission denied: collector ledger access is required' using errcode='insufficient_privilege'; end if;
- return query select e.id,e.occurred_at,e.entry_type,e.direction,e.amount,e.status,e.settlement_id,e.payment_id,e.reason,
-   sum(case when e.status='annulled' then 0 when e.direction='collector_credit' then e.amount else -e.amount end) over(order by e.occurred_at,e.created_at,e.id)
- from public.collector_ledger_entries e where e.campaign_id=p_campaign_id and e.collector_id=p_collector_id order by e.occurred_at,e.created_at,e.id;
+ return query select e.id,e.occurred_at,e.entry_type,e.direction,e.amount,e.status,e.settlement_id,e.payment_id,e.reason,e.annul_reason,
+   sum(case when e.status='annulled' then 0 when e.direction='collector_credit' then e.amount else -e.amount end) over(order by e.occurred_at,e.created_at,case when e.direction='collector_credit' then 0 else 1 end,e.id)
+ from public.collector_ledger_entries e where e.campaign_id=p_campaign_id and e.collector_id=p_collector_id order by e.occurred_at,e.created_at,case when e.direction='collector_credit' then 0 else 1 end,e.id;
 end $$;
 
 revoke all on function public.commission_rule_create(uuid,text,integer,numeric,numeric,date,date,text,text,uuid),

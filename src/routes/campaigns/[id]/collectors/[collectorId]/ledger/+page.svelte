@@ -147,6 +147,11 @@
 											? 'Annulled'
 											: 'Compensated'}
 									{#if entry.reason}<p class="max-w-xs text-xs break-words">{entry.reason}</p>{/if}
+									{#if entry.annulReason}
+										<p class="max-w-xs text-xs break-words">
+											Annulment reason: {entry.annulReason}
+										</p>
+									{/if}
 								</td>
 								{#if data.can.adjustLedger}
 									<td class="px-6 py-2 text-right">

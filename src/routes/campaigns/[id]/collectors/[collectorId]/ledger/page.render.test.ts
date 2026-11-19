@@ -28,7 +28,8 @@ const entries = [
 		status: 'annulled',
 		settlementId: null,
 		paymentId: null,
-		reason: 'Entered twice',
+		reason: 'Cash shortfall',
+		annulReason: 'Entered twice',
 		runningBalance: 15
 	},
 	{
@@ -85,10 +86,12 @@ describe('collector current account page', () => {
 		);
 	});
 
-	it('shows annulled entries struck through with their reason', () => {
+	it('shows annulled adjustments struck through with both original and annulment reasons', () => {
 		const body = page();
 		expect(body).toContain('Annulled');
 		expect(body).toContain('Entered twice');
+		expect(body).toContain('Cash shortfall');
+		expect(body).toContain('Annulment reason: Entered twice');
 		expect(body).toContain('line-through');
 	});
 

@@ -158,7 +158,8 @@ describe('listCollectorLedger', () => {
 					status: 'annulled',
 					settlement_id: null,
 					payment_id: null,
-					reason: 'Twice',
+					reason: 'Cash shortfall',
+					annul_reason: 'Twice',
 					running_balance: '15.00'
 				}
 			]
@@ -166,6 +167,12 @@ describe('listCollectorLedger', () => {
 		const rows = await listCollectorLedger(c, { campaignId, collectorId });
 		expect(rows).toHaveLength(2);
 		expect(rows[0]).toMatchObject({ amount: 15, runningBalance: 15, settlementId: 's1' });
-		expect(rows[1]).toMatchObject({ status: 'annulled', runningBalance: 15 });
+		expect(rows[1]).toMatchObject({
+			status: 'annulled',
+			reason: 'Cash shortfall',
+			annulReason: 'Twice',
+			runningBalance: 15
+		});
+		expect(rows[0].annulReason).toBeNull();
 	});
 });
