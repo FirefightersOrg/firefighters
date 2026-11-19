@@ -11,7 +11,7 @@ import {
 } from '$lib/domain/imports';
 import { parseImportFile } from '$lib/server/imports/parse-file';
 import { listBondNumbersByCampaign } from '$lib/server/repositories/bonds';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
 	getExistingCampaignData,
@@ -71,7 +71,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		...clientOptions,
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	return { client, permissions: await getUserPermissions(client) };
+	return { client, permissions: await loadPermissions(client) };
 }
 
 function fixture(role: string) {

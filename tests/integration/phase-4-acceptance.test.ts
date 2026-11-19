@@ -15,7 +15,7 @@ import {
 	actions as scanActions,
 	load as scanLoad
 } from '../../src/routes/campaigns/[id]/bonds/scan/+page.server';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import type { ImportItem } from '$lib/server/repositories/imports';
 import type { ImportSessionSummary as ImportSummary } from '$lib/server/services/imports';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -70,7 +70,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 
