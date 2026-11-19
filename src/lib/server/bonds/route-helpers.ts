@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import type { z } from 'zod';
 import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
 import { requireActiveUser } from '$lib/server/auth/guards';
-import { hasPermissionIn } from '$lib/server/auth/permissions';
+import { hasPermissionIn, permissionsUnavailable } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import { bondFieldErrors, type BondFieldErrors } from '$lib/schemas/bond';
 import {
@@ -62,6 +62,10 @@ export function checkBondActionPermission(
 	permission: PermissionCode
 ) {
 	requireActiveUser(locals, url.pathname);
+	if (permissionsUnavailable(locals.permissions)) {
+		// Loading the permissions failed (logged by the hook): an outage, not a denial.
+		return bondFormFailure(form, 500, BOND_MESSAGES.internal);
+	}
 	if (!hasPermissionIn(locals.permissions, permission)) {
 		return bondFormFailure(form, 403, BOND_MESSAGES.permission);
 	}

@@ -259,7 +259,10 @@ export function mapBondRpcError(
 
 export interface BondRequestContext {
 	requestId?: string | null;
-	/** The request's permission list (`locals.permissions`): enables the up-front check. */
+	/**
+	 * The request's permission list (`locals.permissions`): enables the up-front check. `null`
+	 * (the list failed to load) fails as `internal` (500), not `permission` (403).
+	 */
 	permissions?: readonly string[] | null;
 }
 
@@ -271,6 +274,10 @@ async function callBondRpc(
 	ctx: BondRequestContext,
 	options: { numberField?: BondNumberField } = {}
 ): Promise<unknown> {
+	if (ctx.permissions === null) {
+		// The request's permission list failed to load (logged by the hook): an outage, not a denial.
+		throw new BondServiceError('internal', BOND_MESSAGES.internal);
+	}
 	if (ctx.permissions !== undefined && !hasPermissionIn(ctx.permissions, permission)) {
 		throw new BondServiceError('permission', BOND_MESSAGES.permission);
 	}

@@ -57,9 +57,9 @@ export const actions = {
 };
 ```
 
-### `getUserPermissions(supabase): Promise<string[]>`
+### `getUserPermissions(supabase): Promise<string[] | null>`
 
-Returns all granular permission codes held by the current authenticated caller in one RPC (`my_permissions()`). Returns an empty array if unauthenticated or on RPC error (logged).
+Returns all granular permission codes held by the current authenticated caller in one RPC (`my_permissions()`). Returns an empty array when the caller holds none (unauthenticated or inactive included), and `null` when the list could not be loaded (RPC error, thrown error or non-array response; logged).
 
 ```typescript
 import { getUserPermissions } from '$lib/server/auth';
@@ -69,7 +69,7 @@ const permissions = await getUserPermissions(supabase);
 
 ### `hasPermissionIn(permissions, permissionCode): boolean` / `requirePermissionIn(permissions, permissionCode): void`
 
-Request-scoped checks against a precomputed list (the result of `getUserPermissions`), with no database round-trip. Load the list once per request (SAN-11/SAN-14 store it on `locals.permissions`) and reuse it for every check in that request. `requirePermissionIn` throws the same 403 as `requirePermission`.
+Request-scoped checks against a precomputed list (the result of `getUserPermissions`), with no database round-trip. Load the list once per request (SAN-11/SAN-14 store it on `locals.permissions`) and reuse it for every check in that request. `requirePermissionIn` throws the same 403 as `requirePermission` when the permission is missing, and the same 500 (`permission_check_failed`) when the list is `null` (failed to load).
 
 ```typescript
 import { getUserPermissions, hasPermissionIn, requirePermissionIn } from '$lib/server/auth';
@@ -79,7 +79,7 @@ requirePermissionIn(permissions, 'bond.view');
 const canAnnul = hasPermissionIn(permissions, 'bond.annul');
 ```
 
-Because `getUserPermissions` returns `[]` on RPC failure, an outage shows up here as 403, not 500. Use `requirePermission` where that distinction matters. The list is a snapshot for the current request only; never cache it across requests.
+`hooks.server.ts` stores a failed load as `locals.permissions = null` (and logs it), so an outage answers 500, not 403. `hasPermissionIn` still returns `false` for `null` (fail closed); action helpers that return `fail()` results check `permissionsUnavailable(locals.permissions)` first and answer 500. The list is a snapshot for the current request only; never cache it across requests.
 
 ### `hasPermissionForUser(supabase, authUserId, permissionCode): Promise<boolean>`
 

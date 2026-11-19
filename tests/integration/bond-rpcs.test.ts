@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEFAULT_NUMBERING_CONFIG } from '$lib/domain/numbering';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { getBondById, listBondNumbersByCampaign } from '$lib/server/repositories/bonds';
 import {
 	annulBond,
@@ -55,7 +55,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		...clientOptions,
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	return { client, permissions: await getUserPermissions(client) };
+	return { client, permissions: await loadPermissions(client) };
 }
 
 let admin: Caller;

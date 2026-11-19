@@ -1,5 +1,5 @@
 /**
- * Canonical list of all 44 granular permission codes defined in docs/permissions.md
+ * Canonical list of all 47 granular permission codes defined in docs/permissions.md
  * and seeded in the database.
  */
 export const PERMISSIONS = [
@@ -22,10 +22,13 @@ export const PERMISSIONS = [
 	'collector.manage',
 	'collector.ledger.view',
 	'collector.ledger.adjust',
+	'sale.view',
 	'sale.create',
 	'sale.correct',
+	'payment.view',
 	'payment.create',
 	'payment.annul',
+	'settlement.view',
 	'settlement.create',
 	'settlement.update_open',
 	'settlement.close',
