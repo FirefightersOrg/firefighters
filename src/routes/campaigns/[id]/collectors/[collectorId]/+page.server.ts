@@ -25,6 +25,7 @@ import { requireActiveUser } from '$lib/server/auth/guards';
 import { listActiveAssignmentNotes } from '$lib/server/repositories/deliveries';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { listCollectorPendingInstallments } from '$lib/server/repositories/sales';
+import { listSettlements } from '$lib/server/repositories/settlements';
 import {
 	DeliveryServiceError,
 	reassignBondsToCollector,
@@ -50,7 +51,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collectorResult.data) error(404, { message: notFound });
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
-	const [bonds, buyers, profiles, audit, installments] = await Promise.all([
+	const [bonds, buyers, profiles, audit, installments, settlements] = await Promise.all([
 		listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
 		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
 		listAvailableCollectorProfileOptions(locals.supabase),
@@ -59,9 +60,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					limit: AUDIT_ENTRIES_LIMIT + 1
 				})
 			: Promise.resolve(null),
-		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId)
+		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId),
+		listSettlements(locals.supabase, params.id, { collectorId: params.collectorId })
 	]);
-	if (bonds.error || buyers.error || profiles.error || audit?.error || installments.error)
+	if (
+		bonds.error ||
+		buyers.error ||
+		profiles.error ||
+		audit?.error ||
+		installments.error ||
+		settlements.error
+	)
 		error(500, { message: 'Could not load the collector. Please try again.' });
 	const collector = collectorResult.data;
 	const assigned = bonds.data?.items ?? [];
@@ -110,6 +119,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		buyersTotal: buyers.data?.total ?? 0,
 		installments: installments.data?.items ?? [],
 		installmentsTotal: installments.data?.total ?? 0,
+		settlements: settlements.data ?? [],
 		profiles: profileOptions,
 		can: { manage: hasPermissionIn(locals.permissions, 'collector.manage'), audit: auditAllowed },
 		audit: auditAllowed

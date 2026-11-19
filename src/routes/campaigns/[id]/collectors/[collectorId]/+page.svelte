@@ -308,11 +308,39 @@
 				</li>{:else}<li class="text-slate-500">No pending installments.</li>{/each}
 		</ul>
 	</section>
-	{#each [{ phase: 'Phase 8: settlements' }, { phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
+	<section id="section-5" class={cardClass}>
+		<h2 class="mb-4 text-base font-semibold">5. Settlements</h2>
+		{#if (data.settlements ?? []).length}<table class="min-w-full text-sm">
+				<thead class="text-left text-xs uppercase text-slate-500"
+					><tr
+						><th class="py-2 pr-3">Number</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"
+							>Total</th
+						><th>Dates</th></tr
+					></thead
+				><tbody
+					>{#each data.settlements ?? [] as settlement (settlement.id)}<tr
+							><td class="py-2 pr-3"
+								><a
+									class="text-blue-700 hover:underline"
+									href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+										id: data.campaign.id,
+										settlementId: settlement.id
+									})}>#{settlement.settlementNumber}</a
+								></td
+							><td>{settlement.status}</td><td>{formatMoney(settlement.totals.totalAmount)}</td><td
+								>{settlement.openedAt.slice(0, 10)}{settlement.closedAt
+									? ` — ${settlement.closedAt.slice(0, 10)}`
+									: ''}</td
+							></tr
+						>{/each}</tbody
+				>
+			</table>{:else}<p class="text-sm text-slate-500">No settlements recorded.</p>{/if}
+	</section>
+	{#each [{ phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
 			id="section-{i + 5}"
 			class={cardClass}
 		>
-			<h2 class="mb-4 text-base font-semibold">{i + 5}. {sections[i + 4]}</h2>
+			<h2 class="mb-4 text-base font-semibold">{i + 6}. {sections[i + 5]}</h2>
 			<p class="text-sm text-slate-500">No data yet. Arrives with {pending.phase}.</p>
 		</section>{/each}
 	<section id="section-8" class={cardClass}>
