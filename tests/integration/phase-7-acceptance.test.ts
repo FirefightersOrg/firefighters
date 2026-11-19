@@ -47,7 +47,6 @@ interface Caller {
 const users = {} as Record<Role, Caller>;
 let service: SupabaseClient;
 let campaignId: string;
-let draftCampaignId: string;
 let collectorId: string;
 let buyerId: string;
 const bonds: Record<string, string> = {};
@@ -163,7 +162,6 @@ beforeAll(async () => {
 		return result.data;
 	};
 	campaignId = await createCampaign('active');
-	draftCampaignId = await createCampaign('draft');
 	const transition = await users.admin.client.rpc('campaign_transition', {
 		p_id: campaignId,
 		p_to_status: 'active',
@@ -384,30 +382,91 @@ describe('Phase 7: sales, payment plans and installments', () => {
 		).toBe('sold');
 	});
 
-	it('C4 refuses unsellable bonds and a draft campaign without writes', async () => {
+	it('C4 refuses unsellable bonds and a campaign that is no longer active, without writes', async () => {
 		for (const bondId of [bonds.available, bonds.lost, bonds.annulled, bonds.sold]) {
 			const requestId = rid('c4');
-			const before = (await service.from('sales').select('id', { count: 'exact', head: true }))
-				.count;
+			// Counted for this bond only: other suites may insert sales concurrently.
+			const salesOf = async () =>
+				(
+					await service
+						.from('sales')
+						.select('id', { count: 'exact', head: true })
+						.eq('bond_id', bondId)
+				).count;
+			const before = await salesOf();
 			expect(
 				await sell(users.operator, bondId, 'full_payment', baDate(), requestId),
 				bondId
 			).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
-			expect((await service.from('sales').select('id', { count: 'exact', head: true })).count).toBe(
-				before
-			);
+			expect(await salesOf()).toBe(before);
 			expect(await auditFor(requestId)).toEqual([]);
 		}
+		// A campaign that is no longer active: a bond delivered while it was active cannot be sold
+		// once it moved to closing (a draft campaign cannot even hold a delivered bond).
+		const closing = await users.admin.client.rpc('campaign_create', {
+			p_name: `[it-p7 ${RUN_ID}] closing`,
+			p_simple_bond_value: '60000.00',
+			p_installment_count: 10,
+			p_number_digits: 4,
+			p_max_number: 9999,
+			p_associated_number_offset: 4871,
+			p_overflow_policy: 'reject',
+			p_barcode_mode: 'base_number',
+			p_starts_at: `${baDate(-1)}T03:00:00Z`,
+			p_ends_at: `${baDate(365)}T03:00:00Z`,
+			p_request_id: rid('campaign-closing')
+		});
+		if (closing.error) throw new Error(closing.error.message);
+		const closingId = closing.data as string;
+		const toStatus = async (status: string) => {
+			const t = await users.admin.client.rpc('campaign_transition', {
+				p_id: closingId,
+				p_to_status: status,
+				p_request_id: rid(`closing-${status}`)
+			});
+			if (t.error) throw new Error(t.error.message);
+		};
+		await toStatus('active');
+		const created = await users.admin.client.rpc('bond_create', {
+			p_campaign_id: closingId,
+			p_base_numbers: [900],
+			p_request_id: rid('closing-bond')
+		});
+		if (created.error) throw new Error(created.error.message);
+		const closingBond = created.data as string;
+		const delivered = await users.admin.client.rpc('bond_deliver', {
+			p_campaign_id: closingId,
+			p_collector_id: collectorId,
+			p_bond_ids: [closingBond],
+			p_notes: null,
+			p_request_id: rid('closing-deliver')
+		});
+		if (delivered.error) throw new Error(delivered.error.message);
+		await toStatus('closing');
+		const closingRequest = rid('closing-sale');
 		const result = await run(
 			saleActions.register as (e: never) => unknown,
 			event(
 				users.operator,
-				`/campaigns/${draftCampaignId}/sales/new?/register`,
-				{ id: draftCampaignId },
-				{ bondId: bonds.available, buyerId, paymentMode: 'full_payment', firstDueDate: baDate() }
+				`/campaigns/${closingId}/sales/new?/register`,
+				{ id: closingId },
+				{ bondId: closingBond, buyerId, paymentMode: 'full_payment', firstDueDate: baDate() },
+				closingRequest
 			)
 		);
-		expect(result).toMatchObject({ status: 409 });
+		expect(result).toMatchObject({
+			status: 409,
+			data: { errors: { campaignId: [expect.any(String)] } }
+		});
+		expect(
+			(
+				await service
+					.from('sales')
+					.select('id', { count: 'exact', head: true })
+					.eq('bond_id', closingBond)
+			).count
+		).toBe(0);
+		expect(await auditFor(closingRequest)).toEqual([]);
 	});
 
 	it('C5 refuses return, reassignment, and loss after sale with no audit side effects', async () => {
@@ -442,7 +501,10 @@ describe('Phase 7: sales, payment plans and installments', () => {
 	});
 
 	it('C6 allows operator/admin sales but limits registration and preserves read-only list/detail visibility', async () => {
-		expect(await saleNewLoad(event(users.admin, salePath(), { id: campaignId }))).toBeDefined();
+		expect(await saleNewLoad(event(users.admin, salePath(), { id: campaignId }))).toMatchObject({
+			campaign: { id: campaignId },
+			canCreateBuyer: true
+		});
 		for (const caller of [users.treasurer, users['read-only']]) {
 			expect(
 				await run(

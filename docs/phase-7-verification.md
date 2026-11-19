@@ -2,19 +2,19 @@
 
 Verified locally on 2026-11-19. `tests/integration/phase-7-acceptance.test.ts` uses live,
 per-user Supabase clients, the real SvelteKit sales and bond action/load modules, and unique
-`RUN_ID` request/audit data. It creates an active campaign, draft campaign, collector, buyer,
+`RUN_ID` request/audit data. It creates an active campaign, collector, buyer,
 bonds, and delivery in `beforeAll`.
 
 ## Acceptance criteria
 
-| #   | Criterion                  | Evidence                                                                                   | Result   |
-| --- | -------------------------- | ------------------------------------------------------------------------------------------ | -------- |
-| C1  | Simple bond and pata sale  | Route registration verifies sold custody/buyer, sale totals, and `sale.create` audit rows. | **Pass** |
-| C2  | Plans and installments     | Verifies numbered monthly rows, totals, full-payment due date, and duplicate `23505`.      | **Pass** |
-| C3  | Financial independence     | Confirms sold/no-payments snapshot and domain overdue calculation independently.           | **Pass** |
-| C4  | Rejections                 | Available, lost, annulled, sold, and draft cases return errors without sale/audit writes.  | **Pass** |
-| C5  | Sold custody guard         | Return, reassign, and mark-lost route actions return 409 without audit rows.               | **Pass** |
-| C6  | Permissions and visibility | Admin/operator registration, treasurer/read-only 403s, read-only list/detail visibility.   | **Pass** |
+| #   | Criterion                  | Evidence                                                                                                                                                                                                                                                                                                                                                                  | Result   |
+| --- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| C1  | Simple bond and pata sale  | Route registration verifies sold custody/buyer, sale totals, and `sale.create` audit rows.                                                                                                                                                                                                                                                                                | **Pass** |
+| C2  | Plans and installments     | Verifies numbered monthly rows, totals, full-payment due date, and duplicate `23505`.                                                                                                                                                                                                                                                                                     | **Pass** |
+| C3  | Financial independence     | Confirms sold/no-payments snapshot and domain overdue calculation independently.                                                                                                                                                                                                                                                                                          | **Pass** |
+| C4  | Rejections                 | Available, lost, annulled and sold bonds are refused with the error on the bond field; a bond delivered while its campaign was active cannot be sold once the campaign is `closing` (error on the campaign field). No sale row (counted per bond) and no audit row for the request id. A draft campaign cannot hold a delivered bond at all (deliveries are active-only). | **Pass** |
+| C5  | Sold custody guard         | Return, reassign, and mark-lost route actions return 409 without audit rows.                                                                                                                                                                                                                                                                                              | **Pass** |
+| C6  | Permissions and visibility | Admin/operator registration, treasurer/read-only 403s, read-only list/detail visibility.                                                                                                                                                                                                                                                                                  | **Pass** |
 
 ## Commands and real results
 
