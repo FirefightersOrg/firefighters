@@ -344,8 +344,8 @@ describe('Phase 4 end-to-end acceptance (local Supabase)', () => {
 			const before = await preview(operator, id, '?status=error');
 			expect(before.items.map((x) => [x.rowNumber, x.errorCode])).toEqual([
 				[2, 'number_out_of_range'],
-				[3, 'number_conflict'],
-				[4, 'number_conflict'],
+				[3, 'duplicate_number'],
+				[4, 'duplicate_number'],
 				[5, 'incomplete_pata']
 			]);
 			expect((await previewAction(operator, id, 'confirm')).status).toBe(409);

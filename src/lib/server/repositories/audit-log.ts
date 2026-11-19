@@ -3,7 +3,7 @@ import type { RepositoryResult } from './campaigns';
 
 /**
  * Read access to `public.audit_log` under the caller's RLS (`audit.view`: without it every read
- * returns no rows). Rows are written only by the audited SQL functions (and `recordAuditLog`).
+ * returns no rows). Rows are written only by the audited SQL functions.
  */
 
 /** Most audit entries read for one record. */
