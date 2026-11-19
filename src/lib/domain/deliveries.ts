@@ -16,12 +16,13 @@ export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
 	lost: 'Lost'
 };
 
-export const DELIVERY_NOTE_REASONS = ['delivery', 'reassignment'] as const;
+export const DELIVERY_NOTE_REASONS = ['delivery', 'reassignment', 'return'] as const;
 export type DeliveryNoteReason = (typeof DELIVERY_NOTE_REASONS)[number];
 
 export const DELIVERY_NOTE_REASON_LABELS: Record<DeliveryNoteReason, string> = {
 	delivery: 'Delivery',
-	reassignment: 'Reassignment'
+	reassignment: 'Reassignment',
+	return: 'Return'
 };
 
 /** At most this many bonds per delivery, reassignment or return (database limit). */
