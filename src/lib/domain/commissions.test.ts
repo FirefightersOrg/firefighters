@@ -123,6 +123,20 @@ describe('compareCommissionRules', () => {
 });
 
 describe('settlement commission calculation', () => {
+	it('treats binary half-cent rounding as a preview, not authoritative numeric money', () => {
+		// PostgreSQL round(10.075::numeric, 2) is 10.08 (covered by pgTAP 031).
+		expect(
+			calculateApplicationCommission([rule({ percentage: '50.00' })], {
+				collectorId: 'collector',
+				paymentDate: '2026-06-15',
+				paymentMode: 'full_payment',
+				installmentNumber: 1,
+				installmentCount: 1,
+				amountApplied: 20.15,
+				installmentAmount: 20.15
+			})
+		).toBe(10.07);
+	});
 	const application = {
 		collectorId: 'collector',
 		paymentDate: '2026-06-15',

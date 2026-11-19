@@ -156,6 +156,8 @@ begin
   if v_reason is null or length(v_reason) > 1000 then
     raise exception 'a trimmed reason of at most 1000 characters is required' using errcode = 'invalid_parameter_value';
   end if;
+  perform 1 from public.campaigns where id = p_campaign_id for share;
+  if not found then raise exception 'campaign % not found', p_campaign_id using errcode = 'no_data_found'; end if;
   perform 1 from public.collectors where id = p_collector_id for share;
   if not found then raise exception 'collector % not found', p_collector_id using errcode = 'no_data_found'; end if;
   perform pg_advisory_xact_lock(hashtextextended(p_campaign_id::text || p_collector_id::text, 68));
