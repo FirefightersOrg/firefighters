@@ -157,6 +157,14 @@ Suggested fields:
 - `status`
 - `created_at`
 
+Implemented in SAN-49 (`20261203000000_collectors_buyers.sql`, pgTAP `019`):
+
+- Global, not per campaign (the same people sell year after year). Never deleted: `status` is `active` or `inactive`; DELETE/TRUNCATE are rejected for every role (`23001`).
+- Text is stored trimmed (empty → null); `email` lowercased and checked; limits: name 200, phone 50, email 254, address 500.
+- `user_profile_id` (optional, unique) links the future collector login: that profile reads its own row without `collector.view` ("own" scope).
+- Writes only through `collector_create` / `collector_update` (`collector.manage`, audited as `collector.create` / `collector.update` with the changed keys; `collector_update` takes `p_expected_updated_at`, `PT409` when stale, and returns false for a no-op).
+- RLS: SELECT with `collector.view` or `collector.manage`, or the own row. `bonds.current_collector_id` and `commission_rules.applies_to_collector_id` now reference it.
+
 ### buyers
 
 Buyers.
@@ -175,6 +183,15 @@ Suggested fields:
 - `usual_collector_id`
 - `notes`
 - `created_at`
+
+Implemented in SAN-49 (same migration):
+
+- Global and never deleted. `type` is `individual` (needs a first or last name) or `business` (needs `business_name`). Limits: names 100/200, document and tax id 30, notes 2000.
+- `document_number` and `tax_id` have partial indexes but are **not unique**: legacy data has duplicate buyers that are normalised by hand, so the screens warn about possible duplicates instead.
+- `usual_collector_id` references `collectors` (any status, so it can stay as history).
+- Writes only through `buyer_create` / `buyer_update` (`buyer.manage`, audited as `buyer.create` / `buyer.update`, same concurrency rule as collectors).
+- RLS: SELECT with `buyer.view` or `buyer.manage` (SAN-93 gives every action permission its `.view`). `bonds.current_buyer_id` now references it.
+- App layer: `src/lib/domain/parties.ts`, `src/lib/server/repositories/parties.ts` (list/search/get), `src/lib/server/services/parties.ts` (writes).
 
 ### bonds
 

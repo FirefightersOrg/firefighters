@@ -46,7 +46,7 @@ export function campaignRow(overrides: Partial<CampaignRow> = {}): CampaignRow {
 	};
 }
 
-type QueryResult = { data: unknown; error: unknown };
+type QueryResult = { data: unknown; error: unknown; count?: number | null };
 
 /**
  * Minimal Supabase mock: `from(table)` select chains resolve to `tables[table]` when given, else
@@ -54,7 +54,12 @@ type QueryResult = { data: unknown; error: unknown };
  * `chain` is the chain of the last `from()` call.
  */
 export function mockSupabase(
-	options: { query?: QueryResult; rpc?: QueryResult; tables?: Record<string, QueryResult> } = {}
+	options: {
+		query?: QueryResult;
+		rpc?: QueryResult;
+		/** A table can return a sequence of results when one route reads it more than once. */
+		tables?: Record<string, QueryResult | QueryResult[]>;
+	} = {}
 ) {
 	const query = options.query ?? { data: null, error: null };
 	const makeChain = (result: QueryResult) => {
@@ -62,9 +67,11 @@ export function mockSupabase(
 			select: vi.fn(),
 			order: vi.fn(),
 			eq: vi.fn(),
+			neq: vi.fn(),
 			limit: vi.fn(),
 			maybeSingle: vi.fn(),
 			is: vi.fn(),
+			not: vi.fn(),
 			gte: vi.fn(),
 			in: vi.fn(),
 			or: vi.fn(),
@@ -76,9 +83,11 @@ export function mockSupabase(
 			'select',
 			'order',
 			'eq',
+			'neq',
 			'limit',
 			'maybeSingle',
 			'is',
+			'not',
 			'gte',
 			'in',
 			'or',
@@ -92,8 +101,15 @@ export function mockSupabase(
 	let chain = makeChain(query);
 	/** Every chain created, per table (in call order). */
 	const chains: Record<string, ReturnType<typeof makeChain>[]> = {};
+	const tableCalls: Record<string, number> = {};
 	const from = vi.fn((table: string) => {
-		chain = makeChain(options.tables?.[table] ?? query);
+		const configured = options.tables?.[table] ?? query;
+		const index = tableCalls[table] ?? 0;
+		tableCalls[table] = index + 1;
+		const result = Array.isArray(configured)
+			? (configured[index] ?? configured.at(-1)!)
+			: configured;
+		chain = makeChain(result);
 		(chains[table] ??= []).push(chain);
 		return chain;
 	});
@@ -111,17 +127,19 @@ export function mockSupabase(
 
 export function makeLocals(options: {
 	signedIn?: boolean;
-	permissions?: string[];
+	/** `null` simulates a failed permissions load (the hook sets it when my_permissions fails). */
+	permissions?: string[] | null;
 	supabase?: SupabaseClient;
 }): App.Locals {
 	const signedIn = options.signedIn ?? true;
+	const permissions = options.permissions === undefined ? ADMIN_PERMISSIONS : options.permissions;
 	return {
 		supabase: options.supabase ?? mockSupabase().supabase,
 		safeGetSession: vi.fn(),
 		session: null,
 		user: signedIn ? ({ id: profile.auth_user_id } as User) : null,
 		profile: signedIn ? profile : null,
-		permissions: signedIn ? (options.permissions ?? ADMIN_PERMISSIONS) : [],
+		permissions: signedIn ? permissions : [],
 		requestId: 'req-test'
 	};
 }

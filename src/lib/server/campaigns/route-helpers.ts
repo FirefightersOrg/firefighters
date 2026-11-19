@@ -1,7 +1,11 @@
 import { fail } from '@sveltejs/kit';
 import type { z } from 'zod';
 import { requireActiveUser } from '$lib/server/auth/guards';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import {
 	CAMPAIGN_VERSION_FIELD,
@@ -41,6 +45,10 @@ export function checkCampaignActionPermission(
 	permission: PermissionCode
 ) {
 	requireActiveUser(locals, url.pathname);
+	if (permissionsUnavailable(locals.permissions)) {
+		// Loading the permissions failed (logged by the hook): an outage, not a denial.
+		return campaignFormFailure(form, 500, CAMPAIGN_MESSAGES.internal);
+	}
 	if (!hasPermissionIn(locals.permissions, permission)) {
 		return campaignFormFailure(form, 403, CAMPAIGN_MESSAGES.permission);
 	}
