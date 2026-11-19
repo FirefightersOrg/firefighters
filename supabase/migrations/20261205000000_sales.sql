@@ -223,6 +223,74 @@ create trigger installments_forbid_delete before delete on public.installments
 create trigger installments_forbid_truncate before truncate on public.installments
   for each statement execute function public.sales_forbid_delete();
 
+
+-- Consistency between a sale, its plan and its installments (#54 review): nothing can be
+-- corrected after insert, so it is enforced here, not only by the SAN-59 function.
+--   * a plan's total equals its sale's total; a full payment is a one-installment plan;
+--   * at commit, an active plan has exactly installment_count installments numbered 1..n whose
+--     amounts add up to the plan total.
+create function public.payment_plans_check_sale()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_sale public.sales;
+begin
+  select * into v_sale from public.sales where id = new.sale_id;
+  if new.total_amount <> v_sale.total_amount then
+    raise exception 'a payment plan total (%) must equal its sale total (%)', new.total_amount, v_sale.total_amount
+      using errcode = 'check_violation';
+  end if;
+  if v_sale.payment_mode = 'full_payment' and new.installment_count <> 1 then
+    raise exception 'a full payment plan has exactly one installment'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+create function public.payment_plans_check_installments()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_plan public.payment_plans;
+  v_count integer;
+  v_max integer;
+  v_sum numeric(12, 2);
+begin
+  if tg_table_name = 'installments' then
+    select * into v_plan from public.payment_plans where id = new.payment_plan_id;
+  else
+    select * into v_plan from public.payment_plans where id = new.id;
+  end if;
+  if v_plan.status <> 'active' then
+    return null;
+  end if;
+  select count(*), max(installment_number), coalesce(sum(amount), 0)
+  into v_count, v_max, v_sum
+  from public.installments where payment_plan_id = v_plan.id;
+  if v_count <> v_plan.installment_count or v_max <> v_plan.installment_count
+     or v_sum <> v_plan.total_amount then
+    raise exception 'payment plan % must have installments 1..% adding up to % (has %, max %, sum %)',
+      v_plan.id, v_plan.installment_count, v_plan.total_amount, v_count, v_max, v_sum
+      using errcode = 'check_violation';
+  end if;
+  return null;
+end;
+$$;
+
+create trigger payment_plans_check_sale before insert on public.payment_plans
+  for each row execute function public.payment_plans_check_sale();
+create constraint trigger payment_plans_check_installments after insert on public.payment_plans
+  deferrable initially deferred
+  for each row execute function public.payment_plans_check_installments();
+create constraint trigger installments_check_plan after insert on public.installments
+  deferrable initially deferred
+  for each row execute function public.payment_plans_check_installments();
+
 -- ---------------------------------------------------------------------------
 -- Privileges and RLS
 -- ---------------------------------------------------------------------------
@@ -239,24 +307,35 @@ alter table public.sales enable row level security;
 alter table public.payment_plans enable row level security;
 alter table public.installments enable row level security;
 
--- Who reads a sale: readers of bonds (bond.view: admin, operator, treasurer, read-only), the
--- sale permissions themselves, and the collector's own login for its sales ("own" scope).
-create function public.sale_can_read(p_collector_id uuid)
+-- Who reads a sale: sale.view (SAN-93, #44), readers of bonds (bond.view: admin, operator,
+-- treasurer, read-only), the sale permissions themselves, and the collector's own login for its
+-- sales ("own" scope). The permission part is evaluated once per query (initPlan); only the
+-- own-collector check runs per row.
+create function public.sale_can_read()
 returns boolean
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select public.has_permission('bond.view') or public.has_permission('sale.create')
-    or public.has_permission('sale.correct')
-    or exists (select 1 from public.collectors c
-               where c.id = p_collector_id and c.user_profile_id is not null
-                 and c.user_profile_id = public.current_profile_id());
+  select public.has_permission('sale.view') or public.has_permission('bond.view')
+    or public.has_permission('sale.create') or public.has_permission('sale.correct');
+$$;
+
+create function public.sale_is_own_collector(p_collector_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.collectors c
+                 where c.id = p_collector_id and c.user_profile_id is not null
+                   and c.user_profile_id = public.current_profile_id());
 $$;
 
 create policy sales_select on public.sales for select to authenticated
-  using ((select public.sale_can_read(collector_id)));
+  using ((select public.sale_can_read()) or public.sale_is_own_collector(collector_id));
 -- Plans and installments follow their sale's visibility.
 create policy payment_plans_select on public.payment_plans for select to authenticated
   using (exists (select 1 from public.sales s where s.id = sale_id));
@@ -270,12 +349,15 @@ begin
   foreach f in array array[
     'public.sales_forbid_delete()', 'public.sales_guard_update()',
     'public.payment_plans_guard_update()', 'public.installments_guard_update()',
-    'public.sales_guard_insert()'
+    'public.sales_guard_insert()', 'public.payment_plans_check_sale()',
+    'public.payment_plans_check_installments()'
   ] loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f);
   end loop;
 end;
 $$;
 -- The RLS helper runs for the reading user.
-revoke all on function public.sale_can_read(uuid) from public, anon, service_role;
-grant execute on function public.sale_can_read(uuid) to authenticated;
+revoke all on function public.sale_can_read() from public, anon, service_role;
+grant execute on function public.sale_can_read() to authenticated;
+revoke all on function public.sale_is_own_collector(uuid) from public, anon, service_role;
+grant execute on function public.sale_is_own_collector(uuid) to authenticated;
