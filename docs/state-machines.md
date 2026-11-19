@@ -68,6 +68,8 @@ Rules:
 
 - Manually entered simple bonds and printed patas start as `available`. Imported bonds are created only when their import session is confirmed, also directly as `available` (SAN-44 decision); `created` is currently unused.
 - A bond loaded by mistake is annulled (`available -> annulled`: only while available, not while delivered to a collector) with a reason and audit; annulling requires `bond.annul`. Its participating numbers are released so they can be entered again, and the annulled bond and its numbers stay as history. The database records the status a bond was annulled from (`annulled_from_status`); only bonds annulled from `available` release their numbers.
+- Bonds are delivered to collectors (and reassigned) only while the campaign is `active`, never in `draft` (product decision on #47).
+- A return (`delivered_to_collector -> returned -> available`) covers the bonds of one collector at a time and issues a return note (a delivery note with reason `return`), the collector's receipt. Return and reassignment from a screen pass the collector the bonds were seen with; if one moved meanwhile, the database refuses (55000).
 - `sold -> annulled` (annulling a sale) is Phase 10: the bond's numbers stay held (never released), so no other bond can take them.
 - `annulled`, `lost` and `closed` have no outgoing transitions; annulled and closed bonds are immutable (except the recalculated financial status).
 - Annulling a bond loaded by mistake (`bond_annul`, SAN-23) only applies to `available` simple bonds and printed patas that are not grouped into a manual pata, and only while the campaign is `draft` or `active`. Annulling a sold bond is a Phase 10 correction.

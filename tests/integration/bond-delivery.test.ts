@@ -68,10 +68,19 @@ beforeAll(async () => {
 		p_associated_number_offset: 4871,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
+		p_starts_at: '2026-01-01T03:00:00Z',
+		p_ends_at: '2027-12-31T03:00:00Z',
 		p_request_id: `it-delivery-${RUN_ID}-campaign`
 	});
 	if (campaign.error) throw new Error(campaign.error.message);
 	campaignId = campaign.data as string;
+	// Bonds are delivered only while the campaign is active.
+	const activated = await admin.client.rpc('campaign_transition', {
+		p_id: campaignId,
+		p_to_status: 'active',
+		p_request_id: `it-delivery-${RUN_ID}-activate`
+	});
+	if (activated.error) throw new Error(activated.error.message);
 	for (const n of [10, 11, 12, 13]) {
 		const bond = await admin.client.rpc('bond_create', {
 			p_campaign_id: campaignId,
@@ -144,13 +153,15 @@ describe('bond delivery (local Supabase)', () => {
 				ctx(operator, 'r')
 			)
 		).rejects.toMatchObject({ kind: 'permission' });
-		expect(
-			await returnBondsFromCollector(
-				admin.client,
-				{ campaignId, bondIds: [bondIds[1]] },
-				ctx(admin, 'return')
-			)
-		).toBe(1);
+		const returnNoteId = await returnBondsFromCollector(
+			admin.client,
+			{ campaignId, bondIds: [bondIds[1]], fromCollectorId: ana },
+			ctx(admin, 'return')
+		);
+		// The return issues a note for the collector (its receipt).
+		const returnNote = await getDeliveryNote(admin.client, campaignId, returnNoteId);
+		expect(returnNote.data?.note).toMatchObject({ reason: 'return', collectorId: ana });
+		expect(returnNote.data?.bondIds).toEqual([bondIds[1]]);
 		await markBondLost(
 			admin.client,
 			{
@@ -171,6 +182,7 @@ describe('bond delivery (local Supabase)', () => {
 			['reassignment', 'active', `Beto ${RUN_ID}`, 2]
 		]);
 		const returned = await listBondAssignments(operator.client, bondIds[1]);
+		expect(returned.data?.at(-1)?.deliveryNoteId).toBe(returnNoteId);
 		expect(returned.data?.map((a) => [a.assignmentType, a.status])).toEqual([
 			['delivery', 'returned'],
 			['return', 'returned']
@@ -205,5 +217,36 @@ describe('bond delivery (local Supabase)', () => {
 				ctx(admin, 'no-responsible')
 			)
 		).rejects.toMatchObject({ kind: 'validation', field: 'responsibleParty' });
+	});
+
+	it('a stale source collector and an impossible loss date are refused on the right field', async () => {
+		// bondIds[0] is with Beto (reassigned above): a screen that still shows it with Ana is stale.
+		await expect(
+			returnBondsFromCollector(
+				admin.client,
+				{ campaignId, bondIds: [bondIds[0]], fromCollectorId: ana },
+				ctx(admin, 'stale-return')
+			)
+		).rejects.toMatchObject({ kind: 'conflict', field: 'bondIds' });
+		await expect(
+			reassignBondsToCollector(
+				admin.client,
+				{ campaignId, collectorId: ana, bondIds: [bondIds[0]], fromCollectorId: ana },
+				ctx(admin, 'stale-reassign')
+			)
+		).rejects.toMatchObject({ kind: 'conflict', field: 'bondIds' });
+		await expect(
+			markBondLost(
+				admin.client,
+				{
+					campaignId,
+					bondId: bondIds[3],
+					responsibleParty: 'Ana',
+					lostOn: '2026-02-31',
+					reason: 'x'
+				},
+				ctx(admin, 'bad-date')
+			)
+		).rejects.toMatchObject({ kind: 'validation', field: 'lostOn' });
 	});
 });
