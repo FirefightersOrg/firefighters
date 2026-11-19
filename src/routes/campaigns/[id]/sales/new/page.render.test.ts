@@ -32,9 +32,11 @@ describe('sale registration page', () => {
 		expect(body).toContain('Find a delivered bond');
 		expect(body).toContain('Create a buyer');
 		expect(body).toContain('Confirm sale');
-		expect(body).toContain('firstDueDate');
+		expect(body).not.toContain('firstDueDate');
+		expect(body).toContain('Collector: Select a bond to see its holder.');
+		expect(body).not.toContain('Confirmed collector');
+		expect(body).toContain('4. Schedule preview');
 		expect(body).toContain('Showing first 1 of 31');
-		expect(body).toContain('min="2026-12-01"');
 	});
 	it('renders field errors with their accessible descriptions', () => {
 		const body = page({
@@ -47,7 +49,7 @@ describe('sale registration page', () => {
 		});
 		expect(body).toContain('bondId-error');
 		expect(body).toContain('aria-describedby="buyerId-error"');
-		expect(body).toContain('Bad date.');
+		expect(body).not.toContain('firstDueDate-error');
 	});
 	it('renders lookup refusal and buyer duplicate warning', () => {
 		expect(page({ form: 'lookup', found: [] }).toString()).toContain(

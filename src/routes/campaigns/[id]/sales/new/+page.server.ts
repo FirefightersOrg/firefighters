@@ -42,9 +42,19 @@ export const firstDueDateBounds = (today = argentinaToday()) => ({
 const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
 	const { min, max } = firstDueDateBounds(today);
 	return saleRegisterSchema
-		.extend({ campaignId: z.literal(campaignId), firstDueDate: z.iso.date() })
-		.superRefine(({ firstDueDate }, context) => {
-			if (firstDueDate < min || firstDueDate > max)
+		.extend({ campaignId: z.literal(campaignId), firstDueDate: z.string().optional() })
+		.superRefine(({ paymentMode, firstDueDate }, context) => {
+			if (paymentMode === 'full_payment') return;
+			if (!z.iso.date().safeParse(firstDueDate).success) {
+				context.addIssue({
+					code: 'custom',
+					path: ['firstDueDate'],
+					message: 'Enter a valid first due date.'
+				});
+				return;
+			}
+			const dueDate = firstDueDate!;
+			if (dueDate < min || dueDate > max)
 				context.addIssue({
 					code: 'custom',
 					path: ['firstDueDate'],
@@ -239,7 +249,12 @@ export const actions: Actions = {
 		try {
 			saleId = await registerSale(
 				locals.supabase,
-				{ campaignId: params.id, ...values, paymentMode: values.paymentMode as PaymentMode },
+				{
+					campaignId: params.id,
+					...values,
+					paymentMode: values.paymentMode as PaymentMode,
+					firstDueDate: values.paymentMode === 'full_payment' ? null : values.firstDueDate
+				},
 				{ requestId: locals.requestId, permissions: locals.permissions }
 			);
 		} catch (err) {

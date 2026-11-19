@@ -22,7 +22,7 @@ describe('sales service', () => {
 		);
 		expect(rpc).toHaveBeenCalledWith(
 			'sale_register',
-			expect.objectContaining({ p_request_id: 'request' })
+			expect.objectContaining({ p_request_id: 'request', p_first_due_date: null })
 		);
 	});
 	it('rejects invalid input before the RPC', async () => {

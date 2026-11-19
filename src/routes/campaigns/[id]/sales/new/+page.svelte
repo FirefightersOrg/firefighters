@@ -32,7 +32,7 @@
 		selectedBond
 			? buildInstallmentSchedule({
 					paymentMode: mode as 'full_payment' | 'installments',
-					firstDueDate: due,
+					firstDueDate: mode === 'full_payment' ? data.today : due,
 					totalAmount: selectedCandidate?.totalValue ?? data.campaign.simpleBondValue,
 					installmentCount: data.campaign.installmentCount,
 					installmentValue: data.campaign.installmentValue,
@@ -50,7 +50,7 @@
 	>
 	<h1 class="text-2xl font-bold">Register sale</h1>
 	<section class="{cardClass} space-y-4">
-		<h2 class="font-semibold">1–2. Find a delivered bond</h2>
+		<h2 class="font-semibold">1. Find a delivered bond</h2>
 		<form method="POST" action="?/lookup" use:enhance class="flex gap-2">
 			<input
 				class={inputClass}
@@ -78,7 +78,7 @@
 			</div>{/if}
 	</section>
 	<section class="{cardClass} space-y-5">
-		<h2 class="font-semibold">3. Buyer</h2>
+		<h2 class="font-semibold">2. Buyer</h2>
 		<form method="GET" class="flex gap-2">
 			<label class="sr-only" for="buyer-search">Search buyers</label>
 			<input
@@ -141,17 +141,14 @@
 		<input type="hidden" name="bondId" value={selectedBond} />
 		<input type="hidden" name="buyerId" value={selectedBuyer} />
 		<FieldError id="bondId-error" errors={form?.form === 'sale' ? errors.bondId : undefined} />
-		<h2 class="font-semibold">4. Confirmed collector</h2>
 		<p class="text-sm text-slate-500">
 			{#if selectedCandidate?.collectorName}
-				{selectedCandidate.collectorName}. The sale is recorded under the collector holding the
-				bond.
+				Collector: {selectedCandidate.collectorName}
 			{:else}
-				Select a bond to see its collector. The sale is recorded under the collector holding the
-				bond.
+				Collector: Select a bond to see its holder.
 			{/if}
 		</p>
-		<h2 class="font-semibold">5. Modality</h2>
+		<h2 class="font-semibold">3. Modality</h2>
 		<select
 			class={inputClass}
 			name="paymentMode"
@@ -168,24 +165,26 @@
 			id="paymentMode-error"
 			errors={form?.form === 'sale' ? errors.paymentMode : undefined}
 		/>
-		<label class={labelClass} for="firstDueDate">First due date</label><input
-			class={inputClass}
-			id="firstDueDate"
-			name="firstDueDate"
-			type="date"
-			bind:value={due}
-			min={data.firstDueDateBounds.min}
-			max={data.firstDueDateBounds.max}
-			aria-invalid={form?.form === 'sale' && errors.firstDueDate ? 'true' : undefined}
-			aria-describedby={form?.form === 'sale' && errors.firstDueDate
-				? 'firstDueDate-error'
-				: undefined}
-		/>
-		<FieldError
-			id="firstDueDate-error"
-			errors={form?.form === 'sale' ? errors.firstDueDate : undefined}
-		/>
-		<h2 class="font-semibold">6. Schedule preview</h2>
+		{#if mode === 'installments'}
+			<label class={labelClass} for="firstDueDate">First due date</label><input
+				class={inputClass}
+				id="firstDueDate"
+				name="firstDueDate"
+				type="date"
+				bind:value={due}
+				min={data.firstDueDateBounds.min}
+				max={data.firstDueDateBounds.max}
+				aria-invalid={form?.form === 'sale' && errors.firstDueDate ? 'true' : undefined}
+				aria-describedby={form?.form === 'sale' && errors.firstDueDate
+					? 'firstDueDate-error'
+					: undefined}
+			/>
+			<FieldError
+				id="firstDueDate-error"
+				errors={form?.form === 'sale' ? errors.firstDueDate : undefined}
+			/>
+		{/if}
+		<h2 class="font-semibold">4. Schedule preview</h2>
 		{#if schedule.length}<table class="text-sm">
 				<tbody
 					>{#each schedule as installment (installment.number)}<tr

@@ -10,9 +10,21 @@
 	} from '$lib/components/campaigns/styles';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
 	import { formatMoney } from '$lib/domain/money';
+	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
 	const href = $derived(resolve('/campaigns/[id]/sales', { id: data.campaign.id }));
+	const numbering = $derived(campaignNumberingConfig(data.campaign));
+	const bondLabel = (pairs: { base: number; associated: number | null }[]) =>
+		pairs
+			.map(
+				({ base, associated }) =>
+					`${formatCampaignNumber(base, numbering)}${
+						associated === null ? '' : ` / ${formatCampaignNumber(associated, numbering)}`
+					}`
+			)
+			.join(', ');
 	function pageLink(page: number): ResolvedPathname {
 		const pairs = Object.entries(data.filters).filter(([, value]) => value);
 		if (page > 1) pairs.push(['page', String(page)]);
@@ -110,7 +122,7 @@
 								href={resolve('/campaigns/[id]/sales/[saleId]', {
 									id: data.campaign.id,
 									saleId: item.sale.id
-								})}>{item.bondNumbers.join(', ')}</a
+								})}>{bondLabel(item.bondNumberPairs)}</a
 							></td
 						><td>{item.buyerName}</td><td>{item.collectorName}</td><td
 							>{PAYMENT_MODE_LABELS[item.sale.paymentMode]}</td

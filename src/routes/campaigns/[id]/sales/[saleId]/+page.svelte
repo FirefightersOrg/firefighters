@@ -3,8 +3,21 @@
 	import { cardClass } from '$lib/components/campaigns/styles';
 	import { PAYMENT_MODE_LABELS, INSTALLMENT_STATUS_LABELS } from '$lib/domain/sales';
 	import { formatMoney } from '$lib/domain/money';
+	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
+	const numbering = $derived(campaignNumberingConfig(data.campaign));
+	const bondLabel = $derived(
+		data.sale.bondNumberPairs
+			.map(
+				({ base, associated }) =>
+					`${formatCampaignNumber(base, numbering)}${
+						associated === null ? '' : ` / ${formatCampaignNumber(associated, numbering)}`
+					}`
+			)
+			.join(', ')
+	);
 </script>
 
 <svelte:head><title>Sale - {data.campaign.name}</title></svelte:head>
@@ -24,7 +37,7 @@
 						href={resolve('/campaigns/[id]/bonds/[bondId]', {
 							id: data.campaign.id,
 							bondId: data.sale.bondId
-						})}>{data.sale.bondNumbers.join(', ')}</a
+						})}>{bondLabel}</a
 					>
 				</dd>
 			</div>

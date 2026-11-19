@@ -114,6 +114,7 @@ export interface SaleListItem {
 	sale: Sale;
 	bondId: string;
 	bondNumbers: number[];
+	bondNumberPairs: { base: number; associated: number | null }[];
 	buyerName: string;
 	collectorName: string;
 	financialStatus: FinancialStatus;
@@ -128,14 +129,35 @@ type SaleListRow = SaleRow & {
 	collectors: { display_name: string } | null;
 	bonds: {
 		financial_status_snapshot: FinancialStatus;
-		bond_numbers: { number_value: number; number_kind: string }[];
+		bond_numbers: {
+			id: string;
+			number_value: number;
+			number_kind: string;
+			source_base_number_id: string | null;
+		}[];
 	} | null;
 };
+type SaleBondNumber = NonNullable<SaleListRow['bonds']>['bond_numbers'][number];
 
 const buyerName = (buyer: SaleListRow['buyers']) =>
 	buyer?.business_name ||
 	[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
 	'Unknown buyer';
+
+function bondNumberPairs(numbers: SaleBondNumber[] | undefined) {
+	const associatedByBase = new Map(
+		(numbers ?? [])
+			.filter((number) => number.number_kind === 'associated' && number.source_base_number_id)
+			.map((number) => [number.source_base_number_id!, number.number_value])
+	);
+	return (numbers ?? [])
+		.filter((number) => number.number_kind === 'base')
+		.map((number) => ({
+			base: number.number_value,
+			associated: associatedByBase.get(number.id) ?? null
+		}))
+		.sort((a, b) => a.base - b.base);
+}
 
 function mapListRow(row: SaleListRow): SaleListItem {
 	return {
@@ -145,6 +167,7 @@ function mapListRow(row: SaleListRow): SaleListItem {
 			.filter((number) => number.number_kind === 'base')
 			.map((number) => number.number_value)
 			.sort((a, b) => a - b),
+		bondNumberPairs: bondNumberPairs(row.bonds?.bond_numbers),
 		buyerName: buyerName(row.buyers),
 		collectorName: row.collectors?.display_name ?? 'Unknown collector',
 		financialStatus: row.bonds?.financial_status_snapshot ?? 'no_payments'
@@ -175,7 +198,7 @@ export async function listSales(
 	let query = supabase
 		.from('sales')
 		.select(
-			`*, ${buyerEmbed}(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(number_value,number_kind))`,
+			`*, ${buyerEmbed}(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(id,number_value,number_kind,source_base_number_id))`,
 			{ count: 'exact' }
 		)
 		.eq('campaign_id', campaignId);
@@ -214,7 +237,7 @@ export async function getSaleDetail(
 	const { data, error } = await supabase
 		.from('sales')
 		.select(
-			'*, buyers(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(number_value,number_kind)), payment_plans(*, installments(*))'
+			'*, buyers(first_name,last_name,business_name), collectors(display_name), bonds!inner(financial_status_snapshot,bond_numbers(id,number_value,number_kind,source_base_number_id)), payment_plans(*, installments(*))'
 		)
 		.eq('campaign_id', campaignId)
 		.eq('id', saleId)

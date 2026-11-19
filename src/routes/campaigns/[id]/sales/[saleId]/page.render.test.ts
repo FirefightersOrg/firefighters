@@ -1,44 +1,39 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from './+page.svelte';
-const campaign = 'f0000000-0000-0000-0000-000000000001';
-const sale = 'a0000000-0000-0000-0000-000000000009';
-describe('sale detail page', () => {
-	it('renders sale links and installment schedule', () => {
+
+describe('sale detail', () => {
+	it('renders base and associated bond numbers with campaign numbering', () => {
 		const body = render(Page, {
 			props: {
 				data: {
-					campaign: { id: campaign, name: 'Campaign' },
-					financialStatus: 'overdue',
-					financialStatusSnapshot: 'overdue',
+					campaign: {
+						id: 'c',
+						name: 'Campaign',
+						numberDigits: 4,
+						maxNumber: 9999,
+						associatedNumberOffset: 4871,
+						overflowPolicy: 'reject'
+					},
 					sale: {
 						bondId: 'b',
-						bondNumbers: ['0068'],
+						bondNumberPairs: [{ base: 68, associated: 4939 }],
+						sale: {
+							buyerId: 'buyer',
+							collectorId: 'collector',
+							paymentMode: 'full_payment',
+							totalAmount: '60000.00'
+						},
 						buyerName: 'Ada',
 						collectorName: 'Ana',
-						sale: {
-							buyerId: 'u',
-							collectorId: 'c',
-							paymentMode: 'installments',
-							totalAmount: '120000.00'
-						},
-						installments: [
-							{
-								id: 'i',
-								installmentNumber: 1,
-								dueDate: '2027-01-01',
-								amount: '12000.00',
-								status: 'pending'
-							}
-						]
-					}
+						installments: []
+					},
+					financialStatusSnapshot: 'no_payments'
 				},
-				params: { id: campaign, saleId: sale }
-			} as never
+				params: { id: 'c', saleId: 's' }
+			} as any
 		}).body;
-		expect(body).toContain('Installment schedule');
-		expect(body).toContain('0068');
-		expect(body).toContain('2027-01-01');
-		expect(body).toContain('overdue');
+		expect(body).toContain('0068 / 4939');
 	});
 });

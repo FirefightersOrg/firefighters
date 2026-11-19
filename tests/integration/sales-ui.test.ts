@@ -264,8 +264,7 @@ describe('sale screens (local Supabase)', () => {
 		const registered = await act(operator, 'register', {
 			bondId: bonds.cash,
 			buyerId,
-			paymentMode: 'full_payment',
-			firstDueDate: argentinaDate(1)
+			paymentMode: 'full_payment'
 		});
 		const saleId = /\/sales\/([0-9a-f-]{36})$/.exec(String(registered.redirect))?.[1];
 		expect(saleId).toBeDefined();
@@ -282,6 +281,10 @@ describe('sale screens (local Supabase)', () => {
 		});
 		expect(detail.sale.installments).toHaveLength(1);
 		expect(detail.financialStatus).toBe('no_payments');
+		expect(detail.sale).toMatchObject({
+			bondNumberPairs: [{ base: 30, associated: 4901 }],
+			installments: [{ dueDate: argentinaDate() }]
+		});
 
 		const bondRecord = (await bondLoad(
 			event(
@@ -360,8 +363,9 @@ describe('sale screens (local Supabase)', () => {
 			event(admin, { id: campaignId }, `/campaigns/${campaignId}/sales`, {
 				search: '?paymentMode=installments'
 			})
-		)) as { sales: { bondId: string }[] };
+		)) as { sales: { bondId: string; bondNumberPairs: { base: number; associated: number }[] }[] };
 		expect(plans.sales.map((s) => s.bondId)).toEqual([bonds.plan]);
+		expect(plans.sales[0].bondNumberPairs).toEqual([{ base: 31, associated: 4902 }]);
 		const byBuyer = (await listLoad(
 			event(admin, { id: campaignId }, `/campaigns/${campaignId}/sales`, {
 				search: `?buyer=${encodeURIComponent('Inline')}`

@@ -107,7 +107,7 @@ describe('new sale', () => {
 			found: [{ sellable: false, reason: 'It is already sold.' }]
 		});
 	});
-	it('accepts due dates from -31 through +365 Buenos Aires days only', async () => {
+	it('accepts full payments without a due date and validates installment due-date bounds', async () => {
 		const { min, max } = firstDueDateBounds();
 		const date = (value: string, days: number) => {
 			const [year, month, day] = value.split('-').map(Number);
@@ -116,25 +116,43 @@ describe('new sale', () => {
 		const fields = (firstDueDate: string) => ({
 			bondId: BOND,
 			buyerId: BUYER,
-			paymentMode: 'full_payment',
+			paymentMode: 'installments',
 			firstDueDate
 		});
+		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], {
+				bondId: BOND,
+				buyerId: BUYER,
+				paymentMode: 'full_payment',
+				firstDueDate: 'not-a-date'
+			})
+		).toMatchObject({ status: 303 });
+		expect(registerSale).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.objectContaining({ paymentMode: 'full_payment', firstDueDate: null }),
+			expect.anything()
+		);
 		expect(
 			await run('register', ['campaign.view', 'sale.create'], fields(date(min, -1)))
 		).toMatchObject({
 			status: 400,
 			data: { errors: { firstDueDate: expect.any(Array) } }
 		});
-		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
 		expect(await run('register', ['campaign.view', 'sale.create'], fields(min))).toMatchObject({
 			status: 303
 		});
-		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
 		expect(await run('register', ['campaign.view', 'sale.create'], fields(max))).toMatchObject({
 			status: 303
 		});
 		expect(
 			await run('register', ['campaign.view', 'sale.create'], fields(date(max, 1)))
+		).toMatchObject({
+			status: 400,
+			data: { errors: { firstDueDate: expect.any(Array) } }
+		});
+		expect(
+			await run('register', ['campaign.view', 'sale.create'], fields('not-a-date'))
 		).toMatchObject({
 			status: 400,
 			data: { errors: { firstDueDate: expect.any(Array) } }
