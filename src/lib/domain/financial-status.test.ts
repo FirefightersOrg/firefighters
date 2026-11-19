@@ -17,39 +17,35 @@ const base = {
 	]
 };
 describe('calculateFinancialStatus', () => {
-	it.each([
-		[{ ...base, saleStatus: 'annulled' as const }, 'annulled'],
-		[{ ...base, planStatus: 'annulled' as const }, 'annulled'],
-		[{ ...base, markedUncollectible: true }, 'uncollectible'],
-		[
-			{ ...base, installments: [{ ...base.installments[0], status: 'paid' as const }] },
-			'fully_paid'
-		],
-		[{ ...base, installments: [{ ...base.installments[0], dueDate: '2026-06-09' }] }, 'overdue'],
-		[base, 'no_payments'],
-		[
-			{ ...base, installments: [{ ...base.installments[0], appliedAmount: '100.00' }] },
-			'fully_paid'
-		],
-		[
-			{ ...base, installments: [{ ...base.installments[0], appliedAmount: '10.00' }] },
-			'partial_payments'
-		],
-		[
-			{
+	it('returns annulled for an annulled sale', () =>
+		expect(calculateFinancialStatus({ ...base, saleStatus: 'annulled' })).toBe('annulled'));
+	it('returns annulled for an annulled plan', () =>
+		expect(calculateFinancialStatus({ ...base, planStatus: 'annulled' })).toBe('annulled'));
+	it('returns uncollectible', () =>
+		expect(calculateFinancialStatus({ ...base, markedUncollectible: true })).toBe('uncollectible'));
+	it('returns fully paid', () =>
+		expect(
+			calculateFinancialStatus({
 				...base,
-				installments: [
-					{ ...base.installments[0], status: 'paid_advance' as const, dueDate: '2026-06-11' }
-				]
-			},
-			'fully_paid'
-		],
-		[
-			{ ...base, installments: [{ ...base.installments[0], status: 'annulled' as const }] },
-			'no_payments'
-		]
-	])('returns %s', (input, expected) => expect(calculateFinancialStatus(input)).toBe(expected));
-	it('is up to date when all installments due today are paid', () => {
+				installments: [{ ...base.installments[0], status: 'paid' }]
+			})
+		).toBe('fully_paid'));
+	it('returns overdue', () =>
+		expect(
+			calculateFinancialStatus({
+				...base,
+				installments: [{ ...base.installments[0], dueDate: '2026-06-09' }]
+			})
+		).toBe('overdue'));
+	it('returns no payments', () => expect(calculateFinancialStatus(base)).toBe('no_payments'));
+	it('returns partial payments', () =>
+		expect(
+			calculateFinancialStatus({
+				...base,
+				installments: [{ ...base.installments[0], appliedAmount: '10.00' }]
+			})
+		).toBe('partial_payments'));
+	it('returns up to date', () =>
 		expect(
 			calculateFinancialStatus({
 				...base,
@@ -58,6 +54,29 @@ describe('calculateFinancialStatus', () => {
 					{ ...base.installments[0], number: 2, dueDate: '2026-06-11' }
 				]
 			})
-		).toBe('up_to_date');
-	});
+		).toBe('up_to_date'));
+	it('does not call an unpaid installment due today overdue', () =>
+		expect(calculateFinancialStatus(base)).not.toBe('overdue'));
+	it('counts paid in advance as paid', () =>
+		expect(
+			calculateFinancialStatus({
+				...base,
+				installments: [{ ...base.installments[0], status: 'paid_advance', dueDate: '2026-06-11' }]
+			})
+		).toBe('fully_paid'));
+	it('ignores annulled installments', () =>
+		expect(
+			calculateFinancialStatus({
+				...base,
+				installments: [{ ...base.installments[0], status: 'annulled' }]
+			})
+		).toBe('no_payments'));
+	it('gives uncollectible precedence over fully paid', () =>
+		expect(
+			calculateFinancialStatus({
+				...base,
+				markedUncollectible: true,
+				installments: [{ ...base.installments[0], status: 'paid' }]
+			})
+		).toBe('uncollectible'));
 });

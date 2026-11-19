@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getUserPermissions } from '$lib/server/auth/permissions';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { assignBondsToCollector } from '$lib/server/services/deliveries';
 import { registerSale } from '$lib/server/services/sales';
+import { buildInstallmentSchedule } from '$lib/domain/sales';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
+import { loadPermissions } from './permissions';
 
 const { supabaseUrl, anonKey, seedEnv } = inject('integrationEnv');
 const config = resolveSeedConfig(seedEnv);
@@ -23,7 +24,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 	const scoped = createClient(supabaseUrl, anonKey, {
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	return { client: scoped, permissions: await getUserPermissions(scoped) };
+	return { client: scoped, permissions: await loadPermissions(scoped) };
 }
 const ctx = (caller: Caller, label: string) => ({
 	permissions: caller.permissions,
@@ -31,15 +32,21 @@ const ctx = (caller: Caller, label: string) => ({
 });
 let admin: Caller;
 let operator: Caller;
+let treasurer: Caller;
 let campaignId: string;
 let collectorId: string;
 let buyerId: string;
 let bondId: string;
+let installmentBondId: string;
 beforeAll(async () => {
 	admin = await signIn(config.admin.email, config.admin.password);
 	operator = await signIn(
 		config.fixtures.find((f) => f.roleNames.includes('operator'))!.email,
 		config.fixtures.find((f) => f.roleNames.includes('operator'))!.password
+	);
+	treasurer = await signIn(
+		config.fixtures.find((f) => f.roleNames.includes('treasurer'))!.email,
+		config.fixtures.find((f) => f.roleNames.includes('treasurer'))!.password
 	);
 	const campaign = await admin.client.rpc('campaign_create', {
 		p_name: `it sale ${run}`,
@@ -101,6 +108,18 @@ beforeAll(async () => {
 		{ campaignId, collectorId, bondIds: [bondId] },
 		ctx(operator, 'deliver')
 	);
+	const installmentBond = await admin.client.rpc('bond_create', {
+		p_campaign_id: campaignId,
+		p_base_numbers: [124, 125],
+		p_request_id: ctx(admin, 'installment-bond').requestId
+	});
+	if (installmentBond.error) throw new Error(installmentBond.error.message);
+	installmentBondId = installmentBond.data as string;
+	await assignBondsToCollector(
+		operator.client,
+		{ campaignId, collectorId, bondIds: [installmentBondId] },
+		ctx(operator, 'deliver-installment')
+	);
 });
 describe('sale registration (local Supabase)', () => {
 	it('creates a full-payment sale, plan, installment and sold bond', async () => {
@@ -133,4 +152,101 @@ describe('sale registration (local Supabase)', () => {
 			financial_status_snapshot: 'no_payments'
 		});
 	});
+	it('creates the database installment schedule for a two-unit pata', async () => {
+		const firstDueDate = '2027-01-31';
+		const saleId = await registerSale(
+			operator.client,
+			{ campaignId, bondId: installmentBondId, buyerId, paymentMode: 'installments', firstDueDate },
+			ctx(operator, 'installments')
+		);
+		const { data, error } = await admin.client
+			.from('installments')
+			.select('installment_number, due_date, amount, payment_plans!inner(sale_id)')
+			.eq('payment_plans.sale_id', saleId)
+			.order('installment_number');
+		if (error) throw error;
+		expect(data).toMatchObject(
+			buildInstallmentSchedule({
+				paymentMode: 'installments',
+				firstDueDate,
+				totalAmount: '120000.00',
+				installmentCount: 10,
+				installmentValue: '6000.00',
+				commercialUnitCount: 2
+			}).map(({ number, dueDate, amount }) => ({
+				installment_number: number,
+				due_date: dueDate,
+				amount: Number(amount)
+			}))
+		);
+	});
+	it('maps rejected sales and permits only sale.create callers', async () => {
+		await expect(
+			registerSale(
+				operator.client,
+				{ campaignId, bondId, buyerId, paymentMode: 'full_payment' },
+				ctx(operator, 'again')
+			)
+		).rejects.toMatchObject({ kind: 'conflict', field: 'bondId' });
+		await expect(
+			registerSale(
+				operator.client,
+				{
+					campaignId,
+					bondId: await createDeliveredBond(126),
+					buyerId: crypto.randomUUID(),
+					paymentMode: 'full_payment'
+				},
+				ctx(operator, 'unknown-buyer')
+			)
+		).rejects.toMatchObject({ kind: 'not_found', field: 'buyerId' });
+		await expect(
+			registerSale(
+				treasurer.client,
+				{ campaignId, bondId: installmentBondId, buyerId, paymentMode: 'full_payment' },
+				ctx(treasurer, 'forbidden')
+			)
+		).rejects.toMatchObject({ kind: 'permission' });
+		const draft = await admin.client.rpc('campaign_create', {
+			p_name: `it sale draft ${run}`,
+			p_simple_bond_value: '60000.00',
+			p_installment_count: 10,
+			p_number_digits: 4,
+			p_max_number: 9999,
+			p_associated_number_offset: 4871,
+			p_overflow_policy: 'reject',
+			p_barcode_mode: 'base_number',
+			p_starts_at: '2027-03-01T00:00:00-03:00',
+			p_ends_at: '2027-12-31T23:59:59-03:00'
+		});
+		if (draft.error) throw draft.error;
+		await expect(
+			registerSale(
+				operator.client,
+				{
+					campaignId: draft.data as string,
+					bondId: installmentBondId,
+					buyerId,
+					paymentMode: 'full_payment'
+				},
+				ctx(operator, 'draft')
+			)
+		).rejects.toMatchObject({ kind: 'conflict', field: 'campaignId' });
+	});
 });
+
+async function createDeliveredBond(baseNumber: number): Promise<string> {
+	const bond = await admin.client.rpc('bond_create', {
+		p_campaign_id: campaignId,
+		p_base_numbers: [baseNumber],
+		p_request_id: ctx(admin, `bond-${baseNumber}`).requestId
+	});
+	if (bond.error) throw bond.error;
+	const id = bond.data as string;
+	await assignBondsToCollector(
+		operator.client,
+		{ campaignId, collectorId, bondIds: [id] },
+		ctx(operator, `deliver-${baseNumber}`)
+	);
+	return id;
+}

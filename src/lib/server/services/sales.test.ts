@@ -25,11 +25,33 @@ describe('sales service', () => {
 			expect.objectContaining({ p_request_id: 'request' })
 		);
 	});
+	it('rejects invalid input before the RPC', async () => {
+		const rpc = vi.fn();
+		await expect(
+			registerSale({ rpc } as never, { ...input, buyerId: 'not-a-guid' } as never)
+		).rejects.toMatchObject({ kind: 'validation' });
+		expect(rpc).not.toHaveBeenCalled();
+	});
 	it.each([
-		[{ code: '42501', message: 'no' }, 'permission'],
-		[{ code: '22023', message: 'first due date invalid' }, 'validation'],
-		[{ code: 'P0002', message: 'buyer x not found' }, 'not_found'],
-		[{ code: '55000', message: 'bond sold' }, 'conflict'],
-		[{ code: 'XX000', message: 'no' }, 'internal']
-	])('maps %o', (error, kind) => expect(mapSaleRpcError(error)).toMatchObject({ kind }));
+		[{ code: '42501', message: 'no' }, 'permission', undefined],
+		[{ code: '22023', message: 'first due date invalid' }, 'validation', 'firstDueDate'],
+		[{ code: '22023', message: 'bad payment mode' }, 'validation', 'paymentMode'],
+		[{ code: '22023', message: 'bond belongs to another campaign' }, 'validation', 'bondId'],
+		[{ code: 'P0002', message: 'buyer x not found' }, 'not_found', 'buyerId'],
+		[{ code: 'P0002', message: 'bond x not found' }, 'not_found', 'bondId'],
+		[{ code: 'P0002', message: 'campaign x not found' }, 'not_found', 'campaignId'],
+		[{ code: '55000', message: 'bond sold' }, 'conflict', 'bondId'],
+		[{ code: '55000', message: 'campaign must be active' }, 'conflict', 'campaignId'],
+		[{ code: '23505', message: 'duplicate bond' }, 'conflict', 'bondId'],
+		[{ code: 'XX000', message: 'no' }, 'internal', undefined]
+	])('maps %o', (error, kind, field) =>
+		expect(mapSaleRpcError(error)).toMatchObject({ kind, field })
+	);
+	it('treats unavailable permissions as an internal error', async () => {
+		await expect(
+			registerSale({ rpc: vi.fn() } as never, input, { permissions: null })
+		).rejects.toMatchObject({
+			kind: 'internal'
+		});
+	});
 });
