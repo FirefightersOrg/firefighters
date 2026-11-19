@@ -9,10 +9,21 @@
 		labelClass,
 		primaryButtonClass
 	} from '$lib/components/campaigns/styles';
+	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
+	const numbering = $derived(campaignNumberingConfig(data.campaign));
+	/** "0068 / 4939" for a simple bond, "Pata 0100, 0101" for a pata. */
+	function bondLabel(bond: { kind: string; baseNumbers: number[]; associatedNumbers: number[] }) {
+		const fmt = (numbers: number[]) =>
+			numbers.map((n) => formatCampaignNumber(n, numbering)).join(', ');
+		return bond.kind === 'simple'
+			? `${fmt(bond.baseNumbers)} / ${fmt(bond.associatedNumbers)}`
+			: `Pata ${fmt(bond.baseNumbers)}`;
+	}
 	const sections = [
 		'General data',
 		'Assigned bonds',
@@ -162,15 +173,20 @@
 	<section id="section-2" class={cardClass}>
 		<h2 class="mb-4 text-base font-semibold">2. Assigned bonds</h2>
 		{#if data.bonds.length === 0}<p class="text-sm text-slate-500">
-				No bonds are assigned in this campaign. Arrives with Phase 6: bond delivery.
-			</p>{:else}<ul>
+				No bonds are assigned in this campaign.
+			</p>{:else}<p class="mb-2 text-sm text-slate-500">
+				{data.bondsTotal} bond{data.bondsTotal === 1 ? '' : 's'}{data.bondsTotal > data.bonds.length
+					? ` (showing the first ${data.bonds.length})`
+					: ''}
+			</p>
+			<ul class="grid gap-1 text-sm sm:grid-cols-3">
 				{#each data.bonds as bond (bond.id)}<li>
 						<a
-							class="text-blue-700 hover:underline"
+							class="font-mono text-blue-700 hover:underline"
 							href={resolve('/campaigns/[id]/bonds/[bondId]', {
 								id: data.campaign.id,
 								bondId: bond.id
-							})}>View bond</a
+							})}>{bondLabel(bond)}</a
 						>
 					</li>{/each}
 			</ul>{/if}
@@ -190,7 +206,10 @@
 						>
 						<!-- eslint-enable svelte/no-navigation-without-resolve -->
 					</li>{/each}
-			</ul>{/if}
+			</ul>
+			{#if data.buyersTotal > data.buyers.length}<p class="mt-2 text-sm text-slate-500">
+					and {data.buyersTotal - data.buyers.length} more
+				</p>{/if}{/if}
 	</section>
 	{#each [{ phase: 'Phase 7: sales and installments' }, { phase: 'Phase 8: settlements' }, { phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
 			id="section-{i + 4}"
