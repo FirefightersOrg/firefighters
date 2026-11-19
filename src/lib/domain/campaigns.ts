@@ -116,6 +116,11 @@ export function canLoadBonds(status: CampaignStatus): boolean {
 	return status === 'draft' || status === 'active';
 }
 
+/** Deliveries and reassignments are issued only after the campaign is active. */
+export function canDeliverBonds(status: CampaignStatus): boolean {
+	return status === 'active';
+}
+
 /** App representation of a `campaigns` row. Money is a two-decimal string (see `money.ts`). */
 export interface Campaign {
 	id: string;
