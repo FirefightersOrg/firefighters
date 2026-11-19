@@ -121,7 +121,9 @@ describe('bond record custody', () => {
 		const data = (await load(loadEvent(setup())))!;
 		expect(data.custody.can).toEqual({ returnBond: true, reassign: true, markLost: true });
 		// The current collector is not offered as the reassignment target.
-		expect(data.custody.collectors.map((c) => c.displayName)).toEqual(['Beto']);
+		expect(data.custody.collectors.map((c: { displayName: string }) => c.displayName)).toEqual([
+			'Beto'
+		]);
 	});
 
 	it('actions follow the bond status, the campaign window and the permissions', async () => {

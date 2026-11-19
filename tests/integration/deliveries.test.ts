@@ -8,6 +8,14 @@ import {
 	load as newLoad
 } from '../../src/routes/campaigns/[id]/deliveries/new/+page.server';
 import { load as noteLoad } from '../../src/routes/campaigns/[id]/deliveries/[noteId]/+page.server';
+import {
+	actions as bondActions,
+	load as bondLoad
+} from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.server';
+import {
+	actions as collectorActions,
+	load as collectorLoad
+} from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.server';
 import { getUserPermissions } from '$lib/server/auth/permissions';
 import { createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -103,6 +111,7 @@ let operator: Caller;
 let readOnly: Caller;
 let campaignId: string;
 let collectorId: string;
+let otherCollectorId: string;
 
 beforeAll(async () => {
 	serviceClient = createClient(supabaseUrl, serviceRoleKey, clientOptions);
@@ -141,6 +150,18 @@ beforeAll(async () => {
 			status: 'active'
 		},
 		{ requestId: rid('collector'), permissions: admin.permissions }
+	);
+	otherCollectorId = await createCollector(
+		admin.client,
+		{
+			displayName: `Beto ${RUN_ID}`,
+			phone: null,
+			email: null,
+			address: null,
+			userProfileId: null,
+			status: 'active'
+		},
+		{ requestId: rid('collector-2'), permissions: admin.permissions }
 	);
 });
 
@@ -236,5 +257,167 @@ describe('delivery screens (local Supabase)', () => {
 			status: 409,
 			data: { errors: { bondIds: [expect.stringContaining('lost')] } }
 		});
+	});
+});
+
+describe('custody from the bond and collector records (local Supabase)', () => {
+	const bonds: string[] = [];
+
+	beforeAll(async () => {
+		for (const n of [40, 41, 42, 43]) {
+			const { data } = await admin.client.rpc('bond_create', {
+				p_campaign_id: campaignId,
+				p_base_numbers: [n],
+				p_request_id: rid(`custody-bond-${n}`)
+			});
+			bonds.push(data as string);
+		}
+		const { error } = await admin.client.rpc('bond_deliver', {
+			p_campaign_id: campaignId,
+			p_collector_id: collectorId,
+			p_bond_ids: bonds,
+			p_notes: null,
+			p_request_id: rid('custody-deliver')
+		});
+		if (error) throw new Error(error.message);
+	});
+
+	const bondPath = (bondId: string) => `/campaigns/${campaignId}/bonds/${bondId}`;
+	const collectorPath = (id: string) => `/campaigns/${campaignId}/collectors/${id}`;
+
+	it('the bond record shows the history and returns, reassigns and marks a bond lost', async () => {
+		const record = (await bondLoad(
+			event(admin, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]))
+		)) as { custody: { history: { assignmentType: string }[]; can: Record<string, boolean> } };
+		expect(record.custody.history.map((a) => a.assignmentType)).toEqual(['delivery']);
+		expect(record.custody.can).toEqual({ returnBond: true, reassign: true, markLost: true });
+
+		// The operator can reassign but not return or mark lost (current matrix).
+		const operatorView = (await bondLoad(
+			event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]))
+		)) as { custody: { can: Record<string, boolean> } };
+		expect(operatorView.custody.can).toEqual({
+			returnBond: false,
+			reassign: true,
+			markLost: false
+		});
+		expect(
+			await run(
+				bondActions.return as (e: never) => unknown,
+				event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
+					action: 'return',
+					fields: {}
+				})
+			)
+		).toMatchObject({ status: 403 });
+
+		expect(
+			await run(
+				bondActions.return as (e: never) => unknown,
+				event(admin, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
+					action: 'return',
+					fields: { notes: 'came back' }
+				})
+			)
+		).toMatchObject({ success: true, action: 'return' });
+
+		const reassigned = await run(
+			bondActions.reassign as (e: never) => unknown,
+			event(operator, { id: campaignId, bondId: bonds[1] }, bondPath(bonds[1]), {
+				action: 'reassign',
+				fields: { collectorId: otherCollectorId }
+			})
+		);
+		expect(String(reassigned.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
+
+		expect(
+			await run(
+				bondActions.markLost as (e: never) => unknown,
+				event(admin, { id: campaignId, bondId: bonds[2] }, bondPath(bonds[2]), {
+					action: 'markLost',
+					fields: { responsibleParty: 'Ana', lostOn: '2026-11-10', reason: 'rain' }
+				})
+			)
+		).toMatchObject({ success: true, action: 'markLost' });
+
+		const after = await serviceClient
+			.from('bonds')
+			.select('id, commercial_status, current_collector_id')
+			.in('id', bonds.slice(0, 3));
+		const byId = new Map((after.data ?? []).map((b) => [b.id, b]));
+		expect(byId.get(bonds[0])).toMatchObject({
+			commercial_status: 'available',
+			current_collector_id: null
+		});
+		expect(byId.get(bonds[1])).toMatchObject({
+			commercial_status: 'delivered_to_collector',
+			current_collector_id: otherCollectorId
+		});
+		expect(byId.get(bonds[2])).toMatchObject({ commercial_status: 'lost' });
+		const history = (await bondLoad(
+			event(admin, { id: campaignId, bondId: bonds[2] }, bondPath(bonds[2]))
+		)) as { custody: { history: { assignmentType: string; responsibleParty: string | null }[] } };
+		expect(history.custody.history.at(-1)).toMatchObject({
+			assignmentType: 'lost',
+			responsibleParty: 'Ana'
+		});
+	});
+
+	it('the collector record lists held bonds with their note and returns / reassigns in bulk', async () => {
+		const page = (await collectorLoad(
+			event(
+				admin,
+				{ id: campaignId, collectorId: otherCollectorId },
+				collectorPath(otherCollectorId)
+			)
+		)) as { bonds: { id: string; note: { noteNumber: number } | null }[]; bondsTotal: number };
+		expect(page.bondsTotal).toBe(1);
+		expect(page.bonds[0]).toMatchObject({ id: bonds[1], note: { noteNumber: expect.any(Number) } });
+
+		// bonds[3] is still with the first collector: reassign it, then return both from Beto.
+		const reassigned = await run(
+			collectorActions.reassignBonds as (e: never) => unknown,
+			event(admin, { id: campaignId, collectorId }, collectorPath(collectorId), {
+				action: 'reassignBonds',
+				fields: { bondIds: [bonds[3]], targetCollectorId: otherCollectorId }
+			})
+		);
+		expect(String(reassigned.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
+		expect(
+			await run(
+				collectorActions.reassignBonds as (e: never) => unknown,
+				event(admin, { id: campaignId, collectorId }, collectorPath(collectorId), {
+					action: 'reassignBonds',
+					fields: { bondIds: [bonds[3]], targetCollectorId: '' }
+				})
+			)
+		).toMatchObject({ status: 400, data: { errors: { targetCollectorId: expect.any(Array) } } });
+
+		expect(
+			await run(
+				collectorActions.returnBonds as (e: never) => unknown,
+				event(
+					admin,
+					{ id: campaignId, collectorId: otherCollectorId },
+					collectorPath(otherCollectorId),
+					{
+						action: 'returnBonds',
+						fields: { bondIds: [bonds[1], bonds[3]] }
+					}
+				)
+			)
+		).toMatchObject({
+			form: 'custody',
+			success: true,
+			message: expect.stringContaining('2 bonds')
+		});
+		const empty = (await collectorLoad(
+			event(
+				admin,
+				{ id: campaignId, collectorId: otherCollectorId },
+				collectorPath(otherCollectorId)
+			)
+		)) as { bondsTotal: number };
+		expect(empty.bondsTotal).toBe(0);
 	});
 });

@@ -1,4 +1,4 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad } from './$types';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
@@ -19,6 +19,16 @@ import { PartyServiceError, updateCollector } from '$lib/server/services/parties
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { COLLECTOR_UPDATE_FIELDS, collectorSchema } from '$lib/schemas/collector';
 import { readFormFields } from '$lib/schemas/campaign';
+import { canLoadBonds } from '$lib/domain/campaigns';
+import { DELIVERY_MAX_BONDS } from '$lib/domain/deliveries';
+import { requireActiveUser } from '$lib/server/auth/guards';
+import { listActiveAssignmentNotes } from '$lib/server/repositories/deliveries';
+import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import {
+	DeliveryServiceError,
+	reassignBondsToCollector,
+	returnBondsFromCollector
+} from '$lib/server/services/deliveries';
 const uuid = (value: string) => z.guid().safeParse(value).success;
 const notFound = 'Collector not found.';
 /** Usual buyers listed on the record; the rest are counted ("and N more"). */
@@ -52,6 +62,26 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (bonds.error || buyers.error || profiles.error || audit?.error)
 		error(500, { message: 'Could not load the collector. Please try again.' });
 	const collector = collectorResult.data;
+	const assigned = bonds.data?.items ?? [];
+
+	// Custody (SAN-55): the note behind each held bond, and bulk return / reassignment.
+	const open = canLoadBonds(campaignResult.data.status);
+	const custodyCan = {
+		returnBonds: open && hasPermissionIn(locals.permissions, 'bond.return'),
+		reassignBonds: open && hasPermissionIn(locals.permissions, 'bond.assign')
+	};
+	const [notes, targets] = await Promise.all([
+		listActiveAssignmentNotes(
+			locals.supabase,
+			assigned.map((b) => b.id)
+		),
+		custodyCan.reassignBonds
+			? listActiveCollectorOptions(locals.supabase)
+			: Promise.resolve({ data: [], error: null })
+	]);
+	if (notes.error || targets.error)
+		error(500, { message: 'Could not load the collector. Please try again.' });
+
 	const profileOptions = profiles.data ?? [];
 	if (collector.userProfileId) {
 		// The admin can read profiles; anyone else sees a generic label.
@@ -65,7 +95,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaignResult.data,
 		collector,
-		bonds: bonds.data?.items ?? [],
+		bonds: assigned.map((bond) => ({ ...bond, note: notes.data?.get(bond.id) ?? null })),
+		custody: {
+			can: custodyCan,
+			collectors: (targets.data ?? []).filter((c) => c.id !== params.collectorId)
+		},
 		bondsTotal: bonds.data?.total ?? 0,
 		buyers: buyers.data?.items ?? [],
 		buyersTotal: buyers.data?.total ?? 0,
@@ -114,5 +148,93 @@ export const actions: Actions = {
 				message: party?.message ?? 'Something went wrong. Please try again.'
 			});
 		}
+	},
+	returnBonds: async ({ request, locals, params, url }) => {
+		const checked = await custodyRequest(locals, url, params, request, 'bond.return');
+		if ('failure' in checked) return checked.failure;
+		try {
+			const count = await returnBondsFromCollector(
+				locals.supabase,
+				{ campaignId: params.id, bondIds: checked.bondIds, notes: null },
+				{ requestId: locals.requestId, permissions: locals.permissions }
+			);
+			return {
+				form: 'custody' as const,
+				success: true,
+				message: `${count} bond${count === 1 ? '' : 's'} returned: available again.`,
+				errors: {}
+			};
+		} catch (err) {
+			return custodyServiceFailure(err);
+		}
+	},
+
+	reassignBonds: async ({ request, locals, params, url }) => {
+		const checked = await custodyRequest(locals, url, params, request, 'bond.assign');
+		if ('failure' in checked) return checked.failure;
+		const target = checked.formData.get('targetCollectorId');
+		if (typeof target !== 'string' || !uuid(target) || target === params.collectorId) {
+			return custodyFailure(400, 'Choose the collector that receives the bonds.', {
+				targetCollectorId: ['Choose the collector that receives the bonds.']
+			});
+		}
+		let noteId: string;
+		try {
+			noteId = await reassignBondsToCollector(
+				locals.supabase,
+				{ campaignId: params.id, collectorId: target, bondIds: checked.bondIds, notes: null },
+				{ requestId: locals.requestId, permissions: locals.permissions }
+			);
+		} catch (err) {
+			return custodyServiceFailure(err);
+		}
+		redirect(303, `/campaigns/${params.id}/deliveries/${noteId}`);
 	}
 };
+
+function custodyFailure(status: number, message: string, errors: Record<string, string[]> = {}) {
+	return fail(status, { form: 'custody' as const, success: false, message, errors });
+}
+
+function custodyServiceFailure(err: unknown) {
+	if (!(err instanceof DeliveryServiceError)) throw err;
+	const field = err.field === 'collectorId' ? 'targetCollectorId' : 'bondIds';
+	return custodyFailure(err.status, err.message, { [field]: [err.message] });
+}
+
+/** Active user, permission, ids and the checked bonds of a bulk custody form. */
+async function custodyRequest(
+	locals: App.Locals,
+	url: URL,
+	params: { id: string; collectorId: string },
+	request: Request,
+	permission: 'bond.return' | 'bond.assign'
+): Promise<
+	{ failure: ReturnType<typeof custodyFailure> } | { bondIds: string[]; formData: FormData }
+> {
+	requireActiveUser(locals, url.pathname);
+	if (!hasPermissionIn(locals.permissions, permission)) {
+		return { failure: custodyFailure(403, 'You do not have permission to do this.') };
+	}
+	if (!uuid(params.id)) return { failure: custodyFailure(404, CAMPAIGN_MESSAGES.notFound) };
+	if (!uuid(params.collectorId)) return { failure: custodyFailure(404, notFound) };
+	const formData = await request.formData();
+	const bondIds = [
+		...new Set(formData.getAll('bondIds').filter((v): v is string => typeof v === 'string'))
+	];
+	if (bondIds.length === 0) {
+		return {
+			failure: custodyFailure(400, 'Select at least one bond.', {
+				bondIds: ['Select at least one bond.']
+			})
+		};
+	}
+	if (bondIds.length > DELIVERY_MAX_BONDS || !bondIds.every(uuid)) {
+		return {
+			failure: custodyFailure(400, `Select at most ${DELIVERY_MAX_BONDS} bonds.`, {
+				bondIds: [`Select at most ${DELIVERY_MAX_BONDS} bonds.`]
+			})
+		};
+	}
+	return { bondIds, formData };
+}

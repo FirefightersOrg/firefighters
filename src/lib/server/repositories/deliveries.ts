@@ -236,3 +236,35 @@ export async function listBondEntriesByIds(
 	if (error) return { data: null, error };
 	return wrap(() => (data ?? []).map(mapBondListRow));
 }
+
+/** The note behind each bond's active custody (delivery or reassignment), keyed by bond id. */
+export async function listActiveAssignmentNotes(
+	supabase: SupabaseClient,
+	bondIds: readonly string[]
+): Promise<RepositoryResult<Map<string, { noteId: string; noteNumber: number }>>> {
+	if (bondIds.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('bond_assignments')
+		.select('bond_id, delivery_note_id, delivery_notes(note_number)')
+		.in('bond_id', [...bondIds])
+		.eq('status', 'active')
+		.overrideTypes<
+			{
+				bond_id: string;
+				delivery_note_id: string | null;
+				delivery_notes: { note_number: number } | null;
+			}[],
+			{ merge: false }
+		>();
+	if (error) return { data: null, error };
+	const notes = new Map<string, { noteId: string; noteNumber: number }>();
+	for (const row of data ?? []) {
+		if (row.delivery_note_id && row.delivery_notes) {
+			notes.set(row.bond_id, {
+				noteId: row.delivery_note_id,
+				noteNumber: row.delivery_notes.note_number
+			});
+		}
+	}
+	return { data: notes, error: null };
+}
