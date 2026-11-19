@@ -39,6 +39,7 @@ const baDate = (days = 0) => {
 type Role = 'admin' | 'operator' | 'treasurer' | 'read-only' | 'collector';
 interface Caller {
 	user: User;
+	accessToken: string;
 	client: SupabaseClient;
 	profile: UserProfile;
 	permissions: string[];
@@ -67,6 +68,7 @@ async function signIn(role: Role, email: string, password: string): Promise<Call
 	if (profileError || !profile) throw new Error(`No profile for ${role}`);
 	return {
 		user: data.user,
+		accessToken: data.session.access_token,
 		client,
 		profile: profile as UserProfile,
 		permissions: await loadPermissions(client)
@@ -77,7 +79,12 @@ const ctx = (caller: Caller, requestId = rid('request')) => ({
 	requestId,
 	permissions: caller.permissions
 });
-function event<E>(caller: Caller, path: string, params: Record<string, string>): E {
+function event<E>(
+	caller: Caller,
+	path: string,
+	params: Record<string, string>,
+	requestId = rid('route')
+): E {
 	const url = new URL(`http://localhost${path}`);
 	return {
 		locals: {
@@ -87,7 +94,7 @@ function event<E>(caller: Caller, path: string, params: Record<string, string>):
 			user: caller.user,
 			profile: caller.profile,
 			permissions: caller.permissions,
-			requestId: rid('route')
+			requestId
 		},
 		params,
 		url
@@ -148,11 +155,24 @@ async function createSale(
 	if (installmentsError || !installments) throw new Error(installmentsError?.message);
 	return { bondId, saleId, installments };
 }
-async function totals(caller: Caller, settlementId: string) {
-	const { data, error } = await caller.client.rpc('settlement_totals', {
+function requestClient(caller: Caller, requestId: string) {
+	return createClient(supabaseUrl, anonKey, {
+		...options,
+		global: {
+			headers: {
+				Authorization: `Bearer ${caller.accessToken}`,
+				'x-request-id': requestId
+			}
+		}
+	});
+}
+async function totals(caller: Caller, settlementId: string, requestId?: string) {
+	const client = requestId ? requestClient(caller, requestId) : caller.client;
+	const { data, error } = await client.rpc('settlement_totals', {
 		p_settlement_id: settlementId
 	});
-	if (error || !data?.[0]) throw new Error(error?.message ?? 'No settlement totals');
+	if (error) throw error;
+	if (!data?.[0]) throw new Error('No settlement totals');
 	return data[0] as Record<string, string | number>;
 }
 const numericTotals = (row: Record<string, string | number>) =>
@@ -164,6 +184,75 @@ async function auditFor(requestId: string) {
 		.eq('request_id', requestId);
 	expect(error).toBeNull();
 	return data ?? [];
+}
+
+/** Read via the RLS-scoped admin: these tables intentionally deny service-role SELECT. */
+async function settlementState() {
+	const settlements = await users.admin.client
+		.from('settlements')
+		.select('*')
+		.eq('campaign_id', campaignId)
+		.order('id');
+	const payments = await users.admin.client
+		.from('payments')
+		.select('*')
+		.eq('campaign_id', campaignId)
+		.order('id');
+	expect(settlements.error).toBeNull();
+	expect(payments.error).toBeNull();
+	const sales = await service.from('sales').select('id').eq('campaign_id', campaignId);
+	expect(sales.error).toBeNull();
+	const plans = await service
+		.from('payment_plans')
+		.select('id')
+		.in(
+			'sale_id',
+			sales.data!.map((s) => s.id)
+		);
+	expect(plans.error).toBeNull();
+	const installments = await service
+		.from('installments')
+		.select('*')
+		.in(
+			'payment_plan_id',
+			plans.data!.map((p) => p.id)
+		)
+		.order('id');
+	const applications = await users.admin.client
+		.from('payment_installments')
+		.select('*')
+		.in(
+			'payment_id',
+			payments.data!.map((p) => p.id)
+		)
+		.order('payment_id')
+		.order('installment_id');
+	for (const result of [settlements, payments, installments, applications])
+		expect(result.error).toBeNull();
+	return {
+		settlements: settlements.data,
+		payments: payments.data,
+		installments: installments.data,
+		applications: applications.data,
+		totals: await Promise.all(settlements.data!.map((s) => totals(users.admin, s.id)))
+	};
+}
+
+async function noWrites(requestId: string, assertion: () => Promise<unknown>) {
+	const before = await settlementState();
+	const count = async () => {
+		const result = await service
+			.from('audit_log')
+			.select('id', { count: 'exact', head: true })
+			.eq('request_id', requestId);
+		expect(result.error).toBeNull();
+		return result.count;
+	};
+	const auditBefore = await count();
+	expect(auditBefore).toBe(0);
+	await assertion();
+	expect(await count()).toBe(auditBefore);
+	expect(await settlementState()).toEqual(before);
 }
 
 beforeAll(async () => {
@@ -454,9 +543,19 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			{ campaignId, collectorId },
 			ctx(users.treasurer)
 		);
-		await expect(
-			closeSettlement(users.treasurer.client, { settlementId: emptyId }, ctx(users.treasurer))
-		).rejects.toMatchObject({ kind: 'conflict' satisfies SettlementServiceError['kind'] });
+		const emptyRequest = rid('empty-close-denied');
+		await noWrites(emptyRequest, () =>
+			expect(
+				closeSettlement(
+					users.treasurer.client,
+					{ settlementId: emptyId },
+					ctx(users.treasurer, emptyRequest)
+				)
+			).rejects.toMatchObject({
+				kind: 'conflict' satisfies SettlementServiceError['kind'],
+				status: 409
+			})
+		);
 		expect(
 			(await users.admin.client.from('settlements').select('status').eq('id', emptyId).single())
 				.data?.status
@@ -472,27 +571,42 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			.limit(1)
 			.single();
 		const settlementId = closed!.id;
-		await expect(
-			closeSettlement(users.treasurer.client, { settlementId }, ctx(users.treasurer))
-		).rejects.toMatchObject({ kind: 'conflict' });
+		const closeRequest = rid('closed-close-denied');
+		await noWrites(closeRequest, () =>
+			expect(
+				closeSettlement(
+					users.treasurer.client,
+					{ settlementId },
+					ctx(users.treasurer, closeRequest)
+				)
+			).rejects.toMatchObject({ kind: 'conflict', status: 409 })
+		);
 		const { data: payment } = await users.admin.client
 			.from('payments')
 			.select('id')
 			.eq('settlement_id', settlementId)
 			.limit(1)
 			.single();
-		await expect(
-			removePaymentFromSettlement(
-				users.operator.client,
-				{ paymentId: payment!.id, reason: 'Too late' },
-				ctx(users.operator)
-			)
-		).rejects.toMatchObject({ kind: 'conflict' });
-		const direct = await users.treasurer.client
-			.from('settlements')
-			.update({ notes: 'forbidden' })
-			.eq('id', settlementId);
-		expect(direct.error).not.toBeNull();
+		const removeRequest = rid('closed-remove-denied');
+		await noWrites(removeRequest, () =>
+			expect(
+				removePaymentFromSettlement(
+					users.operator.client,
+					{ paymentId: payment!.id, reason: 'Too late' },
+					ctx(users.operator, removeRequest)
+				)
+			).rejects.toMatchObject({ kind: 'conflict', status: 409 })
+		);
+		const directRequest = rid('direct-denied');
+		await noWrites(directRequest, async () => {
+			const directClient = requestClient(users.treasurer, directRequest);
+			const direct = await directClient
+				.from('settlements')
+				.update({ notes: 'forbidden' })
+				.eq('id', settlementId);
+			expect(direct.status).toBe(403);
+			expect(direct.error).toMatchObject({ code: '42501' });
+		});
 	});
 
 	it('C4 enforces role permissions and collector own-settlement visibility', async () => {
@@ -501,23 +615,61 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			{ campaignId, collectorId },
 			ctx(users.operator)
 		);
-		await expect(
-			openSettlement(
-				users['read-only'].client,
-				{ campaignId, collectorId },
-				ctx(users['read-only'])
-			)
-		).rejects.toMatchObject({ kind: 'permission' });
-		await expect(
-			closeSettlement(users.operator.client, { settlementId: openId }, ctx(users.operator))
-		).rejects.toMatchObject({ kind: 'permission' });
-		await expect(
-			removePaymentFromSettlement(
-				users.treasurer.client,
-				{ paymentId: randomUUID(), reason: 'No permission first' },
-				ctx(users.treasurer)
-			)
-		).rejects.toMatchObject({ kind: 'permission' });
+		const sale = await createSale('denied', baDate());
+		const input = {
+			settlementId: openId,
+			saleId: sale.saleId,
+			amount: 100,
+			paymentMethod: 'cash' as const,
+			applications: [{ installmentId: sale.installments[0].id, amountApplied: 100 }]
+		};
+		const paymentId = await addPaymentToSettlement(
+			users.operator.client,
+			input,
+			ctx(users.operator)
+		);
+		for (const deny of [
+			(requestId: string) =>
+				openSettlement(
+					users['read-only'].client,
+					{ campaignId, collectorId },
+					ctx(users['read-only'], requestId)
+				),
+			(requestId: string) =>
+				addPaymentToSettlement(
+					users['read-only'].client,
+					input,
+					ctx(users['read-only'], requestId)
+				),
+			(requestId: string) =>
+				closeSettlement(
+					users.operator.client,
+					{ settlementId: openId },
+					ctx(users.operator, requestId)
+				),
+			(requestId: string) =>
+				removePaymentFromSettlement(
+					users.treasurer.client,
+					{ paymentId, reason: 'Permission denied' },
+					ctx(users.treasurer, requestId)
+				)
+		]) {
+			const requestId = rid('permission-denied');
+			await noWrites(requestId, () =>
+				expect(deny(requestId)).rejects.toMatchObject({
+					kind: 'permission',
+					status: 403
+				})
+			);
+		}
+		expect(
+			(await users.admin.client.from('settlements').select('status').eq('id', openId).single()).data
+				?.status
+		).toBe('open');
+		expect(
+			(await users.admin.client.from('payments').select('status').eq('id', paymentId).single()).data
+				?.status
+		).toBe('pending_in_settlement');
 		const own = await users.collector.client.from('settlements').select('id').eq('id', openId);
 		expect(own.error).toBeNull();
 		expect(own.data?.map((row) => row.id)).toEqual([openId]);
@@ -532,7 +684,12 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			.eq('id', foreignId);
 		expect(foreign.error).toBeNull();
 		expect(foreign.data).toEqual([]);
-		await expect(totals(users.collector, foreignId)).rejects.toThrow();
+		const totalsRequest = rid('foreign-totals-denied');
+		await noWrites(totalsRequest, () =>
+			expect(totals(users.collector, foreignId, totalsRequest)).rejects.toMatchObject({
+				code: '42501'
+			})
+		);
 	});
 
 	it('C5 verifies printable documents and settlement workspace against real closed and open data', async () => {
@@ -648,6 +805,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 				saleId: sale.saleId,
 				amount: 100,
 				paymentMethod: 'cash',
+				paymentDate: baDate(-1),
 				applications: [{ installmentId: sale.installments[0].id, amountApplied: 100 }]
 			},
 			ctx(users.operator)
@@ -714,7 +872,8 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			registeredBy: users.operator.profile.full_name,
 			receiptNumber: `SET-${String(stored!.settlement_number).padStart(4, '0')}-${confirmedPaymentId.slice(0, 8).toUpperCase()}`
 		});
-		expect(certificate.document.paymentDate).not.toBe('—');
+		const [year, month, day] = baDate(-1).split('-').map(Number);
+		expect(certificate.document.paymentDate).toBe(`${day}/${month}/${String(year).slice(-2)}`);
 		expect(certificate.document.createdAt).not.toBe('—');
 		const closedWorkspace = (await settlementLoad(
 			event(users.treasurer, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
@@ -729,16 +888,20 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			collectorCreditBalance: '0.00'
 		});
 		expect(closedWorkspace.can).toEqual({ add: false, remove: false, close: false });
-		expect(
-			await routeResult(() =>
-				settlementLoad(
-					event(
-						users['read-only'],
-						`/campaigns/${campaignId}/settlements/${settlementId}`,
-						routeParams
+		const deniedLoadRequest = rid('load-denied');
+		await noWrites(deniedLoadRequest, async () =>
+			expect(
+				await routeResult(() =>
+					settlementLoad(
+						event(
+							users['read-only'],
+							`/campaigns/${campaignId}/settlements/${settlementId}`,
+							routeParams,
+							deniedLoadRequest
+						)
 					)
 				)
-			)
-		).toBe(403);
+			).toBe(403)
+		);
 	});
 });
