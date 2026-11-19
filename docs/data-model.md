@@ -847,3 +847,17 @@ Suggested fields:
 - Do not calculate balances from editable manual fields.
 - Do not confirm imports with blocking errors.
 - Do not apply commission adjustments without reason and audit.
+
+## Maximum text lengths (SAN-97)
+
+Free-text columns written by the audited functions have a `char_length(col) <= N` CHECK with the
+same N as the Zod schema that validates the field, so a caller that skips the app cannot save
+longer text. Migration `20261213000000_text_length_checks.sql` lists every column with its source
+constant; pgTAP `026_text_length_checks` covers each limit (over-length fails with 23514, the
+boundary value succeeds). New text columns written by an RPC must get a CHECK and a Zod `.max()`
+with the same number.
+
+- `audit_log.reason` (1000) is shared by every audited function, so it takes the largest per-function
+  limit. The tighter ones (500 for rule changes and imports) stay in Zod and in the per-column CHECKs.
+- `bonds.internal_code`, `bonds.barcode` and `bond_numbers.barcode` take 200: manual entry is limited
+  to 100 by Zod, but an import carries codes of up to 200 characters.
