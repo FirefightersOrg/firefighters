@@ -231,40 +231,64 @@ beforeAll(async () => {
 	if (error || typeof data !== 'string')
 		throw new Error(`campaign_create failed: ${error?.message}`);
 	campaignId = data;
+
+	// The parties every criterion uses, created through the real routes. Each test reads the
+	// state it needs, so one failing test does not cascade into the others.
+	collectorId = await createFromRedirect(() =>
+		collectorNewActions.default(
+			event(
+				users.admin,
+				`/campaigns/${campaignId}/collectors/new`,
+				{ id: campaignId },
+				collectorFields(`Collector ${RUN_ID}`, ownCollector.profile.id)
+			)
+		)
+	);
+	buyerId = await createFromRedirect(() =>
+		buyerNewActions.default(
+			event(
+				users.operator,
+				`/campaigns/${campaignId}/buyers/new`,
+				{ id: campaignId },
+				individualFields()
+			)
+		)
+	);
+	businessBuyerId = await createFromRedirect(() =>
+		buyerNewActions.default(
+			event(
+				users.operator,
+				`/campaigns/${campaignId}/buyers/new`,
+				{ id: campaignId },
+				businessFields()
+			)
+		)
+	);
 });
 
 describe('Phase 5: collectors and buyers', () => {
 	it('creates, edits, searches and loads individual/business party records through real routes', async () => {
-		collectorId = await createFromRedirect(() =>
-			collectorNewActions.default(
-				event(
-					users.admin,
-					`/campaigns/${campaignId}/collectors/new`,
-					{ id: campaignId },
-					collectorFields(`Collector ${RUN_ID}`, ownCollector.profile.id)
-				)
-			)
-		);
-		buyerId = await createFromRedirect(() =>
-			buyerNewActions.default(
-				event(
-					users.operator,
-					`/campaigns/${campaignId}/buyers/new`,
-					{ id: campaignId },
-					individualFields()
-				)
-			)
-		);
-		businessBuyerId = await createFromRedirect(() =>
-			buyerNewActions.default(
-				event(
-					users.operator,
-					`/campaigns/${campaignId}/buyers/new`,
-					{ id: campaignId },
-					businessFields()
-				)
-			)
-		);
+		// The type decides which identity columns are kept (the other ones are stored as null).
+		const { data: persisted } = await service
+			.from('buyers')
+			.select('id, type, first_name, last_name, business_name, document_number, tax_id')
+			.in('id', [buyerId, businessBuyerId]);
+		expect(persisted?.find((b) => b.id === buyerId)).toMatchObject({
+			type: 'individual',
+			first_name: `Ada ${RUN_ID}`,
+			last_name: `Individual ${RUN_ID}`,
+			business_name: null,
+			document_number: `DNI-${RUN_ID}`,
+			tax_id: null
+		});
+		expect(persisted?.find((b) => b.id === businessBuyerId)).toMatchObject({
+			type: 'business',
+			first_name: null,
+			last_name: null,
+			business_name: `Business ${RUN_ID}`,
+			document_number: null,
+			tax_id: `CUIT-${RUN_ID}`
+		});
 
 		const collectors = (await collectorsLoad(
 			event(users.admin, `/campaigns/${campaignId}/collectors?q=${encodeURIComponent(RUN_ID)}`, {
@@ -288,6 +312,21 @@ describe('Phase 5: collectors and buyers', () => {
 			)
 		)) as { buyers: { id: string }[] };
 		expect(businesses.buyers.map((buyer) => buyer.id)).toContain(businessBuyerId);
+		for (const [query, expected] of [
+			[`Ada ${RUN_ID}`, buyerId],
+			[`Individual ${RUN_ID}`, buyerId],
+			[`Business ${RUN_ID}`, businessBuyerId]
+		] as const) {
+			const found = (await buyersLoad(
+				event(users.operator, `/campaigns/${campaignId}/buyers?q=${encodeURIComponent(query)}`, {
+					id: campaignId
+				})
+			)) as { buyers: { id: string }[] };
+			expect(
+				found.buyers.map((buyer) => buyer.id),
+				query
+			).toEqual([expected]);
+		}
 
 		const collectorRecord = (await collectorLoad(
 			event(users.admin, `/campaigns/${campaignId}/collectors/${collectorId}`, {
@@ -422,10 +461,14 @@ describe('Phase 5: collectors and buyers', () => {
 			).toBe(403);
 		}
 		expect(
-			await status(() =>
-				buyersLoad(event(users.operator, `/campaigns/${campaignId}/buyers`, { id: campaignId }))
+			await buyersLoad(
+				event(
+					users.operator,
+					`/campaigns/${campaignId}/buyers?q=${encodeURIComponent(`DNI-${RUN_ID}`)}`,
+					{ id: campaignId }
+				)
 			)
-		).not.toBe(403);
+		).toMatchObject({ buyers: expect.arrayContaining([expect.objectContaining({ id: buyerId })]) });
 		expect(
 			await status(() =>
 				collectorsLoad(
@@ -434,10 +477,7 @@ describe('Phase 5: collectors and buyers', () => {
 			)
 		).toBe(403);
 
-		const ownRows = await ownCollector.client
-			.from('collectors')
-			.select('id')
-			.in('id', [collectorId]);
+		const ownRows = await ownCollector.client.from('collectors').select('id');
 		expect(ownRows.error).toBeNull();
 		expect(ownRows.data).toEqual([{ id: collectorId }]);
 		const collectorRows = await users.collector.client
@@ -451,6 +491,96 @@ describe('Phase 5: collectors and buyers', () => {
 		expect(
 			(await users.operator.client.from('buyers').select('id').eq('id', buyerId)).data
 		).toEqual([{ id: buyerId }]);
+	});
+
+	it('denies collector.manage and buyer.manage writes through the routes, without side effects', async () => {
+		const statusOf = (result: unknown) =>
+			typeof result === 'number' ? result : (result as { status?: number }).status;
+		const { data: before } = await service
+			.from('buyers')
+			.select('updated_at, last_name')
+			.eq('id', buyerId)
+			.single();
+		const { data: collectorBefore } = await service
+			.from('collectors')
+			.select('updated_at, display_name')
+			.eq('id', collectorId)
+			.single();
+		const buyerCountBefore = (
+			await service.from('buyers').select('id', { count: 'exact', head: true })
+		).count;
+
+		const attempts: [string, () => unknown][] = [];
+		for (const user of [users.treasurer, users['read-only']]) {
+			const createRequest = rid(`${user.role}-buyer-create`);
+			attempts.push([
+				createRequest,
+				() =>
+					buyerNewActions.default(
+						event(
+							user,
+							`/campaigns/${campaignId}/buyers/new`,
+							{ id: campaignId },
+							individualFields({ documentNumber: `DENIED-${RUN_ID}` }),
+							createRequest
+						)
+					)
+			]);
+			const updateRequest = rid(`${user.role}-buyer-update`);
+			attempts.push([
+				updateRequest,
+				() =>
+					buyerActions.update(
+						event(
+							user,
+							`/campaigns/${campaignId}/buyers/${buyerId}?/update`,
+							{ id: campaignId, buyerId },
+							{
+								...individualFields({ lastName: `Denied ${RUN_ID}` }),
+								updatedAt: before!.updated_at
+							},
+							updateRequest
+						)
+					)
+			]);
+		}
+		const collectorRequest = rid('operator-collector-update');
+		attempts.push([
+			collectorRequest,
+			() =>
+				collectorActions.update(
+					event(
+						users.operator,
+						`/campaigns/${campaignId}/collectors/${collectorId}?/update`,
+						{ id: campaignId, collectorId },
+						{
+							...collectorFields(`Denied ${RUN_ID}`, ownCollector.profile.id),
+							updatedAt: collectorBefore!.updated_at
+						},
+						collectorRequest
+					)
+				)
+		]);
+
+		for (const [requestId, attempt] of attempts) {
+			expect(statusOf(await status(attempt)), requestId).toBe(403);
+			expect(await auditFor(requestId), requestId).toEqual([]);
+		}
+		expect(
+			(await service.from('buyers').select('updated_at, last_name').eq('id', buyerId).single()).data
+		).toEqual(before);
+		expect(
+			(
+				await service
+					.from('collectors')
+					.select('updated_at, display_name')
+					.eq('id', collectorId)
+					.single()
+			).data
+		).toEqual(collectorBefore);
+		expect((await service.from('buyers').select('id', { count: 'exact', head: true })).count).toBe(
+			buyerCountBefore
+		);
 	});
 
 	it('returns 409 for stale collector and buyer edits and does not audit the rejected write', async () => {
@@ -545,17 +675,8 @@ describe('Phase 5: collectors and buyers', () => {
 			'8. Audit'
 		])
 			expect(collectorHtml).toContain(title);
-		expect(collectorHtml).toContain('collector.update');
-		const operatorCollectorData = await collectorLoad(
-			event(users.admin, `/campaigns/${campaignId}/collectors/${collectorId}`, {
-				id: campaignId,
-				collectorId
-			})
-		);
-		// Admin has audit.view; operator has no collector route in the current matrix (until SAN-93).
-		expect(
-			render(CollectorPage, { props: { data: operatorCollectorData } as never }).body
-		).toContain('collector.update');
+		expect(collectorHtml).toContain('collector.create');
+		// Only the admin can open a collector record today (operator gets collector.view with SAN-93).
 
 		const buyerData = await buyerLoad(
 			event(users.admin, `/campaigns/${campaignId}/buyers/${buyerId}`, { id: campaignId, buyerId })
@@ -570,7 +691,7 @@ describe('Phase 5: collectors and buyers', () => {
 			'Audit'
 		])
 			expect(buyerHtml).toContain(title);
-		expect(buyerHtml).toContain('buyer.update');
+		expect(buyerHtml).toContain('buyer.create');
 		const operatorBuyerData = await buyerLoad(
 			event(users.operator, `/campaigns/${campaignId}/buyers/${buyerId}`, {
 				id: campaignId,
