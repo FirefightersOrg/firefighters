@@ -509,6 +509,8 @@ Implemented in SAN-62:
   and `closed_by`. Closed, annulled and corrected settlements are otherwise immutable.
 - Readers need `settlement.view` (or a settlement action permission), and a collector login can
   read its own settlements. Nothing in this financial history can be deleted or truncated.
+- A payment's `annulment_reason` is trimmed non-blank text of at most 1,000 characters, the same
+  limit as `audit_log.reason` (SAN-97), because the audited annulment copies it there.
 
 ### commission_rules
 

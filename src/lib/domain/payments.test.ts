@@ -26,7 +26,7 @@ describe('payments domain', () => {
 			adjusted: []
 		});
 		expect(canTransitionPayment('draft', 'confirmed')).toBe(false);
-		expect(PAYMENT_ANNULMENT_REASON_MAX).toBe(2000);
+		expect(PAYMENT_ANNULMENT_REASON_MAX).toBe(1000);
 	});
 	it('mirrors settlement checks, labels, and transitions', () => {
 		expect(Object.keys(SETTLEMENT_STATUS_LABELS)).toEqual([...SETTLEMENT_STATUSES]);

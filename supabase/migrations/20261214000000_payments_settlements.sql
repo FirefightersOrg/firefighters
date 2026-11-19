@@ -62,7 +62,7 @@ create table public.payments (
   constraint payments_annulment_consistent check (
     (status = 'annulled' and annulled_by is not null and annulled_at is not null
       and annulment_reason is not null and annulment_reason = btrim(annulment_reason)
-      and annulment_reason <> '' and length(annulment_reason) <= 2000)
+      and annulment_reason <> '' and char_length(annulment_reason) <= 1000)
     or (status <> 'annulled' and annulled_by is null and annulled_at is null and annulment_reason is null)
   )
 );
