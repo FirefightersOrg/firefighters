@@ -181,7 +181,25 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
 - **Staging.** Rows and scans are staged in `import_session_items`; erroneous rows are soft-removed (`removed_at`), never deleted. Sessions are never deleted either: they are cancelled, marked failed, or (once confirmed) rolled back.
 - **Bonds only on confirmation.** Bonds are created when the session is confirmed, directly as `available` (never `created`), with `bonds.import_session_id` set (immutable). Each item records the bond it created. Confirmation certifies the mapping and completeness: one simple bond per simple item; one printed pata per `grupo_pata`, with one row per unit; no unlinked bond; and, per unit, the base and associated numbers with each row's base number (and its barcode for a pata row).
 - **Patas and barcodes.** Rows sharing a `grupo_pata` form one printed pata: the pata bond's `barcode` is the `grupo_pata`, and each row's barcode is kept on its base number (`bond_numbers.barcode`). A barcode identifies one live thing per campaign across bonds and base numbers; codes are freed only when a bond is annulled from `available` (and its numbers are released), like participating numbers.
-- **Rollback (SAN-47).** Rolling back a confirmed import annuls its bonds (`bond.annul`, admin only, reason required, only if none was delivered, sold or grouped), which frees their numbers and codes, and then marks the session as rolled back (it stays `confirmed`).
+- **Confirmation (SAN-47).** `import_session_confirm(session_id, request_id)` requires the session's
+  permission (`bond.import` for files, `bond.scan` for scans), a `validated` session and a `draft` or
+  `active` campaign. It revalidates under lock: if a number or code was taken after validation, it
+  returns the fresh summary with `confirmed: false`, the session goes back to `draft` (no bonds are
+  created) and the rejection is audited as `import.confirm_rejected`. A concurrent confirmation of
+  overlapping numbers that commits in between hits a unique index; that is caught and reported the
+  same way instead of a raw 23505. Otherwise it creates every bond in one transaction, returns the
+  summary with `confirmed: true`, `bonds_created` and `numbers_created`, and audits
+  `import.confirm` (source, file name, counts and summary) plus one `bond.create` per bond (with
+  `import_session_id`), so the bond record shows how it was loaded.
+- **Rollback (SAN-47).** `import_session_rollback(session_id, reason, request_id)` annuls the
+  import's `available` bonds (`bond.annul`, admin only, reason required, campaign `draft` or
+  `active`), which frees their numbers and codes, and then marks the session as rolled back (it
+  stays `confirmed`). Bonds already annulled by hand are skipped as they are: they keep their own
+  reason, author, `bond.annul` entry and numbers (a bond annulled from `sold` keeps its numbers
+  held). Any other unavailable bond (delivered, sold, returned, lost, closed) or one in an active
+  manual pata blocks the whole rollback. It audits `import.rollback` on the session (with
+  `bonds_annulled` and `bonds_skipped`) and one `bond.annul` per annulled bond, with the same shape
+  as a manual annulment.
 - **Permissions.** Import data is readable with `bond.import` or `bond.scan`. The operator has both (`bond.scan` added in SAN-44).
 - **Staging and validation (SAN-45).** `import_session_create`, `import_session_add_items`,
   `import_session_add_scan`, `import_session_remove_item`, `import_session_validate` and
@@ -196,3 +214,77 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
   `manual_mapping` requires the operator to type it. `internal_code` and
   `external_legacy_code` use the first capture group of `barcode_pattern`; without a pattern they
   behave as `manual_mapping`. Every scan remains a staged row, including an unrecognized one.
+
+## App layer (SAN-45)
+
+Code: `src/lib/domain/barcodes.ts`, `src/lib/domain/csv.ts`, `src/lib/domain/imports.ts`, `src/lib/server/imports/parse-file.ts`, `src/lib/schemas/import.ts`, `src/lib/server/repositories/imports.ts`, `src/lib/server/services/imports.ts`. It calls the functions of `20261126000000_import_staging.sql` and adds no SQL.
+
+### Upload flow
+
+`stageImportFile` parses the file, reads the campaign rules, interprets every row (`interpretImportRow`), creates the session (`import_session_create`), stages the rows in batches of 1,000 (`import_session_add_items`; each batch is its own transaction and `import.stage` audit row) and validates (`import_session_validate`). It returns the summary of `import_session_validate` (camelCase) plus `rowCount`. A file that cannot be read fails before anything is written.
+
+### File format
+
+- `.csv` or `.xlsx` (first worksheet). Excel 97-2003 `.xls` is not supported.
+- Header row with the columns `tipo_bono,grupo_pata,numero_base,barcode`, in any order. Accepted aliases (case, accents, spaces and hyphens ignored): `tipo`, `tipo_de_bono`, `bond_type`, `type`, `kind`; `grupo`, `pata`, `grupo_de_pata`, `pata_group`, `group`, `group_key`; `numero`, `nro_base`, `base_number`, `number`, `base`; `codigo_barras`, `codigo_de_barras`, `codigo`, `bar_code`, `code`. Other columns are ignored.
+- CSV: UTF-8 with or without BOM (invalid UTF-8 is read as Windows-1252), delimiter `,` or `;` (detected from the header), RFC 4180 quoting. Values are trimmed; blank rows are skipped.
+- `.xlsx`: numeric cells with a zero-padding format (`0000`) keep their padding; other numbers are written plainly (68). Formulas use their cached result.
+- Limits: 5 MB per file, 5,000 data rows per file, 500 characters per value.
+- The row number of an item is the file row (header = row 1), so messages point at the spreadsheet row.
+
+### Row interpretation (`interpretImportRow`)
+
+The barcode is read per `barcode_mode` exactly like `import_session_add_scan` reads a scan (same codes and messages): `base_number` takes the barcode as the number (1 to 10 digits; `parse_code_not_a_number`), `manual_mapping` and the pattern modes without a pattern need `numero_base` (`parse_base_number_required`), the pattern modes take the first capture group (`parse_code_not_recognized`). The range is checked by the database (`number_out_of_range`). The first problem wins; a row with a `parse_*` error is staged without a base number.
+
+| Code                          | When                                                                                         |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `parse_invalid_type`          | `tipo_bono` is not `simple` / `pata` (an empty type is left to the database: `missing_type`) |
+| `parse_barcode_too_long`      | barcode over 200 characters                                                                  |
+| `parse_simple_with_group`     | a simple row with `grupo_pata`                                                               |
+| `parse_missing_group`         | a pata row without `grupo_pata` (staged without type: the database rejects such a payload)   |
+| `parse_group_too_long`        | `grupo_pata` over 200 characters                                                             |
+| `parse_invalid_base_number`   | `numero_base` is not 1 to 10 digits                                                          |
+| `parse_code_not_a_number`     | `base_number` mode: the barcode is not a number                                              |
+| `parse_code_not_recognized`   | pattern modes: no match, or the capture is not a number                                      |
+| `parse_base_number_required`  | the barcode does not carry the number and `numero_base` is empty                             |
+| `parse_base_number_mismatch`  | `numero_base` and the number in the barcode differ                                           |
+| `parse_pattern_not_supported` | the campaign pattern cannot be applied in JavaScript (see below) and `numero_base` is empty  |
+
+A row without barcode takes `numero_base`; a row with neither is left to the database (`missing_base_number`).
+
+The pattern is a Postgres ARE. JavaScript `RegExp` applies it only when it stays inside the common subset (literals, `^ $ . \d \s`, bracket expressions like `[0-9A-Z]`, `(...)`, `(?:...)`, `(?=...)`, alternation, greedy quantifiers, `{m,n}`). Patterns using `\b` (a backspace in ARE), `\y \m \M \A \Z`, POSIX classes (`[[:digit:]]`), `***` directors, embedded options `(?i)`, lookbehind, lazy quantifiers or back references are not applied by the app: such file rows need `numero_base` (scans are resolved by the database).
+
+### Instant preview (`validateImportBatch`)
+
+A pure mirror of `import_session_revalidate` + `import_session_check_groups` over the live rows, with the same codes, messages and precedence: `parse_*` (kept) → `missing_type` → `missing_base_number` → `missing_barcode` (pata) → `missing_group` → `number_out_of_range` → `number_conflict` → `number_in_use` → `duplicate_barcode` → `barcode_in_use` (row barcode, then pata code) → `duplicate_barcode` (pata code used as a row barcode) → `incomplete_pata` (only when validating). Without the campaign's live data it skips the `*_in_use` checks. `summarizeImportItems` gives the counts of `import_session_summary`. The database is authoritative; `tests/integration/import-staging.test.ts` checks that both agree on every row, message and count.
+
+## Screens (SAN-46)
+
+Built on the app layer above (SAN-98); they add no parsing or validation of their own.
+
+- `/campaigns/[id]/bonds/import` uploads a `.csv` or `.xlsx` file through `stageImportFile`
+  (up to 5 MB) and lists the campaign's file imports. A file that cannot be read is reported on
+  the file field before any session is opened.
+  The upload goes through the request body, so the deployment must accept at least ~6 MB:
+  `adapter-auto` leaves the limit to the platform (adapter-node defaults to 512K and needs
+  `BODY_SIZE_LIMIT=6M`, see `.env.example`; Vercel caps bodies near 4.5 MB). With a smaller limit
+  the platform answers 413 before the app can explain the 5 MB rule.
+- `/campaigns/[id]/bonds/scan` stages one code per scan into an open `barcode_scan` session
+  (`?session=`). Enter or Tab sends the code; the field is cleared at once (so a fast scanner never
+  loses the next code) and refocused, and a beep plus a coloured frame say whether the code was
+  staged cleanly. A pata is scanned with its `grupo_pata` filled in; campaigns whose codes do not
+  carry the base number (`barcodeNeedsManualNumber`) show a base number field.
+- `/campaigns/[id]/bonds/import/[sessionId]` is the preview of both: the seven metrics (simple
+  bonds, patas, base numbers, participating numbers, blocking errors, warnings, duplicates), rows
+  filtered by status, row correction and removal, Validate, Confirm (disabled while there is any
+  blocking error), Cancel and, with `bond.annul`, Roll back. Files need `bond.import`, scans
+  `bond.scan`.
+- **Row correction.** `import_session_update_item` (migration
+  `20261130000000_import_item_correction.sql`, service `updateImportItem`) retypes the type,
+  `grupo_pata`, base number and barcode of a live row of a draft/validated session and
+  revalidates it (audited as `import.update_item`, with the replaced fields). Unlike revalidation,
+  it also clears a parser error, since the operator typed the values again; `raw_value` keeps the
+  source row. This closes the "no item correction RPC" gap noted for SAN-98.
+- **Confirm and rollback services** (`confirmImportSession`, `rollBackImportSession`) wrap the
+  SAN-47 functions: a confirmation that finds a number taken after validation reports
+  `confirmed: false` and the session goes back to draft.

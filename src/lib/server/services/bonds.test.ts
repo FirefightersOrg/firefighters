@@ -261,6 +261,15 @@ describe('createBond', () => {
 		);
 	});
 
+	it('fails as internal (500, not 403) when the request permission list failed to load', async () => {
+		const { supabase, rpc } = rpcClient({ data: NEW_ID });
+		await expect(createBond(supabase, simpleInput, { permissions: null })).rejects.toMatchObject({
+			kind: 'internal',
+			status: 500
+		});
+		expect(rpc).not.toHaveBeenCalled();
+	});
+
 	it('fails as internal when the RPC throws or returns no id', async () => {
 		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		await expect(
