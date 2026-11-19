@@ -1,5 +1,6 @@
 -- SAN-62: collector settlements, payments and payment-to-installment applications.
--- Writes are reserved for audited SECURITY DEFINER functions (SAN-63).
+-- Direct writes are revoked from API roles. SAN-63 audited SECURITY DEFINER functions own
+-- the required table/row-lock privileges, so callers never need direct table DML privileges.
 
 create table public.settlements (
   id uuid primary key default gen_random_uuid(),
@@ -113,14 +114,17 @@ begin
 end; $$;
 
 -- A payment enters only an OPEN settlement of the same collector (the one who hands the money in).
+-- FOR SHARE serializes admission with settlement status changes, preventing a close/annul race.
 create function public.payments_check_settlement(p_settlement_id uuid, p_collector_id uuid) returns void
 language plpgsql set search_path = '' as $$
 begin
-  if p_settlement_id is not null and not exists (
-    select 1 from public.settlements s
-    where s.id = p_settlement_id and s.collector_id = p_collector_id and s.status = 'open'
-  ) then
-    raise exception 'a payment can only enter an open settlement of its collector' using errcode = 'check_violation';
+  if p_settlement_id is not null then
+    perform 1 from public.settlements s
+      where s.id = p_settlement_id and s.collector_id = p_collector_id and s.status = 'open'
+      for share;
+    if not found then
+      raise exception 'a payment can only enter an open settlement of its collector' using errcode = 'check_violation';
+    end if;
   end if;
 end; $$;
 
@@ -130,8 +134,8 @@ begin
   if new.status not in ('draft', 'pending_in_settlement') then
     raise exception 'a new payment must start draft or pending_in_settlement' using errcode = 'check_violation';
   end if;
-  if (new.status = 'pending_in_settlement') is distinct from (new.settlement_id is not null) then
-    raise exception 'pending payment settlement is inconsistent' using errcode = 'check_violation';
+  if new.status = 'pending_in_settlement' and new.settlement_id is null then
+    raise exception 'a pending payment requires a settlement' using errcode = 'check_violation';
   end if;
   return new;
 end; $$;
@@ -149,10 +153,13 @@ begin
     (old.status = 'pending_in_settlement' and new.status in ('confirmed', 'annulled')) or
     (old.status = 'confirmed' and new.status in ('annulled', 'adjusted'))
   ) then raise exception 'payment status cannot go from % to %', old.status, new.status using errcode = 'check_violation'; end if;
+  if new.status = 'pending_in_settlement' and new.settlement_id is null then
+    raise exception 'a pending payment requires a settlement' using errcode = 'check_violation';
+  end if;
   if old.status <> 'draft' and new.settlement_id is distinct from old.settlement_id then
     raise exception 'payment settlement is immutable after draft' using errcode = 'restrict_violation';
   end if;
-  if new.settlement_id is distinct from old.settlement_id then
+  if new.status = 'pending_in_settlement' or new.settlement_id is distinct from old.settlement_id then
     perform public.payments_check_settlement(new.settlement_id, new.collector_id);
   end if;
   new.updated_at := now(); return new;
@@ -160,9 +167,13 @@ end; $$;
 
 create function public.payment_installments_guard_insert() returns trigger language plpgsql set search_path = '' as $$
 declare v_sale_id uuid; v_plan_id uuid; v_amount numeric(12,2); v_applied numeric(12,2);
-  v_payment_amount numeric(12,2); v_payment_applied numeric(12,2);
+  v_payment_amount numeric(12,2); v_payment_applied numeric(12,2); v_payment_status text;
 begin
-  select sale_id, amount into v_sale_id, v_payment_amount from public.payments where id = new.payment_id for update;
+  select sale_id, amount, status into v_sale_id, v_payment_amount, v_payment_status
+    from public.payments where id = new.payment_id for update;
+  if v_payment_status not in ('draft', 'pending_in_settlement') then
+    raise exception 'payment applications require a draft or pending payment' using errcode = 'check_violation';
+  end if;
   -- A payment never applies more than its own amount across installments.
   select coalesce(sum(amount_applied), 0) into v_payment_applied
     from public.payment_installments where payment_id = new.payment_id;
@@ -199,7 +210,6 @@ create trigger payment_installments_forbid_truncate before truncate on public.pa
 
 revoke all on table public.settlements, public.payments, public.payment_installments from anon, authenticated, service_role;
 grant select on table public.settlements, public.payments, public.payment_installments to authenticated;
-grant select, insert, update on table public.settlements, public.payments, public.payment_installments to service_role;
 alter table public.settlements enable row level security;
 alter table public.payments enable row level security;
 alter table public.payment_installments enable row level security;

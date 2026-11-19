@@ -1,6 +1,6 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
-select plan(71);
+select plan(77);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
 insert into public.user_roles(user_id,role_id) select p.id,r.id from (values ('b6270000-0000-0000-0000-000000000001'::uuid,'admin'),('b6270000-0000-0000-0000-000000000002'::uuid,'operator'),('b6270000-0000-0000-0000-000000000003'::uuid,'treasurer'),('b6270000-0000-0000-0000-000000000004'::uuid,'read-only'),('b6270000-0000-0000-0000-000000000005'::uuid,'collector'))p(id,n) join public.roles r on r.name=p.n;
@@ -68,7 +68,9 @@ select ok(to_regclass('public.payments_created_by_idx') is not null,'payment cre
 select ok(to_regclass('public.payment_installments_installment_idx') is not null,'application installment FK index');
 select ok(has_table_privilege('authenticated','public.payment_installments','select'),'authenticated reads applications');
 select ok(not has_table_privilege('authenticated','public.payment_installments','delete'),'authenticated cannot delete applications');
-select ok(has_table_privilege('service_role','public.settlements','insert'),'service role writes settlement internals');
+select ok(not has_table_privilege('service_role','public.settlements','insert')
+  and not has_table_privilege('service_role','public.payments','update'),
+  'service role has no direct settlement or payment writes');
 select ok(not has_function_privilege('authenticated','public.settlements_guard_update()','execute'),'settlement guard is internal');
 select ok(not has_function_privilege('authenticated','public.payment_installments_guard_insert()','execute'),'application guard is internal');
 select ok(has_function_privilege('authenticated','public.settlement_can_read()','execute'),'settlement RLS helper is granted');
@@ -103,5 +105,44 @@ select lives_ok($$insert into public.payment_installments(payment_id,installment
   'a payment applies up to its amount');
 select throws_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied) values(pg_temp.id('small'),pg_temp.id('i1'),1)$$,
   '23514','payment applications exceed the payment amount','a payment never applies more than its own amount');
+select ok(lower(pg_get_functiondef('public.payments_check_settlement(uuid,uuid)'::regprocedure)) like '%for share%',
+  'settlement admission locks the open settlement against close or annul');
+select throws_ok($$update public.payments set status='pending_in_settlement' where id=pg_temp.id('draft')$$,
+  '23514','a pending payment requires a settlement','draft cannot become pending without a settlement');
+with x as (
+  insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
+  values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id
+) insert into ids select 'closed_set',id from x;
+update public.settlements set status='closed',closed_at=now(),closed_by='b6270000-0000-0000-0000-000000000001'
+  where id=pg_temp.id('closed_set');
+select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,settlement_id,amount,payment_method,status,created_by)
+  values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),pg_temp.id('closed_set'),1,'cash','pending_in_settlement','b6270000-0000-0000-0000-000000000001')$$,
+  '23514','a payment can only enter an open settlement of its collector','payment cannot enter a closed settlement');
+with x as (
+  insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
+  values(pg_temp.id('c'),3,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id
+) insert into ids select 'annulled_set',id from x;
+update public.settlements set status='annulled' where id=pg_temp.id('annulled_set');
+select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,settlement_id,amount,payment_method,status,created_by)
+  values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),pg_temp.id('annulled_set'),1,'cash','pending_in_settlement','b6270000-0000-0000-0000-000000000001')$$,
+  '23514','a payment can only enter an open settlement of its collector','payment cannot enter an annulled settlement');
+with x as (
+  insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
+  values(pg_temp.id('c'),4,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id
+) insert into ids select 'open_set',id from x;
+update public.payments set settlement_id=pg_temp.id('open_set'),status='pending_in_settlement' where id=pg_temp.id('small');
+update public.payments set status='confirmed' where id=pg_temp.id('small');
+select throws_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied)
+  values(pg_temp.id('small'),pg_temp.id('i2'),1)$$,
+  '23514','payment applications require a draft or pending payment','confirmed payment cannot receive applications');
+with x as (
+  insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,settlement_id,amount,payment_method,status,created_by)
+  values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),pg_temp.id('open_set'),1,'cash','pending_in_settlement','b6270000-0000-0000-0000-000000000001') returning id
+) insert into ids select 'annulled_pay',id from x;
+update public.payments set status='annulled',annulled_by='b6270000-0000-0000-0000-000000000001',
+  annulled_at=now(),annulment_reason='Review test' where id=pg_temp.id('annulled_pay');
+select throws_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied)
+  values(pg_temp.id('annulled_pay'),pg_temp.id('i2'),1)$$,
+  '23514','payment applications require a draft or pending payment','annulled payment cannot receive applications');
 
 select * from finish(); rollback;

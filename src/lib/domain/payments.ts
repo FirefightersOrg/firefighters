@@ -1,5 +1,7 @@
 /** Payments and collector settlements (SAN-62). Mirrors the database state guards. */
 export const PAYMENT_METHODS = ['cash', 'transfer'] as const;
+export const SETTLEMENT_NOTES_MAX = 2000;
+export const PAYMENT_ANNULMENT_REASON_MAX = 2000;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 	cash: 'Cash',

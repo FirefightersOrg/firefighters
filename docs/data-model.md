@@ -503,7 +503,8 @@ Implemented in SAN-62:
 
 - Settlement numbers are unique per campaign; a settlement is tied to one collector and campaign.
   Totals are non-negative, notes are trimmed non-blank text of at most 2,000 characters, and
-  changes to totals are permitted only while it is `open`.
+  changes to totals are permitted only while it is `open`. The SAN-63 write functions compute
+  settlement totals from payments and applications; users do not enter totals.
 - Statuses follow `open -> closed|annulled` and `closed -> corrected`; closing records `closed_at`
   and `closed_by`. Closed, annulled and corrected settlements are otherwise immutable.
 - Readers need `settlement.view` (or a settlement action permission), and a collector login can

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
 	PAYMENT_METHOD_LABELS,
 	PAYMENT_METHODS,
+	PAYMENT_ANNULMENT_REASON_MAX,
 	PAYMENT_STATUSES,
 	PAYMENT_STATUS_LABELS,
 	PAYMENT_TRANSITIONS,
 	SETTLEMENT_STATUSES,
+	SETTLEMENT_NOTES_MAX,
 	SETTLEMENT_STATUS_LABELS,
 	SETTLEMENT_TRANSITIONS,
 	canTransitionPayment,
@@ -24,6 +26,7 @@ describe('payments domain', () => {
 			adjusted: []
 		});
 		expect(canTransitionPayment('draft', 'confirmed')).toBe(false);
+		expect(PAYMENT_ANNULMENT_REASON_MAX).toBe(2000);
 	});
 	it('mirrors settlement checks, labels, and transitions', () => {
 		expect(Object.keys(SETTLEMENT_STATUS_LABELS)).toEqual([...SETTLEMENT_STATUSES]);
@@ -35,5 +38,6 @@ describe('payments domain', () => {
 		});
 		expect(canTransitionSettlement('closed', 'corrected')).toBe(true);
 		expect(canTransitionSettlement('corrected', 'open')).toBe(false);
+		expect(SETTLEMENT_NOTES_MAX).toBe(2000);
 	});
 });
