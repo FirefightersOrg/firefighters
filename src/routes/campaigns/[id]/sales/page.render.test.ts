@@ -40,4 +40,23 @@ describe('sales list', () => {
 		}).body;
 		expect(body).toContain('0068 / 4939, 0069 / 4940');
 	});
+
+	it('keeps the applied financial-status filter selected, with pagination links', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign,
+					sales: [item],
+					collectors: [{ id: 'c1', displayName: 'Ana' }],
+					filters: { collector: 'c1', buyer: '', paymentMode: '', financialStatus: 'overdue' },
+					pagination: { page: 1, pageCount: 2 },
+					can: { create: true }
+				},
+				params: { id }
+			} as any
+		}).body;
+		expect(body).toMatch(/<option value="overdue"[^>]*selected/);
+		expect(body).not.toMatch(/<option value="no_payments"[^>]*selected/);
+		expect(body).toContain('financialStatus=overdue');
+	});
 });
