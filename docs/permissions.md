@@ -77,10 +77,13 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 | Permission               | Description                                     |
 | ------------------------ | ----------------------------------------------- |
+| `sale.view`              | View sales.                                     |
 | `sale.create`            | Register sales.                                 |
 | `sale.correct`           | Correct sales with audit.                       |
+| `payment.view`           | View payments.                                  |
 | `payment.create`         | Register payments.                              |
 | `payment.annul`          | Annul confirmed payments.                       |
+| `settlement.view`        | View settlements.                               |
 | `settlement.create`      | Create settlements.                             |
 | `settlement.update_open` | Edit open settlements.                          |
 | `settlement.close`       | Close settlements.                              |
@@ -122,7 +125,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 | Permission               | admin | operator | treasurer | collector | read-only |
 | ------------------------ | ----: | -------: | --------: | --------: | --------: |
-| `campaign.view`          |   yes |      yes |       yes |        no |       yes |
+| `campaign.view`          |   yes |      yes |       yes |       yes |       yes |
 | `campaign.create`        |   yes |       no |        no |        no |        no |
 | `campaign.update_rules`  |   yes |       no |        no |        no |        no |
 | `bond.view`              |   yes |      yes |       yes |       own |       yes |
@@ -130,21 +133,57 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `bond.import`            |   yes |      yes |        no |        no |        no |
 | `bond.scan`              |   yes |      yes |        no |        no |        no |
 | `bond.assign`            |   yes |      yes |        no |        no |        no |
+| `bond.return`            |   yes |      yes |        no |        no |        no |
+| `buyer.view`             |   yes |      yes |        no |        no |        no |
 | `buyer.manage`           |   yes |      yes |        no |        no |        no |
+| `collector.view`         |   yes |      yes |        no |        no |        no |
 | `collector.manage`       |   yes |       no |        no |        no |        no |
+| `collector.ledger.view`  |   yes |       no |       yes |        no |        no |
+| `sale.view`              |   yes |      yes |        no |        no |        no |
 | `sale.create`            |   yes |      yes |        no |        no |        no |
+| `payment.view`           |   yes |      yes |       yes |        no |        no |
 | `payment.create`         |   yes |      yes |       yes |    future |        no |
 | `payment.annul`          |   yes |       no |       yes |        no |        no |
+| `settlement.view`        |   yes |      yes |       yes |        no |        no |
 | `settlement.create`      |   yes |      yes |       yes |        no |        no |
+| `settlement.update_open` |   yes |      yes |        no |        no |        no |
 | `settlement.close`       |   yes |       no |       yes |        no |        no |
 | `settlement.correct`     |   yes |       no |       yes |        no |        no |
+| `commission.view`        |   yes |       no |       yes |        no |       yes |
 | `commission.rule_manage` |   yes |       no |        no |        no |        no |
 | `commission.adjust`      |   yes |       no |       yes |        no |        no |
+| `draw.view`              |   yes |      yes |       yes |        no |        no |
 | `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
 | `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
 | `report.view_financial`  |   yes |       no |       yes |        no |       yes |
 | `audit.view`             |   yes |       no |       yes |        no |        no |
 | `user.manage`            |   yes |       no |        no |        no |        no |
+
+### Action implies view (SAN-93)
+
+A role that holds an action permission on a domain also holds that domain's `<domain>.view` permission, when that permission exists. The domain is the code without its last segment (`buyer.manage` -> `buyer`, `collector.ledger.adjust` -> `collector.ledger`). Codes whose last segment is `view` or `view_*` are views, not actions.
+
+`20261201000000_role_matching_view_permissions.sql` creates `sale.view`, `payment.view` and `settlement.view` (so the rule now applies to every domain) and adds these grants:
+
+| Role        | Added                    | Because of                                                    |
+| ----------- | ------------------------ | ------------------------------------------------------------- |
+| `operator`  | `buyer.view`             | `buyer.manage`                                                |
+| `operator`  | `draw.view`              | `draw.load_winner`                                            |
+| `operator`  | `sale.view`              | `sale.create`                                                 |
+| `operator`  | `payment.view`           | `payment.create`                                              |
+| `operator`  | `settlement.view`        | `settlement.create`, `settlement.update_open`                 |
+| `operator`  | `collector.view`         | decision                                                      |
+| `operator`  | `settlement.update_open` | decision                                                      |
+| `operator`  | `bond.return`            | decision (`bond.mark_lost` stays admin-only)                  |
+| `treasurer` | `commission.view`        | `commission.adjust`                                           |
+| `treasurer` | `draw.view`              | `draw.freeze_roster`, `draw.load_winner`                      |
+| `treasurer` | `payment.view`           | `payment.create`, `payment.annul`                             |
+| `treasurer` | `settlement.view`        | `settlement.create`, `settlement.close`, `settlement.correct` |
+| `treasurer` | `collector.ledger.view`  | decision                                                      |
+| `read-only` | `commission.view`        | decision                                                      |
+| `collector` | `campaign.view`          | decision                                                      |
+
+Product decisions (SAN-93): the three new `.view` permissions are implied by any sale, payment or settlement action; the operator gets `collector.view`, `settlement.update_open` and `bond.return` (not `bond.mark_lost`); the treasurer gets `collector.ledger.view`; read-only gets `commission.view`; the collector gets `campaign.view`. Other cross-domain needs are not covered by the rule. The pgTAP test `017_role_view_permissions` checks the rule for every role, so a later grant cannot break it silently.
 
 ## Technical rules
 
