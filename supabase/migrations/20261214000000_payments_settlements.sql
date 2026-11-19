@@ -112,8 +112,21 @@ begin
   new.updated_at := now(); return new;
 end; $$;
 
+-- A payment enters only an OPEN settlement of the same collector (the one who hands the money in).
+create function public.payments_check_settlement(p_settlement_id uuid, p_collector_id uuid) returns void
+language plpgsql set search_path = '' as $$
+begin
+  if p_settlement_id is not null and not exists (
+    select 1 from public.settlements s
+    where s.id = p_settlement_id and s.collector_id = p_collector_id and s.status = 'open'
+  ) then
+    raise exception 'a payment can only enter an open settlement of its collector' using errcode = 'check_violation';
+  end if;
+end; $$;
+
 create function public.payments_guard_insert() returns trigger language plpgsql set search_path = '' as $$
 begin
+  perform public.payments_check_settlement(new.settlement_id, new.collector_id);
   if new.status not in ('draft', 'pending_in_settlement') then
     raise exception 'a new payment must start draft or pending_in_settlement' using errcode = 'check_violation';
   end if;
@@ -139,13 +152,22 @@ begin
   if old.status <> 'draft' and new.settlement_id is distinct from old.settlement_id then
     raise exception 'payment settlement is immutable after draft' using errcode = 'restrict_violation';
   end if;
+  if new.settlement_id is distinct from old.settlement_id then
+    perform public.payments_check_settlement(new.settlement_id, new.collector_id);
+  end if;
   new.updated_at := now(); return new;
 end; $$;
 
 create function public.payment_installments_guard_insert() returns trigger language plpgsql set search_path = '' as $$
 declare v_sale_id uuid; v_plan_id uuid; v_amount numeric(12,2); v_applied numeric(12,2);
+  v_payment_amount numeric(12,2); v_payment_applied numeric(12,2);
 begin
-  select sale_id into v_sale_id from public.payments where id = new.payment_id;
+  select sale_id, amount into v_sale_id, v_payment_amount from public.payments where id = new.payment_id for update;
+  -- A payment never applies more than its own amount across installments.
+  select coalesce(sum(amount_applied), 0) into v_payment_applied
+    from public.payment_installments where payment_id = new.payment_id;
+  if v_payment_applied + new.amount_applied > v_payment_amount then
+    raise exception 'payment applications exceed the payment amount' using errcode = 'check_violation'; end if;
   select payment_plan_id, amount into v_plan_id, v_amount from public.installments
     where id = new.installment_id for update;
   if v_sale_id is null or v_plan_id is null or not exists (
@@ -194,7 +216,7 @@ create policy settlements_select on public.settlements for select to authenticat
 create policy payment_installments_select on public.payment_installments for select to authenticated using (exists (select 1 from public.payments p where p.id = payment_id));
 
 do $$ declare f text; begin
-  foreach f in array array['public.payments_settlements_forbid_delete()', 'public.settlements_guard_insert()', 'public.settlements_guard_update()', 'public.payments_guard_insert()', 'public.payments_guard_update()', 'public.payment_installments_guard_insert()', 'public.payment_installments_forbid_update()'] loop
+  foreach f in array array['public.payments_settlements_forbid_delete()', 'public.settlements_guard_insert()', 'public.settlements_guard_update()', 'public.payments_guard_insert()', 'public.payments_guard_update()', 'public.payment_installments_guard_insert()', 'public.payment_installments_forbid_update()', 'public.payments_check_settlement(uuid, uuid)'] loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', f);
   end loop;
 end $$;

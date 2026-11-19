@@ -1,6 +1,6 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
-select plan(68);
+select plan(71);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
 insert into public.user_roles(user_id,role_id) select p.id,r.id from (values ('b6270000-0000-0000-0000-000000000001'::uuid,'admin'),('b6270000-0000-0000-0000-000000000002'::uuid,'operator'),('b6270000-0000-0000-0000-000000000003'::uuid,'treasurer'),('b6270000-0000-0000-0000-000000000004'::uuid,'read-only'),('b6270000-0000-0000-0000-000000000005'::uuid,'collector'))p(id,n) join public.roles r on r.name=p.n;
@@ -90,4 +90,18 @@ select pg_temp.act_as(6); select is((select count(*)::int from public.payments),
 select is((select count(*)::int from public.settlements),0,'no role sees no settlements');
 select is((select count(*)::int from public.payment_installments),0,'no role sees no applications');
 reset role;
+
+-- A payment enters only an open settlement of its own collector; it never applies more than its amount.
+reset role;
+select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,settlement_id,amount,payment_method,payment_date,status,created_by)
+  values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('beto'),pg_temp.id('buyer'),pg_temp.id('set'),10,'cash',current_date,'pending_in_settlement','b6270000-0000-0000-0000-000000000001')$$,
+  '23514','a payment can only enter an open settlement of its collector','a payment cannot enter another collector''s settlement');
+with x as (insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,amount,payment_method,payment_date,status,created_by)
+  values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),5,'cash',current_date,'draft','b6270000-0000-0000-0000-000000000001') returning id)
+insert into ids select 'small', id from x;
+select lives_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied) values(pg_temp.id('small'),pg_temp.id('i2'),5)$$,
+  'a payment applies up to its amount');
+select throws_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied) values(pg_temp.id('small'),pg_temp.id('i1'),1)$$,
+  '23514','payment applications exceed the payment amount','a payment never applies more than its own amount');
+
 select * from finish(); rollback;
