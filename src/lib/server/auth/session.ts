@@ -5,6 +5,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // `sb-<ref>-auth-token-code-verifier`.
 const SUPABASE_AUTH_COOKIE = /^sb-.+-auth-token/;
 
+/** Whether the request carries a Supabase auth cookie (a session, valid or not). */
+export function hasSupabaseAuthCookie(cookies: Pick<Cookies, 'getAll'>): boolean {
+	return cookies.getAll().some(({ name }) => SUPABASE_AUTH_COOKIE.test(name));
+}
+
 /** Deletes every Supabase auth cookie on the request, so the browser drops the session. */
 export function clearSupabaseAuthCookies(cookies: Cookies): void {
 	for (const { name } of cookies.getAll()) {

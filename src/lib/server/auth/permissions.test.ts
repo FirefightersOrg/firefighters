@@ -7,6 +7,7 @@ import {
 	hasPermissionForUser,
 	hasPermissionIn,
 	getUserPermissions,
+	permissionsUnavailable,
 	requirePermission,
 	requirePermissionIn
 } from './permissions';
@@ -150,32 +151,41 @@ describe('getUserPermissions', () => {
 		expect(permissions).toEqual(expectedPermissions);
 	});
 
-	it('fails closed (returns empty array) on RPC error', async () => {
+	it('returns an empty array when the user holds no permissions', async () => {
+		const client = createMockSupabase(async () => ({ data: [], error: null }));
+
+		expect(await getUserPermissions(client)).toEqual([]);
+		expect(consoleErrorSpy).not.toHaveBeenCalled();
+	});
+
+	it('returns null (load failed) and logs on RPC error', async () => {
 		const client = createMockSupabase(async () => {
 			return { data: null, error: { message: 'auth required' } };
 		});
 
 		const permissions = await getUserPermissions(client);
-		expect(permissions).toEqual([]);
+		expect(permissions).toBeNull();
 		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 
-	it('fails closed (returns empty array) when RPC response is not an array', async () => {
-		const client = createMockSupabase(async () => {
-			return { data: null, error: null };
-		});
+	it('returns null (load failed) and logs when the RPC response is not an array', async () => {
+		for (const data of [null, 'campaign.view', { code: 'campaign.view' }]) {
+			consoleErrorSpy.mockClear();
+			const client = createMockSupabase(async () => ({ data, error: null }));
 
-		const permissions = await getUserPermissions(client);
-		expect(permissions).toEqual([]);
+			expect(await getUserPermissions(client)).toBeNull();
+			expect(consoleErrorSpy).toHaveBeenCalled();
+		}
 	});
 
-	it('fails closed (returns empty array) when RPC throws', async () => {
+	it('returns null (load failed) and logs when the RPC throws', async () => {
 		const client = createMockSupabase(async () => {
 			throw new Error('Timeout');
 		});
 
 		const permissions = await getUserPermissions(client);
-		expect(permissions).toEqual([]);
+		expect(permissions).toBeNull();
+		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 });
 
@@ -281,13 +291,47 @@ describe('request-scoped checks (hasPermissionIn / requirePermissionIn)', () => 
 			});
 		}
 	});
+
+	it('requirePermissionIn throws 403 for an empty or missing list (no permissions)', () => {
+		for (const list of [[], undefined]) {
+			expect(() => requirePermissionIn(list, 'campaign.view')).toThrow(
+				expect.objectContaining({
+					status: 403,
+					body: { message: 'Forbidden', code: 'permission_denied', permission: 'campaign.view' }
+				})
+			);
+		}
+	});
+
+	it('requirePermissionIn throws 500 when the list could not be loaded (null)', () => {
+		try {
+			requirePermissionIn(null, 'campaign.view');
+			expect.fail('Should have thrown');
+		} catch (err) {
+			expect(err).toMatchObject({
+				status: 500,
+				body: {
+					message: 'Permission check failed',
+					code: 'permission_check_failed',
+					permission: 'campaign.view'
+				}
+			});
+		}
+	});
+
+	it('permissionsUnavailable is true only for null', () => {
+		expect(permissionsUnavailable(null)).toBe(true);
+		expect(permissionsUnavailable(undefined)).toBe(false);
+		expect(permissionsUnavailable([])).toBe(false);
+		expect(permissionsUnavailable(permissions)).toBe(false);
+	});
 });
 
 describe('canonical permission codes', () => {
-	it('defines exactly 44 unique permission codes', () => {
-		expect(PERMISSIONS.length).toBe(44);
+	it('defines exactly 47 unique permission codes', () => {
+		expect(PERMISSIONS.length).toBe(47);
 		const unique = new Set(PERMISSIONS);
-		expect(unique.size).toBe(44);
+		expect(unique.size).toBe(47);
 	});
 
 	it('includes core administrative and operational permissions', () => {
