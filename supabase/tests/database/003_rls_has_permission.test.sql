@@ -62,7 +62,7 @@ select is(
 );
 select is(
   (select array_agg(cmd order by cmd) from pg_policies where schemaname = 'public' and tablename = 'audit_log'),
-  array['INSERT', 'SELECT'], 'audit_log only has INSERT and SELECT policies'
+  array['SELECT'], 'audit_log only has a SELECT policy (SAN-94: no direct insert)'
 );
 select is(
   (select count(*)::int from pg_policies where schemaname = 'public'
@@ -199,10 +199,10 @@ select throws_ok(
   $$truncate public.audit_log$$, '42501', null,
   'admin cannot truncate audit_log (no privilege)'
 );
-select lives_ok(
+select throws_ok(
   $$insert into public.audit_log (actor_user_id, action, entity_type)
     values ('10000000-0000-0000-0000-000000000001', 'test.admin', 'profile')$$,
-  'admin can append an audit entry as themselves'
+  '42501', null, 'admin cannot append an audit entry directly, even as themselves'
 );
 select throws_ok(
   $$insert into public.audit_log (actor_user_id, action, entity_type)
@@ -271,10 +271,10 @@ select is_empty(
   $$with u as (update public.profiles set full_name = 'hacked' returning 1) select * from u$$,
   'operator updates no profile rows'
 );
-select lives_ok(
+select throws_ok(
   $$insert into public.audit_log (actor_user_id, action, entity_type)
     values ('10000000-0000-0000-0000-000000000003', 'test.operator', 'profile')$$,
-  'operator can append an audit entry as themselves'
+  '42501', null, 'operator cannot append an audit entry directly, even as themselves'
 );
 select throws_ok(
   $$insert into public.audit_log (actor_user_id, action, entity_type) values (null, 'test.null', 'profile')$$,
