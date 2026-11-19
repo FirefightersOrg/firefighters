@@ -17,6 +17,9 @@ describe('hooks.server handle', () => {
 		getUserError?: AuthError | Error | null;
 		profile?: UserProfile | null;
 		profileError?: { message: string } | null;
+		path?: string;
+		method?: string;
+		cookieNames?: string[];
 	}) {
 		const session = (options?.session ?? null) as Session | null;
 		const user = (options?.user ?? null) as User | null;
@@ -31,7 +34,8 @@ describe('hooks.server handle', () => {
 				getUser: vi.fn().mockResolvedValue({
 					data: { user: getUserError ? null : user },
 					error: getUserError
-				})
+				}),
+				signOut: vi.fn().mockResolvedValue({ error: null })
 			},
 			from: vi.fn().mockImplementation((table: string) => {
 				if (table === 'profiles') {
@@ -54,11 +58,18 @@ describe('hooks.server handle', () => {
 			mockSupabase as unknown as SupabaseClient
 		);
 
+		// Requests that carry a session send its Supabase auth cookie.
+		const cookieNames = options?.cookieNames ?? (session ? ['sb-127-auth-token'] : []);
 		const event = {
 			locals: {},
+			url: new URL(options?.path ?? '/', 'http://localhost:5173'),
+			request: new Request(new URL(options?.path ?? '/', 'http://localhost:5173'), {
+				method: options?.method ?? 'GET'
+			}),
 			cookies: {
-				getAll: vi.fn().mockReturnValue([]),
-				set: vi.fn()
+				getAll: vi.fn().mockReturnValue(cookieNames.map((name) => ({ name, value: 'x' }))),
+				set: vi.fn(),
+				delete: vi.fn()
 			}
 		} as unknown as RequestEvent;
 
@@ -215,5 +226,192 @@ describe('hooks.server handle', () => {
 		expect(event.locals.user).toBeNull();
 		expect(event.locals.profile).toBeNull();
 		expect(event.locals.permissions).toEqual([]);
+	});
+
+	describe('route guard', () => {
+		const activeProfile: UserProfile = {
+			id: 'prof-123',
+			auth_user_id: 'user-123',
+			full_name: 'John Firefighter',
+			email: 'john@firefighters.local',
+			status: 'active',
+			created_at: new Date().toISOString()
+		};
+		const inactiveProfile: UserProfile = { ...activeProfile, status: 'inactive' };
+
+		it('redirects an anonymous request for a protected page to /login, keeping the path', async () => {
+			const { event, resolve } = createMockEvent({ path: '/campaigns/7/bonds?page=2' });
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fcampaigns%2F7%2Fbonds%3Fpage%3D2'
+			});
+			expect(resolve).not.toHaveBeenCalled();
+		});
+
+		it('protects a route nobody has allowlisted (new routes are protected by default)', async () => {
+			const { event, resolve } = createMockEvent({ path: '/imports/new' });
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fimports%2Fnew'
+			});
+		});
+
+		it('lets anonymous visitors reach public routes', async () => {
+			for (const path of ['/', '/login', '/login?redirectTo=%2Fcampaigns']) {
+				const { event, resolve } = createMockEvent({ path });
+				await handle({ event, resolve });
+				expect(resolve).toHaveBeenCalledOnce();
+			}
+		});
+
+		it('answers 401 JSON for an anonymous API request', async () => {
+			const { event, resolve } = createMockEvent({ path: '/api/admin/users', method: 'POST' });
+
+			const response = await handle({ event, resolve });
+
+			expect(response.status).toBe(401);
+			expect(await response.json()).toEqual({ message: 'Unauthorized', code: 'unauthenticated' });
+			expect(resolve).not.toHaveBeenCalled();
+		});
+
+		it('lets an active user through to a protected page', async () => {
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue(['campaign.view']);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: activeProfile
+			});
+
+			await handle({ event, resolve });
+
+			expect(resolve).toHaveBeenCalledOnce();
+			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+		});
+
+		it('ends the session of a user deactivated while logged in and shows the expired banner', async () => {
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: inactiveProfile
+			});
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fcampaigns&reason=expired'
+			});
+			expect(mockSupabase.auth.signOut).toHaveBeenCalledOnce();
+		});
+
+		it('ends the session of a user whose profile is gone', async () => {
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-404' },
+				profile: null
+			});
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({ status: 303 });
+			expect(mockSupabase.auth.signOut).toHaveBeenCalledOnce();
+		});
+
+		it('clears the auth cookies locally when signOut fails for a deactivated user', async () => {
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: inactiveProfile
+			});
+			mockSupabase.auth.signOut.mockResolvedValue({ error: new Error('auth down') });
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({ status: 303 });
+			expect(event.cookies.delete).toHaveBeenCalledWith('sb-127-auth-token', { path: '/' });
+		});
+
+		it('ends a deactivated session on a public page too, and renders it anonymously', async () => {
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profile: inactiveProfile
+			});
+
+			await handle({ event, resolve });
+
+			expect(mockSupabase.auth.signOut).toHaveBeenCalledOnce();
+			expect(resolve).toHaveBeenCalledOnce();
+			expect(event.locals.user).toBeNull();
+		});
+
+		it.each(['/login', '/logout'])(
+			'leaves a deactivated session to %s, which manages it itself',
+			async (path) => {
+				vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+				const { event, resolve, mockSupabase } = createMockEvent({
+					path,
+					method: 'POST',
+					session: { access_token: 'valid-token' },
+					user: { id: 'user-123' },
+					profile: inactiveProfile
+				});
+
+				await handle({ event, resolve });
+
+				expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+				expect(resolve).toHaveBeenCalledOnce();
+			}
+		);
+
+		it('flags an expired or invalid session cookie on the redirect, without signing out', async () => {
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'expired-token' },
+				user: { id: 'user-123' },
+				getUserError: new Error('JWT expired')
+			});
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fcampaigns&reason=expired'
+			});
+			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+		});
+
+		it('keeps the session and does not claim it expired when the profile lookup fails', async () => {
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+			const { event, resolve, mockSupabase } = createMockEvent({
+				path: '/campaigns',
+				session: { access_token: 'valid-token' },
+				user: { id: 'user-123' },
+				profileError: { message: 'db down' }
+			});
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fcampaigns'
+			});
+			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+		});
+
+		it('drops the ?/action query from the return path of a form action', async () => {
+			const { event, resolve } = createMockEvent({
+				path: '/campaigns/new?/create',
+				method: 'POST'
+			});
+
+			await expect(handle({ event, resolve })).rejects.toMatchObject({
+				status: 303,
+				location: '/login?redirectTo=%2Fcampaigns%2Fnew'
+			});
+		});
 	});
 });
