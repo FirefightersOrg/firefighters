@@ -178,6 +178,12 @@ Reference document: `docs/backup-operations.md`.
 
 ## Open questions
 
+### Sale due dates and uncollectible status
+
+Provisional SAN-59 decisions: the first due date may be from 31 days before the sale through one
+year ahead, and later due dates add calendar months with end-of-month clamping. The operational
+trigger for marking a sale `uncollectible` remains to be defined.
+
 ### Definitive pata value
 
 Pending confirmation of whether a pata always equals `simple_bond_value * base_number_count` or if there are commercial exceptions.

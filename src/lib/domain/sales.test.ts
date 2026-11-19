@@ -7,6 +7,7 @@ import {
 	PAYMENT_MODES,
 	SALE_STATUSES,
 	SALE_STATUS_LABELS,
+	buildInstallmentSchedule,
 	canTransitionInstallment
 } from './sales';
 
@@ -24,6 +25,23 @@ describe('sales domain', () => {
 		expect(Object.keys(PAYMENT_MODE_LABELS)).toEqual([...PAYMENT_MODES]);
 		expect(Object.keys(SALE_STATUS_LABELS)).toEqual([...SALE_STATUSES]);
 		expect(Object.keys(INSTALLMENT_STATUS_LABELS)).toEqual([...INSTALLMENT_STATUSES]);
+	});
+
+	it('builds exact schedules with end-of-month clamping', () => {
+		expect(
+			buildInstallmentSchedule({
+				paymentMode: 'installments',
+				firstDueDate: '2027-01-31',
+				totalAmount: '300.00',
+				installmentCount: 3,
+				installmentValue: '100.00',
+				commercialUnitCount: 1
+			})
+		).toEqual([
+			{ number: 1, dueDate: '2027-01-31', amount: '100.00' },
+			{ number: 2, dueDate: '2027-02-28', amount: '100.00' },
+			{ number: 3, dueDate: '2027-03-31', amount: '100.00' }
+		]);
 	});
 
 	it('allows exactly the documented installment transitions', () => {
