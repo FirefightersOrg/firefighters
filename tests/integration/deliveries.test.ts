@@ -331,21 +331,21 @@ describe('custody from the bond and collector records (local Supabase)', () => {
 			)
 		).toMatchObject({ status: 403 });
 
-		expect(
-			await run(
-				bondActions.return as (e: never) => unknown,
-				event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
-					action: 'return',
-					fields: { notes: 'came back' }
-				})
-			)
-		).toMatchObject({ success: true, action: 'return' });
+		// The return issues a return note and opens it (the collector's receipt).
+		const returnedBond = await run(
+			bondActions.return as (e: never) => unknown,
+			event(operator, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]), {
+				action: 'return',
+				fields: { notes: 'came back', fromCollectorId: collectorId }
+			})
+		);
+		expect(String(returnedBond.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
 
 		const reassigned = await run(
 			bondActions.reassign as (e: never) => unknown,
 			event(operator, { id: campaignId, bondId: bonds[1] }, bondPath(bonds[1]), {
 				action: 'reassign',
-				fields: { collectorId: otherCollectorId }
+				fields: { collectorId: otherCollectorId, fromCollectorId: collectorId }
 			})
 		);
 		expect(String(reassigned.redirect)).toMatch(/\/deliveries\/[0-9a-f-]{36}$/);
