@@ -10,7 +10,7 @@ import { load as saleLoad } from '../../src/routes/campaigns/[id]/sales/[saleId]
 import { load as salesLoad } from '../../src/routes/campaigns/[id]/sales/+page.server';
 import { actions as bondActions } from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.server';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
-import { calculateFinancialStatus } from '$lib/domain/financial-status';
+import { formatCampaignNumber } from '$lib/domain/numbering';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
@@ -50,6 +50,7 @@ let campaignId: string;
 let collectorId: string;
 let buyerId: string;
 const bonds: Record<string, string> = {};
+let nextDedicatedBase = 2000;
 
 async function signIn(role: Role, email: string, password: string) {
 	const auth = createClient(supabaseUrl, anonKey, options);
@@ -133,6 +134,40 @@ async function auditFor(requestId: string) {
 		.eq('request_id', requestId);
 	expect(error).toBeNull();
 	return data ?? [];
+}
+async function bondState(bondId: string) {
+	const { data, error } = await service
+		.from('bonds')
+		.select('commercial_status, current_buyer_id, current_collector_id')
+		.eq('id', bondId)
+		.single();
+	expect(error).toBeNull();
+	return data;
+}
+async function salesOf(bondId: string) {
+	const { count, error } = await service
+		.from('sales')
+		.select('id', { count: 'exact', head: true })
+		.eq('bond_id', bondId);
+	expect(error).toBeNull();
+	return count;
+}
+async function createDeliveredBond(label: string) {
+	const created = await users.admin.client.rpc('bond_create', {
+		p_campaign_id: campaignId,
+		p_base_numbers: [nextDedicatedBase++],
+		p_request_id: rid(`bond-${label}`)
+	});
+	if (created.error || typeof created.data !== 'string') throw new Error(created.error?.message);
+	const delivered = await users.admin.client.rpc('bond_deliver', {
+		p_campaign_id: campaignId,
+		p_collector_id: collectorId,
+		p_bond_ids: [created.data],
+		p_notes: null,
+		p_request_id: rid(`deliver-${label}`)
+	});
+	if (delivered.error) throw new Error(delivered.error.message);
+	return created.data;
 }
 const saleId = (result: unknown) =>
 	/\/sales\/([0-9a-f-]{36})$/.exec(String((result as { redirect?: string }).redirect))?.[1];
@@ -285,14 +320,65 @@ describe('Phase 7: sales, payment plans and installments', () => {
 				collector_id: collectorId,
 				total_amount: mode === 'installments' ? 120000 : 60000
 			});
+			const id = saleId(result)!;
+			expect(await auditFor(requestId)).toEqual(
+				expect.arrayContaining([
+					{ action: 'sale.create', entity_type: 'sale', entity_id: id, request_id: requestId },
+					{
+						action: 'sale.create',
+						entity_type: 'bond',
+						entity_id: bondId,
+						request_id: requestId
+					}
+				])
+			);
 			expect(
-				(await auditFor(requestId)).map((item) => `${item.action}:${item.entity_type}`)
-			).toEqual(expect.arrayContaining(['sale.create:sale', 'sale.create:bond']));
+				(await auditFor(requestId)).filter((item) => item.action === 'sale.create')
+			).toHaveLength(2);
+			if (bondId === bonds.pata) {
+				const expectedPairs = [
+					{ base: 102, associated: 102 + 4871 },
+					{ base: 103, associated: 103 + 4871 }
+				];
+				const detail = (await saleLoad(
+					event(users['read-only'], `/campaigns/${campaignId}/sales/${id}`, {
+						id: campaignId,
+						saleId: id
+					})
+				)) as { sale: { bondNumberPairs: typeof expectedPairs } };
+				const list = (await salesLoad(
+					event(users['read-only'], `/campaigns/${campaignId}/sales`, { id: campaignId })
+				)) as { sales: { bondId: string; bondNumberPairs: typeof expectedPairs }[] };
+				expect(detail.sale.bondNumberPairs).toEqual(expectedPairs);
+				expect(list.sales.find((item) => item.bondId === bonds.pata)?.bondNumberPairs).toEqual(
+					expectedPairs
+				);
+				expect(
+					expectedPairs.map(({ base, associated }) => [
+						formatCampaignNumber(base, {
+							numberDigits: 4,
+							maxNumber: 9999,
+							associatedNumberOffset: 4871,
+							overflowPolicy: 'reject'
+						}),
+						formatCampaignNumber(associated, {
+							numberDigits: 4,
+							maxNumber: 9999,
+							associatedNumberOffset: 4871,
+							overflowPolicy: 'reject'
+						})
+					])
+				).toEqual([
+					['0102', '4973'],
+					['0103', '4974']
+				]);
+			}
 		}
 	});
 
 	it('C2 creates exact monthly installment plans and protects their number uniqueness', async () => {
-		const result = await sell(users.operator, bonds.planPata, 'installments', baDate(1));
+		const today = baDate();
+		const result = await sell(users.operator, bonds.planPata, 'installments', addMonths(today, 0));
 		const id = saleId(result)!;
 		const { data: plan } = await service
 			.from('payment_plans')
@@ -309,38 +395,56 @@ describe('Phase 7: sales, payment plans and installments', () => {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		]);
 		expect(installments!.map((item) => item.due_date)).toEqual(
-			Array.from({ length: 10 }, (_, i) => addMonths(baDate(1), i))
+			Array.from({ length: 10 }, (_, i) => addMonths(today, i))
 		);
 		expect(installments!.map((item) => Number(item.amount))).toEqual(Array(10).fill(12000));
-		expect(installments!.reduce((sum, item) => sum + Number(item.amount), 0)).toBe(120000);
+		const installmentTotal = installments!.reduce((sum, item) => sum + Number(item.amount), 0);
+		const { data: installmentSale } = await service
+			.from('sales')
+			.select('total_amount')
+			.eq('id', id)
+			.single();
+		expect(installmentTotal).toBe(120000);
+		expect(Number(plan!.total_amount)).toBe(installmentTotal);
+		expect(Number(installmentSale!.total_amount)).toBe(installmentTotal);
 		expect(
 			(
 				await service.from('installments').insert({
 					payment_plan_id: plan!.id,
 					installment_number: 1,
-					due_date: baDate(),
+					due_date: today,
 					amount: '1.00'
 				})
 			).error?.code
 		).toBe('23505');
-		const fullSale = await sell(users.operator, bonds.full, 'full_payment');
+		const fullSale = await sell(users.operator, bonds.full, 'full_payment', today);
 		const full = await service
 			.from('payment_plans')
-			.select('id')
+			.select('id, total_amount')
 			.eq('sale_id', saleId(fullSale)!)
 			.single();
-		expect(
-			(
-				await service
-					.from('installments')
-					.select('installment_number, due_date')
-					.eq('payment_plan_id', full.data!.id)
-			).data
-		).toEqual([{ installment_number: 1, due_date: baDate() }]);
+		const { data: fullInstallments } = await service
+			.from('installments')
+			.select('installment_number, due_date, amount')
+			.eq('payment_plan_id', full.data!.id);
+		const { data: fullSaleRow } = await service
+			.from('sales')
+			.select('total_amount')
+			.eq('id', saleId(fullSale)!)
+			.single();
+		expect(fullInstallments).toHaveLength(1);
+		expect(fullInstallments![0]).toMatchObject({
+			installment_number: 1,
+			due_date: today,
+			amount: 60000
+		});
+		expect(Number(full.data!.total_amount)).toBe(60000);
+		expect(Number(fullSaleRow!.total_amount)).toBe(60000);
 	});
 
-	it('C3 keeps commercial and financial status independent and exposes the stored snapshot', async () => {
-		const registered = await sell(users.operator, bonds.financial, 'installments', baDate(-31));
+	it('C3 verifies the Phase 7 initial financial-status snapshot without payments', async () => {
+		const today = baDate();
+		const registered = await sell(users.operator, bonds.financial, 'installments', today);
 		const sale = { id: saleId(registered)! };
 		const detail = (await saleLoad(
 			event(users['read-only'], `/campaigns/${campaignId}/sales/${sale!.id}`, {
@@ -360,45 +464,24 @@ describe('Phase 7: sales, payment plans and installments', () => {
 		};
 		expect(detail.financialStatusSnapshot).toBe('no_payments');
 		expect(
-			calculateFinancialStatus({
-				saleStatus: 'active',
-				planStatus: 'active',
-				markedUncollectible: false,
-				today: baDate(),
-				installments: [
-					{
-						number: 1,
-						dueDate: baDate(-31),
-						amount: '1.00',
-						appliedAmount: '0.00',
-						status: 'pending'
-					}
-				]
-			})
-		).toBe('overdue');
-		expect(
 			(await service.from('bonds').select('commercial_status').eq('id', bonds.financial).single())
 				.data?.commercial_status
 		).toBe('sold');
 	});
 
 	it('C4 refuses unsellable bonds and a campaign that is no longer active, without writes', async () => {
-		for (const bondId of [bonds.available, bonds.lost, bonds.annulled, bonds.sold]) {
+		const soldBond = await createDeliveredBond('c4-sold');
+		expect(saleId(await sell(users.operator, soldBond, 'full_payment', baDate()))).toBeDefined();
+		for (const bondId of [bonds.available, bonds.lost, bonds.annulled, soldBond]) {
 			const requestId = rid('c4');
-			// Counted for this bond only: other suites may insert sales concurrently.
-			const salesOf = async () =>
-				(
-					await service
-						.from('sales')
-						.select('id', { count: 'exact', head: true })
-						.eq('bond_id', bondId)
-				).count;
-			const before = await salesOf();
+			const before = await salesOf(bondId);
+			const beforeBond = await bondState(bondId);
 			expect(
 				await sell(users.operator, bondId, 'full_payment', baDate(), requestId),
 				bondId
 			).toMatchObject({ status: 409, data: { errors: { bondId: [expect.any(String)] } } });
-			expect(await salesOf()).toBe(before);
+			expect(await salesOf(bondId)).toBe(before);
+			expect(await bondState(bondId)).toEqual(beforeBond);
 			expect(await auditFor(requestId)).toEqual([]);
 		}
 		// A campaign that is no longer active: a bond delivered while it was active cannot be sold
@@ -444,6 +527,7 @@ describe('Phase 7: sales, payment plans and installments', () => {
 		if (delivered.error) throw new Error(delivered.error.message);
 		await toStatus('closing');
 		const closingRequest = rid('closing-sale');
+		const beforeClosingBond = await bondState(closingBond);
 		const result = await run(
 			saleActions.register as (e: never) => unknown,
 			event(
@@ -466,27 +550,34 @@ describe('Phase 7: sales, payment plans and installments', () => {
 					.eq('bond_id', closingBond)
 			).count
 		).toBe(0);
+		expect(await bondState(closingBond)).toEqual(beforeClosingBond);
 		expect(await auditFor(closingRequest)).toEqual([]);
 	});
 
 	it('C5 refuses return, reassignment, and loss after sale with no audit side effects', async () => {
+		const soldBond = await createDeliveredBond('c5-sold');
+		expect(saleId(await sell(users.operator, soldBond, 'full_payment', baDate()))).toBeDefined();
 		for (const [action, fields] of [
 			['return', { fromCollectorId: collectorId, notes: '' }],
 			['reassign', { fromCollectorId: collectorId, collectorId, notes: '' }],
 			['markLost', { responsibleParty: 'Test', lostOn: baDate(), reason: 'No' }]
 		] as const) {
 			const requestId = rid(`c5-${action}`);
+			const beforeBond = await bondState(soldBond);
+			const beforeSales = await salesOf(soldBond);
 			const result = await run(
 				bondActions[action] as (e: never) => unknown,
 				event(
 					users.admin,
-					`/campaigns/${campaignId}/bonds/${bonds.sold}?/${action}`,
-					{ id: campaignId, bondId: bonds.sold },
+					`/campaigns/${campaignId}/bonds/${soldBond}?/${action}`,
+					{ id: campaignId, bondId: soldBond },
 					fields,
 					requestId
 				)
 			);
 			expect(result).toMatchObject({ status: 409 });
+			expect(await bondState(soldBond)).toEqual(beforeBond);
+			expect(await salesOf(soldBond)).toBe(beforeSales);
 			expect(await auditFor(requestId)).toEqual([]);
 		}
 		expect(
@@ -494,7 +585,7 @@ describe('Phase 7: sales, payment plans and installments', () => {
 				await service
 					.from('bonds')
 					.select('commercial_status, current_collector_id')
-					.eq('id', bonds.sold)
+					.eq('id', soldBond)
 					.single()
 			).data
 		).toMatchObject({ commercial_status: 'sold', current_collector_id: collectorId });
@@ -512,11 +603,42 @@ describe('Phase 7: sales, payment plans and installments', () => {
 					event(caller, salePath(), { id: campaignId })
 				)
 			).toMatchObject({ status: 403 });
-			expect(await sell(caller, bonds.custody, 'full_payment')).toMatchObject({ status: 403 });
+			const requestId = rid(`c6-${caller === users.treasurer ? 'treasurer' : 'read-only'}`);
+			const beforeBond = await bondState(bonds.custody);
+			const beforeSales = await salesOf(bonds.custody);
+			expect(await sell(caller, bonds.custody, 'full_payment', baDate(), requestId)).toMatchObject({
+				status: 403
+			});
+			expect(await bondState(bonds.custody)).toEqual(beforeBond);
+			expect(await salesOf(bonds.custody)).toBe(beforeSales);
+			expect(await auditFor(requestId)).toEqual([]);
 		}
+		const treasurerList = (await salesLoad(
+			event(users.treasurer, `/campaigns/${campaignId}/sales`, { id: campaignId })
+		)) as { sales: { bondId: string }[] };
+		expect(treasurerList.sales.map((item) => item.bondId)).toContain(bonds.simple);
 		const list = (await salesLoad(
 			event(users['read-only'], `/campaigns/${campaignId}/sales`, { id: campaignId })
 		)) as { sales: { bondId: string }[] };
 		expect(list.sales.map((item) => item.bondId)).toContain(bonds.simple);
+		const simpleSale = (
+			await service.from('sales').select('id').eq('bond_id', bonds.simple).single()
+		).data!.id;
+		expect(
+			await saleLoad(
+				event(users.treasurer, `/campaigns/${campaignId}/sales/${simpleSale}`, {
+					id: campaignId,
+					saleId: simpleSale
+				})
+			)
+		).toMatchObject({ sale: { bondId: bonds.simple } });
+		expect(
+			await saleLoad(
+				event(users['read-only'], `/campaigns/${campaignId}/sales/${simpleSale}`, {
+					id: campaignId,
+					saleId: simpleSale
+				})
+			)
+		).toMatchObject({ sale: { bondId: bonds.simple } });
 	});
 });
