@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { isHttpError } from '@sveltejs/kit';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
 import {
 	addPaymentToSettlement,
@@ -9,9 +10,13 @@ import {
 	removePaymentFromSettlement,
 	SettlementServiceError
 } from '$lib/server/services/settlements';
+import { formatMoney } from '$lib/domain/money';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
+import { load as settlementLoad } from '../../src/routes/campaigns/[id]/settlements/[settlementId]/+page.server';
+import { load as settlementPrintLoad } from '../../src/routes/campaigns/[id]/settlements/[settlementId]/print/+page.server';
+import { load as paymentPrintLoad } from '../../src/routes/campaigns/[id]/payments/[paymentId]/print/+page.server';
 
 const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
 const seed = resolveSeedConfig(seedEnv);
@@ -72,6 +77,30 @@ const ctx = (caller: Caller, requestId = rid('request')) => ({
 	requestId,
 	permissions: caller.permissions
 });
+function event<E>(caller: Caller, path: string, params: Record<string, string>): E {
+	const url = new URL(`http://localhost${path}`);
+	return {
+		locals: {
+			supabase: caller.client,
+			safeGetSession: async () => ({ session: null, user: caller.user }),
+			session: null,
+			user: caller.user,
+			profile: caller.profile,
+			permissions: caller.permissions,
+			requestId: rid('route')
+		},
+		params,
+		url
+	} as unknown as E;
+}
+async function routeResult(fn: () => unknown) {
+	try {
+		return await fn();
+	} catch (err) {
+		if (isHttpError(err)) return err.status;
+		throw err;
+	}
+}
 async function rpcId(client: SupabaseClient, name: string, args: Record<string, unknown>) {
 	const { data, error } = await client.rpc(name, args);
 	if (error || typeof data !== 'string')
@@ -506,5 +535,210 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		await expect(totals(users.collector, foreignId)).rejects.toThrow();
 	});
 
-	it.todo('C5 printable settlement documents and UI are verified in SAN-64/65 (Part 2)');
+	it('C5 verifies printable documents and settlement workspace against real closed and open data', async () => {
+		const sale = await createSale('c5-print', baDate());
+		const { data: bondNumbers, error: bondNumbersError } = await service
+			.from('bond_numbers')
+			.select('number_value')
+			.eq('bond_id', sale.bondId)
+			.eq('number_kind', 'base')
+			.single();
+		expect(bondNumbersError).toBeNull();
+		const paddedBond = String(bondNumbers!.number_value).padStart(4, '0');
+		const { data: collector, error: collectorError } = await service
+			.from('collectors')
+			.select('display_name')
+			.eq('id', collectorId)
+			.single();
+		expect(collectorError).toBeNull();
+		const settlementId = await openSettlement(
+			users.operator.client,
+			{ campaignId, collectorId, notes: 'C5 delivery note' },
+			ctx(users.operator)
+		);
+		const paymentId = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 100,
+				paymentMethod: 'cash',
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 100 }]
+			},
+			ctx(users.operator)
+		);
+		const routeParams = { id: campaignId, settlementId };
+		const openPrint = (await settlementPrintLoad(
+			event(users.admin, `/campaigns/${campaignId}/settlements/${settlementId}/print`, routeParams)
+		)) as Exclude<Awaited<ReturnType<typeof settlementPrintLoad>>, void>;
+		const openDocument = openPrint.document;
+		expect(openDocument.preliminary).toBe(true);
+		expect(openDocument.closingDate).toBe('—');
+		expect(openDocument).toMatchObject({
+			campaign: `[it-p8 ${RUN_ID}] settlements`,
+			settlementNumberLabel: expect.stringMatching(/^Settlement \d{4}$/),
+			collector: collector!.display_name,
+			closedBy: null,
+			notes: 'C5 delivery note',
+			manualAdjustments: '0 — No manual adjustments have been recorded.',
+			collectorSignature: 'Collector signature',
+			administrationSignature: 'Administration signature'
+		});
+		expect(openDocument.openingDate).not.toBe('—');
+		expect(openDocument.payments).toEqual([
+			expect.objectContaining({
+				bond: paddedBond,
+				buyer: `Phase ${RUN_ID}`,
+				installments: 'Installment 1 (100.00)',
+				method: 'Cash',
+				amount: formatMoney('100.00')
+			})
+		]);
+		expect(openDocument.totals).toEqual({
+			cash: formatMoney('100.00'),
+			transfer: formatMoney('0.00'),
+			amount: formatMoney('100.00'),
+			commission: formatMoney('0.00'),
+			commissionPaid: formatMoney('0.00'),
+			net: formatMoney('100.00'),
+			balance: formatMoney('0.00')
+		});
+		const openWorkspace = (await settlementLoad(
+			event(users.operator, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
+		)) as Exclude<Awaited<ReturnType<typeof settlementLoad>>, void>;
+		expect(openWorkspace.totals).toEqual({
+			totalCash: '100.00',
+			totalTransfer: '0.00',
+			totalAmount: '100.00',
+			commissionAmount: '0.00',
+			commissionPaidAmount: '0.00',
+			netToFirefighters: '100.00',
+			collectorCreditBalance: '0.00'
+		});
+		expect(openWorkspace.can).toMatchObject({ add: true, remove: true, close: false });
+		expect(
+			await routeResult(() =>
+				paymentPrintLoad(
+					event(users.operator, `/campaigns/${campaignId}/payments/${paymentId}/print`, {
+						id: campaignId,
+						paymentId
+					})
+				)
+			)
+		).toBe(404);
+		await removePaymentFromSettlement(
+			users.operator.client,
+			{ paymentId, reason: 'C5 pending document rejection' },
+			ctx(users.operator)
+		);
+		expect(
+			await routeResult(() =>
+				paymentPrintLoad(
+					event(users.operator, `/campaigns/${campaignId}/payments/${paymentId}/print`, {
+						id: campaignId,
+						paymentId
+					})
+				)
+			)
+		).toBe(404);
+		const confirmedPaymentId = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 100,
+				paymentMethod: 'cash',
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 100 }]
+			},
+			ctx(users.operator)
+		);
+		await closeSettlement(users.treasurer.client, { settlementId }, ctx(users.treasurer));
+		const { data: stored, error: storedError } = await users.admin.client
+			.from('settlements')
+			.select(
+				'settlement_number,opened_at,closed_at,total_cash,total_transfer,total_amount,commission_amount,commission_paid_amount,net_to_firefighters'
+			)
+			.eq('id', settlementId)
+			.single();
+		expect(storedError).toBeNull();
+		expect(stored).toBeTruthy();
+		const closedPrint = (await settlementPrintLoad(
+			event(users.admin, `/campaigns/${campaignId}/settlements/${settlementId}/print`, routeParams)
+		)) as Exclude<Awaited<ReturnType<typeof settlementPrintLoad>>, void>;
+		const document = closedPrint.document;
+		expect(document.preliminary).toBe(false);
+		expect(document).toMatchObject({
+			campaign: `[it-p8 ${RUN_ID}] settlements`,
+			settlementNumberLabel: `Settlement ${String(stored!.settlement_number).padStart(4, '0')}`,
+			collector: collector!.display_name,
+			closedBy: users.treasurer.profile.full_name,
+			notes: 'C5 delivery note',
+			manualAdjustments: '0 — No manual adjustments have been recorded.',
+			collectorSignature: 'Collector signature',
+			administrationSignature: 'Administration signature'
+		});
+		expect(document.openingDate).not.toBe('—');
+		expect(document.closingDate).not.toBe('—');
+		expect(document.payments).toEqual([
+			expect.objectContaining({
+				bond: paddedBond,
+				buyer: `Phase ${RUN_ID}`,
+				installments: 'Installment 1 (100.00)',
+				method: 'Cash',
+				amount: formatMoney('100.00')
+			})
+		]);
+		expect(document.totals).toEqual({
+			cash: formatMoney(String(stored!.total_cash)),
+			transfer: formatMoney(String(stored!.total_transfer)),
+			amount: formatMoney(String(stored!.total_amount)),
+			commission: formatMoney(String(stored!.commission_amount)),
+			commissionPaid: formatMoney(String(stored!.commission_paid_amount)),
+			net: formatMoney(String(stored!.net_to_firefighters)),
+			balance: formatMoney('0.00')
+		});
+		const certificate = (await paymentPrintLoad(
+			event(users.operator, `/campaigns/${campaignId}/payments/${confirmedPaymentId}/print`, {
+				id: campaignId,
+				paymentId: confirmedPaymentId
+			})
+		)) as Exclude<Awaited<ReturnType<typeof paymentPrintLoad>>, void>;
+		expect(certificate.document).toMatchObject({
+			campaign: `[it-p8 ${RUN_ID}] settlements`,
+			bond: paddedBond,
+			buyer: `Phase ${RUN_ID}`,
+			collector: collector!.display_name,
+			installments: 'Installment 1 (100.00)',
+			amount: formatMoney('100.00'),
+			method: 'Cash',
+			registeredBy: users.operator.profile.full_name,
+			receiptNumber: `SET-${String(stored!.settlement_number).padStart(4, '0')}-${confirmedPaymentId.slice(0, 8).toUpperCase()}`
+		});
+		expect(certificate.document.paymentDate).not.toBe('—');
+		expect(certificate.document.createdAt).not.toBe('—');
+		const closedWorkspace = (await settlementLoad(
+			event(users.treasurer, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
+		)) as Exclude<Awaited<ReturnType<typeof settlementLoad>>, void>;
+		expect(closedWorkspace.totals).toEqual({
+			totalCash: Number(stored!.total_cash).toFixed(2),
+			totalTransfer: Number(stored!.total_transfer).toFixed(2),
+			totalAmount: Number(stored!.total_amount).toFixed(2),
+			commissionAmount: Number(stored!.commission_amount).toFixed(2),
+			commissionPaidAmount: Number(stored!.commission_paid_amount).toFixed(2),
+			netToFirefighters: Number(stored!.net_to_firefighters).toFixed(2),
+			collectorCreditBalance: '0.00'
+		});
+		expect(closedWorkspace.can).toEqual({ add: false, remove: false, close: false });
+		expect(
+			await routeResult(() =>
+				settlementLoad(
+					event(
+						users['read-only'],
+						`/campaigns/${campaignId}/settlements/${settlementId}`,
+						routeParams
+					)
+				)
+			)
+		).toBe(403);
+	});
 });
