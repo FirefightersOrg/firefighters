@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { z } from 'zod';
 import { requireActiveUser } from '$lib/server/auth/guards';
-import { hasPermissionIn } from '$lib/server/auth/permissions';
+import { hasPermissionIn, permissionsUnavailable } from '$lib/server/auth/permissions';
 import {
 	COMMISSION_RULE_VERSION_FIELD,
 	commissionRuleFieldErrors,
@@ -39,6 +39,10 @@ export function checkCommissionRuleManager(
 	form: CommissionRuleFormName
 ) {
 	requireActiveUser(locals, url.pathname);
+	if (permissionsUnavailable(locals.permissions)) {
+		// Loading the permissions failed (logged by the hook): an outage, not a denial.
+		return commissionRuleFormFailure(form, 500, COMMISSION_RULE_MESSAGES.internal);
+	}
 	if (!hasPermissionIn(locals.permissions, 'commission.rule_manage')) {
 		return commissionRuleFormFailure(form, 403, COMMISSION_RULE_MESSAGES.permission);
 	}

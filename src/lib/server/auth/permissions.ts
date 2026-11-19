@@ -112,31 +112,42 @@ export async function hasPermissionForUser(
  * (e.g. in `hooks.server.ts`) and combined with `hasPermissionIn` / `requirePermissionIn`
  * to avoid one RPC round-trip per check.
  *
- * Returns an empty array if unauthenticated or on RPC error (fail closed). RPC errors are logged.
+ * Returns `[]` when the caller holds no permissions (unauthenticated or inactive callers included),
+ * and `null` when the list could not be loaded (RPC error, thrown error, or a non-array response).
+ * Failures are logged. `null` still denies every permission, but `requirePermissionIn` answers
+ * 500 for it instead of 403, so an outage does not look like an access problem.
  *
  * @param supabase User-scoped Supabase client (anon key + user session cookies)
  */
-export async function getUserPermissions(supabase: SupabaseClient): Promise<string[]> {
+export async function getUserPermissions(supabase: SupabaseClient): Promise<string[] | null> {
 	try {
 		const { data, error: rpcError } = await supabase.rpc('my_permissions');
 
 		if (rpcError) {
 			console.error('[auth] my_permissions RPC failed; failing closed', { error: rpcError });
-			return [];
+			return null;
 		}
 
 		if (!Array.isArray(data)) {
-			if (data !== null) {
-				console.error('[auth] my_permissions returned a non-array; failing closed', { data });
-			}
-			return [];
+			// my_permissions() always returns an array (empty when none), so anything else is a fault.
+			console.error('[auth] my_permissions returned a non-array; failing closed', { data });
+			return null;
 		}
 
 		return data as string[];
 	} catch (err) {
 		console.error('[auth] my_permissions RPC threw; failing closed', { error: err });
-		return [];
+		return null;
 	}
+}
+
+/** HttpError 500 for a permission check that could not be performed (the cause is logged). */
+function permissionCheckFailed(permissionCode: PermissionCode): never {
+	error(500, {
+		message: 'Permission check failed',
+		code: 'permission_check_failed',
+		permission: permissionCode
+	});
 }
 
 function forbidden(permissionCode: PermissionCode): never {
@@ -165,11 +176,7 @@ export async function requirePermission(
 	const result = await checkPermission(supabase, permissionCode);
 
 	if (result === 'error') {
-		error(500, {
-			message: 'Permission check failed',
-			code: 'permission_check_failed',
-			permission: permissionCode
-		});
+		permissionCheckFailed(permissionCode);
 	}
 
 	if (result !== 'granted') {
@@ -191,17 +198,31 @@ export function hasPermissionIn(
 }
 
 /**
+ * True when the request's permission list could not be loaded (`locals.permissions === null`,
+ * set by `hooks.server.ts` when `getUserPermissions` fails). Callers answer 500, not 403.
+ */
+export function permissionsUnavailable(
+	permissions: readonly string[] | null | undefined
+): permissions is null {
+	return permissions === null;
+}
+
+/**
  * Like `requirePermission`, but checks a precomputed, request-scoped permission list
  * (the result of `getUserPermissions`, e.g. `locals.permissions`). No database round-trip.
  *
- * Throws `HttpError` 403 if the permission is absent. Because `getUserPermissions` returns `[]`
- * on RPC failure (logged), an outage while loading the list surfaces here as 403, not 500;
- * use `requirePermission` when that distinction matters.
+ * - List could not be loaded (`null`) → throws `HttpError` 500
+ *   `{ message: 'Permission check failed', code: 'permission_check_failed', permission }`.
+ * - Permission absent → throws `HttpError` 403
+ *   `{ message: 'Forbidden', code: 'permission_denied', permission }`.
  */
 export function requirePermissionIn(
 	permissions: readonly string[] | null | undefined,
 	permissionCode: PermissionCode
 ): void {
+	if (permissionsUnavailable(permissions)) {
+		permissionCheckFailed(permissionCode);
+	}
 	if (!hasPermissionIn(permissions, permissionCode)) {
 		forbidden(permissionCode);
 	}

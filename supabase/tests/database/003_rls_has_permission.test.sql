@@ -130,7 +130,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select is((select count(*)::int from public.profiles), 5, 'admin reads all profiles');
 select is(public.current_profile_id(), '10000000-0000-0000-0000-000000000001'::uuid, 'admin: current_profile_id is own profile');
 select ok(public.has_permission('user.manage'), 'admin: has_permission(user.manage)');
-select is(cardinality(public.my_permissions()), 44, 'admin: my_permissions returns 44 codes');
+select is(cardinality(public.my_permissions()), 47, 'admin: my_permissions returns 47 codes');
 select is((select count(*)::int from public.audit_log), 1, 'admin reads audit_log (audit.view)');
 select lives_ok(
   $$insert into public.profiles (auth_user_id, full_name, email) values ('00000000-0000-0000-0000-000000000006', 'Spare', 'rls-user-6@example.com')$$,
@@ -221,7 +221,7 @@ select is((select count(*)::int from public.profiles), 1, 'operator reads only o
 select is((select count(*)::int from public.user_roles), 1, 'operator reads only own user_roles');
 select is((select count(*)::int from public.audit_log), 0, 'operator reads no audit_log rows');
 select cmp_ok((select count(*)::int from public.roles), '=', 5, 'operator can read roles');
-select is((select count(*)::int from public.permissions), 44, 'operator can read permissions');
+select is((select count(*)::int from public.permissions), 47, 'operator can read permissions');
 select set_eq(
   $$select role_id from public.role_permissions$$,
   $$select id from public.roles where name = 'operator'$$,
@@ -266,7 +266,7 @@ select ok(not public.has_permission('anything'), 'no-role user: has_permission(a
 select ok(not public.has_permission('user.manage'), 'no-role user: lacks user.manage');
 select is(
   public.my_permissions(),
-  array['bond.view', 'campaign.view', 'report.view_financial'],
+  array['bond.view', 'campaign.view', 'commission.view', 'report.view_financial'],
   'no-role user: my_permissions reflects only the role granted earlier in this test (read-only)'
 );
 reset role;
