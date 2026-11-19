@@ -11,7 +11,8 @@ export function loginRedirectPath(path: string): string {
  * `locals.user` / `locals.profile` null otherwise) and returns that profile. Anyone else is
  * redirected (303) to the login page, which sends them back to `returnTo` after signing in.
  *
- * Scoped guard used by `/campaigns/**` loads and actions; app-wide guards are SAN-95.
+ * Defense in depth for `/campaigns/**` loads and actions: hooks.server.ts already redirects
+ * anonymous requests for every non-public path (`$lib/server/auth/route-guard`).
  * Form actions do not run layout loads, so every action must call this itself.
  *
  * @param returnTo Path to come back to, e.g. `url.pathname + url.search` in a load, or

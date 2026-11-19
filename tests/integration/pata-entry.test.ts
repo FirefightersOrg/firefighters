@@ -11,7 +11,7 @@ import {
 	actions as recordActions,
 	load as recordLoad
 } from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.server';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { getBondById } from '$lib/server/repositories/bonds';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -62,7 +62,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 
