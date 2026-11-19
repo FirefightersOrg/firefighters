@@ -16,7 +16,7 @@ Define the conceptual relational model for the MVP. Names are preliminary and mu
 
 ## Function privileges
 
-Since `20261202000000_revoke_default_function_execute.sql` (SAN-102), a function that a migration creates is executable only by its owner (`postgres`). Its default privileges no longer grant `EXECUTE` to `PUBLIC` (in any schema) or to `anon`, `authenticated` and `service_role` (in `public`). An RPC the app calls is unreachable until the migration grants it:
+Since `20261210000000_revoke_default_function_execute.sql` (SAN-102), a function that a migration creates is executable only by its owner (`postgres`). Its default privileges no longer grant `EXECUTE` to `PUBLIC` (in any schema) or to `anon`, `authenticated` and `service_role` (in `public`). An RPC the app calls is unreachable until the migration grants it:
 
 ```sql
 grant execute on function public.my_rpc(uuid, text) to authenticated;
@@ -27,7 +27,7 @@ grant execute on function public.my_rpc(uuid, text) to authenticated;
 - Functions created before this migration keep the ACLs their migrations set.
 - Only `postgres`'s defaults are changed. Migrations run as `postgres`, which cannot change `supabase_admin`'s defaults, so functions created by `supabase_admin` (platform internals, extensions) keep the platform defaults.
 - pgTAP helpers in `pg_temp` are also created without `PUBLIC` `EXECUTE`. Grant them to the roles the test switches to (`grant execute on function pg_temp.act_as(int) to authenticated, anon;`).
-- pgTAP `018_default_function_privileges.test.sql` checks the default ACLs and that a new function cannot be called without a grant.
+- pgTAP `022_default_function_privileges.test.sql` checks the default ACLs and that a new function cannot be called without a grant.
 
 ## Main entities
 
