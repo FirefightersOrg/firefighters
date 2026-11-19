@@ -401,6 +401,18 @@ Constraints:
 
 - Unique `(payment_plan_id, installment_number)`.
 
+Rules (SAN-58, `20261205000000_sales.sql`):
+
+- A bond has at most one `active` sale (`sales.status`: `active`, `annulled`, `corrected`); a
+  sale's bond belongs to the sale's campaign. `payment_mode` is `full_payment` (a one-installment
+  plan) or `installments`. A sale has at most one `active` payment plan (1 to 120 installments).
+- New rows start `active` (installments `pending`). After that only the status changes: sale
+  `active -> annulled | corrected`, plan `active -> annulled`, installments as in
+  `docs/state-machines.md` "Installment". Amounts, dates and parties never change.
+- Nothing is deleted. Writes go through audited functions (`sale.create`, SAN-59; `sale.correct`,
+  Phase 10). Readers: `bond.view`, `sale.create`, `sale.correct`, and a collector's own login for
+  its sales.
+
 ### payments
 
 Recorded payments.
