@@ -134,8 +134,8 @@ begin
   if new.status not in ('draft', 'pending_in_settlement') then
     raise exception 'a new payment must start draft or pending_in_settlement' using errcode = 'check_violation';
   end if;
-  if new.status = 'pending_in_settlement' and new.settlement_id is null then
-    raise exception 'a pending payment requires a settlement' using errcode = 'check_violation';
+  if (new.status = 'pending_in_settlement') is distinct from (new.settlement_id is not null) then
+    raise exception 'pending payment settlement is inconsistent' using errcode = 'check_violation';
   end if;
   return new;
 end; $$;
