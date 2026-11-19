@@ -10,6 +10,7 @@ import {
 	type DeliveryNoteReason
 } from '$lib/domain/deliveries';
 import type { RepositoryResult } from './campaigns';
+import { mapBondListRow, BOND_LIST_COLUMNS, type BondListEntry, type BondListRow } from './bonds';
 
 /**
  * Read access to delivery notes and bond custody history under the caller's RLS (bond.view or a
@@ -17,6 +18,7 @@ import type { RepositoryResult } from './campaigns';
  * functions (services/deliveries.ts).
  */
 export const DELIVERY_NOTES_PAGE_SIZE = 25;
+export const AVAILABLE_BONDS_LIMIT = 500;
 
 interface NoteRow {
 	id: string;
@@ -112,6 +114,8 @@ export async function listDeliveryNotes(
 	options: {
 		collectorId?: string | null;
 		noteNumber?: number | null;
+		from?: string | null;
+		to?: string | null;
 		page?: number;
 		pageSize?: number;
 	} = {}
@@ -126,6 +130,9 @@ export async function listDeliveryNotes(
 		.eq('campaign_id', campaignId);
 	if (options.collectorId) query = query.eq('collector_id', options.collectorId);
 	if (options.noteNumber) query = query.eq('note_number', options.noteNumber);
+	const bounds = deliveryDateBounds(options);
+	if (bounds.from) query = query.gte('issued_at', bounds.from);
+	if (bounds.to) query = query.lt('issued_at', bounds.to);
 	const { data, error, count } = await query
 		.order('note_number', { ascending: false })
 		.range((page - 1) * pageSize, page * pageSize - 1)
@@ -175,4 +182,116 @@ export async function listBondAssignments(
 		.overrideTypes<AssignmentRow[], { merge: false }>();
 	if (error) return { data: null, error };
 	return wrap(() => (data ?? []).map(mapAssignmentRow));
+}
+
+/** Available campaign bonds matching a participating number, barcode or internal code. */
+export async function findAvailableBonds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	options: {
+		number?: number | null;
+		code?: string | null;
+		from?: number | null;
+		to?: number | null;
+	}
+): Promise<RepositoryResult<{ items: BondListEntry[]; truncated: boolean }>> {
+	let query = supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.eq('commercial_status', 'available')
+		// Members of a manual pata are delivered with their pata, never alone.
+		.is('group_pata_id', null);
+	if (options.number != null) {
+		query = query.or(
+			`base_numbers.cs.{${options.number}},associated_numbers.cs.{${options.number}}`
+		);
+	}
+	if (options.code)
+		query = query.or(
+			`barcode.eq."${options.code.replace(/["\\]/g, '\\$&')}",internal_code.eq."${options.code.replace(/["\\]/g, '\\$&')}"`
+		);
+	if (options.from != null) query = query.gte('sort_number', options.from);
+	if (options.to != null) query = query.lte('sort_number', options.to);
+	const { data, error } = await query
+		.order('sort_number', { ascending: true })
+		.limit(AVAILABLE_BONDS_LIMIT + 1)
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return wrap(() => ({
+		items: (data ?? []).slice(0, AVAILABLE_BONDS_LIMIT).map(mapBondListRow),
+		truncated: (data?.length ?? 0) > AVAILABLE_BONDS_LIMIT
+	}));
+}
+
+/** Buenos Aires has a fixed UTC-3 offset and no daylight saving time. */
+function argentinaDayStart(day: string): string {
+	return `${day}T00:00:00-03:00`;
+}
+
+function nextDay(day: string): string {
+	const date = new Date(`${day}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + 1);
+	return date.toISOString().slice(0, 10);
+}
+
+/** Half-open Buenos Aires day bounds for delivery note filters. */
+export function deliveryDateBounds(options: { from?: string | null; to?: string | null }): {
+	from: string | null;
+	to: string | null;
+} {
+	return {
+		from: options.from ? argentinaDayStart(options.from) : null,
+		to: options.to ? argentinaDayStart(nextDay(options.to)) : null
+	};
+}
+
+/** Bonds of the campaign by id, as list entries (for a note's detail). */
+export async function listBondEntriesByIds(
+	supabase: SupabaseClient,
+	campaignId: string,
+	ids: readonly string[]
+): Promise<RepositoryResult<BondListEntry[]>> {
+	if (ids.length === 0) return { data: [], error: null };
+	const { data, error } = await supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS)
+		.eq('campaign_id', campaignId)
+		.in('id', [...ids])
+		.order('sort_number', { ascending: true })
+		.overrideTypes<BondListRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	return wrap(() => (data ?? []).map(mapBondListRow));
+}
+
+/** The note behind each bond's active custody (delivery or reassignment), keyed by bond id. */
+export async function listActiveAssignmentNotes(
+	supabase: SupabaseClient,
+	bondIds: readonly string[]
+): Promise<RepositoryResult<Map<string, { noteId: string; noteNumber: number }>>> {
+	if (bondIds.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('bond_assignments')
+		.select('bond_id, delivery_note_id, delivery_notes(note_number)')
+		.in('bond_id', [...bondIds])
+		.eq('status', 'active')
+		.overrideTypes<
+			{
+				bond_id: string;
+				delivery_note_id: string | null;
+				delivery_notes: { note_number: number } | null;
+			}[],
+			{ merge: false }
+		>();
+	if (error) return { data: null, error };
+	const notes = new Map<string, { noteId: string; noteNumber: number }>();
+	for (const row of data ?? []) {
+		if (row.delivery_note_id && row.delivery_notes) {
+			notes.set(row.bond_id, {
+				noteId: row.delivery_note_id,
+				noteNumber: row.delivery_notes.note_number
+			});
+		}
+	}
+	return { data: notes, error: null };
 }

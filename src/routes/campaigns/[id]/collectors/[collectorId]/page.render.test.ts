@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from './+page.svelte';
+import { mapCampaignRow } from '$lib/server/repositories/campaigns';
 import { CAMPAIGN_ID, campaignRow } from '../../../test-helpers';
 
 const COLLECTOR_ID = 'c0000000-0000-0000-0000-000000000001';
 
-function page(manage: boolean) {
+function page(manage: boolean, extra: Record<string, unknown> = {}) {
 	return render(Page, {
 		props: {
 			data: {
-				campaign: { id: CAMPAIGN_ID, name: campaignRow().name },
 				collector: {
 					id: COLLECTOR_ID,
 					displayName: 'Ada Collector',
@@ -26,7 +26,12 @@ function page(manage: boolean) {
 				buyers: [],
 				profiles: [],
 				can: { manage, audit: false },
-				audit: null
+				audit: null,
+				campaign: mapCampaignRow(campaignRow()),
+				bondsTotal: 0,
+				buyersTotal: 0,
+				custody: { can: { returnBonds: false, reassignBonds: false }, collectors: [] },
+				...extra
 			},
 			form: null,
 			params: { id: CAMPAIGN_ID, collectorId: COLLECTOR_ID }
@@ -58,5 +63,44 @@ describe('/campaigns/[id]/collectors/[collectorId] page', () => {
 		expect(page(false)).not.toContain('Save changes');
 		expect(page(true)).toContain('action="?/update"');
 		expect(page(true)).toContain('Save changes');
+	});
+
+	it('lists held bonds with their note and offers bulk return / reassign', () => {
+		const bond = (id: string, base: number, status: string, note: number | null) => ({
+			id,
+			kind: 'simple',
+			baseNumbers: [base],
+			associatedNumbers: [base + 4871],
+			commercialStatus: status,
+			note: note ? { noteId: `n000000${note}-0000-0000-0000-000000000000`, noteNumber: note } : null
+		});
+		const body = page(false, {
+			bonds: [
+				bond('b0000000-0000-0000-0000-000000000001', 68, 'delivered_to_collector', 3),
+				bond('b0000000-0000-0000-0000-000000000002', 70, 'sold', null)
+			],
+			bondsTotal: 2,
+			custody: {
+				can: { returnBonds: true, reassignBonds: true },
+				collectors: [{ id: 'c0000000-0000-0000-0000-000000000002', displayName: 'Beto' }]
+			}
+		});
+		expect(body).toContain('0068 / 4939');
+		expect(body).toContain('0070 / 4941');
+		expect(body).toContain(
+			`/campaigns/${CAMPAIGN_ID}/deliveries/n0000003-0000-0000-0000-000000000000`
+		);
+		// Only the delivered bond can be selected.
+		expect(body.match(/name="bondIds"/g)).toHaveLength(1);
+		expect(body).toContain('formaction="?/returnBonds"');
+		expect(body).toContain('formaction="?/reassignBonds"');
+		expect(body).toContain('Beto');
+
+		const readOnly = page(false, {
+			bonds: [bond('b0000000-0000-0000-0000-000000000001', 68, 'delivered_to_collector', 3)],
+			bondsTotal: 1
+		});
+		expect(readOnly).not.toContain('name="bondIds"');
+		expect(readOnly).not.toContain('formaction=');
 	});
 });

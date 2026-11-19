@@ -7,8 +7,11 @@
 		cardClass,
 		inputClass,
 		labelClass,
-		primaryButtonClass
+		primaryButtonClass,
+		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
+	import { BOND_COMMERCIAL_STATUS_LABELS } from '$lib/domain/bonds';
+	import { deliveryNoteLabel } from '$lib/domain/deliveries';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
@@ -34,8 +37,15 @@
 		'Monthly report',
 		'Audit'
 	];
+	const canBulk = $derived(data.custody.can.returnBonds || data.custody.can.reassignBonds);
+	/** A bulk return / reassignment result (its errors belong to section 2, not the edit form). */
+	const custodyForm = $derived(
+		form && 'form' in form && form.form === 'custody'
+			? (form as { errors?: Record<string, string[]> })
+			: null
+	);
 	const collectorForm = $derived(
-		(form ?? {}) as {
+		(custodyForm ? { message: form?.message, success: form?.success } : (form ?? {})) as {
 			success?: boolean;
 			message?: string;
 			values?: Record<string, string>;
@@ -174,22 +184,86 @@
 		<h2 class="mb-4 text-base font-semibold">2. Assigned bonds</h2>
 		{#if data.bonds.length === 0}<p class="text-sm text-slate-500">
 				No bonds are assigned in this campaign.
-			</p>{:else}<p class="mb-2 text-sm text-slate-500">
+			</p>{:else}
+			<p class="mb-2 text-sm text-slate-500">
 				{data.bondsTotal} bond{data.bondsTotal === 1 ? '' : 's'}{data.bondsTotal > data.bonds.length
 					? ` (showing the first ${data.bonds.length})`
 					: ''}
 			</p>
-			<ul class="grid gap-1 text-sm sm:grid-cols-3">
-				{#each data.bonds as bond (bond.id)}<li>
-						<a
-							class="font-mono text-blue-700 hover:underline"
-							href={resolve('/campaigns/[id]/bonds/[bondId]', {
-								id: data.campaign.id,
-								bondId: bond.id
-							})}>{bondLabel(bond)}</a
-						>
-					</li>{/each}
-			</ul>{/if}
+			<form method="POST" use:enhance>
+				<table class="min-w-full text-sm">
+					<thead class="text-left text-xs text-slate-500 uppercase">
+						<tr>
+							{#if canBulk}<th class="w-8 py-2"><span class="sr-only">Select</span></th>{/if}
+							<th class="py-2 pr-3 font-medium">Bond</th>
+							<th class="py-2 pr-3 font-medium">Status</th>
+							<th class="py-2 font-medium">Delivery note</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#each data.bonds as bond (bond.id)}
+							<tr>
+								{#if canBulk}<td class="py-1">
+										{#if bond.commercialStatus === 'delivered_to_collector'}<input
+												type="checkbox"
+												name="bondIds"
+												value={bond.id}
+												aria-label="Select {bondLabel(bond)}"
+											/>{/if}
+									</td>{/if}
+								<td class="py-1 pr-3">
+									<a
+										class="font-mono text-blue-700 hover:underline"
+										href={resolve('/campaigns/[id]/bonds/[bondId]', {
+											id: data.campaign.id,
+											bondId: bond.id
+										})}>{bondLabel(bond)}</a
+									>
+								</td>
+								<td class="py-1 pr-3">{BOND_COMMERCIAL_STATUS_LABELS[bond.commercialStatus]}</td>
+								<td class="py-1">
+									{#if bond.note}<a
+											class="text-blue-700 hover:underline"
+											href={resolve('/campaigns/[id]/deliveries/[noteId]', {
+												id: data.campaign.id,
+												noteId: bond.note.noteId
+											})}>{deliveryNoteLabel(bond.note.noteNumber)}</a
+										>{:else}—{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				<FieldError id="bondIds-error" errors={custodyForm?.errors?.bondIds} />
+				{#if canBulk}
+					<div class="mt-4 flex flex-wrap items-end gap-3">
+						{#if data.custody.can.returnBonds}
+							<button type="submit" formaction="?/returnBonds" class={secondaryButtonClass}
+								>Return selected</button
+							>
+						{/if}
+						{#if data.custody.can.reassignBonds}
+							<div>
+								<label for="targetCollectorId" class={labelClass}>Reassign selected to</label>
+								<select id="targetCollectorId" name="targetCollectorId" class={inputClass}>
+									<option value="">Choose…</option>
+									{#each data.custody.collectors as c (c.id)}<option value={c.id}
+											>{c.displayName}</option
+										>{/each}
+								</select>
+								<FieldError
+									id="targetCollectorId-error"
+									errors={custodyForm?.errors?.targetCollectorId}
+								/>
+							</div>
+							<button type="submit" formaction="?/reassignBonds" class={secondaryButtonClass}
+								>Reassign</button
+							>
+						{/if}
+					</div>
+				{/if}
+			</form>
+		{/if}
 	</section>
 	<section id="section-3" class={cardClass}>
 		<h2 class="mb-4 text-base font-semibold">3. Associated buyers</h2>
