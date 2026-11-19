@@ -98,15 +98,8 @@ select ok(
   'btree_gist is installed (needed by the overlap EXCLUDE constraint)'
 );
 select col_is_null('public', 'commission_rules', 'applies_to_collector_id', 'applies_to_collector_id is nullable');
-select ok(
-  not exists (
-    select 1 from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
-    where c.conrelid = 'public.commission_rules'::regclass and c.contype = 'f'
-      and a.attname = 'applies_to_collector_id'
-  ),
-  'applies_to_collector_id has no FK yet (collectors arrive in Phase 5)'
-);
+select fk_ok('public', 'commission_rules', 'applies_to_collector_id', 'public', 'collectors', 'id',
+  'applies_to_collector_id references collectors (Phase 5, SAN-49)');
 select ok(
   exists (select 1 from pg_constraint where conrelid = 'public.commission_rules'::regclass
     and conname = 'commission_rules_no_overlap' and contype = 'x'),
@@ -536,8 +529,9 @@ select lives_ok(
 reset role;
 
 select lives_ok(
-  $$insert into public.commission_rules (campaign_id, rule_type, percentage, valid_from, applies_to_collector_id)
-    values ((select id from ids where k = 'c-draft'), 'cash_full_payment', 40, '2026-01-01', gen_random_uuid())$$,
+  $$with c as (insert into public.collectors (display_name) values ('Rule collector') returning id)
+    insert into public.commission_rules (campaign_id, rule_type, percentage, valid_from, applies_to_collector_id)
+    select (select id from ids where k = 'c-draft'), 'cash_full_payment', 40, '2026-01-01', c.id from c$$,
   'overlap: special collector rules are not part of the general-rule exclusion'
 );
 select is(
