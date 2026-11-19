@@ -104,3 +104,25 @@ describe('/campaigns/[id]/collectors/[collectorId] page', () => {
 		expect(readOnly).not.toContain('formaction=');
 	});
 });
+
+describe('collector sale sections', () => {
+	it('renders pending installments for collector sales', () => {
+		const body = page(false, {
+			installmentsTotal: 1,
+			installments: [
+				{
+					id: 'i',
+					saleId: 's',
+					bondNumbers: ['0068'],
+					buyerName: 'Ada',
+					dueDate: '2027-01-01',
+					amount: '6000.00',
+					status: 'pending'
+				}
+			]
+		});
+		expect(body).toContain('2027-01-01');
+		expect(body).toContain('Ada');
+		expect(body).toContain(`/sales/s`);
+	});
+});

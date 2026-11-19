@@ -110,7 +110,8 @@ describe('/campaigns/[id]', () => {
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
-				viewDeliveries: false
+				viewDeliveries: false,
+				viewSales: false
 			});
 		});
 
@@ -129,7 +130,8 @@ describe('/campaigns/[id]', () => {
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
-				viewDeliveries: false
+				viewDeliveries: false,
+				viewSales: false
 			});
 		});
 
@@ -148,7 +150,8 @@ describe('/campaigns/[id]', () => {
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
-				viewDeliveries: false
+				viewDeliveries: false,
+				viewSales: false
 			});
 		});
 
@@ -183,7 +186,8 @@ describe('/campaigns/[id]', () => {
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
-				viewDeliveries: false
+				viewDeliveries: false,
+				viewSales: false
 			});
 		});
 

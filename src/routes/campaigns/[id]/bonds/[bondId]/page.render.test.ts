@@ -377,3 +377,39 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 	});
 });
+
+describe('bond sale sections', () => {
+	it('links its active sale and shows pending installments', () => {
+		const data = {
+			campaign,
+			record: record(),
+			custody: {
+				history: [],
+				collectors: [],
+				can: { returnBond: false, reassign: false, markLost: false }
+			},
+			sale: {
+				sale: {
+					id: 'a0000000-0000-0000-0000-000000000009',
+					paymentMode: 'installments',
+					totalAmount: '60000.00'
+				}
+			},
+			installments: [
+				{
+					id: 'i',
+					installmentNumber: 1,
+					dueDate: '2027-01-01',
+					amount: '6000.00',
+					status: 'pending'
+				}
+			]
+		};
+		const body = render(Page, {
+			props: { data, form: null, params: { id: CAMPAIGN_ID, bondId: BOND_ID } } as never
+		}).body;
+		expect(body).toContain('Active sale');
+		expect(body).toContain('/sales/a0000000-0000-0000-0000-000000000009');
+		expect(body).toContain('2027-01-01');
+	});
+});

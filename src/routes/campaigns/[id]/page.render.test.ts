@@ -39,7 +39,8 @@ const can = {
 	loadBonds: false,
 	viewCollectors: false,
 	viewBuyers: false,
-	viewDeliveries: false
+	viewDeliveries: false,
+	viewSales: false
 };
 
 function renderPage(

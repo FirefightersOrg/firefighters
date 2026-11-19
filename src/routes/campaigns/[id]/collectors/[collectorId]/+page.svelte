@@ -15,6 +15,7 @@
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
+	import { formatMoney } from '$lib/domain/money';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
@@ -285,11 +286,33 @@
 					and {data.buyersTotal - data.buyers.length} more
 				</p>{/if}{/if}
 	</section>
-	{#each [{ phase: 'Phase 7: sales and installments' }, { phase: 'Phase 8: settlements' }, { phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
-			id="section-{i + 4}"
+	<section id="section-4" class={cardClass}>
+		<h2 class="mb-4 text-base font-semibold">4. Pending installments</h2>
+		<p class="mb-2 text-sm text-slate-500">
+			{data.installmentsTotal ?? 0} pending or overdue installment{data.installmentsTotal === 1
+				? ''
+				: 's'}{(data.installmentsTotal ?? 0) > (data.installments ?? []).length
+				? ` (showing the first ${(data.installments ?? []).length})`
+				: ''}
+		</p>
+		<ul class="text-sm">
+			{#each data.installments ?? [] as installment (installment.id)}<li class="border-t py-2">
+					<a
+						class="text-blue-700 underline"
+						href={resolve('/campaigns/[id]/sales/[saleId]', {
+							id: data.campaign.id,
+							saleId: installment.saleId
+						})}>Bond {installment.bondNumbers.join(', ')}</a
+					>
+					— {installment.buyerName} — {installment.dueDate} — {formatMoney(installment.amount)} — {installment.status}
+				</li>{:else}<li class="text-slate-500">No pending installments.</li>{/each}
+		</ul>
+	</section>
+	{#each [{ phase: 'Phase 8: settlements' }, { phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
+			id="section-{i + 5}"
 			class={cardClass}
 		>
-			<h2 class="mb-4 text-base font-semibold">{i + 4}. {sections[i + 3]}</h2>
+			<h2 class="mb-4 text-base font-semibold">{i + 5}. {sections[i + 4]}</h2>
 			<p class="text-sm text-slate-500">No data yet. Arrives with {pending.phase}.</p>
 		</section>{/each}
 	<section id="section-8" class={cardClass}>

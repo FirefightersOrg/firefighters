@@ -133,6 +133,16 @@ Rules:
 - Financial status is calculated from installments and confirmed payments.
 - It must not replace the commercial status.
 - A bond can be `sold` and `overdue` at the same time.
+- Financial status precedence is: annulled sale/plan, uncollectible mark, fully paid non-annulled
+  installments, overdue unpaid installment, no applied payment, up to date, then partial payments.
+
+## Sale
+
+`sale_register` sells only a bond held by a collector (`delivered_to_collector -> sold`) in an
+active campaign. The collector is the bond's current collector and custody remains open. A sale
+creates one active payment plan: full payment has one installment; an installment sale uses the
+campaign count and per-unit value. The first due date defaults to the Buenos Aires sale date and
+each subsequent date is one calendar month later (end-of-month clamped).
 
 ## Installment
 
