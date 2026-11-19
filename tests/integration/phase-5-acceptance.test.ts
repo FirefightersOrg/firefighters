@@ -19,7 +19,7 @@ import { load as campaignLoad } from '../../src/routes/campaigns/[id]/+page.serv
 import CampaignPage from '../../src/routes/campaigns/[id]/+page.svelte';
 import CollectorPage from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.svelte';
 import BuyerPage from '../../src/routes/campaigns/[id]/buyers/[buyerId]/+page.svelte';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
 
@@ -79,7 +79,7 @@ async function signIn(role: Role, email: string, password: string): Promise<Call
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 
@@ -444,15 +444,21 @@ describe('Phase 5: collectors and buyers', () => {
 	});
 
 	it('uses the current role matrix for route 403s and RLS, including the collector own scope', async () => {
-		// Until SAN-93 grants the missing .view permissions: operator cannot view collectors;
-		// treasurer/read-only cannot view either party; operator can manage/view buyers.
+		// SAN-93 (#44): the operator views collectors (collector.view) and manages buyers;
+		// treasurer/read-only cannot view either party.
 		expect(
-			await status(() =>
-				collectorsLoad(
-					event(users.operator, `/campaigns/${campaignId}/collectors`, { id: campaignId })
+			await collectorsLoad(
+				event(
+					users.operator,
+					`/campaigns/${campaignId}/collectors?q=${encodeURIComponent(RUN_ID)}`,
+					{
+						id: campaignId
+					}
 				)
 			)
-		).toBe(403);
+		).toMatchObject({
+			collectors: expect.arrayContaining([expect.objectContaining({ id: collectorId })])
+		});
 		for (const user of [users.treasurer, users['read-only']]) {
 			expect(
 				await status(() =>
@@ -676,7 +682,7 @@ describe('Phase 5: collectors and buyers', () => {
 		])
 			expect(collectorHtml).toContain(title);
 		expect(collectorHtml).toContain('collector.create');
-		// Only the admin can open a collector record today (operator gets collector.view with SAN-93).
+		// The operator opens collector records too (collector.view, SAN-93); only the admin sees the audit.
 
 		const buyerData = await buyerLoad(
 			event(users.admin, `/campaigns/${campaignId}/buyers/${buyerId}`, { id: campaignId, buyerId })
@@ -714,9 +720,9 @@ describe('Phase 5: collectors and buyers', () => {
 			event(users.operator, `/campaigns/${campaignId}`, { id: campaignId })
 		);
 		const operatorHtml = render(CampaignPage, { props: { data: operatorData } as never }).body;
-		// Until SAN-93: operator has buyer.manage but no collector.view/manage.
+		// SAN-93 (#44): the operator has collector.view and buyer.manage.
 		expect(operatorHtml).toContain('Buyers →');
-		expect(operatorHtml).not.toContain('Collectors →');
+		expect(operatorHtml).toContain('Collectors →');
 		for (const user of [users.treasurer, users['read-only']]) {
 			const data = await campaignLoad(event(user, `/campaigns/${campaignId}`, { id: campaignId }));
 			const html = render(CampaignPage, { props: { data } as never }).body;

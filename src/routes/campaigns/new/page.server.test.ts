@@ -48,6 +48,14 @@ describe('/campaigns/new', () => {
 			).rejects.toMatchObject({ status: 403, body: { permission: 'campaign.create' } });
 		});
 
+		it('answers 500 (not 403) when the permissions failed to load', async () => {
+			await expect(load(loadEvent(makeLocals({ permissions: null })))).rejects.toMatchObject({
+				status: 500,
+				// The first check of the load (requireCampaignViewer) is the one that fails.
+				body: { code: 'permission_check_failed', permission: 'campaign.view' }
+			});
+		});
+
 		it('redirects anonymous users to login', async () => {
 			await expect(load(loadEvent(makeLocals({ signedIn: false })))).rejects.toMatchObject({
 				status: 303,
@@ -79,6 +87,20 @@ describe('/campaigns/new', () => {
 				form: 'create',
 				success: false,
 				message: 'You do not have permission to perform this action.'
+			});
+			expect(rpc).not.toHaveBeenCalled();
+		});
+
+		it('returns 500 (not 403) when the permissions failed to load, without calling the database', async () => {
+			const { supabase, rpc } = mockSupabase();
+			const result = (await actions.default(
+				actionEvent(makeLocals({ permissions: null, supabase }), validForm)
+			)) as ActionFailure;
+			expect(result.status).toBe(500);
+			expect(result.data).toMatchObject({
+				form: 'create',
+				success: false,
+				message: 'Something went wrong. Please try again.'
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});

@@ -154,9 +154,10 @@ select is((select reason || ':' || note_number from public.delivery_notes where 
 -- ---------------------------------------------------------------------------
 -- Return
 -- ---------------------------------------------------------------------------
--- Current matrix: bond.return and bond.mark_lost are admin-only (the operator only assigns).
+-- SAN-93 (#44): the operator holds bond.return; bond.mark_lost stays admin-only.
+select pg_temp.act_as(3);
 select throws_ok($$select public.bond_return(pg_temp.id('c'), array[pg_temp.id('b1')])$$,
-  '42501', null, 'the operator without bond.return cannot return bonds');
+  '42501', null, 'the treasurer without bond.return cannot return bonds');
 select pg_temp.act_as(1);
 select throws_ok($$select public.bond_return(pg_temp.id('c'), array[pg_temp.id('b5')])$$,
   '55000', null, 'an available bond cannot be returned');

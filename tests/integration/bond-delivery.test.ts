@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getUserPermissions } from '$lib/server/auth/permissions';
 import {
 	getDeliveryNote,
 	listBondAssignments,
@@ -16,6 +15,7 @@ import {
 } from '$lib/server/services/deliveries';
 import { createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
+import { loadPermissions } from './permissions';
 
 /**
  * SAN-53/54: the delivery services and reads against the local Supabase, with the seeded admin
@@ -40,7 +40,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		...clientOptions,
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	return { client, permissions: await getUserPermissions(client) };
+	return { client, permissions: await loadPermissions(client) };
 }
 
 let admin: Caller;
@@ -116,7 +116,7 @@ describe('bond delivery (local Supabase)', () => {
 			{ campaignId, collectorId: ana, bondIds: bondIds.slice(0, 3), notes: 'first batch' },
 			ctx(operator, 'deliver')
 		);
-		// Collector names need collector.view: the admin reads them (the operator gets it with SAN-93/#44).
+		// Collector names need collector.view (admin, and the operator since SAN-93).
 		const list = await listDeliveryNotes(admin.client, campaignId);
 		expect(list.error).toBeNull();
 		expect(list.data?.items).toEqual([
@@ -130,9 +130,12 @@ describe('bond delivery (local Supabase)', () => {
 				notes: 'first batch'
 			})
 		]);
-		// The operator reads the note too, without the collector's name until it has collector.view.
+		// The operator reads the note with the collector's name (collector.view, SAN-93).
 		const operatorView = await listDeliveryNotes(operator.client, campaignId);
-		expect(operatorView.data?.items[0]).toMatchObject({ id: noteId, collectorName: null });
+		expect(operatorView.data?.items[0]).toMatchObject({
+			id: noteId,
+			collectorName: `Ana ${RUN_ID}`
+		});
 		const note = await getDeliveryNote(operator.client, campaignId, noteId);
 		expect(note.data?.bondIds.sort()).toEqual(bondIds.slice(0, 3).sort());
 		const filtered = await listDeliveryNotes(operator.client, campaignId, { collectorId: beto });
@@ -145,16 +148,22 @@ describe('bond delivery (local Supabase)', () => {
 			{ campaignId, collectorId: beto, bondIds: [bondIds[0]] },
 			ctx(operator, 'reassign')
 		);
-		// The operator holds bond.assign only: returns and losses are admin-only in the current matrix.
+		// SAN-93 (#44): the operator returns bonds too, but cannot mark them lost (admin only).
 		await expect(
-			returnBondsFromCollector(
+			markBondLost(
 				operator.client,
-				{ campaignId, bondIds: [bondIds[1]] },
-				ctx(operator, 'r')
+				{
+					campaignId,
+					bondId: bondIds[1],
+					responsibleParty: 'X',
+					lostOn: '2026-11-01',
+					reason: 'x'
+				},
+				ctx(operator, 'lost-denied')
 			)
 		).rejects.toMatchObject({ kind: 'permission' });
 		const returnNoteId = await returnBondsFromCollector(
-			admin.client,
+			operator.client,
 			{ campaignId, bondIds: [bondIds[1]], fromCollectorId: ana },
 			ctx(admin, 'return')
 		);

@@ -41,7 +41,7 @@ describe('/login +page.server', () => {
 		it('renders the page when the hook found no active profile (stale or deactivated session)', async () => {
 			// hooks.server.ts leaves session/user/profile null for inactive or missing profiles.
 			const event = loadEvent({ session: null, user: null, profile: null });
-			await expect(load(event)).resolves.toEqual({ redirectTo: null });
+			await expect(load(event)).resolves.toEqual({ redirectTo: null, sessionExpired: false });
 		});
 
 		it('returns a sanitized redirectTo when unauthenticated', async () => {
@@ -49,7 +49,29 @@ describe('/login +page.server', () => {
 				{ session: null, user: null, profile: null },
 				'http://localhost:5173/login?redirectTo=/admin/users'
 			);
-			await expect(load(event)).resolves.toEqual({ redirectTo: '/admin/users' });
+			await expect(load(event)).resolves.toEqual({
+				redirectTo: '/admin/users',
+				sessionExpired: false
+			});
+		});
+
+		it('flags the session-expired banner when the route guard sent the user here', async () => {
+			const event = loadEvent(
+				{ session: null, user: null, profile: null },
+				'http://localhost:5173/login?redirectTo=%2Fcampaigns&reason=expired'
+			);
+			await expect(load(event)).resolves.toEqual({
+				redirectTo: '/campaigns',
+				sessionExpired: true
+			});
+		});
+
+		it('ignores unknown reason values', async () => {
+			const event = loadEvent(
+				{ session: null, user: null, profile: null },
+				'http://localhost:5173/login?reason=whatever'
+			);
+			await expect(load(event)).resolves.toEqual({ redirectTo: null, sessionExpired: false });
 		});
 
 		it.each(['/%09/evil.com', '//evil.com', 'https://evil.com', '/%5Cevil.com'])(
@@ -59,7 +81,7 @@ describe('/login +page.server', () => {
 					{ session: null, user: null, profile: null },
 					`http://localhost:5173/login?redirectTo=${redirectTo}`
 				);
-				await expect(load(event)).resolves.toEqual({ redirectTo: null });
+				await expect(load(event)).resolves.toEqual({ redirectTo: null, sessionExpired: false });
 			}
 		);
 	});
