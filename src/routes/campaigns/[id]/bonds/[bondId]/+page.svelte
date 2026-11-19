@@ -83,6 +83,7 @@
 	<BondPartySection role="collector" party={record.collector} />
 	<BondCustodySection
 		campaignId={campaign.id}
+		fromCollectorId={data.custody.fromCollectorId}
 		history={data.custody.history}
 		collectors={data.custody.collectors}
 		can={data.custody.can}

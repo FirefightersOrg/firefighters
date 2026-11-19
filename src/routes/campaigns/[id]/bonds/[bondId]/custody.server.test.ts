@@ -153,16 +153,21 @@ describe('bond record custody', () => {
 
 	it('return: 403 without bond.return; success message', async () => {
 		expect(await run('return', setup(OPERATOR), {})).toMatchObject({ status: 403 });
-		vi.mocked(returnBondsFromCollector).mockResolvedValue(1);
-		expect(await run('return', setup(), { notes: ' back ' })).toMatchObject({
-			form: 'custody',
-			action: 'return',
-			success: true
+		vi.mocked(returnBondsFromCollector).mockResolvedValue(NOTE);
+		expect(
+			await run('return', setup(), {
+				notes: ' back ',
+				fromCollectorId: 'c0000000-0000-0000-0000-000000000001'
+			})
+		).toMatchObject({
+			status: 303,
+			location: `/campaigns/${CAMPAIGN_ID}/deliveries/${NOTE}`
 		});
 		expect(vi.mocked(returnBondsFromCollector).mock.calls[0][1]).toEqual({
 			campaignId: CAMPAIGN_ID,
 			bondIds: [BOND_ID],
-			notes: 'back'
+			notes: 'back',
+			fromCollectorId: 'c0000000-0000-0000-0000-000000000001'
 		});
 	});
 
@@ -172,7 +177,12 @@ describe('bond record custody', () => {
 			data: { errors: { collectorId: expect.any(Array) } }
 		});
 		vi.mocked(reassignBondsToCollector).mockResolvedValue(NOTE);
-		expect(await run('reassign', setup(OPERATOR), { collectorId: COLLECTOR })).toMatchObject({
+		expect(
+			await run('reassign', setup(OPERATOR), {
+				collectorId: COLLECTOR,
+				fromCollectorId: 'c0000000-0000-0000-0000-000000000001'
+			})
+		).toMatchObject({
 			status: 303,
 			location: `/campaigns/${CAMPAIGN_ID}/deliveries/${NOTE}`
 		});

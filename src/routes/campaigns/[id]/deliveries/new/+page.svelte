@@ -76,6 +76,8 @@
 						busy = false;
 						if (result.type === 'success' && result.data?.found) {
 							add(result.data.found as DeliveryBondOption[]);
+							if (result.data.truncated)
+								lookupMessage = 'Showing the first 500 matches; narrow the range.';
 						} else if (result.type === 'failure') {
 							lookupMessage = (result.data?.message as string) ?? 'Lookup failed.';
 						}

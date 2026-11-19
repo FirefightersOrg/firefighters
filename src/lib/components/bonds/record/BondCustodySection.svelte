@@ -22,12 +22,14 @@
 	 */
 	let {
 		campaignId,
+		fromCollectorId,
 		history,
 		collectors,
 		can,
 		form
 	}: {
 		campaignId: string;
+		fromCollectorId: string | null;
 		history: BondAssignment[];
 		collectors: { id: string; displayName: string }[];
 		can: { returnBond: boolean; reassign: boolean; markLost: boolean };
@@ -101,6 +103,7 @@
 
 	{#if can.returnBond}
 		<form method="POST" action="?/return" class="mt-4 flex flex-wrap items-end gap-3" use:enhance>
+			<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
 			<div class="min-w-64 flex-1">
 				<label for="return-notes" class={labelClass}>Return to stock (notes, optional)</label>
 				<input
@@ -118,6 +121,7 @@
 
 	{#if can.reassign}
 		<form method="POST" action="?/reassign" class="mt-4 flex flex-wrap items-end gap-3" use:enhance>
+			<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
 			<div class="min-w-64 flex-1">
 				<label for="reassign-collector" class={labelClass}>Reassign to</label>
 				<select

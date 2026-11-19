@@ -40,7 +40,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		...clientOptions,
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	return { client, permissions: await getUserPermissions(client) };
+	return { client, permissions: (await getUserPermissions(client)) ?? [] };
 }
 
 let admin: Caller;
@@ -145,18 +145,11 @@ describe('bond delivery (local Supabase)', () => {
 			{ campaignId, collectorId: beto, bondIds: [bondIds[0]] },
 			ctx(operator, 'reassign')
 		);
-		// The operator holds bond.assign only: returns and losses are admin-only in the current matrix.
-		await expect(
-			returnBondsFromCollector(
-				operator.client,
-				{ campaignId, bondIds: [bondIds[1]] },
-				ctx(operator, 'r')
-			)
-		).rejects.toMatchObject({ kind: 'permission' });
+		// The operator can return, but loss remains admin-only.
 		const returnNoteId = await returnBondsFromCollector(
-			admin.client,
+			operator.client,
 			{ campaignId, bondIds: [bondIds[1]], fromCollectorId: ana },
-			ctx(admin, 'return')
+			ctx(operator, 'return')
 		);
 		// The return issues a note for the collector (its receipt).
 		const returnNote = await getDeliveryNote(admin.client, campaignId, returnNoteId);
@@ -206,7 +199,7 @@ describe('bond delivery (local Supabase)', () => {
 		await expect(sold).rejects.toMatchObject({ kind: 'conflict', field: 'bondIds' });
 		await expect(
 			markBondLost(
-				admin.client,
+				operator.client,
 				{
 					campaignId,
 					bondId: bondIds[3],
@@ -214,9 +207,9 @@ describe('bond delivery (local Supabase)', () => {
 					lostOn: '2026-11-01',
 					reason: 'x'
 				},
-				ctx(admin, 'no-responsible')
+				ctx(operator, 'no-responsible')
 			)
-		).rejects.toMatchObject({ kind: 'validation', field: 'responsibleParty' });
+		).rejects.toMatchObject({ kind: 'permission' });
 	});
 
 	it('a stale source collector and an impossible loss date are refused on the right field', async () => {

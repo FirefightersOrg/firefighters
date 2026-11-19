@@ -52,7 +52,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: (await getUserPermissions(client)) ?? []
 	};
 }
 function event(caller: Caller, suffix: string, fields?: Record<string, string>, buyerId?: string) {

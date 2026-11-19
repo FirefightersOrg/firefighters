@@ -19,7 +19,7 @@ import { PartyServiceError, updateCollector } from '$lib/server/services/parties
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { COLLECTOR_UPDATE_FIELDS, collectorSchema } from '$lib/schemas/collector';
 import { readFormFields } from '$lib/schemas/campaign';
-import { canLoadBonds } from '$lib/domain/campaigns';
+import { canDeliverBonds, canLoadBonds } from '$lib/domain/campaigns';
 import { DELIVERY_MAX_BONDS } from '$lib/domain/deliveries';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { listActiveAssignmentNotes } from '$lib/server/repositories/deliveries';
@@ -65,10 +65,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const assigned = bonds.data?.items ?? [];
 
 	// Custody (SAN-55): the note behind each held bond, and bulk return / reassignment.
-	const open = canLoadBonds(campaignResult.data.status);
 	const custodyCan = {
-		returnBonds: open && hasPermissionIn(locals.permissions, 'bond.return'),
-		reassignBonds: open && hasPermissionIn(locals.permissions, 'bond.assign')
+		returnBonds:
+			canLoadBonds(campaignResult.data.status) &&
+			hasPermissionIn(locals.permissions, 'bond.return'),
+		reassignBonds:
+			canDeliverBonds(campaignResult.data.status) &&
+			hasPermissionIn(locals.permissions, 'bond.assign')
 	};
 	const [notes, targets] = await Promise.all([
 		listActiveAssignmentNotes(
@@ -152,21 +155,22 @@ export const actions: Actions = {
 	returnBonds: async ({ request, locals, params, url }) => {
 		const checked = await custodyRequest(locals, url, params, request, 'bond.return');
 		if ('failure' in checked) return checked.failure;
+		let noteId: string;
 		try {
-			const count = await returnBondsFromCollector(
+			noteId = await returnBondsFromCollector(
 				locals.supabase,
-				{ campaignId: params.id, bondIds: checked.bondIds, notes: null },
+				{
+					campaignId: params.id,
+					bondIds: checked.bondIds,
+					notes: null,
+					fromCollectorId: params.collectorId
+				},
 				{ requestId: locals.requestId, permissions: locals.permissions }
 			);
-			return {
-				form: 'custody' as const,
-				success: true,
-				message: `${count} bond${count === 1 ? '' : 's'} returned: available again.`,
-				errors: {}
-			};
 		} catch (err) {
 			return custodyServiceFailure(err);
 		}
+		redirect(303, `/campaigns/${params.id}/deliveries/${noteId}`);
 	},
 
 	reassignBonds: async ({ request, locals, params, url }) => {
@@ -182,7 +186,13 @@ export const actions: Actions = {
 		try {
 			noteId = await reassignBondsToCollector(
 				locals.supabase,
-				{ campaignId: params.id, collectorId: target, bondIds: checked.bondIds, notes: null },
+				{
+					campaignId: params.id,
+					collectorId: target,
+					bondIds: checked.bondIds,
+					notes: null,
+					fromCollectorId: params.collectorId
+				},
 				{ requestId: locals.requestId, permissions: locals.permissions }
 			);
 		} catch (err) {

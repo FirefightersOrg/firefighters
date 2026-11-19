@@ -79,7 +79,7 @@ async function signIn(role: Role, email: string, password: string): Promise<Call
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: (await getUserPermissions(client)) ?? []
 	};
 }
 

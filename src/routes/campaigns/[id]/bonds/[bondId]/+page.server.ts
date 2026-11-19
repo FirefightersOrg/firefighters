@@ -35,7 +35,7 @@ import {
 	returnBondsFromCollector
 } from '$lib/server/services/deliveries';
 import { requireActiveUser } from '$lib/server/auth/guards';
-import { canLoadBonds } from '$lib/domain/campaigns';
+import { canDeliverBonds, canLoadBonds } from '$lib/domain/campaigns';
 import { fail, redirect } from '@sveltejs/kit';
 import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bonds';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
@@ -121,17 +121,22 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	// Custody (SAN-55): history, and which custody actions apply to this bond now.
 	const status = bond.commercialStatus;
 	const open = canLoadBonds(campaign.status);
+	const canDeliver = canDeliverBonds(campaign.status);
+	const isActiveManualPataMember = bond.activeGroup !== null;
 	const can = {
 		returnBond:
 			open &&
+			!isActiveManualPataMember &&
 			status === 'delivered_to_collector' &&
 			hasPermissionIn(locals.permissions, 'bond.return'),
 		reassign:
-			open &&
+			canDeliver &&
+			!isActiveManualPataMember &&
 			status === 'delivered_to_collector' &&
 			hasPermissionIn(locals.permissions, 'bond.assign'),
 		markLost:
 			open &&
+			!isActiveManualPataMember &&
 			(status === 'available' || status === 'delivered_to_collector') &&
 			hasPermissionIn(locals.permissions, 'bond.mark_lost')
 	};
@@ -149,6 +154,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		custody: {
 			history: historyResult.data ?? [],
 			collectors: (collectorsResult.data ?? []).filter((c) => c.id !== bond.currentCollectorId),
+			fromCollectorId: bond.currentCollectorId,
 			can
 		},
 		record: buildBondRecord({
@@ -343,29 +349,37 @@ const custodyCtx = (locals: App.Locals) => ({
 async function returnAction({ request, locals, params, url }: RequestEvent) {
 	const denied = await custodyPreflight(locals, url, params, 'return', 'bond.return');
 	if (denied) return denied;
-	const notes = field(await request.formData(), 'notes');
+	const formData = await request.formData();
+	const notes = field(formData, 'notes');
+	const fromCollectorId = field(formData, 'fromCollectorId');
+	if (!isUuid(fromCollectorId)) {
+		return custodyFailure(
+			'return',
+			400,
+			'The bond custody is out of date. Reload the page and try again.',
+			{
+				errors: {
+					fromCollectorId: ['The bond custody is out of date. Reload the page and try again.']
+				}
+			}
+		);
+	}
 	if (notes.length > 2000) {
 		return custodyFailure('return', 400, 'Notes are limited to 2000 characters.', {
 			errors: { notes: ['Notes are limited to 2000 characters.'] }
 		});
 	}
+	let noteId: string;
 	try {
-		await returnBondsFromCollector(
+		noteId = await returnBondsFromCollector(
 			locals.supabase,
-			{ campaignId: params.id, bondIds: [params.bondId], notes: notes || null },
+			{ campaignId: params.id, bondIds: [params.bondId], notes: notes || null, fromCollectorId },
 			custodyCtx(locals)
 		);
 	} catch (err) {
 		return custodyServiceFailure('return', err, { notes });
 	}
-	const result: CustodyFormResult = {
-		form: 'custody',
-		action: 'return',
-		success: true,
-		message: 'Bond returned: it is available again.',
-		errors: {}
-	};
-	return result;
+	redirect(303, `/campaigns/${params.id}/deliveries/${noteId}`);
 }
 
 async function reassignAction({ request, locals, params, url }: RequestEvent) {
@@ -373,6 +387,7 @@ async function reassignAction({ request, locals, params, url }: RequestEvent) {
 	if (denied) return denied;
 	const formData = await request.formData();
 	const collectorId = field(formData, 'collectorId');
+	const fromCollectorId = field(formData, 'fromCollectorId');
 	const notes = field(formData, 'notes');
 	const values = { collectorId, notes };
 	if (!isUuid(collectorId)) {
@@ -381,11 +396,30 @@ async function reassignAction({ request, locals, params, url }: RequestEvent) {
 			values
 		});
 	}
+	if (!isUuid(fromCollectorId)) {
+		return custodyFailure(
+			'reassign',
+			400,
+			'The bond custody is out of date. Reload the page and try again.',
+			{
+				errors: {
+					fromCollectorId: ['The bond custody is out of date. Reload the page and try again.']
+				},
+				values
+			}
+		);
+	}
 	let noteId: string;
 	try {
 		noteId = await reassignBondsToCollector(
 			locals.supabase,
-			{ campaignId: params.id, collectorId, bondIds: [params.bondId], notes: notes || null },
+			{
+				campaignId: params.id,
+				collectorId,
+				bondIds: [params.bondId],
+				notes: notes || null,
+				fromCollectorId
+			},
 			custodyCtx(locals)
 		);
 	} catch (err) {
@@ -407,7 +441,8 @@ async function markLostAction({ request, locals, params, url }: RequestEvent) {
 	if (!values.responsibleParty) errors.responsibleParty = ['Who was responsible is required.'];
 	else if (values.responsibleParty.length > 200)
 		errors.responsibleParty = ['At most 200 characters.'];
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(values.lostOn)) errors.lostOn = ['Pick the date of the loss.'];
+	if (!z.iso.date().safeParse(values.lostOn).success)
+		errors.lostOn = ['Pick a real calendar date.'];
 	if (!values.reason) errors.reason = ['A reason is required.'];
 	else if (values.reason.length > 2000) errors.reason = ['At most 2000 characters.'];
 	if (Object.keys(errors).length) {
