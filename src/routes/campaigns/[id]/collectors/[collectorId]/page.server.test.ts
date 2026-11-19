@@ -42,8 +42,10 @@ function collectorRow(overrides: Record<string, unknown> = {}) {
 function setup(
 	permissions = ADMIN,
 	options: {
-		collector?: { data: unknown; error: unknown };
+		collector?: { data: unknown; error: unknown } | { data: unknown; error: unknown }[];
 		rpc?: { data: unknown; error: unknown };
+		bondList?: { data: unknown; error: unknown; count?: number };
+		profiles?: { data: unknown; error: unknown }[];
 	} = {}
 ) {
 	const mock = mockSupabase({
@@ -55,9 +57,9 @@ function setup(
 						{ data: collectorRow(), error: null },
 						{ data: [], error: null }
 					],
-			bonds: { data: [], error: null },
+			bond_list: options.bondList ?? { data: [], error: null, count: 0 },
 			buyers: { data: [], error: null, count: 0 },
-			profiles: { data: [], error: null },
+			profiles: options.profiles ?? { data: [], error: null },
 			audit_log: { data: [], error: null }
 		},
 		rpc: options.rpc
@@ -135,6 +137,71 @@ describe('/campaigns/[id]/collectors/[collectorId]', () => {
 			status: 409,
 			data: { message: expect.stringContaining('Someone else') }
 		});
+	});
+
+	it('lists assigned bonds by number with the exact total', async () => {
+		const row = {
+			id: 'b0000000-0000-0000-0000-000000000001',
+			campaign_id: CAMPAIGN_ID,
+			kind: 'simple',
+			origin: 'printed',
+			internal_code: null,
+			barcode: null,
+			commercial_status: 'delivered_to_collector',
+			financial_status_snapshot: 'no_payments',
+			commercial_unit_count: 1,
+			total_value: '60000.00',
+			created_at: '2026-11-18T00:00:00Z',
+			base_numbers: [68],
+			associated_numbers: [4939],
+			sort_number: 68,
+			group_pata_id: null
+		};
+		const test = setup(VIEWER, { bondList: { data: [row], error: null, count: 1500 } });
+		const data = await load(loadEvent(test.locals));
+		expect(data?.bonds.map((b: { baseNumbers: number[] }) => b.baseNumbers)).toEqual([[68]]);
+		// More than PostgREST's max_rows: the total comes from the count, not from the rows.
+		expect(data?.bondsTotal).toBe(1500);
+	});
+
+	it('names the linked user when the profile can be read, else a generic label', async () => {
+		const linked = 'a0000000-0000-0000-0000-0000000000aa';
+		const test = setup(ADMIN, {
+			collector: [
+				{ data: collectorRow({ user_profile_id: linked }), error: null },
+				{ data: [], error: null }
+			],
+			profiles: [
+				{ data: [], error: null },
+				{ data: { full_name: 'Ada Lovelace', email: 'ada@example.test' }, error: null }
+			]
+		});
+		expect((await load(loadEvent(test.locals)))?.profiles[0]).toMatchObject({
+			id: linked,
+			fullName: 'Ada Lovelace'
+		});
+		const hidden = setup(VIEWER, {
+			collector: [
+				{ data: collectorRow({ user_profile_id: linked }), error: null },
+				{ data: [], error: null }
+			],
+			profiles: [
+				{ data: [], error: null },
+				{ data: null, error: null }
+			]
+		});
+		expect((await load(loadEvent(hidden.locals)))?.profiles[0].fullName).toBe(
+			'Current linked user'
+		);
+	});
+
+	it('rejects a malformed updatedAt with 400 before calling the RPC', async () => {
+		for (const updatedAt of ['', 'yesterday']) {
+			const test = setup(MANAGER);
+			const result = await update(test.locals, { ...fields, updatedAt });
+			expect(result.status).toBe(400);
+			expect(test.rpc).not.toHaveBeenCalled();
+		}
 	});
 
 	it('returns 404 for malformed action ids without calling the RPC', async () => {
