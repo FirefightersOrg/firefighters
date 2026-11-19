@@ -1,0 +1,71 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, expect, it } from 'vitest';
+import { render } from 'svelte/server';
+import Page from './+page.svelte';
+const id = 'c',
+	settlement = {
+		id: 's',
+		settlementNumber: 1,
+		collectorName: 'Ana',
+		openedAt: '2026-01-01',
+		status: 'open'
+	};
+const totals = {
+	totalCash: '1.00',
+	totalTransfer: '2.00',
+	totalAmount: '3.00',
+	commissionAmount: '0.00',
+	commissionPaidAmount: '0.00',
+	netToFirefighters: '3.00',
+	collectorCreditBalance: '0.00'
+};
+const page = (status = 'open') =>
+	render(Page, {
+		props: {
+			data: {
+				campaign: { id },
+				settlement: { ...settlement, status },
+				totals,
+				payments: [
+					{ id: 'p', date: '2026-01-01', amount: '3.00', method: 'cash', status: 'confirmed' }
+				],
+				candidates: [],
+				reasonMax: 2000,
+				can: { add: status === 'open', remove: status === 'open', close: status === 'open' }
+			},
+			params: { id, settlementId: 's' }
+		} as any
+	}).body;
+describe('settlement workspace render', () => {
+	it('renders seven metrics and open forms', () => {
+		const body = page();
+		expect(body.match(/tabular-nums/g)).toHaveLength(7);
+		expect(body).toContain('?/add');
+		expect(body).toContain('?/remove');
+		expect(body).toContain('?/close');
+	});
+	it('renders closed documents read-only', () => {
+		const body = page('closed');
+		expect(body).toContain('/settlements/s/print');
+		expect(body).toContain('/payments/p/print');
+		expect(body).not.toContain('?/add');
+		expect(body).not.toContain('?/close');
+	});
+	it('does not print certificates for unconfirmed payments', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					settlement: { ...settlement, status: 'closed' },
+					totals,
+					payments: [{ id: 'p', date: '', amount: '1.00', method: 'cash', status: 'annulled' }],
+					candidates: [],
+					reasonMax: 1,
+					can: { add: false, remove: false, close: false }
+				},
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+		expect(body).not.toContain('/payments/p/print');
+	});
+});
