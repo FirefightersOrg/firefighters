@@ -757,6 +757,14 @@ SAN-45 write functions:
 - `import_session_summary(session_id)`: preview counts: simple bonds, patas, base and
   participating numbers, errors, warnings and duplicates.
 
+File rows reach `import_session_add_items` already interpreted by the app
+(`src/lib/domain/imports.ts`, `interpretImportRow`): `parsed_value` holds the four raw file fields
+(`tipo_bono`, `grupo_pata`, `numero_base`, `barcode`; trimmed, blank = null), and `item_type`,
+`group_key`, `base_number` and `barcode` are derived from them with the campaign's barcode rules.
+A row the parser cannot interpret is staged with a `parse_*` `error_code` (kept by revalidation)
+and no base number. Scans store `barcode`, `base_number`, `group_key` and `barcode_mode` in
+`parsed_value`. See `docs/imports.md` ("App layer (SAN-45)").
+
 ### legacy_migration_staging
 
 Staging area for data exported from the old system.
