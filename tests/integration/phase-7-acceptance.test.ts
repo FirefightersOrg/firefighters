@@ -596,6 +596,19 @@ describe('Phase 7: sales, payment plans and installments', () => {
 			campaign: { id: campaignId },
 			canCreateBuyer: true
 		});
+		// Own state: the operator and the admin each sell a dedicated bond (independent of C1).
+		const today = baDate();
+		const operatorBond = await createDeliveredBond('c6-operator');
+		const adminBond = await createDeliveredBond('c6-admin');
+		const operatorSale = saleId(
+			await sell(users.operator, operatorBond, 'full_payment', today, rid('c6-operator-sale'))
+		);
+		const adminSale = saleId(
+			await sell(users.admin, adminBond, 'full_payment', today, rid('c6-admin-sale'))
+		);
+		expect(operatorSale).toMatch(/^[0-9a-f-]{36}$/);
+		expect(adminSale).toMatch(/^[0-9a-f-]{36}$/);
+		const deniedBond = await createDeliveredBond('c6-denied');
 		for (const caller of [users.treasurer, users['read-only']]) {
 			expect(
 				await run(
@@ -604,26 +617,24 @@ describe('Phase 7: sales, payment plans and installments', () => {
 				)
 			).toMatchObject({ status: 403 });
 			const requestId = rid(`c6-${caller === users.treasurer ? 'treasurer' : 'read-only'}`);
-			const beforeBond = await bondState(bonds.custody);
-			const beforeSales = await salesOf(bonds.custody);
-			expect(await sell(caller, bonds.custody, 'full_payment', baDate(), requestId)).toMatchObject({
+			const beforeBond = await bondState(deniedBond);
+			const beforeSales = await salesOf(deniedBond);
+			expect(await sell(caller, deniedBond, 'full_payment', today, requestId)).toMatchObject({
 				status: 403
 			});
-			expect(await bondState(bonds.custody)).toEqual(beforeBond);
-			expect(await salesOf(bonds.custody)).toBe(beforeSales);
+			expect(await bondState(deniedBond)).toEqual(beforeBond);
+			expect(await salesOf(deniedBond)).toBe(beforeSales);
 			expect(await auditFor(requestId)).toEqual([]);
 		}
 		const treasurerList = (await salesLoad(
 			event(users.treasurer, `/campaigns/${campaignId}/sales`, { id: campaignId })
 		)) as { sales: { bondId: string }[] };
-		expect(treasurerList.sales.map((item) => item.bondId)).toContain(bonds.simple);
+		expect(treasurerList.sales.map((item) => item.bondId)).toContain(operatorBond);
 		const list = (await salesLoad(
 			event(users['read-only'], `/campaigns/${campaignId}/sales`, { id: campaignId })
 		)) as { sales: { bondId: string }[] };
-		expect(list.sales.map((item) => item.bondId)).toContain(bonds.simple);
-		const simpleSale = (
-			await service.from('sales').select('id').eq('bond_id', bonds.simple).single()
-		).data!.id;
+		expect(list.sales.map((item) => item.bondId)).toContain(operatorBond);
+		const simpleSale = operatorSale!;
 		expect(
 			await saleLoad(
 				event(users.treasurer, `/campaigns/${campaignId}/sales/${simpleSale}`, {
@@ -631,7 +642,7 @@ describe('Phase 7: sales, payment plans and installments', () => {
 					saleId: simpleSale
 				})
 			)
-		).toMatchObject({ sale: { bondId: bonds.simple } });
+		).toMatchObject({ sale: { bondId: operatorBond } });
 		expect(
 			await saleLoad(
 				event(users['read-only'], `/campaigns/${campaignId}/sales/${simpleSale}`, {
@@ -639,6 +650,6 @@ describe('Phase 7: sales, payment plans and installments', () => {
 					saleId: simpleSale
 				})
 			)
-		).toMatchObject({ sale: { bondId: bonds.simple } });
+		).toMatchObject({ sale: { bondId: operatorBond } });
 	});
 });
