@@ -257,8 +257,8 @@ describe('bond imports (local Supabase)', () => {
 		expect(errors.items.map((i) => [i.rowNumber, i.errorCode])).toEqual([
 			[3, 'parse_invalid_base_number'],
 			[4, 'number_out_of_range'],
-			[7, 'number_conflict'],
-			[8, 'number_conflict']
+			[7, 'duplicate_number'],
+			[8, 'duplicate_number']
 		]);
 	});
 

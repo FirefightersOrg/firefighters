@@ -73,7 +73,14 @@ export function loginRedirectLocation(returnTo: string, sessionExpired: boolean)
 }
 
 export type RouteAccess =
-	{ kind: 'allow' } | { kind: 'redirect'; location: string } | { kind: 'unauthorized' };
+	| { kind: 'allow' }
+	| { kind: 'redirect'; location: string }
+	| { kind: 'unauthorized' }
+	| { kind: 'unavailable'; api: boolean };
+
+/** User-facing message (Spanish) when the profile lookup failed; shown on pages and in API JSON. */
+export const SERVICE_UNAVAILABLE_MESSAGE =
+	'Servicio no disponible, intentá de nuevo en unos minutos';
 
 export interface RouteAccessInput {
 	url: URL;
@@ -82,6 +89,11 @@ export interface RouteAccessInput {
 	authenticated: boolean;
 	/** The request carried a Supabase session that did not yield an active user. */
 	sessionExpired: boolean;
+	/**
+	 * The profile lookup itself failed (DB/RPC error), so we cannot tell whether the user is
+	 * active. That is an outage, not a deactivation: answer 503 instead of redirecting to login.
+	 */
+	profileLookupFailed?: boolean;
 }
 
 /**
@@ -95,9 +107,11 @@ export function decideRouteAccess({
 	url,
 	method,
 	authenticated,
-	sessionExpired
+	sessionExpired,
+	profileLookupFailed = false
 }: RouteAccessInput): RouteAccess {
 	if (authenticated || isPublicPath(url.pathname)) return { kind: 'allow' };
+	if (profileLookupFailed) return { kind: 'unavailable', api: isApiPath(url.pathname) };
 	if (isApiPath(url.pathname)) return { kind: 'unauthorized' };
 
 	const isRead = method === 'GET' || method === 'HEAD';
