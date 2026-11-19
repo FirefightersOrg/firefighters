@@ -17,6 +17,8 @@ export interface PrintableDeliveryNote {
 	institutionName: string;
 	campaign: string;
 	deliveryNoteNumber: string;
+	reason: DeliveryNote['reason'];
+	status: DeliveryNote['status'];
 	date: string;
 	collector: string;
 	registeredBy: string;
@@ -34,6 +36,7 @@ export interface PrintableDeliveryNote {
 function pairs(bond: DeliveryNoteBond, campaign: Campaign) {
 	return bond.numbers
 		.filter((number) => number.kind === 'base')
+		.sort((a, b) => a.value - b.value)
 		.map((base) => ({
 			base: formatCampaignNumber(base.value, campaignNumberingConfig(campaign)),
 			associated: base.sourceBaseNumberId
@@ -51,7 +54,11 @@ function pairs(bond: DeliveryNoteBond, campaign: Campaign) {
 }
 
 function printableBond(bond: DeliveryNoteBond, campaign: Campaign): PrintableDeliveryBond {
-	const legs = bond.members.length ? bond.members : [bond];
+	const legs = (bond.members.length ? bond.members : [bond]).toSorted(
+		(a, b) =>
+			(a.numbers.find((number) => number.kind === 'base')?.value ?? Infinity) -
+			(b.numbers.find((number) => number.kind === 'base')?.value ?? Infinity)
+	);
 	return {
 		type: bond.kind === 'simple' ? 'Simple' : 'Pata',
 		numbers: legs.flatMap((leg) => pairs(leg, campaign)),
@@ -71,6 +78,8 @@ export function buildPrintableDeliveryNote(
 		institutionName,
 		campaign: campaign.name,
 		deliveryNoteNumber: deliveryNoteLabel(note.noteNumber),
+		reason: note.reason,
+		status: note.status,
 		// The institution works in Argentina: print the local date of the delivery.
 		date: new Intl.DateTimeFormat('es-AR', {
 			dateStyle: 'short',

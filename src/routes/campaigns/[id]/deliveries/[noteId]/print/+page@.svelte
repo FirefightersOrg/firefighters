@@ -24,7 +24,8 @@
 		<header>
 			<div>
 				<p class="institution">{doc.institutionName}</p>
-				<h1>Bond delivery note</h1>
+				<h1>{doc.reason === 'reassignment' ? 'Reassignment' : 'Bond delivery note'}</h1>
+				{#if doc.status === 'annulled'}<p class="annulled">ANNULLED</p>{/if}
 				<p>{doc.campaign}</p>
 			</div>
 			<div class="meta">
@@ -132,6 +133,12 @@
 	.copy {
 		font-weight: 700;
 		letter-spacing: 0.05em;
+	}
+	.annulled {
+		color: #b00020;
+		font-size: 14pt;
+		font-weight: 700;
+		letter-spacing: 0.1em;
 	}
 	dl {
 		display: flex;

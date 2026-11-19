@@ -191,12 +191,23 @@ interface DeliveryBondRow {
 		barcode: string | null;
 	}[];
 	groups: {
+		grouped_at: string;
 		ungrouped_at: string | null;
 		member: Omit<DeliveryBondRow, 'groups'> | null;
 	}[];
 }
 
-function mapDeliveryBond(row: DeliveryBondRow): DeliveryNoteBond {
+function baseNumber(bond: DeliveryNoteBond): number {
+	const ownBase = bond.numbers.find((number) => number.kind === 'base')?.value;
+	if (ownBase !== undefined) return ownBase;
+	return bond.members.reduce((lowest, member) => Math.min(lowest, baseNumber(member)), Infinity);
+}
+
+function sortByBaseNumber(bonds: DeliveryNoteBond[]): DeliveryNoteBond[] {
+	return bonds.toSorted((a, b) => baseNumber(a) - baseNumber(b));
+}
+
+function mapDeliveryBond(row: DeliveryBondRow, issuedAt: string): DeliveryNoteBond {
 	return {
 		id: row.id,
 		kind: row.kind,
@@ -209,11 +220,15 @@ function mapDeliveryBond(row: DeliveryBondRow): DeliveryNoteBond {
 			sourceBaseNumberId: number.source_base_number_id,
 			barcode: number.barcode
 		})),
-		// Only the current members of a manual pata (an ungrouped membership is history).
-		members: (row.groups ?? []).flatMap((group) =>
-			group.member && group.ungrouped_at === null
-				? [mapDeliveryBond({ ...group.member, groups: [] })]
-				: []
+		// Preserve the members the manual pata had when this immutable note was issued.
+		members: sortByBaseNumber(
+			(row.groups ?? []).flatMap((group) =>
+				group.member &&
+				group.grouped_at <= issuedAt &&
+				(group.ungrouped_at === null || group.ungrouped_at > issuedAt)
+					? [mapDeliveryBond({ ...group.member, groups: [] }, issuedAt)]
+					: []
+			)
 		)
 	};
 }
@@ -224,7 +239,8 @@ function mapDeliveryBond(row: DeliveryBondRow): DeliveryNoteBond {
  */
 export async function listDeliveryNoteBonds(
 	supabase: SupabaseClient,
-	noteId: string
+	noteId: string,
+	issuedAt: string
 ): Promise<RepositoryResult<DeliveryNoteBond[]>> {
 	const { data, error } = await supabase
 		.from('delivery_note_items')
@@ -242,7 +258,9 @@ export async function listDeliveryNoteBonds(
 	if (error) return { data: null, error };
 	try {
 		return {
-			data: (data ?? []).flatMap((item) => (item.bond ? [mapDeliveryBond(item.bond)] : [])),
+			data: sortByBaseNumber(
+				(data ?? []).flatMap((item) => (item.bond ? [mapDeliveryBond(item.bond, issuedAt)] : []))
+			),
 			error: null
 		};
 	} catch (cause) {
