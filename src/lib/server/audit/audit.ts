@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+/** Same limits as the CHECKs on `audit_log.reason` / `audit_log.request_id` (SAN-97). */
+export const AUDIT_REASON_MAX_LENGTH = 1000;
+export const AUDIT_REQUEST_ID_MAX_LENGTH = 100;
+
 /**
  * Zod validation schema for structured audit log entries.
  *
@@ -17,8 +21,8 @@ export const auditLogEntrySchema = z.object({
 	entityId: z.string().nullable().optional(),
 	oldValue: z.unknown().nullable().optional(),
 	newValue: z.unknown().nullable().optional(),
-	reason: z.string().nullable().optional(),
-	requestId: z.string().nullable().optional()
+	reason: z.string().max(AUDIT_REASON_MAX_LENGTH).nullable().optional(),
+	requestId: z.string().max(AUDIT_REQUEST_ID_MAX_LENGTH).nullable().optional()
 });
 
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
