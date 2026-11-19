@@ -9,13 +9,19 @@ import {
 
 function access(
 	path: string,
-	options: { method?: string; authenticated?: boolean; sessionExpired?: boolean } = {}
+	options: {
+		method?: string;
+		authenticated?: boolean;
+		sessionExpired?: boolean;
+		profileLookupFailed?: boolean;
+	} = {}
 ) {
 	return decideRouteAccess({
 		url: new URL(path, 'http://localhost:5173'),
 		method: options.method ?? 'GET',
 		authenticated: options.authenticated ?? false,
-		sessionExpired: options.sessionExpired ?? false
+		sessionExpired: options.sessionExpired ?? false,
+		profileLookupFailed: options.profileLookupFailed
 	});
 }
 
@@ -143,6 +149,24 @@ describe('decideRouteAccess', () => {
 
 	it('answers 401 instead of redirecting for API endpoints', () => {
 		expect(access('/api/admin/users', { method: 'POST' })).toEqual({ kind: 'unauthorized' });
+	});
+
+	it('answers unavailable (page) when the profile lookup failed, instead of redirecting', () => {
+		expect(access('/campaigns', { profileLookupFailed: true })).toEqual({
+			kind: 'unavailable',
+			api: false
+		});
+	});
+
+	it('answers unavailable (api) when the profile lookup failed, instead of 401', () => {
+		expect(access('/api/admin/users', { profileLookupFailed: true })).toEqual({
+			kind: 'unavailable',
+			api: true
+		});
+	});
+
+	it('keeps public paths open when the profile lookup failed', () => {
+		expect(access('/login', { profileLookupFailed: true })).toEqual({ kind: 'allow' });
 	});
 
 	it('never builds an off-site redirect from a crafted path', () => {

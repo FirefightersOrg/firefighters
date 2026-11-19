@@ -22,7 +22,7 @@
 --   profiles.full_name                     200   PROFILE_FULL_NAME_MAX_LENGTH (services/user-admin.ts)
 --   profiles.email                         254   PROFILE_EMAIL_MAX_LENGTH (services/user-admin.ts)
 --   audit_log.reason                      1000   largest reason limit above (see below)
---   audit_log.request_id                   100   REQUEST_ID_MAX_LENGTH (services/user-admin.ts, audit.ts)
+--   audit_log.request_id                   100   REQUEST_ID_MAX_LENGTH (services/user-admin.ts)
 --
 -- audit_log.reason is shared by every audited function, so it takes the largest per-function limit;
 -- the tighter ones (500 for rule changes and imports) stay in Zod and in the per-column CHECKs.
