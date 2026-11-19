@@ -9,6 +9,8 @@
 	import BondNumbersSection from '$lib/components/bonds/record/BondNumbersSection.svelte';
 	import BondPartySection from '$lib/components/bonds/record/BondPartySection.svelte';
 	import BondPendingSection from '$lib/components/bonds/record/BondPendingSection.svelte';
+	import { PAYMENT_MODE_LABELS, INSTALLMENT_STATUS_LABELS } from '$lib/domain/sales';
+	import { formatMoney } from '$lib/domain/money';
 	import { BOND_RECORD_SECTIONS } from '$lib/components/bonds/record/types';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import type { PageProps } from './$types';
@@ -90,8 +92,46 @@
 		form={form?.form === 'custody' ? form : null}
 	/>
 	<BondPartySection role="buyer" party={record.buyer} />
-	<BondPendingSection id="sale" />
-	<BondPendingSection id="installments" />
+	<section
+		id="sale"
+		aria-labelledby="sale-title"
+		class="rounded-lg border border-slate-200 bg-white p-5"
+	>
+		<h2 id="sale-title" class="text-base font-semibold">
+			<span class="text-slate-400 tabular-nums">7.</span> Sale
+		</h2>
+		{#if data.sale}<p class="mt-2 text-sm">
+				Active sale — <a
+					class="text-blue-700 underline"
+					href={resolve('/campaigns/[id]/sales/[saleId]', {
+						id: campaign.id,
+						saleId: data.sale.sale.id
+					})}>view sale</a
+				>. {PAYMENT_MODE_LABELS[data.sale.sale.paymentMode]}, {formatMoney(
+					data.sale.sale.totalAmount
+				)}.
+			</p>{:else}<p class="mt-2 text-sm text-slate-500">This bond has not been sold.</p>{/if}
+	</section>
+	<section
+		id="installments"
+		aria-labelledby="installments-title"
+		class="rounded-lg border border-slate-200 bg-white p-5"
+	>
+		<h2 id="installments-title" class="text-base font-semibold">
+			<span class="text-slate-400 tabular-nums">8.</span> Installments
+		</h2>
+		{#if (data.installments ?? []).length}<table class="mt-2 text-sm">
+				<tbody
+					>{#each data.installments as installment (installment.id)}<tr
+							><td class="pr-3">{installment.installmentNumber}</td><td class="pr-3"
+								>{installment.dueDate}</td
+							><td class="pr-3">{formatMoney(installment.amount)}</td><td
+								>{INSTALLMENT_STATUS_LABELS[installment.status]}</td
+							></tr
+						>{/each}</tbody
+				>
+			</table>{:else}<p class="mt-2 text-sm text-slate-500">No installment plan.</p>{/if}
+	</section>
 	<BondPendingSection id="payments" />
 	<BondPendingSection id="settlements" />
 	<BondPendingSection id="commissions" />

@@ -105,7 +105,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			viewBuyers:
 				hasPermissionIn(permissions, 'buyer.view') || hasPermissionIn(permissions, 'buyer.manage'),
 			viewDeliveries:
-				hasPermissionIn(permissions, 'bond.view') || hasPermissionIn(permissions, 'bond.assign')
+				hasPermissionIn(permissions, 'bond.view') || hasPermissionIn(permissions, 'bond.assign'),
+			viewSales:
+				hasPermissionIn(permissions, 'sale.view') ||
+				hasPermissionIn(permissions, 'sale.create') ||
+				hasPermissionIn(permissions, 'bond.view')
 		}
 	};
 };

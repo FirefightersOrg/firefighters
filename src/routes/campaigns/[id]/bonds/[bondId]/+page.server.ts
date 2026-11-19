@@ -41,6 +41,7 @@ import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bond
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$lib/schemas/bond';
 import { readFormFields } from '$lib/schemas/campaign';
+import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -140,14 +141,20 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			(status === 'available' || status === 'delivered_to_collector') &&
 			hasPermissionIn(locals.permissions, 'bond.mark_lost')
 	};
-	const [historyResult, collectorsResult] = await Promise.all([
+	const [historyResult, collectorsResult, activeSaleResult] = await Promise.all([
 		listBondAssignments(locals.supabase, bond.id),
 		can.reassign
 			? listActiveCollectorOptions(locals.supabase)
-			: Promise.resolve({ data: [], error: null })
+			: Promise.resolve({ data: [], error: null }),
+		getActiveSaleForBond(locals.supabase, bond.id)
 	]);
-	if (historyResult.error) fail500(historyResult.error);
+	if (historyResult.error || activeSaleResult.error)
+		fail500(historyResult.error ?? activeSaleResult.error);
 	if (collectorsResult.error) fail500(collectorsResult.error);
+	const installmentsResult = activeSaleResult.data
+		? await listInstallmentsForSale(locals.supabase, activeSaleResult.data.sale.id)
+		: { data: [], error: null };
+	if (installmentsResult.error) fail500(installmentsResult.error);
 
 	return {
 		campaign,
@@ -171,7 +178,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					}
 				: null,
 			permissions: locals.permissions ?? []
-		})
+		}),
+		sale: activeSaleResult.data,
+		installments: installmentsResult.data ?? []
 	};
 };
 
