@@ -450,21 +450,58 @@ describe('hooks.server handle', () => {
 			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
 		});
 
-		it('keeps the session and does not claim it expired when the profile lookup fails', async () => {
-			vi.spyOn(console, 'error').mockImplementation(() => {});
-			vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
-			const { event, resolve, mockSupabase } = createMockEvent({
-				path: '/campaigns',
-				session: { access_token: 'valid-token' },
-				user: { id: 'user-123' },
-				profileError: { message: 'db down' }
+		describe('when the profile lookup itself fails', () => {
+			function lookupFailure(path: string, method = 'GET') {
+				const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+				vi.spyOn(permissionsModule, 'getUserPermissions').mockResolvedValue([]);
+				const mocks = createMockEvent({
+					path,
+					method,
+					session: { access_token: 'valid-token' },
+					user: { id: 'user-123' },
+					profileError: { message: 'db down' }
+				});
+				return { ...mocks, consoleError };
+			}
+
+			it('answers 503 on a page instead of redirecting to /login, keeping the session', async () => {
+				const { event, resolve, mockSupabase, consoleError } = lookupFailure('/campaigns');
+
+				await expect(handle({ event, resolve })).rejects.toMatchObject({
+					status: 503,
+					body: { message: 'Servicio no disponible, intentá de nuevo en unos minutos' }
+				});
+				expect(resolve).not.toHaveBeenCalled();
+				expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+				expect(event.cookies.delete).not.toHaveBeenCalled();
+				expect(consoleError).toHaveBeenCalledWith(
+					expect.stringContaining('profile lookup failed'),
+					expect.objectContaining({ requestId: event.locals.requestId })
+				);
 			});
 
-			await expect(handle({ event, resolve })).rejects.toMatchObject({
-				status: 303,
-				location: '/login?redirectTo=%2Fcampaigns'
+			it('answers a 503 JSON on an API route, keeping the session', async () => {
+				const { event, resolve, mockSupabase } = lookupFailure('/api/admin/users', 'POST');
+
+				const response = await handle({ event, resolve });
+
+				expect(response.status).toBe(503);
+				expect(await response.json()).toEqual({
+					message: 'Servicio no disponible, intentá de nuevo en unos minutos',
+					code: 'service_unavailable'
+				});
+				expect(resolve).not.toHaveBeenCalled();
+				expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
 			});
-			expect(mockSupabase.auth.signOut).not.toHaveBeenCalled();
+
+			it('still serves public routes', async () => {
+				for (const path of ['/', '/login']) {
+					const { event, resolve } = lookupFailure(path);
+					const response = await handle({ event, resolve });
+					expect(response.status).toBe(200);
+					expect(resolve).toHaveBeenCalledOnce();
+				}
+			});
 		});
 
 		it('drops the ?/action query from the return path of a form action', async () => {
