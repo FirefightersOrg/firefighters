@@ -50,7 +50,8 @@ with c as (
      starts_at, ends_at)
   select v.name, 60000, 10, 6000, v.mode, v.pattern, '2026-03-01 00:00-03', '2026-12-31 23:59:59-03'
   from (values
-    ('Import', 'base_number', null),
+    ('Import', 'manual_mapping', null),
+    ('Scan', 'base_number', null),
     ('Manual', 'manual_mapping', null),
     ('Pattern', 'internal_code', '^IT-([0-9]{4})$'),
     ('Closed', 'base_number', null)
@@ -266,11 +267,11 @@ select is(
 );
 select is(
   (select error_code from public.import_session_items where import_session_id = pg_temp.id('s1') and row_number = 4),
-  'number_conflict', 'the first row of a repeated participating number is flagged'
+  'duplicate_number', 'the first row of a repeated base number is flagged'
 );
 select is(
   (select error_code from public.import_session_items where import_session_id = pg_temp.id('s1') and row_number = 5),
-  'number_conflict', 'the second row of a repeated participating number is flagged'
+  'duplicate_number', 'the second row of a repeated base number is flagged'
 );
 select is(
   (select error_code from public.import_session_items where import_session_id = pg_temp.id('s1') and row_number = 6),
@@ -431,7 +432,7 @@ select is(
 -- ---------------------------------------------------------------------------
 select pg_temp.act_as(2);
 insert into ids
-select 's4', public.import_session_create(pg_temp.id('c-import'), 'barcode_scan');
+select 's4', public.import_session_create(pg_temp.id('c-scan'), 'barcode_scan');
 select is(
   public.import_session_add_scan(pg_temp.id('s4'), '0688') ->> 'valid',
   'true', 'a base_number barcode resolves to its base number'
