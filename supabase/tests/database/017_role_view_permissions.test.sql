@@ -1,8 +1,8 @@
 -- SAN-93 invariant: a role that holds an action permission on a domain also holds that domain's
--- `<domain>.view` permission, whenever that view permission exists. The domain is the code
+-- `<domain>.view` permission (`sale`, `payment` and `settlement` have one since SAN-93). The domain is the code
 -- without its last segment; codes whose last segment is `view` or `view_*` are not actions.
 begin;
-select plan(3);
+select plan(4);
 
 create temp table _action_without_view on commit drop as
 select r.name as role_name, a.code as action_code, v.code as view_code
@@ -43,6 +43,12 @@ select ok(
     where r.name = 'treasurer' and p.code = 'commission.view'
   ),
   'treasurer holds commission.view (commission.adjust)'
+);
+
+select is(
+  (select array_agg(code order by code) from public.permissions where code in ('sale.view', 'payment.view', 'settlement.view')),
+  array['payment.view', 'sale.view', 'settlement.view'],
+  'sale.view, payment.view and settlement.view exist'
 );
 
 select * from finish();

@@ -1124,7 +1124,11 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				'commission.view'
 			]);
 			expect(campaignAndCommission(users.operator)).toEqual(['campaign.view']);
-			expect(campaignAndCommission(users['read-only'])).toEqual(['campaign.view']);
+			// SAN-93 decision: read-only may view commission rules.
+			expect(campaignAndCommission(users['read-only'])).toEqual([
+				'campaign.view',
+				'commission.view'
+			]);
 			// The treasurer may adjust commissions (later phase) and, since SAN-93, view the rules
 			// (commission.adjust implies commission.view), but not manage them.
 			expect(campaignAndCommission(users.treasurer)).toEqual([
@@ -1132,7 +1136,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				'commission.adjust',
 				'commission.view'
 			]);
-			expect(campaignAndCommission(users.collector)).toEqual([]);
+			expect(campaignAndCommission(users.collector)).toEqual(['campaign.view']);
 		});
 
 		describe.each(['operator', 'treasurer', 'read-only'] as const)('%s', (role) => {
@@ -1151,8 +1155,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					editDates: false,
 					editRules: false,
 					transitions: [],
-					// SAN-93: the treasurer holds commission.view (implied by commission.adjust).
-					viewCommissions: role === 'treasurer',
+					// SAN-93: treasurer (commission.adjust) and read-only (decision) hold commission.view.
+					viewCommissions: role !== 'operator',
 					// SAN-26: every one of these roles has bond.view (bonds list link).
 					viewBonds: true,
 					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
@@ -1243,9 +1247,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				expect(leaked).toEqual([]);
 			});
 
-			it('cannot manage commission rules; only the treasurer can see them (SAN-93)', async () => {
+			it('cannot manage commission rules; only the treasurer and read-only can see them (SAN-93)', async () => {
 				const caller = users[role];
-				const canView = role === 'treasurer';
+				const canView = role !== 'operator';
 				if (canView) {
 					await expect(loadCommissions(caller, targetId)).resolves.toBeDefined();
 				} else {
@@ -1357,16 +1361,23 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			expect(await getCampaign(targetId)).toEqual(target);
 		});
 
-		it('collector cannot view campaigns (403 in the route, empty under RLS, 42501 on writes)', async () => {
+		it('collector can view campaigns (campaign.view, SAN-93) but not manage them (403 in the route, 42501 on writes)', async () => {
 			const collector = users.collector;
+			const list = (await listLoad(
+				event(collector, { path: '/campaigns', requestId: rid('collector-list') })
+			)) as unknown as { campaigns: Campaign[]; canCreate: boolean };
+			expect(list.canCreate).toBe(false);
+			expect(list.campaigns.map((c) => c.id)).toContain(targetId);
 			await expect(
-				listLoad(event(collector, { path: '/campaigns', requestId: rid('collector-list') }))
+				newCampaignLoad(
+					event(collector, { path: '/campaigns/new', requestId: rid('collector-new') })
+				)
 			).rejects.toMatchObject({ status: 403 });
-			await expect(loadCampaign(collector, targetId)).rejects.toMatchObject({ status: 403 });
+			await expect(loadCommissions(collector, targetId)).rejects.toMatchObject({ status: 403 });
 
 			const { data, error } = await collector.client.from('campaigns').select('id').limit(1);
 			expect(error).toBeNull();
-			expect(data).toEqual([]);
+			expect(data).toHaveLength(1);
 
 			const requestId = rid('collector-rpc-create');
 			const { error: rpcError } = await rpc(
