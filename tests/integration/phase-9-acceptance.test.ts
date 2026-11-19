@@ -39,6 +39,7 @@ let service: SupabaseClient;
 let campaignId: string;
 let collectorA: string;
 let collectorB: string;
+let collectorWindow: string;
 let buyerId: string;
 let nextBase = 3000;
 const sales: Record<string, { saleId: string; installments: string[] }> = {};
@@ -94,7 +95,8 @@ async function openWithPayment(
 	collectorId: string,
 	label: string,
 	method: 'cash' | 'transfer',
-	amount: number
+	amount: number,
+	paymentDate: string = baDate()
 ) {
 	const settlementId = await rpc<string>(users.admin, 'settlement_open', {
 		p_campaign_id: campaignId,
@@ -106,6 +108,7 @@ async function openWithPayment(
 		p_sale_id: sales[label].saleId,
 		p_amount: amount,
 		p_payment_method: method,
+		p_payment_date: paymentDate,
 		p_applications: [{ installment_id: sales[label].installments[0], amount_applied: amount }],
 		p_request_id: rid(`pay-${label}`)
 	});
@@ -128,7 +131,7 @@ const balance = (collectorId: string) =>
 async function entries(collectorId: string) {
 	const { data, error } = await users.admin.client
 		.from('collector_ledger_entries')
-		.select('id, entry_type, direction, amount, status, settlement_id')
+		.select('id, entry_type, direction, amount, status, settlement_id, reason, annul_reason')
 		.eq('campaign_id', campaignId)
 		.eq('collector_id', collectorId)
 		.order('created_at');
@@ -165,7 +168,7 @@ beforeAll(async () => {
 		p_associated_number_offset: 4871,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
-		p_starts_at: `${baDate(-1)}T03:00:00Z`,
+		p_starts_at: `${baDate(-10)}T03:00:00Z`,
 		p_ends_at: `${baDate(365)}T03:00:00Z`,
 		p_request_id: rid('campaign')
 	});
@@ -190,6 +193,7 @@ beforeAll(async () => {
 		);
 	collectorA = await collector('A');
 	collectorB = await collector('B');
+	collectorWindow = await collector('Window');
 	buyerId = await createBuyer(
 		users.admin.client,
 		{
@@ -213,7 +217,7 @@ beforeAll(async () => {
 		p_installment_number: null,
 		p_percentage: '10',
 		p_fixed_amount: null,
-		p_valid_from: baDate(-1),
+		p_valid_from: baDate(-10),
 		p_valid_to: null,
 		p_request_id: rid('rule-general'),
 		p_reason: null
@@ -233,6 +237,18 @@ beforeAll(async () => {
 	await soldBond('a-cash', collectorA);
 	await soldBond('a-transfer', collectorA);
 	await soldBond('b-cash', collectorB);
+	await rpc(users.admin, 'commission_rule_create', {
+		p_campaign_id: campaignId,
+		p_rule_type: 'installment_first',
+		p_installment_number: null,
+		p_percentage: '20',
+		p_fixed_amount: null,
+		p_valid_from: baDate(-4),
+		p_valid_to: baDate(-2),
+		p_request_id: rid('rule-window'),
+		p_reason: null,
+		p_applies_to_collector_id: collectorWindow
+	});
 }, 120_000);
 
 describe('Phase 9: commissions and collector ledger', () => {
@@ -245,6 +261,20 @@ describe('Phase 9: commissions and collector ledger', () => {
 		expect(await totals(other)).toMatchObject({ commission_amount: 3000 });
 	});
 
+	it.each([
+		['before valid_from (future rule)', -5, 3000],
+		['at inclusive valid_from', -4, 6000],
+		['at inclusive valid_to', -2, 6000],
+		['after valid_to (expired rule)', -1, 3000]
+	] as const)(
+		'C1 payment dated %s selects the applicable rule',
+		async (label, days, commission) => {
+			await soldBond(label, collectorWindow);
+			const settlement = await openWithPayment(collectorWindow, label, 'cash', 30000, baDate(days));
+			expect(await totals(settlement)).toMatchObject({ commission_amount: commission });
+		}
+	);
+
 	it('C2 closing a cash settlement posts generated and cash-retained commission', async () => {
 		expect(await totals(cashSettlement)).toMatchObject({
 			total_cash: 30000,
@@ -256,10 +286,27 @@ describe('Phase 9: commissions and collector ledger', () => {
 			p_request_id: rid('close-cash')
 		});
 		const posted = (await entries(collectorA)).filter((e) => e.settlement_id === cashSettlement);
-		expect(posted.map((e) => [e.entry_type, e.direction, e.amount])).toEqual([
+		expect(posted.map((e) => [e.entry_type, e.direction, e.amount]).sort()).toEqual([
 			['commission_generated', 'collector_credit', 6000],
 			['commission_settled', 'collector_debit', 6000]
 		]);
+		expect(await balance(collectorA)).toBe(0);
+	});
+
+	it('C2 repeated settlement_close fails without duplicating ledger entries', async () => {
+		const before = await entries(collectorA);
+		expect(before.filter((e) => e.settlement_id === cashSettlement)).toHaveLength(2);
+		expect(
+			await codeOf(
+				rpc(users.admin, 'settlement_close', {
+					p_settlement_id: cashSettlement,
+					p_request_id: rid('close-cash-again')
+				})
+			)
+		).toBe('55000');
+		expect((await entries(collectorA)).sort((a, b) => a.id.localeCompare(b.id))).toEqual(
+			before.sort((a, b) => a.id.localeCompare(b.id))
+		);
 		expect(await balance(collectorA)).toBe(0);
 	});
 
@@ -355,6 +402,10 @@ describe('Phase 9: commissions and collector ledger', () => {
 			p_request_id: annulRequest
 		});
 		expect((await audit(annulRequest)).map((a) => a.action)).toEqual(['collector_ledger.annul']);
+		expect((await entries(collectorA)).find((e) => e.id === creditId)).toMatchObject({
+			reason: 'Typo, to be annulled',
+			annul_reason: 'Entered by mistake'
+		});
 		expect(await balance(collectorA)).toBe(3000);
 		const closedEntry = (await entries(collectorA)).find(
 			(e) => e.settlement_id === cashSettlement
