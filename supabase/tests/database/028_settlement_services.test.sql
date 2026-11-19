@@ -1,5 +1,5 @@
 begin;
-select plan(44);
+select plan(46);
 insert into auth.users(id,email) values ('a6280000-0000-0000-0000-000000000001','settle@example.com');
 insert into public.profiles(id,auth_user_id,full_name,email,status) values ('b6280000-0000-0000-0000-000000000001','a6280000-0000-0000-0000-000000000001','Settlement','settle@example.com','active');
 insert into public.user_roles(user_id,role_id) select 'b6280000-0000-0000-0000-000000000001',id from public.roles where name='admin';
@@ -20,6 +20,7 @@ with x as (insert into public.installments(payment_plan_id,installment_number,du
 set local role authenticated;
 with x as (select public.settlement_open(pg_temp.id('c'),pg_temp.id('collector'),' note ','r1') id) insert into ids select 'set',id from x;
 select is((select settlement_number from public.settlements where id=pg_temp.id('set')),1,'opens next numbered settlement');
+select throws_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),10,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',10)),(now() at time zone 'America/Argentina/Buenos_Aires')::date+1)$$,'22023','payment date cannot be in the future','future Buenos Aires payment date rejected');
 select throws_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),10,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',9)))$$,'22023','payment applications must equal the payment amount','applications must sum to the payment');
 select lives_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),100,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',50),jsonb_build_object('installment_id',pg_temp.id('i2'),'amount_applied',50)))$$,'adds multi-installment cash payment');
 select is((select total_cash from public.settlement_totals(pg_temp.id('set'))),100::numeric,'preliminary cash total');
@@ -107,4 +108,6 @@ select is(public.settlement_application_commission(pg_temp.id('commission_campai
 select ok(public.settlement_application_commission(pg_temp.id('commission_campaign'),pg_temp.id('collector2'),current_date,'installments',2,3,50,50) = 5
   and public.settlement_application_commission(pg_temp.id('commission_campaign'),pg_temp.id('collector2'),current_date,'installments',3,3,50,50) = 10,'middle and last installments select different rules');
 select is((select financial_status_snapshot from public.bonds where id=pg_temp.id('bond')),'fully_paid','closing updates bond financial status snapshot');
+select ok(not has_function_privilege('service_role','public.settlement_close(uuid,text)','execute')
+  and not has_function_privilege('service_role','public.settlement_remove_payment(uuid,text,text)','execute'),'service_role cannot call settlement RPCs');
 select * from finish(); rollback;

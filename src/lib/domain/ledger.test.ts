@@ -11,6 +11,17 @@ import {
 } from './ledger';
 
 describe('ledger domain', () => {
+	it('sums fractional credits and debits in cents without floating-point drift', () => {
+		expect(
+			calculateLedgerBalance([
+				{ direction: 'collector_credit', amount: '0.10', status: 'recorded' },
+				{ direction: 'collector_credit', amount: 0.2, status: 'recorded' },
+				{ direction: 'collector_debit', amount: '0.30', status: 'compensated' },
+				{ direction: 'collector_credit', amount: 0.01, status: 'annulled' }
+			])
+		).toBe(0);
+	});
+
 	it('exports database entry checks and labels', () => {
 		expect(LEDGER_ENTRY_TYPES).toHaveLength(7);
 		expect(Object.keys(LEDGER_ENTRY_TYPE_LABELS)).toEqual([...LEDGER_ENTRY_TYPES]);
