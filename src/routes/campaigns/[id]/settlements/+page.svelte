@@ -8,6 +8,7 @@
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
 	import { formatMoney } from '$lib/domain/money';
+	import { formatCampaignDate } from '$lib/domain/campaigns';
 	import { SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUSES } from '$lib/domain/payments';
 	import type { PageProps } from './$types';
 	let { data }: PageProps = $props();
@@ -97,7 +98,7 @@
 							></td
 						><td>{s.collectorName}</td><td>{SETTLEMENT_STATUS_LABELS[s.status]}</td><td
 							>{formatMoney(s.totals.totalAmount)}</td
-						><td>{s.openedAt.slice(0, 10)}</td></tr
+						><td>{formatCampaignDate(s.openedAt)}</td></tr
 					>{:else}<tr><td colspan="5" class="py-3 text-slate-500">No settlements match.</td></tr
 					>{/each}</tbody
 			>

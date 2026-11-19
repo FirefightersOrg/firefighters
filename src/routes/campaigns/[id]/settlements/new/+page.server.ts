@@ -65,7 +65,7 @@ export const actions: Actions = {
 					collectorId: parsed.data.collectorId,
 					notes: parsed.data.notes || null
 				},
-				{ requestId: locals.requestId, permissions: locals.permissions }
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
 		} catch (err) {
 			const e = err instanceof SettlementServiceError ? err : null;

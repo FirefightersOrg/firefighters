@@ -24,7 +24,11 @@ export const addPaymentToSettlementSchema = z.object({
 });
 export const removePaymentFromSettlementSchema = z.object({
 	paymentId: uuid,
-	reason: z.string().trim().min(1).max(PAYMENT_ANNULMENT_REASON_MAX)
+	reason: z
+		.string()
+		.trim()
+		.min(1)
+		.refine((reason) => [...reason].length <= PAYMENT_ANNULMENT_REASON_MAX)
 });
 export const closeSettlementSchema = z.object({ settlementId: uuid });
 export type OpenSettlementInput = z.input<typeof openSettlementSchema>;

@@ -92,6 +92,8 @@ function serviceFailure(err: unknown, form: string, values: Record<string, strin
 }
 export const actions: Actions = {
 	add: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'add', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.update_open') || denied(locals, 'payment.create'))
 			return fail(403, {
@@ -168,7 +170,7 @@ export const actions: Actions = {
 					paymentMethod: method as 'cash' | 'transfer',
 					applications
 				},
-				{ requestId: locals.requestId, permissions: locals.permissions }
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
 			return { form: 'add', success: true, message: 'Payment added.', errors: {} };
 		} catch (e) {
@@ -176,6 +178,8 @@ export const actions: Actions = {
 		}
 	},
 	remove: async ({ request, locals, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'remove', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.update_open'))
 			return fail(403, {
@@ -189,7 +193,7 @@ export const actions: Actions = {
 		if (
 			!uuid.safeParse(paymentId).success ||
 			!reason ||
-			reason.length > PAYMENT_ANNULMENT_REASON_MAX
+			[...reason].length > PAYMENT_ANNULMENT_REASON_MAX
 		)
 			return fail(400, {
 				form: 'remove',
@@ -200,7 +204,7 @@ export const actions: Actions = {
 			await removePaymentFromSettlement(
 				locals.supabase,
 				{ paymentId, reason },
-				{ requestId: locals.requestId, permissions: locals.permissions }
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
 			return { form: 'remove', success: true, message: 'Payment removed.', errors: {} };
 		} catch (e) {
@@ -208,6 +212,8 @@ export const actions: Actions = {
 		}
 	},
 	close: async ({ locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form: 'close', errors: {}, message: 'Could not load permissions.' });
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.close'))
 			return fail(403, {
@@ -219,7 +225,7 @@ export const actions: Actions = {
 			await closeSettlement(
 				locals.supabase,
 				{ settlementId: params.settlementId },
-				{ requestId: locals.requestId, permissions: locals.permissions }
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
 			return { form: 'close', success: true, message: 'Settlement closed.', errors: {} };
 		} catch (e) {

@@ -7,7 +7,7 @@ const id = 'c',
 		id: 's',
 		settlementNumber: 1,
 		collectorName: 'Ana',
-		openedAt: '2026-01-01',
+		openedAt: '2026-01-01T02:59:59Z',
 		status: 'open'
 	};
 const totals = {
@@ -43,6 +43,9 @@ describe('settlement workspace render', () => {
 		expect(body).toContain('?/add');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');
+		expect(body).toContain('Dec 31, 2025');
+		// Native maxlength counts UTF-16 units, unlike the database's code-point limit.
+		expect(body).not.toContain('maxlength=');
 	});
 	it('renders closed documents read-only', () => {
 		const body = page('closed');

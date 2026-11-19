@@ -54,7 +54,7 @@ const settlement = (status = 'open') => ({
 });
 const run = async (
 	action: keyof typeof actions,
-	permissions: string[],
+	permissions: string[] | null,
 	fields: Record<string, string> = {}
 ) => {
 	const body = new FormData();
@@ -77,6 +77,58 @@ beforeEach(() => {
 	} as never);
 });
 describe('settlement workspace', () => {
+	it.each(['add', 'remove', 'close'] as const)(
+		'returns 500 before authorization or work when permissions are unavailable: %s',
+		async (action) => {
+			expect(await run(action, null)).toMatchObject({
+				status: 500,
+				data: { form: action, message: 'Could not load permissions.' }
+			});
+			expect(getSettlement).not.toHaveBeenCalled();
+			expect(addPaymentToSettlement).not.toHaveBeenCalled();
+			expect(removePaymentFromSettlement).not.toHaveBeenCalled();
+			expect(closeSettlement).not.toHaveBeenCalled();
+		}
+	);
+	it('validates the remaining installment balance rather than the original amount', async () => {
+		vi.mocked(listCollectorPaymentCandidates).mockResolvedValueOnce({
+			data: [{ id: INSTALLMENT, saleId: SALE, amount: '2.50' }],
+			error: null
+		} as never);
+		expect(
+			await run('add', ['campaign.view', 'settlement.update_open', 'payment.create'], {
+				saleId: SALE,
+				installmentId: INSTALLMENT,
+				[`amount-${INSTALLMENT}`]: '2,51',
+				paymentMethod: 'cash'
+			})
+		).toMatchObject({
+			status: 400,
+			data: {
+				errors: {
+					[`amount-${INSTALLMENT}`]: ['The amount cannot exceed the installment balance.']
+				}
+			}
+		});
+		expect(addPaymentToSettlement).not.toHaveBeenCalled();
+	});
+	it('counts removal reasons in Unicode code points at the database limit', async () => {
+		const permissions = ['campaign.view', 'settlement.update_open'];
+		expect(
+			await run('remove', permissions, {
+				paymentId: SETTLEMENT,
+				reason: '😀'.repeat(1000)
+			})
+		).toMatchObject({ success: true });
+		expect(removePaymentFromSettlement).toHaveBeenCalledTimes(1);
+		expect(
+			await run('remove', permissions, {
+				paymentId: SETTLEMENT,
+				reason: '😀'.repeat(1001)
+			})
+		).toMatchObject({ status: 400 });
+		expect(removePaymentFromSettlement).toHaveBeenCalledTimes(1);
+	});
 	it('returns 404 for malformed and missing settlements', async () => {
 		await expect(
 			load({
