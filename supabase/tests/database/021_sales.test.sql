@@ -286,7 +286,8 @@ select throws_ok($$delete from public.payment_plans where id = pg_temp.id('p1')$
   '23001', null, 'payment plans are never deleted');
 select throws_ok($$delete from public.installments where id = pg_temp.id('i3')$$,
   '23001', null, 'installments are never deleted');
-select throws_ok($$truncate public.installments, public.payment_plans, public.sales$$,
+select throws_ok($$truncate public.payment_installments, public.payments, public.settlements,
+  public.installments, public.payment_plans, public.sales$$,
   '23001', null, 'sales tables cannot be truncated');
 
 -- ---------------------------------------------------------------------------

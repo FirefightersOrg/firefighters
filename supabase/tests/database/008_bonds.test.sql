@@ -1045,7 +1045,7 @@ select throws_ok(
   -- sales tables (SAN-58).
   $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items,
     public.delivery_note_items, public.bond_assignments, public.installments,
-    public.payment_plans, public.sales$$,
+    public.payment_installments, public.payments, public.settlements, public.payment_plans, public.sales$$,
   '23001', null,
   'truncate: bonds and bond_numbers (owner)'
 );
