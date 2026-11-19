@@ -28,4 +28,16 @@ describe('ledger domain', () => {
 			])
 		).toBe(75.25);
 	});
+
+	it('reconstructs cash-retained versus transfer commission and ignores annulments', () => {
+		// Both payments generate commission; only cash is settled at close.
+		expect(
+			calculateLedgerBalance([
+				{ direction: 'collector_credit', amount: 10, status: 'recorded' },
+				{ direction: 'collector_debit', amount: 4, status: 'recorded' },
+				{ direction: 'collector_credit', amount: 6, status: 'recorded' },
+				{ direction: 'collector_debit', amount: 99, status: 'annulled' }
+			])
+		).toBe(12);
+	});
 });

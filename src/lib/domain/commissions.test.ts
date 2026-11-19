@@ -8,6 +8,8 @@ import {
 	formatDay,
 	formatValidity,
 	todayInArgentina,
+	calculateApplicationCommission,
+	selectCommissionRule,
 	type CommissionRule
 } from './commissions';
 
@@ -117,5 +119,59 @@ describe('compareCommissionRules', () => {
 			'custom-5',
 			'annulled'
 		]);
+	});
+});
+
+describe('settlement commission calculation', () => {
+	const application = {
+		collectorId: 'collector',
+		paymentDate: '2026-06-15',
+		paymentMode: 'installments' as const,
+		installmentNumber: 1,
+		installmentCount: 3,
+		amountApplied: 25,
+		installmentAmount: 50
+	};
+	it('uses collector-specific before general, then custom before type rules', () => {
+		expect(
+			selectCommissionRule(
+				[
+					rule({ id: 'general-custom', ruleType: 'custom', installmentNumber: 1 }),
+					rule({
+						id: 'specific-first',
+						appliesToCollectorId: 'collector',
+						ruleType: 'installment_first'
+					})
+				],
+				application
+			)?.id
+		).toBe('specific-first');
+		expect(
+			selectCommissionRule(
+				[
+					rule({ id: 'first', ruleType: 'installment_first' }),
+					rule({ id: 'custom', ruleType: 'custom', installmentNumber: 1 })
+				],
+				application
+			)?.id
+		).toBe('custom');
+	});
+	it('uses newest valid_from then id and prorates fixed amounts', () => {
+		expect(
+			selectCommissionRule(
+				[
+					rule({ id: 'a', ruleType: 'installment_first', validFrom: '2026-06-01' }),
+					rule({ id: 'z', ruleType: 'installment_first', validFrom: '2026-06-01' }),
+					rule({ id: 'old', ruleType: 'installment_first', validFrom: '2026-01-01' })
+				],
+				application
+			)?.id
+		).toBe('z');
+		expect(
+			calculateApplicationCommission(
+				[rule({ percentage: null, fixedAmount: '10.00', ruleType: 'installment_first' })],
+				application
+			)
+		).toBe(5);
 	});
 });
