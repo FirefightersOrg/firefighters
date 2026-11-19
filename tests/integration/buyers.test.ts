@@ -8,7 +8,7 @@ import {
 	actions as buyerActions,
 	load as buyerLoad
 } from '../../src/routes/campaigns/[id]/buyers/[buyerId]/+page.server';
-import { getUserPermissions } from '$lib/server/auth/permissions';
+import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
 
@@ -52,7 +52,7 @@ async function signIn(email: string, password: string): Promise<Caller> {
 		user: data.user,
 		client,
 		profile: profile as UserProfile,
-		permissions: await getUserPermissions(client)
+		permissions: await loadPermissions(client)
 	};
 }
 function event(caller: Caller, suffix: string, fields?: Record<string, string>, buyerId?: string) {

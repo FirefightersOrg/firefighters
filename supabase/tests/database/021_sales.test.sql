@@ -1,6 +1,6 @@
 -- SAN-58: sales, payment_plans and installments tables, guards, privileges and RLS.
 begin;
-select plan(58);
+select plan(63);
 
 -- auth ids / profiles: ...01 admin, ...02 operator, ...03 treasurer, ...04 read-only,
 -- ...05 a collector's own login (collector role), ...06 no role at all.
@@ -246,6 +246,39 @@ select throws_ok(
   '23514', null, 'plan status only allows active and annulled'
 );
 
+-- Consistency of sale, plan and installments (#54 review).
+select pg_temp.sale('b3', 'beto', 's3');
+select throws_ok(
+  $$insert into public.payment_plans (sale_id, installment_count, total_amount) values (pg_temp.id('s3'), 3, 50000)$$,
+  '23514', null, 'a plan total equals its sale total'
+);
+-- The new active sale of b2 is a full payment.
+select throws_ok(
+  $$insert into public.payment_plans (sale_id, installment_count, total_amount)
+    select id, 3, 60000 from public.sales where bond_id = pg_temp.id('b2') and status = 'active'$$,
+  '23514', null, 'a full payment plan has exactly one installment'
+);
+set constraints all immediate;
+select throws_ok(
+  $$insert into public.payment_plans (sale_id, installment_count, total_amount) values (pg_temp.id('s3'), 3, 60000)$$,
+  '23514', null, 'at commit, an active plan needs all its installments'
+);
+select throws_ok(
+  $$with p as (insert into public.payment_plans (sale_id, installment_count, total_amount)
+      select id, 1, 60000 from public.sales where bond_id = pg_temp.id('b2') and status = 'active' returning id)
+    insert into public.installments (payment_plan_id, installment_number, due_date, amount)
+    select id, 1, date '2026-12-10', 59999 from p$$,
+  '23514', null, 'at commit, the installments add up to the plan total'
+);
+select lives_ok(
+  $$with p as (insert into public.payment_plans (sale_id, installment_count, total_amount)
+      select id, 1, 60000 from public.sales where bond_id = pg_temp.id('b2') and status = 'active' returning id)
+    insert into public.installments (payment_plan_id, installment_number, due_date, amount)
+    select id, 1, date '2026-12-10', 60000 from p$$,
+  'a consistent full payment plan is accepted'
+);
+set constraints all deferred;
+
 -- No deletion, for any role.
 select throws_ok($$delete from public.sales where id = pg_temp.id('s1')$$,
   '23001', null, 'sales are never deleted');
@@ -278,8 +311,8 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'public.sales_guard_update()', 'execute')
   and not has_function_privilege('service_role', 'public.installments_guard_update()', 'execute')
-  and has_function_privilege('authenticated', 'public.sale_can_read(uuid)', 'execute')
-  and not has_function_privilege('anon', 'public.sale_can_read(uuid)', 'execute'),
+  and has_function_privilege('authenticated', 'public.sale_can_read()', 'execute')
+  and not has_function_privilege('anon', 'public.sale_can_read()', 'execute'),
   'trigger functions are internal; the RLS helper runs for authenticated'
 );
 select ok(
@@ -304,13 +337,13 @@ select throws_ok(
   $$update public.installments set status = 'paid' where id = pg_temp.id('i3')$$,
   '42501', null, 'the operator cannot change an installment directly'
 );
-select is((select count(*)::int from public.sales where campaign_id = pg_temp.id('c')), 3,
+select is((select count(*)::int from public.sales where campaign_id = pg_temp.id('c')), 4,
   'the operator (sale.create, bond.view) reads every sale');
 select is((select count(*)::int from public.installments where payment_plan_id = pg_temp.id('p1')), 3,
   'the operator reads the installments');
 
 select pg_temp.act_as(1);
-select is((select count(*)::int from public.sales where campaign_id = pg_temp.id('c')), 3,
+select is((select count(*)::int from public.sales where campaign_id = pg_temp.id('c')), 4,
   'the admin reads every sale');
 select pg_temp.act_as(3);
 select is((select count(*)::int from public.payment_plans where sale_id = pg_temp.id('s1')), 1,
@@ -323,7 +356,8 @@ select is((select count(*)::int from public.installments where payment_plan_id =
 select pg_temp.act_as(5);
 select is((select array_agg(id) from public.sales), array[pg_temp.id('s1')],
   'a collector''s own login reads only its own sales');
-select is((select count(*)::int from public.installments), 3,
+select is((select count(*)::int from public.installments
+  where payment_plan_id in (select p.id from public.payment_plans p where p.sale_id = pg_temp.id('s1'))), 3,
   'and the installments of its own sales');
 
 select pg_temp.act_as(6);

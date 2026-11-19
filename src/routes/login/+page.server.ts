@@ -4,6 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { loginSchema } from '$lib/schemas/auth';
 import { getSafeRedirectPath } from '$lib/server/auth/redirect';
 import { endSession } from '$lib/server/auth/session';
+import { SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE } from '$lib/server/auth/route-guard';
 
 const MESSAGES = {
 	invalidInput: 'Please provide a valid email and password',
@@ -50,7 +51,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		redirect(303, redirectTo);
 	}
 
-	return { redirectTo: redirectTo === '/' ? null : redirectTo };
+	return {
+		redirectTo: redirectTo === '/' ? null : redirectTo,
+		// Set by the route guard in hooks.server.ts when it rejected or ended an existing session.
+		sessionExpired: url.searchParams.get(SESSION_EXPIRED_PARAM) === SESSION_EXPIRED_VALUE
+	};
 };
 
 export const actions: Actions = {

@@ -85,7 +85,14 @@ export function mapDeliveryRpcError(rpcError: PostgrestLikeError): DeliveryServi
 	switch (rpcError.code) {
 		case '42501':
 			return err('permission', DELIVERY_MESSAGES.permission);
+		case '22007':
+		case '22008':
+			// A well-formed but impossible date (2026-02-31) fails the cast of p_lost_on.
+			return err('validation', 'Enter a real calendar date.', 'lostOn');
 		case '22023':
+			if (/one collector at a time/.test(message)) {
+				return err('validation', 'Return the bonds of one collector at a time.', 'bondIds');
+			}
 			return err(
 				'validation',
 				humanize(message),
@@ -97,11 +104,24 @@ export function mapDeliveryRpcError(rpcError: PostgrestLikeError): DeliveryServi
 			}
 			return err('not_found', DELIVERY_MESSAGES.bondNotFound, 'bondIds');
 		case '55000': {
+			if (/only while the campaign is active/.test(message)) {
+				return err(
+					'conflict',
+					'Bonds are delivered to collectors only while the campaign is active.'
+				);
+			}
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
 				const label =
 					CAMPAIGN_STATUS_LABELS[window[1] as CampaignStatus]?.toLowerCase() ?? window[1];
 				return err('conflict', `${DELIVERY_MESSAGES.campaignLocked} This campaign is ${label}.`);
+			}
+			if (/no longer with that collector/.test(message)) {
+				return err(
+					'conflict',
+					'A selected bond is no longer with this collector. Reload the page and try again.',
+					'bondIds'
+				);
 			}
 			if (/collector .* is inactive/.test(message))
 				return err('conflict', humanize(message), 'collectorId');
@@ -191,7 +211,14 @@ export async function assignBondsToCollector(
 /** Moves delivered bonds to another active collector (`bond.assign`). Returns the new note id. */
 export async function reassignBondsToCollector(
 	supabase: SupabaseClient,
-	input: { campaignId: string; collectorId: string; bondIds: string[]; notes?: string | null },
+	input: {
+		campaignId: string;
+		collectorId: string;
+		bondIds: string[];
+		notes?: string | null;
+		/** The collector the bonds were seen with: the database refuses if one moved meanwhile. */
+		fromCollectorId?: string | null;
+	},
 	ctx: DeliveryRequestContext = {}
 ): Promise<string> {
 	const data = await call(
@@ -202,19 +229,29 @@ export async function reassignBondsToCollector(
 			p_campaign_id: input.campaignId,
 			p_collector_id: input.collectorId,
 			p_bond_ids: input.bondIds,
-			p_notes: input.notes ?? null
+			p_notes: input.notes ?? null,
+			p_from_collector_id: input.fromCollectorId ?? null
 		},
 		ctx
 	);
 	return requireId('bond_reassign', data, ctx);
 }
 
-/** Returns delivered bonds to stock (`bond.return`). Returns how many were returned. */
+/**
+ * Returns delivered bonds of one collector to stock (`bond.return`), with a return note as the
+ * collector's receipt. Returns the note id.
+ */
 export async function returnBondsFromCollector(
 	supabase: SupabaseClient,
-	input: { campaignId: string; bondIds: string[]; notes?: string | null },
+	input: {
+		campaignId: string;
+		bondIds: string[];
+		notes?: string | null;
+		/** The collector the bonds were seen with: the database refuses if one moved meanwhile. */
+		fromCollectorId?: string | null;
+	},
 	ctx: DeliveryRequestContext = {}
-): Promise<number> {
+): Promise<string> {
 	const data = await call(
 		supabase,
 		'bond_return',
@@ -222,11 +259,12 @@ export async function returnBondsFromCollector(
 		{
 			p_campaign_id: input.campaignId,
 			p_bond_ids: input.bondIds,
-			p_notes: input.notes ?? null
+			p_notes: input.notes ?? null,
+			p_from_collector_id: input.fromCollectorId ?? null
 		},
 		ctx
 	);
-	return typeof data === 'number' ? data : 0;
+	return requireId('bond_return', data, ctx);
 }
 
 /** Marks an available or delivered bond lost (`bond.mark_lost`); all three details are required. */
