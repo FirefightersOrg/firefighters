@@ -14,7 +14,7 @@
  * 2. {@link validateImportBatch}: an instant-preview mirror of the database validation, with the
  *    same codes, messages and precedence (first match wins):
  *    parse_* (kept) → missing_type → missing_base_number → missing_barcode (pata) → missing_group
- *    (pata) → number_out_of_range → number_conflict → number_in_use → duplicate_barcode →
+ *    (pata) → number_out_of_range → duplicate_number → number_conflict → number_in_use → duplicate_barcode →
  *    barcode_in_use (row barcode, then pata code) → duplicate_barcode (pata code used as a row
  *    barcode) → valid; then, when validating, incomplete_pata.
  * 3. {@link summarizeImportItems}: the counts of `import_session_summary`.
@@ -359,6 +359,14 @@ export function validateImportBatch(
 			numberOwners.set(n, (numberOwners.get(n) ?? new Set()).add(item.key));
 		}
 	}
+	// Base numbers of the live rows (rows in error included): the same one on two rows is a
+	// duplicate_number.
+	const baseCount = new Map<number, number>();
+	for (const item of items) {
+		if (item.baseNumber === null) continue;
+		baseCount.set(item.baseNumber, (baseCount.get(item.baseNumber) ?? 0) + 1);
+	}
+	const baseRepeated = (base: number) => (baseCount.get(base) ?? 0) > 1;
 	const numberRepeated = (base: number) =>
 		offset === 0 || // its base and associated numbers are the same number
 		[base, base + offset].some((n) => (numberOwners.get(n)?.size ?? 0) > 1);
@@ -398,6 +406,12 @@ export function validateImportBatch(
 			return {
 				code: 'number_out_of_range',
 				message: `Number ${fmt(base)} does not fit the campaign (maximum ${fmt(rules.maxNumber)}).`
+			};
+		}
+		if (baseRepeated(base)) {
+			return {
+				code: 'duplicate_number',
+				message: `Base number ${fmt(base)} is repeated in the import.`
 			};
 		}
 		if (numberRepeated(base)) {
