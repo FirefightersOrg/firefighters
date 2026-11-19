@@ -10,6 +10,7 @@ import {
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
 	getCollector,
+	getProfileName,
 	listAssignedBondsForCollector,
 	listAvailableCollectorProfileOptions,
 	listBuyers
@@ -20,6 +21,9 @@ import { COLLECTOR_UPDATE_FIELDS, collectorSchema } from '$lib/schemas/collector
 import { readFormFields } from '$lib/schemas/campaign';
 const uuid = (value: string) => z.guid().safeParse(value).success;
 const notFound = 'Collector not found.';
+/** Usual buyers listed on the record; the rest are counted ("and N more"). */
+const BUYERS_SHOWN = 100;
+const isTimestamp = (value: string) => z.iso.datetime({ offset: true }).safeParse(value).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
 	if (!hasPermissionIn(locals.permissions, 'collector.view'))
@@ -37,7 +41,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
 	const [bonds, buyers, profiles, audit] = await Promise.all([
 		listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
-		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: 1000 }),
+		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
 		listAvailableCollectorProfileOptions(locals.supabase),
 		auditAllowed
 			? listAuditEntriesForEntities(locals.supabase, 'collector', [params.collectorId], {
@@ -49,17 +53,22 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(500, { message: 'Could not load the collector. Please try again.' });
 	const collector = collectorResult.data;
 	const profileOptions = profiles.data ?? [];
-	if (collector.userProfileId)
+	if (collector.userProfileId) {
+		// The admin can read profiles; anyone else sees a generic label.
+		const linked = await getProfileName(locals.supabase, collector.userProfileId);
 		profileOptions.unshift({
 			id: collector.userProfileId,
-			fullName: 'Current linked user',
+			fullName: linked.data ?? 'Current linked user',
 			email: ''
 		});
+	}
 	return {
 		campaign: campaignResult.data,
 		collector,
-		bonds: bonds.data ?? [],
+		bonds: bonds.data?.items ?? [],
+		bondsTotal: bonds.data?.total ?? 0,
 		buyers: buyers.data?.items ?? [],
+		buyersTotal: buyers.data?.total ?? 0,
 		profiles: profileOptions,
 		can: { manage: hasPermissionIn(locals.permissions, 'collector.manage'), audit: auditAllowed },
 		audit: auditAllowed
@@ -77,6 +86,13 @@ export const actions: Actions = {
 		if (!uuid(params.id)) return fail(404, { message: CAMPAIGN_MESSAGES.notFound });
 		if (!uuid(params.collectorId)) return fail(404, { message: notFound });
 		const values = readFormFields(await request.formData(), COLLECTOR_UPDATE_FIELDS);
+		// A stale-check token that is not a timestamp is a bad request, not a database cast error.
+		if (!isTimestamp(values.updatedAt))
+			return fail(400, {
+				values,
+				errors: {},
+				message: 'The form is out of date. Reload the page and try again.'
+			});
 		const parsed = collectorSchema.safeParse(values);
 		if (!parsed.success)
 			return fail(400, {

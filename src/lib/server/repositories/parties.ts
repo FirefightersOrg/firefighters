@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BOND_LIST_COLUMNS, mapBondListRow, type BondListEntry, type BondListRow } from './bonds';
 import {
 	BUYER_TYPES,
 	COLLECTOR_STATUSES,
@@ -245,41 +246,70 @@ export async function getCollectorsByIds(
 	};
 }
 
-/** Assigned bond counts for all collectors shown on one page (one query, never N+1). */
+/**
+ * Assigned bond counts for the collectors shown on one page: one exact `head` count per
+ * collector (at most a page of them), so no row cap can make a count come out short.
+ */
 export async function countAssignedBondsByCollector(
 	supabase: SupabaseClient,
 	campaignId: string,
 	collectorIds: readonly string[]
 ): Promise<RepositoryResult<Map<string, number>>> {
-	if (collectorIds.length === 0) return { data: new Map(), error: null };
-	const { data, error } = await supabase
-		.from('bonds')
-		.select('current_collector_id')
-		.eq('campaign_id', campaignId)
-		.in('current_collector_id', [...collectorIds])
-		.overrideTypes<{ current_collector_id: string }[], { merge: false }>();
-	if (error) return { data: null, error };
+	const results = await Promise.all(
+		collectorIds.map((collectorId) =>
+			supabase
+				.from('bonds')
+				.select('id', { count: 'exact', head: true })
+				.eq('campaign_id', campaignId)
+				.eq('current_collector_id', collectorId)
+				.overrideTypes<null, { merge: false }>()
+		)
+	);
 	const counts = new Map<string, number>();
-	for (const row of data ?? [])
-		counts.set(row.current_collector_id, (counts.get(row.current_collector_id) ?? 0) + 1);
+	for (const [i, result] of results.entries()) {
+		if (result.error) return { data: null, error: result.error };
+		counts.set(collectorIds[i], result.count ?? 0);
+	}
 	return { data: counts, error: null };
 }
 
-/** This campaign's bonds currently assigned to a collector. */
+/** Most assigned bonds the collector record lists (the total is always exact). */
+export const ASSIGNED_BONDS_LIMIT = 200;
+
+/** This campaign's bonds currently held by a collector, by number, with the exact total. */
 export async function listAssignedBondsForCollector(
 	supabase: SupabaseClient,
 	campaignId: string,
 	collectorId: string
-): Promise<RepositoryResult<{ id: string }[]>> {
-	const { data, error } = await supabase
-		.from('bonds')
-		.select('id')
+): Promise<RepositoryResult<{ items: BondListEntry[]; total: number }>> {
+	const { data, error, count } = await supabase
+		.from('bond_list')
+		.select(BOND_LIST_COLUMNS, { count: 'exact' })
 		.eq('campaign_id', campaignId)
 		.eq('current_collector_id', collectorId)
-		.order('created_at', { ascending: false })
-		.overrideTypes<{ id: string }[], { merge: false }>();
+		.order('sort_number', { ascending: true })
+		.limit(ASSIGNED_BONDS_LIMIT)
+		.overrideTypes<BondListRow[], { merge: false }>();
 	if (error) return { data: null, error };
-	return { data: data ?? [], error: null };
+	return {
+		data: { items: (data ?? []).map(mapBondListRow), total: count ?? data?.length ?? 0 },
+		error: null
+	};
+}
+
+/** A profile's display name, or null when it cannot be read (RLS) or does not exist. */
+export async function getProfileName(
+	supabase: SupabaseClient,
+	profileId: string
+): Promise<RepositoryResult<string | null>> {
+	const { data, error } = await supabase
+		.from('profiles')
+		.select('full_name, email')
+		.eq('id', profileId)
+		.maybeSingle()
+		.overrideTypes<{ full_name: string | null; email: string } | null, { merge: false }>();
+	if (error) return { data: null, error };
+	return { data: data ? data.full_name || data.email : null, error: null };
 }
 
 /**

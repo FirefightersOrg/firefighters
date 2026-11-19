@@ -30,10 +30,8 @@ function setup(
 		tables: {
 			campaigns: campaign,
 			collectors: { data: [collectorRow()], error: null, count: 1 },
-			bonds: {
-				data: [{ current_collector_id: COLLECTOR_ID }, { current_collector_id: COLLECTOR_ID }],
-				error: null
-			}
+			// An exact head count per collector (never rows counted in JS: max_rows would cap them).
+			bonds: { data: null, error: null, count: 2 }
 		}
 	});
 	return { ...mock, locals: makeLocals({ supabase: mock.supabase, permissions }) };
@@ -73,6 +71,8 @@ describe('/campaigns/[id]/collectors load', () => {
 		expect(chains.collectors[0].or).toHaveBeenCalledTimes(2);
 		expect(chains.collectors[0].range).toHaveBeenCalledWith(25, 49);
 		expect(chains.bonds[0].eq).toHaveBeenCalledWith('campaign_id', CAMPAIGN_ID);
+		expect(chains.bonds[0].eq).toHaveBeenCalledWith('current_collector_id', COLLECTOR_ID);
+		expect(chains.bonds[0].select).toHaveBeenCalledWith('id', { count: 'exact', head: true });
 		expect(data?.collectors[0]).toMatchObject({ displayName: 'Ada Collector', assignedBonds: 2 });
 		expect(data?.query).toEqual({ q: 'Ada Collector', status: 'active' });
 	});
