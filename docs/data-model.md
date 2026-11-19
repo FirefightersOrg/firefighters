@@ -14,6 +14,21 @@ Define the conceptual relational model for the MVP. Names are preliminary and mu
 - Separate internal value from visible format in bond numbers.
 - Maintain configurable rules per campaign.
 
+## Function privileges
+
+Since `20261202000000_revoke_default_function_execute.sql` (SAN-102), a function that a migration creates is executable only by its owner (`postgres`). Its default privileges no longer grant `EXECUTE` to `PUBLIC` (in any schema) or to `anon`, `authenticated` and `service_role` (in `public`). An RPC the app calls is unreachable until the migration grants it:
+
+```sql
+grant execute on function public.my_rpc(uuid, text) to authenticated;
+```
+
+- Every new RPC needs an explicit `grant execute ... to authenticated` (or `to service_role` for server-only functions). Internal helpers and trigger functions get no grant: triggers and `SECURITY DEFINER` callers do not need one.
+- Keep the explicit `revoke all on function ... from public, anon, authenticated, service_role` before the grant anyway. It documents intent and keeps working if the function already existed with other privileges (`create or replace` keeps the old ACL).
+- Functions created before this migration keep the ACLs their migrations set.
+- Only `postgres`'s defaults are changed. Migrations run as `postgres`, which cannot change `supabase_admin`'s defaults, so functions created by `supabase_admin` (platform internals, extensions) keep the platform defaults.
+- pgTAP helpers in `pg_temp` are also created without `PUBLIC` `EXECUTE`. Grant them to the roles the test switches to (`grant execute on function pg_temp.act_as(int) to authenticated, anon;`).
+- pgTAP `018_default_function_privileges.test.sql` checks the default ACLs and that a new function cannot be called without a grant.
+
 ## Main entities
 
 ### campaigns
