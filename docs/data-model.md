@@ -454,8 +454,10 @@ Implemented in SAN-62 (`20261214000000_payments_settlements.sql`):
   foreign keys). Its amount, method, date, sale, buyer and collector are immutable; corrections
   annul the payment and create a replacement.
 - New payments are `draft` or `pending_in_settlement`; transitions are `draft ->
-pending_in_settlement -> confirmed|annulled` and `confirmed -> annulled|adjusted`. Annulment
-  requires actor, timestamp and a trimmed non-blank reason.
+ pending_in_settlement -> confirmed|annulled` and `confirmed -> annulled|adjusted`. Annulment
+  requires actor, timestamp and a trimmed non-blank reason. Drafts have no settlement, while
+  pending payments require an open settlement of their collector; confirmed payments retain it.
+- Payment dates default to the current date in `America/Argentina/Buenos_Aires`.
 - Payments are applied to installments through `payment_installments`. An application must target
   the active payment plan of the payment's sale, is immutable, and non-annulled applications can
   never exceed the installment amount.
@@ -502,7 +504,7 @@ Rule:
 Implemented in SAN-62:
 
 - Settlement numbers are unique per campaign; a settlement is tied to one collector and campaign.
-  Totals are non-negative, notes are trimmed non-blank text of at most 2,000 characters, and
+  Totals are non-negative and `total_amount` equals `total_cash + total_transfer`; notes are trimmed non-blank text of at most 2,000 characters, and
   changes to totals are permitted only while it is `open`. The SAN-63 write functions compute
   settlement totals from payments and applications; users do not enter totals.
 - Statuses follow `open -> closed|annulled` and `closed -> corrected`; closing records `closed_at`

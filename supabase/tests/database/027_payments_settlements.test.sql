@@ -1,6 +1,6 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
-select plan(77);
+select plan(82);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
 insert into public.user_roles(user_id,role_id) select p.id,r.id from (values ('b6270000-0000-0000-0000-000000000001'::uuid,'admin'),('b6270000-0000-0000-0000-000000000002'::uuid,'operator'),('b6270000-0000-0000-0000-000000000003'::uuid,'treasurer'),('b6270000-0000-0000-0000-000000000004'::uuid,'read-only'),('b6270000-0000-0000-0000-000000000005'::uuid,'collector'))p(id,n) join public.roles r on r.name=p.n;
@@ -20,6 +20,13 @@ with x as (insert into public.settlements(campaign_id,settlement_number,collecto
 select columns_are('public','settlements',array['id','campaign_id','settlement_number','collector_id','status','opened_at','closed_at','created_by','closed_by','total_cash','total_transfer','total_amount','commission_amount','commission_paid_amount','net_to_firefighters','notes','updated_at'],'settlement columns');
 select columns_are('public','payments',array['id','campaign_id','sale_id','collector_id','buyer_id','settlement_id','amount','payment_method','payment_date','status','created_by','created_at','updated_at','annulled_by','annulled_at','annulment_reason'],'payment columns');
 select columns_are('public','payment_installments',array['payment_id','installment_id','amount_applied'],'application columns');
+select ok((
+  select pg_get_expr(ad.adbin, ad.adrelid) like '%America/Argentina/Buenos_Aires%'
+  from pg_attrdef ad join pg_attribute a on a.attrelid = ad.adrelid and a.attnum = ad.adnum
+  where ad.adrelid = 'public.payments'::regclass and a.attname = 'payment_date'
+),
+  'payment date defaults in Buenos Aires'
+);
 select fk_ok('public','payments',array['sale_id','campaign_id'],'public','sales',array['id','campaign_id'],'payment sale campaign FK');
 select fk_ok('public','payments',array['settlement_id','campaign_id'],'public','settlements',array['id','campaign_id'],'payment settlement campaign FK');
 select fk_ok('public','payments','buyer_id','public','buyers','id','payment buyer FK');
@@ -28,6 +35,7 @@ select col_is_unique('public','settlements',array['campaign_id','settlement_numb
 select col_is_pk('public','payment_installments',array['payment_id','installment_id'],'application composite PK');
 select throws_ok($$insert into public.settlements(campaign_id,settlement_number,collector_id,created_by) values(pg_temp.id('c'),0,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001')$$,'23514',null,'number positive');
 select throws_ok($$insert into public.settlements(campaign_id,settlement_number,collector_id,created_by,total_cash) values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001',-1)$$,'23514',null,'totals nonnegative');
+select throws_ok($$insert into public.settlements(campaign_id,settlement_number,collector_id,created_by,total_cash,total_transfer,total_amount) values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001',1,2,2)$$,'23514',null,'total amount equals cash plus transfer');
 select throws_ok($$insert into public.settlements(campaign_id,settlement_number,collector_id,created_by,notes) values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001',' ')$$,'23514',null,'notes not blank');
 select throws_ok($$insert into public.settlements(campaign_id,settlement_number,collector_id,created_by,status) values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001','closed')$$,'23514',null,'new settlement open');
 select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,amount,payment_method,created_by) values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),0,'cash','b6270000-0000-0000-0000-000000000001')$$,'23514',null,'payment positive');
@@ -47,10 +55,21 @@ select lives_ok($$update public.settlements set status='closed',closed_at=now(),
 select lives_ok($$update public.settlements set status='corrected' where id=pg_temp.id('set')$$,'closed corrects');
 select throws_ok($$update public.settlements set total_cash=1 where id=pg_temp.id('set')$$,'23001',null,'corrected totals immutable');
 select throws_ok($$update public.settlements set status='open' where id=pg_temp.id('set')$$,'23514',null,'corrected final');
+with x as (insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
+  values(pg_temp.id('c'),5,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id)
+insert into ids select 'transition_set', id from x;
 with x as (insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,amount,payment_method,created_by) values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),50,'transfer','b6270000-0000-0000-0000-000000000001') returning id) insert into ids select 'draft',id from x;
 select lives_ok($$insert into public.payment_installments values(pg_temp.id('draft'),pg_temp.id('i1'),50)$$,'active sale plan application');
 select throws_ok($$insert into public.payment_installments values(pg_temp.id('pay'),pg_temp.id('i1'),1)$$,'23514',null,'over application refused');
 select throws_ok($$update public.payment_installments set amount_applied=1 where payment_id=pg_temp.id('draft')$$,'23001',null,'applications immutable');
+select throws_ok($$update public.payments set settlement_id=pg_temp.id('transition_set') where id=pg_temp.id('draft')$$,
+  '23514','pending payment settlement is inconsistent','draft payment cannot gain a settlement');
+select lives_ok($$update public.payments set settlement_id=pg_temp.id('transition_set'),status='pending_in_settlement' where id=pg_temp.id('draft')$$,
+  'draft payment enters a settlement in one update');
+select lives_ok($$update public.payments set status='confirmed' where id=pg_temp.id('draft')$$,
+  'pending payment confirms after entering settlement');
+select is((select settlement_id from public.payments where id=pg_temp.id('draft')),pg_temp.id('transition_set'),
+  'confirmed payment keeps its settlement');
 select throws_ok($$delete from public.payment_installments where payment_id=pg_temp.id('draft')$$,'23001',null,'applications never deleted');
 select throws_ok($$delete from public.payments where id=pg_temp.id('draft')$$,'23001',null,'payments never deleted');
 select throws_ok($$delete from public.settlements where id=pg_temp.id('set')$$,'23001',null,'settlements never deleted');
@@ -82,9 +101,9 @@ set local role authenticated;
 select pg_temp.act_as(2);
 select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,amount,payment_method,created_by) values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),1,'cash','b6270000-0000-0000-0000-000000000002')$$,'42501',null,'payment create cannot directly insert');
 select is((select count(*)::int from public.payments),2,'operator reads payments');
-select is((select count(*)::int from public.settlements),1,'operator reads settlements');
+select is((select count(*)::int from public.settlements),2,'operator reads settlements');
 select pg_temp.act_as(1); select is((select count(*)::int from public.payments),2,'admin reads payments');
-select pg_temp.act_as(3); select is((select count(*)::int from public.settlements),1,'treasurer reads settlements');
+select pg_temp.act_as(3); select is((select count(*)::int from public.settlements),2,'treasurer reads settlements');
 select pg_temp.act_as(4); select is((select count(*)::int from public.payments),0,'read-only cannot read payments');
 select pg_temp.act_as(5); select is((select count(*)::int from public.payments),2,'collector reads own payments');
 select is((select count(*)::int from public.payment_installments),1,'collector reads own applications');
@@ -105,10 +124,8 @@ select lives_ok($$insert into public.payment_installments(payment_id,installment
   'a payment applies up to its amount');
 select throws_ok($$insert into public.payment_installments(payment_id,installment_id,amount_applied) values(pg_temp.id('small'),pg_temp.id('i1'),1)$$,
   '23514','payment applications exceed the payment amount','a payment never applies more than its own amount');
-select ok(lower(pg_get_functiondef('public.payments_check_settlement(uuid,uuid)'::regprocedure)) like '%for share%',
-  'settlement admission locks the open settlement against close or annul');
-select throws_ok($$update public.payments set status='pending_in_settlement' where id=pg_temp.id('draft')$$,
-  '23514','a pending payment requires a settlement','draft cannot become pending without a settlement');
+select throws_ok($$update public.payments set status='pending_in_settlement' where id=pg_temp.id('small')$$,
+  '23514','pending payment settlement is inconsistent','draft cannot become pending without a settlement');
 with x as (
   insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
   values(pg_temp.id('c'),2,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id

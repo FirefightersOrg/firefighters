@@ -28,6 +28,7 @@ create table public.settlements (
     total_cash >= 0 and total_transfer >= 0 and total_amount >= 0 and commission_amount >= 0
     and commission_paid_amount >= 0 and net_to_firefighters >= 0
   ),
+  constraint settlements_total_amount_sum check (total_amount = total_cash + total_transfer),
   constraint settlements_notes_format check (notes is null or (notes = btrim(notes) and notes <> '' and length(notes) <= 2000)),
   constraint settlements_closing_consistent check (
     (status in ('closed', 'corrected') and closed_at is not null and closed_by is not null)
@@ -44,7 +45,7 @@ create table public.payments (
   settlement_id uuid,
   amount numeric(12,2) not null,
   payment_method text not null,
-  payment_date date not null default current_date,
+  payment_date date not null default (now() at time zone 'America/Argentina/Buenos_Aires')::date,
   status text not null default 'draft',
   created_by uuid not null references public.profiles (id) on delete restrict,
   created_at timestamptz not null default now(),
@@ -153,8 +154,9 @@ begin
     (old.status = 'pending_in_settlement' and new.status in ('confirmed', 'annulled')) or
     (old.status = 'confirmed' and new.status in ('annulled', 'adjusted'))
   ) then raise exception 'payment status cannot go from % to %', old.status, new.status using errcode = 'check_violation'; end if;
-  if new.status = 'pending_in_settlement' and new.settlement_id is null then
-    raise exception 'a pending payment requires a settlement' using errcode = 'check_violation';
+  if new.status in ('draft', 'pending_in_settlement')
+     and (new.status = 'pending_in_settlement') is distinct from (new.settlement_id is not null) then
+    raise exception 'pending payment settlement is inconsistent' using errcode = 'check_violation';
   end if;
   if old.status <> 'draft' and new.settlement_id is distinct from old.settlement_id then
     raise exception 'payment settlement is immutable after draft' using errcode = 'restrict_violation';
