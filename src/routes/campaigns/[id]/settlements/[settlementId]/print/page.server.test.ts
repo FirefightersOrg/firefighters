@@ -31,7 +31,7 @@ const event = (locals: App.Locals, settlementId = ID) =>
 		params: { id: CAMPAIGN_ID, settlementId },
 		url: new URL(`http://localhost/campaigns/${CAMPAIGN_ID}/settlements/${settlementId}/print`)
 	}) as unknown as Parameters<typeof load>[0];
-const setup = (permissions = ['campaign.view', 'settlement.view']) =>
+const setup = (permissions: string[] | null = ['campaign.view', 'settlement.view']) =>
 	makeLocals({
 		supabase: mockSupabase({ tables: { campaigns: { data: campaignRow(), error: null } } })
 			.supabase,
@@ -44,6 +44,10 @@ describe('settlement print load', () => {
 	});
 	it('denies users without a settlement read permission', async () => {
 		await expect(load(event(setup(['campaign.view'])))).rejects.toMatchObject({ status: 403 });
+	});
+	it('returns 500 rather than 403 when permissions could not be loaded', async () => {
+		await expect(load(event(setup(null)))).rejects.toMatchObject({ status: 500 });
+		expect(getSettlementPrint).not.toHaveBeenCalled();
 	});
 	it('returns 404 for malformed or missing settlements', async () => {
 		await expect(load(event(setup(), 'bad'))).rejects.toMatchObject({ status: 404 });
