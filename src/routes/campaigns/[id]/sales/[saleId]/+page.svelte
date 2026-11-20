@@ -106,6 +106,13 @@
 									[buyer.firstName, buyer.lastName].filter(Boolean).join(' ')}</option
 							>{/each}</select
 					>
+					{#if (data.correction.buyersTotal ?? 0) > data.correction.buyers.length}<p
+							class="text-xs text-amber-800"
+							data-testid="buyers-truncated"
+						>
+							Showing the first {data.correction.buyers.length} of {data.correction.buyersTotal} buyers.
+							If the right buyer is missing, open their record from the buyers list.
+						</p>{/if}
 					<label class={labelClass} for="buyer-reason">Reason (max. 1000 Unicode characters)</label>
 					<textarea class={inputClass} id="buyer-reason" name="reason" required></textarea>
 					<button class={secondaryButtonClass}>Confirm buyer correction</button>

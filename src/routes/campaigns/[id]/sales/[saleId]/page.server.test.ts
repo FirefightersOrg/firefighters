@@ -86,6 +86,17 @@ const BUYER = 'b0000000-0000-4000-8000-000000000001';
 const COLLECTOR = 'c0000000-0000-4000-8000-000000000001';
 
 describe('sale correction actions', () => {
+	it('exposes the buyers total so the selector can warn when it is truncated', async () => {
+		vi.mocked(listBuyers).mockResolvedValueOnce({
+			data: { items: [{ id: BUYER, firstName: 'Ana' }], total: 750 },
+			error: null
+		} as never);
+		const data = (await load(event(['campaign.view', 'sale.view', 'sale.correct']) as never)) as {
+			correction: { buyers: unknown[]; buyersTotal: number };
+		};
+		expect(data.correction.buyersTotal).toBe(750);
+		expect(data.correction.buyers).toHaveLength(1);
+	});
 	it.each(['correctBuyer', 'correctCollector'] as const)(
 		'%s fails closed at 500 and denies missing permission at 403 before service work',
 		async (action) => {

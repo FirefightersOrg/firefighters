@@ -76,6 +76,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		correction: canCorrect
 			? {
 					buyers: buyers.data?.items ?? [],
+					/** More buyers exist than the selector shows (it lists the first 500). */
+					buyersTotal: buyers.data?.total ?? 0,
 					collectors: collectors.data ?? []
 				}
 			: null,

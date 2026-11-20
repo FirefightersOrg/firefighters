@@ -424,3 +424,15 @@ the `moved_payment_correction_guard` trigger refuses it (55000, shown as a 409 c
 message "This payment's sale was moved to another collector. Correct the sale collector back
 before annulling or correcting this payment."). Making payment corrections collector-aware is a
 follow-up.
+
+### Campaign audit viewer: performance and coverage (SAN-73 review)
+
+`/campaigns/[id]/audit` selects rows whose `entity_id` is the campaign or whose `old_value` /
+`new_value` snapshot carries `campaign_id`. Migration `20261221000000_audit_log_campaign_indexes.sql`
+adds one index per OR branch (`entity_id`, `old_value->>'campaign_id'`, `new_value->>'campaign_id'`)
+so the filter and its exact count use a BitmapOr instead of scanning `audit_log`.
+
+**Coverage limit (follow-up):** only rows whose snapshot includes `campaign_id` appear (all SAN-71/72
+corrections do; older audited actions such as bond or sale registration generally do not). Showing
+the full campaign history needs a `campaign_id` column on `audit_log` written by every audited
+function, and a backfill of existing rows.

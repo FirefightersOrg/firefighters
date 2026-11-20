@@ -51,4 +51,11 @@ describe('sale detail', () => {
 		expect(body).toContain('database');
 		expect(body).not.toContain('maxlength=');
 	});
+	it('warns when the buyer selector shows only part of the buyers', () => {
+		const buyers = [{ id: 'b1', firstName: 'Bea', lastName: 'Buyer', businessName: null }];
+		const truncated = page({ buyers, buyersTotal: 750, collectors: [] });
+		expect(truncated).toContain('data-testid="buyers-truncated"');
+		expect(truncated).toContain('Showing the first 1 of 750 buyers');
+		expect(page({ buyers, buyersTotal: 1, collectors: [] })).not.toContain('buyers-truncated');
+	});
 });
