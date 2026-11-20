@@ -1,0 +1,75 @@
+-- Post-restoration reconciliation (SAN-90, docs/backup-operations.md).
+--
+-- Read-only: only SELECTs. Run it against the production database (before the incident, or from
+-- the last good export) and against the restored database, then compare the outputs line by line.
+--
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -A -F $'\t' -f scripts/reconcile-backup.sql
+--
+-- Local check:
+--   docker exec -i supabase_db_firefighters psql -U postgres -v ON_ERROR_STOP=1 -X -A -F $'\t' \
+--     < scripts/reconcile-backup.sql
+--
+-- Sections 1-4 are totals per campaign (bonds, payments, settlements, collector balances).
+-- Section 5 lists integrity checks that must return zero rows. Section 6 is pending (Phase 11).
+
+\echo '== 1. bonds per campaign and commercial status (count, total_value)'
+select campaign_id, commercial_status, count(*) as bonds, coalesce(sum(total_value), 0)::text as total_value
+from public.bonds
+group by campaign_id, commercial_status
+order by campaign_id, commercial_status;
+
+\echo '== 2. payments per campaign and status (count, amount)'
+select campaign_id, status, count(*) as payments, coalesce(sum(amount), 0)::text as amount
+from public.payments
+group by campaign_id, status
+order by campaign_id, status;
+
+\echo '== 3. settlements per campaign and status (count, totals)'
+select campaign_id, status, count(*) as settlements,
+  coalesce(sum(total_cash), 0)::text as total_cash,
+  coalesce(sum(total_transfer), 0)::text as total_transfer,
+  coalesce(sum(total_amount), 0)::text as total_amount,
+  coalesce(sum(commission_amount), 0)::text as commission_amount,
+  coalesce(sum(commission_paid_amount), 0)::text as commission_paid_amount,
+  coalesce(sum(net_to_firefighters), 0)::text as net_to_firefighters
+from public.settlements
+group by campaign_id, status
+order by campaign_id, status;
+
+\echo '== 4. collector balances per campaign (credits - debits, annulled entries excluded)'
+select campaign_id, collector_id, count(*) as entries,
+  coalesce(sum(case when direction = 'collector_credit' then amount else -amount end), 0)::text as balance
+from public.collector_ledger_entries
+where status <> 'annulled'
+group by campaign_id, collector_id
+order by campaign_id, collector_id;
+
+\echo '== 5a. integrity: bonds with a sale-side collector/buyer that no longer exists (expect 0 rows)'
+select b.id as bond_id
+from public.bonds b
+left join public.collectors c on c.id = b.current_collector_id
+left join public.buyers y on y.id = b.current_buyer_id
+where (b.current_collector_id is not null and c.id is null)
+   or (b.current_buyer_id is not null and y.id is null);
+
+\echo '== 5b. integrity: payments whose settlement belongs to another collector (expect 0 rows)'
+select p.id as payment_id, p.settlement_id
+from public.payments p
+join public.settlements s on s.id = p.settlement_id
+where s.collector_id <> p.collector_id;
+
+\echo '== 5c. integrity: payment applications exceeding the payment amount (expect 0 rows)'
+select pi.payment_id, p.amount::text as payment_amount, sum(pi.amount_applied)::text as applied
+from public.payment_installments pi
+join public.payments p on p.id = pi.payment_id
+group by pi.payment_id, p.amount
+having sum(pi.amount_applied) > p.amount;
+
+\echo '== 5d. integrity: number of audit_log rows per entity type (compare with the source)'
+select entity_type, count(*) as rows
+from public.audit_log
+group by entity_type
+order by entity_type;
+
+\echo '== 6. frozen rosters: PENDING (Phase 11 tables do not exist yet; add the count per draw here)'
+-- TODO(SAN-90 follow-up): select draw_id, count(*) from the frozen roster table once it exists.

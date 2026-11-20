@@ -15,7 +15,7 @@ vi.mock('$lib/server/services/sales', async (o) => ({
 	registerSale: vi.fn()
 }));
 vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
-import { actions, firstDueDateBounds, load } from './+page.server';
+import { actions, _firstDueDateBounds as firstDueDateBounds, load } from './+page.server';
 import {
 	getBuyer,
 	getCollectorsByIds,
