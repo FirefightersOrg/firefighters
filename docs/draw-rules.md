@@ -133,3 +133,137 @@ Possible results:
   first. Simple bonds receive one; patas receive one per base. Capacity is checked first, so
   exhaustion raises a typed error and returns no partial assignment.
 - SAN-76 does not persist these assignments or generate/freeze rosters; SAN-77 owns both operations.
+
+## Implemented in SAN-77
+
+### Trusted writes and configuration
+
+- The new `20261224000000_draw_roster_services.sql` migration leaves SAN-75 unchanged.
+  `draw_generate_roster(draw_id, request_id)` returns the new roster UUID; it computes eligibility
+  inside the database and never accepts client-supplied entries or eligibility flags.
+  `draw_freeze_roster(draw_id, request_id)` returns void (the SAN-78 UI contract).
+- The scope also includes `draw_create` (UUID result), `draw_update` and `draw_annul` (void).
+  Create requires `draw.create` and a draft/active campaign. Update requires `draw.update`
+  and a draft/active campaign (55000 otherwise),
+  preserves draw type and only edits scheduled draws; changing the installment takes the campaign
+  lock before the draw lock and remains bounded by the campaign's installment count.
+- There is no `draw.annul` permission in `docs/permissions.md`, so annulment uses `draw.update`.
+  Only `scheduled -> annulled` is allowed, exactly as in `docs/state-machines.md` and SAN-75.
+  Generated/frozen draws cannot be annulled; no frozen history is changed or discarded.
+  Annulment has its own timestamp, actor and trimmed 1..1000-code-point reason.
+- Names are trimmed, nonblank and at most 200 Unicode code points. Configuration dates remain
+  date-only; the payment cutoff is a timestamp. Monthly configuration requires a positive
+  installment number. Eligibility configuration is a JSON object, as in SAN-75; final and
+  extraordinary draws always require the complete active plan regardless of installment setting.
+  Consolation configuration can be saved even though generation is currently unavailable,
+  but create/update reject a missing or invalid required installment with 22023 and an explicit
+  message. The positive integer can come from the column or the JSON rule; matching SAN-76,
+  `requiredInstallmentNumber` takes precedence over `required_installment_number`, then the
+  column. JSON null falls through; an invalid non-null rule does not silently fall back.
+- Every RPC uses `SECURITY DEFINER`, an empty search path, an active-profile permission check,
+  and exactly one audit row on success in the same transaction. Only authenticated callers get
+  EXECUTE; helpers are internal. Existing direct-write revocations and read RLS remain intact.
+  `draws.ts` and `draw-rosters.ts` require `{ requestId, permissions }`, fail closed before any
+  database call and explicitly map 42501/55000/22023/23514/P0002 to 403/409/400/400/404.
+
+### Participation, snapshots and lifecycle
+
+- Include all **currently reserved** base/associated numbers of the campaign, sold or unsold,
+  with an eligibility flag and stable SAN-76 reason code. This implements the requirement to show
+  both enabled and non-enabled numbers. Extraordinary reservations appear only in extraordinary
+  rosters. Released number rows are historical, not participants (including an annulled mistaken
+  load); they are excluded to avoid duplicate participating values after ordinary number reuse.
+  An annulled sale whose numbers remain reserved still appears as ineligible with `annulled`.
+- Active manual patas retain number ownership on their member bonds (the SAN-75 entry FK/guard
+  requires that physical owner). Their parent pata supplies the commercial status, active sale,
+  payment plan, buyer and collector; numbers and extra source-base links retain their physical
+  member ownership. Printed patas supply one extra per base; simple members of a manual pata
+  collectively supply one per parent base, without double counting the numberless parent.
+- Eligibility, commercial state, buyer and collector are materialized by one SQL statement.
+  Buyer snapshots contain id, first/last/business names, document number and tax id; collector
+  snapshots contain id, display name and linked profile id (collectors have no document column).
+  Missing parties produce JSON objects with null identity fields, never JSON null.
+- Coverage sums exact SQL numerics against every required active-plan installment, never the
+  installment's cached status. Only confirmed payment applications count; adjusted, annulled,
+  pending and draft payments do not. Monthly checks every installment 1..required; final and
+  extraordinary require a nonempty, fully covered plan, including a full-payment plan's one
+  installment. Reason precedence matches SAN-76: annulled, not sold, then payment coverage.
+- **Cutoff decision remains isolated:** `draw_payment_before_cutoff(status, payment_date, cutoff)`
+  is the sole predicate for qualifying payments. It compares `payment_date` with the Buenos Aires
+  calendar day of the cutoff, inclusively, and checks status at generation time. A confirmed
+  payment on that day counts even if its confirmation occurred later. The product question about
+  confirmation-timestamp semantics remains open; payments currently have no such timestamp.
+- Generation locks campaign FOR SHARE, draw FOR UPDATE, then existing rosters in UUID order.
+  Generation also requires the locked campaign to be draft/active (55000 for closing, closed
+  or annulled), before any extraordinary reservation or roster write. The existing campaign
+  lock stabilizes the status check; this review does not change lock acquisition order.
+  Regeneration is allowed only before freeze, supersedes previous generated rosters and preserves
+  all their entries. Freeze locks draw then the current generated roster; it never takes a
+  campaign lock after the draw lock. It sets freeze actor/time and `roster_frozen` atomically.
+  A repeated freeze of an already frozen roster is an idempotent no-op success (Santiago's
+  decision on #79): nothing changes and no audit row is written.
+  **Freeze decision (review 4642358561):** freezing an already generated roster remains allowed
+  after campaign closure. It seals the existing snapshot, does not recompute eligibility or
+  reserve numbers, and satisfies the documented requirement to freeze before winner loading.
+  No campaign lock/status gate is added to freeze; pgTAP proves closed-campaign freeze and audit.
+- Frozen rosters are immutable snapshots: later confirmations, payments and audited payment
+  corrections cannot update their entries. Tests compare **full entry rows**, including ids and
+  timestamps, after a late confirmation and an actual `payment_annul` correction.
+
+### Extraordinary reservations and concurrency
+
+- Eligible bonds are ordered by lowest base value, then effective bond UUID, and sources by base
+  value then base UUID. The allocator reserves the lowest free values in ascending order,
+  matching SAN-76. Capacity is checked before inserting anything; failure rolls back the whole
+  invocation, including roster status, reservations and audit.
+- **Campaign-wide reuse decision:** one immutable extraordinary row per source base is reused
+  on regeneration **and across later extraordinary draws in the same campaign**. No draw-specific
+  ownership is invented on `bond_numbers`. A unique source-base index backs this invariant.
+  Reused numbers remain visible as ineligible if that bond later fails payment eligibility.
+- Extraordinary allocation never reuses any historically reserved value, including released
+  values; existing ordinary bond creation can still reuse released ordinary numbers by its own
+  documented rules. Released extraordinary rows are never reactivated or replaced.
+- A campaign-specific transaction advisory lock (hash seed 77, distinct from financial seed 68)
+  serializes extraordinary allocators after the roster locks. Number insertion also uses the
+  existing bond-number guard's owner lock. These services do not acquire financial locks or
+  lower any ledger balance. Ordinary concurrent bond creation does not take the new advisory
+  lock: a uniqueness collision aborts generation with 55000 and asks the caller to retry,
+  without partial writes.
+  **Review 4642358564:** only the individual `bond_numbers` insertion has a
+  `unique_violation` handler. A uniqueness error elsewhere keeps SQLSTATE 23505 and its original
+  constraint message; pgTAP installs a fixture-only roster index and verifies that failure rolls
+  back supersession, creates no roster and writes no audit.
+- PostgreSQL UUID ordering is byte-order, matching SAN-76's merged `compareBinary` tie-breaker
+  for canonical UUIDs (no locale collation). The existing extraordinary integration parity
+  comparison still passes after merging the SAN-75/SAN-76 review fixes.
+- pgTAP uses two real dblink sessions calling the RPCs: freeze waits for generation, generation
+  waits for and refuses a committed freeze, and two different extraordinary draws serialize
+  allocation and reuse the same persisted extra without duplicates.
+
+### Known gap and verification
+
+- **Consolation generation deliberately fails closed with 55000:** “consolation rosters require
+  draw results (Phase 12): not available yet”. Neither SAN-75 nor SAN-76 persists previous winners
+  or exclusion flags. Adding a pretend winners table or silently assuming no prior wins would
+  grant incorrect eligibility; winner storage belongs to Phase 12, not SAN-78 (UI).
+  Enable generation only when authoritative previous-result storage exists, then apply SAN-76's
+  `already_won` precedence and configured required-installment rule. The pure TS consolation
+  evaluator remains unchanged and available for preview with explicit previous-win snapshots.
+  The SQL evaluator includes the same `missing_required_installment` reason for legacy missing
+  consolation configuration, using the shared SQL resolver also used by create/update validation.
+  This reason branch remains unreachable through roster generation while the Phase 12 gate is
+  in place; no claim of end-to-end consolation parity is made without authoritative winners.
+- `038_draw_roster_services.test.sql` covers exact monthly/final/extraordinary rows and reasons,
+  the consolation refusal, identity snapshots, base-linked deterministic extras, regeneration,
+  exhaustion rollback, freeze and history guards, late confirmation/correction independence,
+  permission denials with unchanged state/no audit, audited configuration writes, direct-write
+  privileges and real concurrency.
+- The integration suite uses real admin/read-only users and signed-in admin financial reads.
+  Draw configuration is created through the new service, not privileged fixture DML. It compares
+  TS and SQL eligibility on the same persisted plans/payments for monthly/final/extraordinary
+  draws, compares extraordinary assignments, generates/freezes through the services and proves
+  that forged TS permissions cannot bypass database authorization.
+- Validation: clean local reset followed by `supabase test db` **before** seeding/integration:
+  38 database files / 2475 assertions passed (038 plan: 152); `pnpm test:integration`:
+  23 files / 192 tests passed; `pnpm check`: 0 errors / 0 warnings; `pnpm lint`: passed;
+  `pnpm test`: 121 files / 1577 tests passed.
