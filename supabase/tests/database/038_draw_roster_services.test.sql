@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(152);
+select plan(153);
 insert into auth.users(id,email)
 select ('a6380000-0000-0000-0000-00000000000'||n)::uuid,'roster-'||n||'@example.com' from generate_series(1,2)n;
 insert into public.profiles(id,auth_user_id,full_name,email,status)
@@ -113,7 +113,9 @@ select lives_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-fr
 select is((select status from public.draws where id=pg_temp.id('monthly')),'roster_frozen','draw frozen');
 select ok((select status='frozen' and frozen_at is not null and frozen_by='b6380000-0000-0000-0000-000000000001'::uuid from public.draw_rosters where id=pg_temp.id('r-monthly')),'freeze metadata');
 select throws_ok($$select public.draw_generate_roster(pg_temp.id('monthly'),'038-after-freeze')$$,'55000',null,'generation after freeze refused');
-select throws_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-freeze-twice')$$,'55000',null,'double freeze refused without duplicate audit');
+create temp table freeze_before as select to_jsonb(r) as row from public.draw_rosters r where r.draw_id=pg_temp.id('monthly') and r.status='frozen';
+select lives_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-freeze-twice')$$,'repeated freeze is an idempotent no-op');
+select is((select to_jsonb(r) from public.draw_rosters r where r.draw_id=pg_temp.id('monthly') and r.status='frozen'),(select row from freeze_before),'repeated freeze leaves the frozen roster identical');
 reset role;
 create temp table frozen_before as select * from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-monthly');
 update public.payments set status='confirmed' where id=pg_temp.id('pay3');

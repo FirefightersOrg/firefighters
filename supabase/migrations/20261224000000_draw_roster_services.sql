@@ -188,6 +188,12 @@ begin
   if p_draw_id is null then raise exception 'draw id is required' using errcode = '22023'; end if;
   select * into v_draw from public.draws where id = p_draw_id for update;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
+  -- Idempotent (Santiago's decision on #79): freezing an already frozen roster is a no-op
+  -- success. Nothing changes and no audit row is written.
+  if v_draw.status = 'roster_frozen'
+    and exists (select 1 from public.draw_rosters where draw_id = p_draw_id and status = 'frozen') then
+    return;
+  end if;
   if v_draw.status <> 'roster_generated' then
     raise exception 'draw must have a generated roster' using errcode = '55000';
   end if;

@@ -200,7 +200,8 @@ Possible results:
   Regeneration is allowed only before freeze, supersedes previous generated rosters and preserves
   all their entries. Freeze locks draw then the current generated roster; it never takes a
   campaign lock after the draw lock. It sets freeze actor/time and `roster_frozen` atomically.
-  A second freeze is a 55000 conflict, not an idempotent success, and adds no audit row.
+  A repeated freeze of an already frozen roster is an idempotent no-op success (Santiago's
+  decision on #79): nothing changes and no audit row is written.
   **Freeze decision (review 4642358561):** freezing an already generated roster remains allowed
   after campaign closure. It seals the existing snapshot, does not recompute eligibility or
   reserve numbers, and satisfies the documented requirement to freeze before winner loading.
