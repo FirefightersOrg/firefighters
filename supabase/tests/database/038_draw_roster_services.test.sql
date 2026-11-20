@@ -84,7 +84,9 @@ select throws_ok($$select public.draw_freeze_roster(null,'038-invalid-freeze')$$
 select throws_ok($$select public.draw_generate_roster(gen_random_uuid(),'038-missing')$$,'P0002',null,'missing draw');
 select throws_ok($$select public.draw_freeze_roster(gen_random_uuid(),'038-missing-freeze')$$,'P0002',null,'freeze missing draw');
 select throws_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-too-early')$$,'55000',null,'freeze requires generation');
-select throws_ok($$select public.draw_generate_roster(pg_temp.id('consolation'),'038-consolation')$$,'55000','consolation rosters require draw results (Phase 12): not available yet','consolation fails closed without results');
+savepoint consolation_generation;
+select lives_ok($$select public.draw_generate_roster(pg_temp.id('consolation'),'038-consolation')$$,'consolation now generates with authoritative prize storage');
+rollback to savepoint consolation_generation;
 insert into ids values('r-monthly',public.draw_generate_roster(pg_temp.id('monthly'),'038-monthly'));
 select results_eq($$select number_value,eligible,ineligibility_reason from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-monthly') and number_value<100 order by number_value$$,
 $$select * from (values(10,true,null::text),(20,true,null::text),(30,false,'installments_not_covered'),(40,false,'installments_not_covered'),(50,false,'not_sold'),(60,false,'annulled'),(70,true,null::text),(71,true,null::text))v$$,'monthly exact base rows and reasons');

@@ -4,6 +4,7 @@ import {
 	createDraw,
 	updateDraw,
 	annulDraw,
+	completeDraw,
 	createDrawSchema,
 	updateDrawSchema,
 	annulDrawSchema
@@ -129,5 +130,35 @@ describe.each([
 		await expect(
 			run({ rpc } as unknown as SupabaseClient, { permissions: [permission], requestId: 'error' })
 		).rejects.toMatchObject({ status: 500 });
+	});
+});
+describe('completeDraw (SAN-123)', () => {
+	it('requires draw.update, fails closed and validates the id before any call', async () => {
+		const rpc = vi.fn();
+		const db = { rpc } as unknown as SupabaseClient;
+		await expect(
+			completeDraw(db, { drawId: id }, { permissions: ['draw.view'], requestId: 'r' })
+		).rejects.toMatchObject({ status: 403 });
+		await expect(
+			completeDraw(db, { drawId: id }, { permissions: null, requestId: 'r' } as never)
+		).rejects.toMatchObject({ status: 500 });
+		await expect(
+			completeDraw(db, { drawId: 'bad' }, { permissions: ['draw.update'], requestId: 'r' })
+		).rejects.toMatchObject({ status: 400 });
+		expect(rpc).not.toHaveBeenCalled();
+	});
+	it('calls draw_complete and maps 55000 to a 409 with the database message', async () => {
+		const rpc = vi
+			.fn()
+			.mockResolvedValueOnce({ data: null, error: null })
+			.mockResolvedValueOnce({
+				data: null,
+				error: { code: '55000', message: 'resolve every prize of the draw before completing it' }
+			});
+		const db = { rpc } as unknown as SupabaseClient;
+		const ctx = { permissions: ['draw.update'], requestId: 'req-1' };
+		await completeDraw(db, { drawId: id }, ctx);
+		expect(rpc).toHaveBeenCalledWith('draw_complete', { p_draw_id: id, p_request_id: 'req-1' });
+		await expect(completeDraw(db, { drawId: id }, ctx)).rejects.toMatchObject({ status: 409 });
 	});
 });

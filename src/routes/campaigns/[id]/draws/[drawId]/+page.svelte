@@ -139,6 +139,29 @@
 				><button class="{primaryButtonClass} mt-3">Freeze roster</button>
 			</form>{/if}
 	</section>
+	<section class={cardClass}>
+		<h2 class="font-semibold">Winners and prizes</h2>
+		<p class="mt-2 text-sm">
+			Configure prizes, load winning numbers and record delivery.
+			<a
+				class="text-blue-700 underline"
+				href={resolve('/campaigns/[id]/draws/[drawId]/winners', {
+					id: data.campaign.id,
+					drawId: data.draw.id
+				})}>Manage winners and prizes</a
+			>
+		</p>
+	</section>
+	{#if data.can.complete}<section class={cardClass}>
+			<h2 class="font-semibold">Complete draw</h2>
+			<p class="mt-1 text-sm text-slate-600">
+				Every prize must be resolved (awarded or unawarded) first. Pending deliveries can still be
+				recorded after completion.
+			</p>
+			<form method="POST" action="?/complete" class="mt-3">
+				<button class={secondaryButtonClass}>Complete draw</button>
+			</form>
+		</section>{/if}
 	{#if data.can.annul}<details class="{cardClass} border-red-200">
 			<summary class="cursor-pointer font-semibold text-red-700">Annul draw</summary>
 			<form method="POST" action="?/annul" class="mt-3">

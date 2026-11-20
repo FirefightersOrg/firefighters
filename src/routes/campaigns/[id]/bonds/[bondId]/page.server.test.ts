@@ -81,6 +81,7 @@ function setup(
 		groups?: QueryResult;
 		bondList?: QueryResult;
 		audit?: QueryResult;
+		prizes?: QueryResult;
 		rpc?: QueryResult;
 		permissions?: string[];
 	} = {}
@@ -95,7 +96,8 @@ function setup(
 			},
 			bond_groups: options.groups ?? { data: [], error: null },
 			bond_list: options.bondList ?? { data: [], error: null },
-			audit_log: options.audit ?? { data: [], error: null }
+			audit_log: options.audit ?? { data: [], error: null },
+			prize_awards: options.prizes ?? { data: [], error: null }
 		},
 		rpc: options.rpc ?? { data: null, error: null }
 	});
@@ -213,6 +215,41 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				'00068',
 				'48778'
 			]);
+		});
+
+		it('loads prizes won by this bond when prize reads are allowed', async () => {
+			const { locals, chains } = setup({
+				permissions: [...ADMIN, 'draw.view'],
+				prizes: {
+					data: [
+						{
+							id: 'award',
+							delivered_at: '2026-11-20T02:30:00+00:00',
+							prizes: {
+								id: 'prize',
+								name: 'Bike',
+								position: 1,
+								status: 'delivered',
+								draws: { id: 'draw', name: 'December', campaign_id: CAMPAIGN_ID }
+							}
+						}
+					],
+					error: null
+				}
+			});
+			const data = await load(loadEvent(locals));
+			expect(data?.prizes).toEqual([
+				{
+					id: 'prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Bike',
+					position: 1,
+					status: 'delivered',
+					deliveredAt: '2026-11-20T02:30:00+00:00'
+				}
+			]);
+			expect(chains.prize_awards[0].eq).toHaveBeenCalledWith('bond_id', BOND_ID);
 		});
 
 		it('explains that a bond cannot be annulled once the campaign is closed', async () => {
