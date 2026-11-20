@@ -113,3 +113,23 @@ Possible results:
 - Prize not awarded for not meeting draw rule.
 - No matching number.
 - Pending review.
+
+## Implemented in SAN-76
+
+- `src/lib/domain/draw-eligibility.ts` evaluates the four draw types from plain snapshots. It
+  only counts `confirmed` payments and sums applications in integer cents.
+- Payments have a Buenos Aires calendar `payment_date` but no confirmation timestamp. Eligibility
+  therefore compares that date (not `created_at`) with the Buenos Aires calendar day containing
+  `payment_cutoff_at`; the cutoff day is inclusive.
+- Monthly eligibility covers every installment from 1 through the required number. Extraordinary
+  and final eligibility require every plan installment to be fully covered; this treats a
+  `full_payment` plan's single installment and a fully covered installment plan consistently.
+- Consolation uses its configured required installment when present, otherwise the draw's required
+  installment, and excludes any previous win marked as excluding from consolation.
+- Ineligibility is returned as a stable code; English and Spanish label maps are separate from the
+  frozen value.
+- Extraordinary numbers are deterministic: eligible bonds are ordered by lowest base number and
+  then bond id, each pata's bases by value and id, and the lowest free campaign values are assigned
+  first. Simple bonds receive one; patas receive one per base. Capacity is checked first, so
+  exhaustion raises a typed error and returns no partial assignment.
+- SAN-76 does not persist these assignments or generate/freeze rosters; SAN-77 owns both operations.
