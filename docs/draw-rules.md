@@ -483,3 +483,30 @@ Review resolutions (PR #89):
   result was `Business 20261120172700-be8f7ada`, not a roster side effect.
   An unchanged full-suite rerun passed all 210 tests. That pre-existing fixture
   flake is outside this SQL lock follow-up and remains unfixed.
+
+## Implemented in SAN-82
+
+- `/campaigns/[id]/draws/[drawId]/winners` is the prize operations screen and is linked from
+  draw detail. It keeps configuration, load, resolution, delivery and correction controls
+  permission- and state-aware, while every action repeats the permission check and verifies
+  form-supplied prize IDs belong to the route draw before calling a service.
+- A successful winning-number submission reads the persisted result back immediately. The UI
+  formats the number with campaign padding and displays the frozen roster's real buyer and
+  collector snapshot keys, bond, eligibility, exact ineligibility label and whether resolution
+  is pending or the prize is unawarded. No current-party data is substituted for the snapshot.
+- Prize reads use the signed-in RLS client. Lists are fetched in deterministic 500-row
+  PostgREST pages so records beyond the 1,000-row default are not omitted. Missing prize lookups
+  preserve the repository `{ data: null, error: null }` contract.
+- Bond and buyer records list awards for their respective persisted `bond_id` / `buyer_id`.
+  Delivery timestamps are converted as instants to `America/Argentina/Buenos_Aires`; date-only
+  draw fields remain unchanged.
+- Correction follows SAN-81's replacement model: an annulled prize offers a prefilled create
+  form at the same position. Delivered prizes show the SAN-81 explanation and no annul control.
+  Textareas deliberately have no native `maxlength`; server and service validation count Unicode
+  code points.
+- Decision: prize history is visible only with a capability accepted by prize read RLS
+  (`draw.view`, `draw.load_winner`, or a prize action). A bond/buyer reader without one sees an
+  explicit permission message rather than causing an RLS query failure.
+- Known gaps are unchanged: **SAN-117** extraordinary-number release remains out of scope, and
+  **SAN-81** still forbids annulment of delivered prizes pending a product decision. No new
+  integration test or database change was required by this UI-only phase.
