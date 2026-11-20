@@ -33,6 +33,22 @@ export function mapPrizeRpcError(error: { code?: string; message?: string }) {
 		case '42501':
 			return new PrizeServiceError('permission', 'Prize permission is required.');
 		case '55000':
+			return new PrizeServiceError(
+				'conflict',
+				(
+					{
+						'this prize already has a loaded winning number':
+							'This prize already has a loaded winning number.',
+						'a delivered prize cannot be annulled; pending product decision':
+							'A delivered prize cannot be annulled; pending product decision.',
+						'completed draws cannot configure prizes': 'Completed draws cannot configure prizes.',
+						'previous draws of the campaign have unresolved prizes that exclude from consolation':
+							'Previous draws of the campaign have unresolved prizes that exclude from consolation.'
+					} as Record<string, string>
+				)[error.message ?? ''] ||
+					error.message ||
+					'Prize state conflicts.'
+			);
 		case '23505':
 			return new PrizeServiceError(
 				'conflict',
@@ -189,7 +205,7 @@ export function annulPrize(
 	input: AnnulPrizeInput,
 	ctx: PrizeRequestContext
 ) {
-	return write(client, input, ctx, 'prize.resolve', annulPrizeSchema, 'prize_annul', (p) => ({
+	return write(client, input, ctx, 'prize.annul', annulPrizeSchema, 'prize_annul', (p) => ({
 		p_prize_id: p.prizeId,
 		p_reason: p.reason
 	})).then(() => undefined);

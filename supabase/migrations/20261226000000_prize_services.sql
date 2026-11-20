@@ -1,5 +1,10 @@
 -- SAN-81. Corrections retain the immutable winning-number snapshot and replace the
 -- prize (including its position). A void result is identified by its annulled parent.
+insert into public.permissions(code,description)
+values ('prize.annul','Annul an undelivered prize.');
+insert into public.role_permissions(role_id,permission_id)
+select r.id,p.id from public.roles r cross join public.permissions p
+where r.name = 'admin' and p.code = 'prize.annul';
 alter table public.prizes drop constraint prizes_draw_id_position_key;
 create unique index prizes_active_position on public.prizes(draw_id,position) where status <> 'annulled';
 create index prizes_draw_idx on public.prizes(draw_id);
@@ -106,7 +111,9 @@ create function public.prize_create(p_draw_id uuid,p_name text,p_description tex
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare actor uuid := public.bond_require_actor('draw.update'); p public.prizes;
 begin
-  perform public.prize_lock_draw(p_draw_id);
+  if (public.prize_lock_draw(p_draw_id)).status = 'completed' then
+    raise exception 'completed draws cannot configure prizes' using errcode = '55000';
+  end if;
   perform public.prize_validate_text(p_name,200,true);
   perform public.prize_validate_text(p_description,1000,false);
   if p_position is null or p_position < 1 or p_excludes_from_consolation is null then
@@ -124,6 +131,9 @@ returns void language plpgsql security definer set search_path = '' as $$
 declare actor uuid := public.bond_require_actor('draw.update'); old_p public.prizes; p public.prizes;
 begin
   old_p := public.prize_lock(p_prize_id);
+  if (select status from public.draws where id = old_p.draw_id) = 'completed' then
+    raise exception 'completed draws cannot configure prizes' using errcode = '55000';
+  end if;
   if old_p.status <> 'pending_validation' then
     raise exception 'only pending prizes can be edited' using errcode = '55000';
   end if;
@@ -144,6 +154,9 @@ declare actor uuid := public.bond_require_actor('draw.load_winner');
   old_p public.prizes; p public.prizes; e public.draw_roster_entries; w uuid; result text; maximum integer;
 begin
   old_p := public.prize_lock(p_prize_id);
+  if exists(select 1 from public.winning_numbers where prize_id = p_prize_id) then
+    raise exception 'this prize already has a loaded winning number' using errcode = '55000';
+  end if;
   if old_p.status <> 'pending_validation'
     or (select status from public.draws where id = old_p.draw_id) <> 'roster_frozen' then
     raise exception 'winning numbers require a pending prize and frozen draw' using errcode = '55000';
@@ -220,12 +233,17 @@ begin
 end $$;
 create function public.prize_annul(p_prize_id uuid,p_reason text,p_request_id text default null)
 returns void language plpgsql security definer set search_path = '' as $$
-declare actor uuid := public.bond_require_actor('prize.resolve'); old_p public.prizes; p public.prizes;
+declare actor uuid := public.bond_require_actor('prize.annul'); old_p public.prizes; p public.prizes;
   previous_flag text := current_setting('app.prize_annul',true);
   previous_snapshot jsonb; next_snapshot jsonb; campaign uuid;
 begin
   old_p := public.prize_lock(p_prize_id);
-  if old_p.status = 'annulled' then raise exception 'prize already annulled' using errcode = '55000'; end if;
+  if old_p.status = 'delivered' then
+    raise exception 'a delivered prize cannot be annulled; pending product decision' using errcode = '55000';
+  end if;
+  if old_p.status not in ('pending_validation','awarded','pending_delivery','unawarded') then
+    raise exception 'prize already annulled' using errcode = '55000';
+  end if;
   perform public.prize_validate_text(p_reason,1000,true);
   select campaign_id into campaign from public.draws where id = old_p.draw_id;
   previous_snapshot := jsonb_build_object('prize',to_jsonb(old_p),
@@ -260,8 +278,26 @@ grant execute on function public.prize_create(uuid,text,text,integer,boolean,tex
   public.draw_load_winning_number(uuid,integer,text,text),public.prize_resolve(uuid,text,text,text),
   public.prize_deliver(uuid,text,text),public.prize_annul(uuid,text,text) to authenticated;
 
--- SAN-77 generator, unchanged except authoritative previous-win evaluation and
--- consolation installment coverage. Cutoff remains in draw_payment_before_cutoff.
+-- SAN-77 generator adds authoritative previous-win evaluation, resolved-prize
+-- admission and campaign serialization. Cutoff remains in draw_payment_before_cutoff.
+-- Caller holds the campaign UPDATE lock before locking the target draw. This
+-- excludes concurrent prize mutations (campaign SHARE), including new prizes.
+create function public.draw_require_resolved_prizes(p_draw public.draws)
+returns void language plpgsql set search_path = '' as $$
+begin
+  if p_draw.draw_type = 'consolation' and exists (
+    select 1 from public.draws prior join public.prizes p on p.draw_id = prior.id
+    where prior.campaign_id = p_draw.campaign_id and prior.status <> 'annulled'
+      and (prior.draw_date,prior.created_at,prior.id) < (p_draw.draw_date,p_draw.created_at,p_draw.id)
+      and p.excludes_from_consolation and p.status = 'pending_validation'
+  ) then
+    raise exception 'previous draws of the campaign have unresolved prizes that exclude from consolation'
+      using errcode = '55000';
+  end if;
+end $$;
+revoke all on function public.draw_require_resolved_prizes(public.draws)
+  from public,anon,authenticated,service_role;
+
 create or replace function public.draw_generate_roster(p_draw_id uuid, p_request_id text default null)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
@@ -284,11 +320,12 @@ begin
   select campaign_id into v_campaign from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
   select max_number,status into v_max,v_campaign_status
-    from public.campaigns where id = v_campaign for share;
+    from public.campaigns where id = v_campaign for update;
   if v_campaign_status not in ('draft','active') then
     raise exception 'draws require a draft or active campaign' using errcode = '55000';
   end if;
   select * into v_draw from public.draws where id = p_draw_id for update;
+  perform public.draw_require_resolved_prizes(v_draw);
   perform 1 from public.draw_rosters where draw_id = p_draw_id order by id for update;
   if v_draw.status not in ('scheduled','roster_generated')
     or exists (select 1 from public.draw_rosters where draw_id = p_draw_id and status = 'frozen') then
@@ -317,7 +354,7 @@ begin
         join public.draws prior on prior.id = pr.draw_id
         left join public.bond_groups wg on wg.member_bond_id = a.bond_id and wg.ungrouped_at is null
         where a.status in ('awarded','delivered') and pr.status <> 'annulled'
-          and pr.excludes_from_consolation and prior.campaign_id = v_campaign
+          and pr.excludes_from_consolation and prior.campaign_id = v_campaign and prior.status <> 'annulled'
           and (prior.draw_date,prior.created_at,prior.id) < (v_draw.draw_date,v_draw.created_at,v_draw.id)
           and coalesce(wg.pata_bond_id,a.bond_id) = p.effective_bond_id) as already_won,
       (select count(*) > 0 and bool_and(coalesce((
@@ -411,3 +448,40 @@ begin
 end $$;
 revoke all on function public.draw_generate_roster(uuid,text) from public,anon,service_role;
 grant execute on function public.draw_generate_roster(uuid,text) to authenticated;
+
+create or replace function public.draw_freeze_roster(p_draw_id uuid, p_request_id text default null)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid := public.bond_require_actor('draw.freeze_roster');
+  v_campaign uuid;
+  v_draw public.draws;
+  v_roster public.draw_rosters;
+begin
+  if p_draw_id is null then raise exception 'draw id is required' using errcode = '22023'; end if;
+  select campaign_id into v_campaign from public.draws where id = p_draw_id;
+  if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
+  -- Same parent-first lock order as generation; excludes all prize RPC writes.
+  perform 1 from public.campaigns where id = v_campaign for update;
+  select * into v_draw from public.draws where id = p_draw_id for update;
+  perform public.draw_require_resolved_prizes(v_draw);
+  -- Preserve the idempotent no-op when the admission gate still holds.
+  if v_draw.status = 'roster_frozen'
+    and exists (select 1 from public.draw_rosters where draw_id = p_draw_id and status = 'frozen') then
+    return;
+  end if;
+  if v_draw.status <> 'roster_generated' then
+    raise exception 'draw must have a generated roster' using errcode = '55000';
+  end if;
+  select * into v_roster from public.draw_rosters
+    where draw_id = p_draw_id and status = 'generated' for update;
+  if not found then raise exception 'generated roster not found' using errcode = '55000'; end if;
+  update public.draw_rosters set status = 'frozen',frozen_at = now(),frozen_by = v_actor
+    where id = v_roster.id;
+  update public.draws set status = 'roster_frozen' where id = p_draw_id;
+  insert into public.audit_log(actor_user_id,action,entity_type,entity_id,old_value,new_value,request_id)
+    values(v_actor,'draw.freeze_roster','draw_roster',v_roster.id,
+      to_jsonb(v_roster),jsonb_build_object('draw_id',p_draw_id,'campaign_id',v_draw.campaign_id,
+        'roster_id',v_roster.id,'status','frozen','frozen_by',v_actor,'frozen_at',now()),p_request_id);
+end $$;
+revoke all on function public.draw_freeze_roster(uuid,text) from public,anon,service_role;
+grant execute on function public.draw_freeze_roster(uuid,text) to authenticated;

@@ -13,11 +13,32 @@ import {
 	resolvePrizeSchema,
 	deliverPrizeSchema,
 	annulPrizeSchema,
+	mapPrizeRpcError,
 	type PrizeRequestContext
 } from './prizes';
 
 const id = 'a6420000-0000-4000-8000-000000000001';
 const fields = { name: 'Prize', description: null, position: 1, excludesFromConsolation: true };
+it.each([
+	[
+		'this prize already has a loaded winning number',
+		'This prize already has a loaded winning number.'
+	],
+	[
+		'a delivered prize cannot be annulled; pending product decision',
+		'A delivered prize cannot be annulled; pending product decision.'
+	],
+	['completed draws cannot configure prizes', 'Completed draws cannot configure prizes.'],
+	[
+		'previous draws of the campaign have unresolved prizes that exclude from consolation',
+		'Previous draws of the campaign have unresolved prizes that exclude from consolation.'
+	]
+])('maps review conflict %s', (message, expected) => {
+	expect(mapPrizeRpcError({ code: '55000', message })).toMatchObject({
+		status: 409,
+		message: expected
+	});
+});
 const cases = [
 	[
 		'create',
@@ -75,7 +96,7 @@ const cases = [
 		'annul',
 		(db: SupabaseClient, ctx: PrizeRequestContext) =>
 			annulPrize(db, { prizeId: id, reason: ' Wrong result ' }, ctx),
-		'prize.resolve',
+		'prize.annul',
 		'prize_annul',
 		{ p_prize_id: id, p_reason: 'Wrong result' }
 	]
@@ -164,7 +185,13 @@ describe('prize validation', () => {
 		const rpc = vi.fn();
 		const db = { rpc } as unknown as SupabaseClient;
 		const ctx = {
-			permissions: ['draw.update', 'draw.load_winner', 'prize.resolve', 'prize.deliver'],
+			permissions: [
+				'draw.update',
+				'draw.load_winner',
+				'prize.resolve',
+				'prize.deliver',
+				'prize.annul'
+			],
 			requestId: 'invalid'
 		};
 		for (const run of [

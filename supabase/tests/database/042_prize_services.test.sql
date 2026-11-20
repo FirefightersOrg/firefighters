@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(139);
+select plan(175);
 insert into auth.users(id,email)
 values('a6420000-0000-0000-0000-000000000001','san81-admin@example.com'),
 ('a6420000-0000-0000-0000-000000000002','san81-reader@example.com');
@@ -20,7 +20,7 @@ create function pg_temp.actor() returns uuid language sql immutable as $$select 
 create function pg_temp.act(n int) returns void language sql as $$
 select set_config('request.jwt.claims',format('{"sub":"a6420000-0000-0000-0000-00000000000%s","role":"authenticated"}',n),true)$$;
 grant execute on function pg_temp.id(text),pg_temp.actor(),pg_temp.act(int) to authenticated;
-grant select,update on ids to authenticated;
+grant select,insert,update on ids to authenticated;
 insert into public.campaigns(id,name,simple_bond_value,installment_count,installment_value,barcode_mode,max_number,associated_number_offset)
 values(pg_temp.id('c'),'SAN81',100,2,50,'base_number',999,100);
 insert into public.buyers(id,type,first_name) values(pg_temp.id('buyer'),'individual','Frozen');
@@ -55,21 +55,28 @@ select is((select name from public.prizes where id=pg_temp.id('p')),'Edited','up
 select lives_ok($$select public.draw_load_winning_number(pg_temp.id('p'),1,'Original notes','042-load')$$,'load eligible');
 select is((select result_status from public.winning_numbers where prize_id=pg_temp.id('p')),'eligible_winner','eligible classification');
 select is((select status from public.prizes where id=pg_temp.id('p')),'pending_validation','eligible awaits resolution');
-select throws_ok($$select public.draw_load_winning_number(pg_temp.id('p'),1,null,'042-duplicate')$$,'23505',null,'one loaded result per prize');
+select throws_ok($$select public.draw_load_winning_number(pg_temp.id('p'),1,null,'042-duplicate')$$,'55000','this prize already has a loaded winning number','one loaded result per prize');
 select lives_ok($$select public.prize_resolve(pg_temp.id('p'),'award','Award notes','042-resolve')$$,'resolve award');
 select is((select status from public.prizes where id=pg_temp.id('p')),'pending_delivery','prize advanced atomically');
 select is((select status from public.prize_awards where prize_id=pg_temp.id('p')),'awarded','award synchronized');
 select ok((select bond_id=pg_temp.id('b') and buyer_id=pg_temp.id('buyer') and collector_id=pg_temp.id('collector')
   from public.prize_awards where prize_id=pg_temp.id('p')),'uses physical bond and snapshot parties');
-select lives_ok($$select public.prize_deliver(pg_temp.id('p'),' Received by buyer ','042-deliver')$$,'deliver prize');
-select is((select status from public.prizes where id=pg_temp.id('p')),'delivered','prize delivered');
+insert into ids values('delivered',public.prize_create(pg_temp.id('d'),'Delivered fixture',null,6,false,'042-delivered-create'));
+select public.draw_load_winning_number(pg_temp.id('delivered'),1,null,'042-delivered-load');
+select public.prize_resolve(pg_temp.id('delivered'),'award',null,'042-delivered-resolve');
+select lives_ok($$select public.prize_deliver(pg_temp.id('delivered'),' Received by buyer ','042-deliver')$$,'deliver prize');
+select is((select status from public.prizes where id=pg_temp.id('delivered')),'delivered','prize delivered');
 select ok((select status='delivered' and delivered_at is not null and delivered_by=pg_temp.actor()
-  and notes='Received by buyer' from public.prize_awards where prize_id=pg_temp.id('p')),'delivery metadata');
-select lives_ok($$select public.prize_annul(pg_temp.id('p'),' Wrong winning result ','042-annul')$$,'annul delivered incorrect result');
+  and notes='Received by buyer' from public.prize_awards where prize_id=pg_temp.id('delivered')),'delivery metadata');
+select throws_ok($$select public.prize_annul(pg_temp.id('delivered'),'Wrong result','042-delivered-denied')$$,
+  '55000','a delivered prize cannot be annulled; pending product decision','delivered annulment refused');
+select is((select status from public.prizes where id=pg_temp.id('delivered')),'delivered','refusal preserves delivered prize');
+select is((select status from public.prize_awards where prize_id=pg_temp.id('delivered')),'delivered','refusal preserves award');
+select lives_ok($$select public.prize_annul(pg_temp.id('p'),' Wrong winning result ','042-annul')$$,'annul pending delivery incorrect result');
 select is((select status from public.prizes where id=pg_temp.id('p')),'annulled','prize voided');
 select ok((select status='annulled' and annul_reason='Wrong winning result'
-  and delivered_at is not null and notes='Received by buyer'
-  from public.prize_awards where prize_id=pg_temp.id('p')),'award voided, delivery history retained');
+  and delivered_at is null and notes='Award notes'
+  from public.prize_awards where prize_id=pg_temp.id('p')),'award voided, original notes retained');
 select is((select notes from public.winning_numbers where prize_id=pg_temp.id('p')),'Original notes','loaded snapshot never overwritten');
 select lives_ok($$update ids set id=public.prize_create(pg_temp.id('d'),'Correct result',null,1,true,'042-replacement') where k='replacement'$$,'replacement may reuse annulled position');
 select lives_ok($$select public.draw_load_winning_number(pg_temp.id('replacement'),1,null,'042-correct-load')$$,'load correct result on replacement');
@@ -98,7 +105,7 @@ select ok((select reason='Wrong winning result' and new_value->>'campaign_id'=pg
   from public.audit_log where request_id='042-annul'),'annul reason and campaign audit');
 select ok((select new_value ?& array['correction_type','affected_entity','related_entity','reason','user','date',
   'previous_value','new_value','generated_compensatory_movements']
-  and old_value->'awards'->0->>'status'='delivered'
+  and old_value->'awards'->0->>'status'='awarded'
   and new_value->'new_value'->'awards'->0->>'status'='annulled'
   from public.audit_log where request_id='042-annul'),'correction has all nine fields and both award snapshots');
 select is((select count(*) from public.audit_log where request_id in ('042-annul','042-correct-load')),2::bigint,'both correction events preserved');
@@ -140,6 +147,7 @@ from unnest(array['prizes','winning_numbers','prize_awards'])t;
 select is(pg_temp.snapshot(),(select snapshot from before_denial),'direct DML denial preserves full state');
 select is(pg_temp.audits('042-denied-direct'),0::bigint,'direct DML denial has no audit');
 reset role;
+select is((select count(*) from public.audit_log where request_id='042-delivered-denied'),0::bigint,'delivered refusal has no audit');
 select pg_temp.act(1);
 set local role authenticated;
 select throws_ok($$select public.prize_create(pg_temp.id('closed'),'x',null,1,true,'042-state-create')$$,'55000',null,'create closed draw');
@@ -185,6 +193,61 @@ from unnest(array['public.prize_create(uuid,text,text,integer,boolean,text)',
   'public.draw_load_winning_number(uuid,integer,text,text)','public.prize_resolve(uuid,text,text,text)',
   'public.prize_deliver(uuid,text,text)','public.prize_annul(uuid,text,text)'])f;
 
+-- A resolver without the dedicated annul permission still fails closed.
+reset role;
+update before_denial set snapshot=pg_temp.snapshot();
+select is((select array_agg(r.name order by r.name)
+  from public.roles r join public.role_permissions rp on rp.role_id=r.id
+  join public.permissions p on p.id=rp.permission_id where p.code='prize.annul'),
+  array['admin']::text[],'annul permission seeded only for admin');
+insert into public.role_permissions(role_id,permission_id)
+select r.id,p.id from public.roles r cross join public.permissions p
+where r.name='read-only' and p.code='prize.resolve' on conflict do nothing;
+select pg_temp.act(2);
+set local role authenticated;
+select throws_ok($$select public.prize_annul(pg_temp.id('replacement'),'Denied','042-resolver-denied')$$,
+  '42501',null,'resolve permission does not authorize annulment');
+select is(pg_temp.snapshot(),(select snapshot from before_denial),'resolver denial preserves state');
+select is(pg_temp.audits('042-resolver-denied'),0::bigint,'resolver denial has no audit');
+reset role;
+select pg_temp.act(1);
+-- Dedicated source fixtures cover the remaining three permitted source states.
+insert into ids values
+('annul-pending',public.prize_create(pg_temp.id('d'),'Pending',null,10,false,'042-source-pending-create')),
+('annul-awarded',public.prize_create(pg_temp.id('d'),'Awarded',null,11,false,'042-source-awarded-create')),
+('annul-unawarded',public.prize_create(pg_temp.id('d'),'Unawarded',null,12,false,'042-source-unawarded-create'));
+update public.prizes set status='awarded' where id=pg_temp.id('annul-awarded');
+update public.prizes set status='unawarded' where id=pg_temp.id('annul-unawarded');
+set local role authenticated;
+select lives_ok(format('select public.prize_annul(%L,''Correction'',%L)',pg_temp.id('annul-'||s),'042-source-'||s),
+  'annul allowed from '||s) from unnest(array['pending','awarded','unawarded'])s;
+select is((select status from public.prizes where id=pg_temp.id('annul-'||s)),'annulled',
+  'source state annulled: '||s) from unnest(array['pending','awarded','unawarded'])s;
+reset role;
+select is((select count(*) from public.audit_log where request_id='042-source-'||s),1::bigint,
+  'source audit: '||s) from unnest(array['pending','awarded','unawarded'])s;
+-- A completed draw cannot accept new or edited prize configuration.
+insert into ids values('completed',gen_random_uuid()),('completed-prize',gen_random_uuid());
+insert into public.draws(id,campaign_id,draw_type,name,draw_date,payment_cutoff_at,created_by)
+values(pg_temp.id('completed'),pg_temp.id('c'),'final','Completed',
+  (now() at time zone 'America/Argentina/Buenos_Aires')::date,now(),pg_temp.actor());
+insert into public.prizes(id,draw_id,name,position,created_by)
+values(pg_temp.id('completed-prize'),pg_temp.id('completed'),'Pending',1,pg_temp.actor());
+update public.draws set status='roster_generated' where id=pg_temp.id('completed');
+update public.draws set status='roster_frozen' where id=pg_temp.id('completed');
+update public.draws set status='completed' where id=pg_temp.id('completed');
+set local role authenticated;
+select throws_ok($$select public.prize_create(pg_temp.id('completed'),'No',null,2,true,'042-completed-create')$$,
+  '55000','completed draws cannot configure prizes','completed create refused');
+select throws_ok($$select public.prize_update(pg_temp.id('completed-prize'),'No',null,1,true,'042-completed-update')$$,
+  '55000','completed draws cannot configure prizes','completed update refused');
+reset role;
+select is((select name from public.prizes where id=pg_temp.id('completed-prize')),'Pending','completed config unchanged');
+select is((select count(*) from public.audit_log where request_id in ('042-completed-create','042-completed-update')),
+  0::bigint,'completed refusals never audit');
+select public.prize_annul(pg_temp.id('completed-prize'),'Fixture cleanup','042-completed-annul');
+select public.prize_annul(pg_temp.id('scheduled'),'Fixture cleanup','042-validation-annul');
+
 -- Consolation snapshot uses authoritative active awards; not merely loaded results.
 -- Sell the physical winner after freeze: frozen identity is still authoritative.
 select pg_temp.act(1);
@@ -195,7 +258,23 @@ select public.sale_register(pg_temp.id('c'),pg_temp.id('b'),pg_temp.id('buyer'),
   (now() at time zone 'America/Argentina/Buenos_Aires')::date,'042-sale');
 select public.draw_create(pg_temp.id('c'),'consolation','Consolation',
   (now() at time zone 'America/Argentina/Buenos_Aires')::date + 1,now(),1,'{}','042-consolation-create') as consolation \gset
+insert into ids values('unresolved',public.prize_create(pg_temp.id('d'),'Unresolved',null,13,true,'042-unresolved-create'));
+select throws_ok(format('select public.draw_generate_roster(%L,''042-unresolved-empty'')',:'consolation'),
+  '55000','previous draws of the campaign have unresolved prizes that exclude from consolation','unloaded previous prize blocks generation');
+select public.draw_load_winning_number(pg_temp.id('unresolved'),1,null,'042-unresolved-load');
+select throws_ok(format('select public.draw_generate_roster(%L,''042-unresolved-loaded'')',:'consolation'),
+  '55000','previous draws of the campaign have unresolved prizes that exclude from consolation','loaded pending previous prize blocks generation');
+select public.prize_resolve(pg_temp.id('unresolved'),'unaward',null,'042-unresolved-resolve');
 select lives_ok(format('select public.draw_generate_roster(%L,''042-consolation'')',:'consolation'),'consolation generates');
+-- Resolved states cannot transition back to pending. Creating a new excluding
+-- prize on a prior draw is the reachable equivalent between generate and freeze.
+insert into ids values('late-pending',public.prize_create(pg_temp.id('d'),'Late pending',null,14,true,'042-late-create'));
+select throws_ok(format('select public.draw_freeze_roster(%L,''042-late-freeze'')',:'consolation'),
+  '55000','previous draws of the campaign have unresolved prizes that exclude from consolation','new pending prize blocks freeze');
+select is((select status from public.draws where id=:'consolation'),'roster_generated','failed freeze preserves generated state');
+select is((select count(*) from public.audit_log where request_id in
+  ('042-unresolved-empty','042-unresolved-loaded','042-late-freeze')),0::bigint,'unresolved refusals never audit');
+select public.prize_annul(pg_temp.id('late-pending'),'Fixture cleanup','042-late-annul');
 select is((select count(*) from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
   where r.draw_id=:'consolation' and e.ineligibility_reason='not_sold'),1::bigint,'unsold reason precedence preserved');
 select is((select e.ineligibility_reason from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
@@ -204,6 +283,12 @@ select public.prize_annul(pg_temp.id('replacement'),'Corrected exclusion','042-a
 select public.draw_generate_roster(:'consolation','042-consolation-regenerate') as regenerated \gset
 select is((select ineligibility_reason from public.draw_roster_entries where draw_roster_id=:'regenerated'
   and bond_id=pg_temp.id('b')),'installments_not_covered','annulled awards no longer exclude');
+select lives_ok(format('select public.draw_freeze_roster(%L,''042-resolved-freeze'')',:'consolation'),'resolved previous prizes permit freeze');
+insert into ids values('post-freeze-pending',public.prize_create(pg_temp.id('d'),'Pending after freeze',null,15,true,'042-post-freeze-create'));
+select throws_ok(format('select public.draw_freeze_roster(%L,''042-post-freeze-denied'')',:'consolation'),
+  '55000','previous draws of the campaign have unresolved prizes that exclude from consolation','repeat freeze still enforces unresolved gate');
+select is((select status from public.draws where id=:'consolation'),'roster_frozen','repeat refusal preserves immutable frozen state');
+select is((select count(*) from public.audit_log where request_id='042-post-freeze-denied'),0::bigint,'repeat refusal has no audit');
 
 -- Two REAL sessions invoke the public RPCs. Committed fixture setup is removed
 -- explicitly; all racing writes are request-scoped.
@@ -257,9 +342,35 @@ select pg_temp.remote('san81_a',$q$select public.draw_load_winning_number('e6421
 select extensions.dblink_send_query('san81_b',$q$select public.draw_load_winning_number('e6421000-0000-0000-0000-000000000001',998,null,'042-race-second')::text$q$);
 select ok(pg_temp.wait_lock(:'bpid'::int),'second load waits for first draw lock');
 select extensions.dblink_exec('san81_a','commit');
-select is(pg_temp.result('san81_b'),'winning numbers require a pending prize and frozen draw','second loader rechecks committed status');
+select is(pg_temp.result('san81_b'),'this prize already has a loaded winning number','second loader rechecks committed result');
 select is(pg_temp.remote('san81_a',$q$select count(*)::text from public.winning_numbers where prize_id='e6421000-0000-0000-0000-000000000001'$q$),'1','no duplicate result');
 select is(pg_temp.remote('san81_a',$q$select count(*)::text from public.audit_log where request_id='042-race-second'$q$),'0','losing loader no audit');
+-- Campaign lock serializes prior-prize writes against both consolation gates.
+select pg_temp.remote('san81_a',$q$select public.draw_create('c6421000-0000-0000-0000-000000000001',
+  'consolation','Race consolation',(now() at time zone 'America/Argentina/Buenos_Aires')::date+1,
+  now(),1,'{}','042-race-consolation-create')::text$q$) as race_consolation \gset
+select extensions.dblink_exec('san81_a','begin');
+select pg_temp.remote('san81_a',$q$select public.prize_create('d6421000-0000-0000-0000-000000000001',
+  'Late pending',null,3,true,'042-race-pending-create')::text$q$) as race_pending \gset
+select extensions.dblink_send_query('san81_b',format('select public.draw_generate_roster(%L,''042-race-generate-denied'')::text',:'race_consolation'));
+select ok(pg_temp.wait_lock(:'bpid'::int),'consolation generation waits for prior prize mutation');
+select extensions.dblink_exec('san81_a','commit');
+select is(pg_temp.result('san81_b'),'previous draws of the campaign have unresolved prizes that exclude from consolation',
+  'generation rechecks newly committed pending prize');
+select pg_temp.remote('san81_a',format('select public.prize_annul(%L,''Correction'',''042-race-pending-annul'')::text',:'race_pending'));
+select pg_temp.remote('san81_a',format('select public.draw_generate_roster(%L,''042-race-generate'')::text',:'race_consolation'));
+select extensions.dblink_exec('san81_a','begin');
+select pg_temp.remote('san81_a',$q$select public.prize_create('d6421000-0000-0000-0000-000000000001',
+  'Late freeze',null,4,true,'042-race-freeze-pending-create')::text$q$);
+select extensions.dblink_send_query('san81_b',format('select public.draw_freeze_roster(%L,''042-race-freeze-denied'')::text',:'race_consolation'));
+select ok(pg_temp.wait_lock(:'bpid'::int),'consolation freeze waits for prior prize mutation');
+select extensions.dblink_exec('san81_a','commit');
+select is(pg_temp.result('san81_b'),'previous draws of the campaign have unresolved prizes that exclude from consolation',
+  'freeze rechecks newly committed pending prize');
+select is(pg_temp.remote('san81_a',$q$select count(*)::text from public.audit_log
+  where request_id in ('042-race-generate-denied','042-race-freeze-denied')$q$),'0','racing gate refusals have no audits');
+select is(pg_temp.remote('san81_a',format('select status from public.draws where id=%L',:'race_consolation')),
+  'roster_generated','racing freeze refusal preserves draw');
 select extensions.dblink_exec('san81_a','begin');
 select pg_temp.remote('san81_a',$q$select public.prize_create('d6421000-0000-0000-0000-000000000001','Hold draw',null,2,true,'042-race-create')::text$q$);
 select extensions.dblink_exec('san81_b','reset role');
@@ -277,11 +388,12 @@ select is(pg_temp.remote('san81_b',$q$select count(*)::text from public.audit_lo
 select extensions.dblink_exec('san81_b',$q$
 begin;
 set local session_replication_role=replica;
-delete from public.audit_log where request_id='042-race-first';
+delete from public.audit_log where request_id like '042-race-%';
 delete from public.winning_numbers where draw_id='d6421000-0000-0000-0000-000000000001';
 delete from public.prizes where draw_id='d6421000-0000-0000-0000-000000000001';
-delete from public.draw_rosters where draw_id='d6421000-0000-0000-0000-000000000001';
-delete from public.draws where id='d6421000-0000-0000-0000-000000000001';
+delete from public.draw_rosters where draw_id in
+  (select id from public.draws where campaign_id='c6421000-0000-0000-0000-000000000001');
+delete from public.draws where campaign_id='c6421000-0000-0000-0000-000000000001';
 delete from public.campaigns where id='c6421000-0000-0000-0000-000000000001';
 delete from public.user_roles where user_id='b6421000-0000-0000-0000-000000000001';
 delete from public.profiles where id='b6421000-0000-0000-0000-000000000001';

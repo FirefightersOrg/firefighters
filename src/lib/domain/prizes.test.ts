@@ -33,11 +33,11 @@ describe('prize storage contracts', () => {
 	});
 	it('permits exactly documented prize transitions', () => {
 		expect(PRIZE_TRANSITIONS).toEqual({
-			pending_validation: ['awarded', 'unawarded'],
+			pending_validation: ['awarded', 'unawarded', 'annulled'],
 			awarded: ['pending_delivery', 'annulled'],
-			pending_delivery: ['delivered'],
+			pending_delivery: ['delivered', 'annulled'],
 			delivered: [],
-			unawarded: [],
+			unawarded: ['annulled'],
 			annulled: []
 		});
 		for (const from of PRIZE_STATUSES)

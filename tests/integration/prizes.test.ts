@@ -307,6 +307,16 @@ describe('audited prize services with real users', () => {
 		expect((await row('prizes', prizeId)).status).toBe('pending_delivery');
 		await deliverPrize(admin, { prizeId, notes: 'Received by buyer' }, ctx());
 		expect((await row('prizes', prizeId)).status).toBe('delivered');
+		const deliveredBefore = await row('prizes', prizeId);
+		const deliveredAnnul = ctx();
+		await expect(
+			annulPrize(admin, { prizeId, reason: 'Wrong result' }, deliveredAnnul)
+		).rejects.toMatchObject({
+			status: 409,
+			message: 'A delivered prize cannot be annulled; pending product decision.'
+		});
+		expect(await row('prizes', prizeId)).toEqual(deliveredBefore);
+		expect(await audits(deliveredAnnul.requestId)).toEqual([]);
 		expect(await row('prize_awards', award.id)).toMatchObject({
 			status: 'delivered',
 			notes: 'Received by buyer'
@@ -410,6 +420,48 @@ describe('audited prize services with real users', () => {
 			if (error) throw error;
 			expect(data).toEqual([]);
 		}
+	});
+	it('blocks consolation generation and freeze until all previous excluding prizes are resolved', async () => {
+		const f = await fixture();
+		const prizeId = await f.prize();
+		const drawId = await f.draw('consolation', today);
+		const prizeBefore = await row('prizes', prizeId);
+		for (const loaded of [false, true]) {
+			if (loaded) await loadWinningNumber(admin, { prizeId, numberValue: 100, notes: null }, ctx());
+			const denied = ctx();
+			await expect(generateDrawRoster(admin, { drawId }, denied)).rejects.toMatchObject({
+				status: 409,
+				message:
+					'previous draws of the campaign have unresolved prizes that exclude from consolation'
+			});
+			expect(await audits(denied.requestId)).toEqual([]);
+			expect((await row('prizes', prizeId)).status).toBe(prizeBefore.status);
+			expect((await row('draws', drawId)).status).toBe('scheduled');
+		}
+		await resolvePrize(admin, { prizeId, decision: 'unaward', notes: null }, ctx());
+		await generateDrawRoster(admin, { drawId }, ctx());
+		const latePrize = await f.prize(2);
+		const deniedFreeze = ctx();
+		await expect(freezeDrawRoster(admin, { drawId }, deniedFreeze)).rejects.toMatchObject({
+			status: 409,
+			message: 'previous draws of the campaign have unresolved prizes that exclude from consolation'
+		});
+		expect(await audits(deniedFreeze.requestId)).toEqual([]);
+		expect((await row('draws', drawId)).status).toBe('roster_generated');
+		await annulPrize(admin, { prizeId: latePrize, reason: 'Incorrect configuration' }, ctx());
+		await freezeDrawRoster(admin, { drawId }, ctx());
+		expect((await row('draws', drawId)).status).toBe('roster_frozen');
+	});
+	it('requires the dedicated annul permission even when resolution is allowed in TS', async () => {
+		const f = await fixture();
+		const prizeId = await f.prize();
+		const before = await row('prizes', prizeId);
+		const denied = { requestId: ctx().requestId, permissions: ['prize.resolve'] };
+		await expect(annulPrize(admin, { prizeId, reason: 'Denied' }, denied)).rejects.toMatchObject({
+			status: 403
+		});
+		expect(await row('prizes', prizeId)).toEqual(before);
+		expect(await audits(denied.requestId)).toEqual([]);
 	});
 	it('consolation parity excludes only prior active excluding awards and regenerates after annulment', async () => {
 		const f = await fixture();
