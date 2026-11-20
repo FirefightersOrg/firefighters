@@ -63,6 +63,50 @@ describe('buyer record page', () => {
 		expect(body).toContain('Main Street 1');
 		expect(body).toContain('Call after noon');
 	});
+	it('renders prizes and converts a UTC instant near midnight to Buenos Aires', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id: campaignId, name: 'Campaign' },
+					buyer: {
+						id: 'buyer',
+						type: 'individual',
+						firstName: 'Ada',
+						lastName: 'Lovelace',
+						businessName: null,
+						documentNumber: null,
+						taxId: null,
+						phone: null,
+						address: null,
+						usualCollectorId: null,
+						notes: null
+					},
+					collector: null,
+					collectors: [],
+					canManage: false,
+					campaignBonds: [],
+					historicalBonds: [],
+					audit: null,
+					canViewPrizes: true,
+					prizes: [
+						{
+							id: 'prize',
+							drawId: 'draw',
+							drawName: 'December',
+							name: 'Bike',
+							position: 1,
+							status: 'delivered',
+							deliveredAt: '2026-11-20T02:30:00+00:00'
+						}
+					]
+				},
+				form: null
+			} as never
+		}).body;
+		expect(body).toContain('#1 — Bike');
+		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('/draws/draw/winners');
+	});
 });
 
 describe('buyer sale sections', () => {

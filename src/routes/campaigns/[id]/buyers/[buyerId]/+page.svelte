@@ -7,6 +7,8 @@
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { formatCents, formatMoney, parseMoneyToCents } from '$lib/domain/money';
 	import type { PageProps } from './$types';
+	import { PRIZE_STATUS_LABELS } from '$lib/domain/prizes';
+	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 	let { data, form }: PageProps = $props();
 	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
 		bond.baseNumbers
@@ -26,6 +28,8 @@
 			0
 		)
 	);
+	const deliveredAt = (value: string | null) =>
+		value ? `${buenosAiresDateTimeLocal(value).replace('T', ' ')} (Buenos Aires)` : '—';
 </script>
 
 <svelte:head
@@ -144,7 +148,35 @@
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Prizes</h2>
-		<p class="mt-2 text-sm text-slate-500">Arrives with Phase 12: prizes.</p>
+		{#if data.canViewPrizes === false}<p class="mt-2 text-sm text-slate-500">
+				You do not have permission to view prizes.
+			</p>
+		{:else if (data.prizes ?? []).length}
+			<table class="mt-3 min-w-full text-sm">
+				<thead
+					><tr class="text-left"><th>Draw</th><th>Prize</th><th>Status</th><th>Delivered at</th></tr
+					></thead
+				>
+				<tbody>
+					{#each data.prizes as prize (prize.id)}
+						<tr class="border-t border-slate-100">
+							<td class="py-2">
+								<a
+									class="text-blue-700 underline"
+									href={resolve('/campaigns/[id]/draws/[drawId]/winners', {
+										id: data.campaign.id,
+										drawId: prize.drawId
+									})}>{prize.drawName}</a
+								>
+							</td>
+							<td>#{prize.position} — {prize.name}</td>
+							<td>{PRIZE_STATUS_LABELS[prize.status]}</td>
+							<td>{deliveredAt(prize.deliveredAt)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{:else}<p class="mt-2 text-sm text-slate-500">No prizes won.</p>{/if}
 	</section>
 	<section class={cardClass}>
 		<h2 class="text-lg font-semibold">Historical numbers</h2>
