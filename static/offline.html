@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#2563eb" />
+		<title>Sin conexión - Firefighters</title>
+		<style>
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: #f8fafc;
+				color: #0f172a;
+				font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			}
+			main {
+				max-width: 26rem;
+				margin: 1rem;
+				padding: 2rem;
+				text-align: center;
+				background: #fff;
+				border: 1px solid #e2e8f0;
+				border-radius: 0.75rem;
+			}
+			h1 {
+				font-size: 1.5rem;
+				margin: 0 0 0.5rem;
+			}
+			p {
+				color: #64748b;
+				line-height: 1.5;
+				margin: 0 0 1.5rem;
+			}
+			button {
+				background: #2563eb;
+				color: #fff;
+				border: 0;
+				border-radius: 0.5rem;
+				padding: 0.625rem 1.25rem;
+				font-size: 1rem;
+				font-weight: 600;
+				cursor: pointer;
+			}
+			button:focus-visible {
+				outline: 3px solid #93c5fd;
+				outline-offset: 2px;
+			}
+		</style>
+	</head>
+	<body>
+		<main role="alert">
+			<h1>Sin conexión</h1>
+			<p>
+				No pudimos conectarnos a internet. Revisá tu conexión e intentá de nuevo. Por seguridad, no
+				se pueden registrar pagos ni consultar datos sin conexión.
+			</p>
+			<button type="button" onclick="location.reload()">Reintentar</button>
+		</main>
+	</body>
+</html>
