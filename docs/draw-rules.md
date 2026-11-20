@@ -282,3 +282,151 @@ Possible results:
   38 database files / 2475 assertions passed (038 plan: 152); `pnpm test:integration`:
   23 files / 192 tests passed; `pnpm check`: 0 errors / 0 warnings; `pnpm lint`: passed;
   `pnpm test`: 121 files / 1577 tests passed.
+
+## Implemented in SAN-81
+
+### RPC and authorization contract
+
+- Migration `20261226000000_prize_services.sql` adds `prize_create` (UUID),
+  `prize_update` (void), `draw_load_winning_number` (winning-number UUID),
+  `prize_resolve`, `prize_deliver`, and `prize_annul` (all void). SAN-80 and
+  merged migrations are unchanged. All six are audited SECURITY DEFINER RPCs
+  with empty search paths, explicit authenticated EXECUTE, and no public,
+  anon or service-role EXECUTE. Private helpers have no API EXECUTE.
+- Configuration uses **`draw.update`**, since the catalog has no prize-create
+  permission. Loading uses `draw.load_winner`, resolution and correction use
+  `prize.resolve`, and delivery uses `prize.deliver`. Checks use active-profile
+  capabilities, never role names. No new permissions or write RLS policies
+  are introduced; no API role has direct prize/winner/award DML.
+- TS `src/lib/server/services/prizes.ts` requires `{ requestId, permissions }`;
+  unavailable permissions fail closed with 500 and missing permission with
+  403 before any DB call. Zod mirrors SQL's trimmed, nullable optional text
+  and Unicode-code-point limits (name 200, description/notes/reason 1000),
+  positive int32 positions and nonnegative int32 numbers. Campaign-specific
+  number bounds are authoritative in SQL. `42501`, `55000`, `22023`, `23514`,
+  `P0002`, and `23505` map to 403/409/400/400/404/409 respectively.
+  Context request IDs correlate calls; they are not idempotency keys.
+
+### Loading, resolution and delivery
+
+- Create always starts pending validation; update requires pending validation.
+  All operations reject closed or annulled draws. Configuration can be created
+  before generation and after freeze, allowing a corrected result to have a
+  replacement prize. Completed-but-not-closed draws permit resolution, delivery,
+  configuration and correction; **loading requires exactly `roster_frozen`**.
+  Consequently, annulment after completion is void-only: a replacement cannot
+  be loaded on a completed draw (55000), and this task introduces no reopen
+  transition. The replacement-and-reload workflow runs before completion.
+  No campaign-status gate is added to prize workflows: an already frozen
+  snapshot remains actionable after campaign closure, as with SAN-77 freezing.
+- Loading searches only the draw's immutable **frozen** roster, including
+  extraordinary entries. Eligible matches produce `eligible_winner`, leaving
+  the prize pending validation. Ineligible matches produce `not_eligible` and
+  make the prize unawarded; their original reason remains accessible through
+  `matched_roster_entry_id`. Missing numbers produce `no_match` and unawarded.
+  There is no manual override of frozen eligibility or new `pending_review`
+  write path. SAN-80's one-winning-number-per-prize rule is retained.
+- Resolution requires an eligible loaded result and pending prize. `award`
+  transitions through `awarded`, inserts the award and reaches `pending_delivery`
+  in one transaction; `unaward` reaches terminal unawarded without an award.
+  A missing loaded result or missing frozen party identity fails with 55000.
+  The physical entry bond and actual snapshot keys `buyer_snapshot.id` and
+  `collector_snapshot.id` determine ownership, never current parties or their
+  active status. Resolved prizes freeze `excludes_from_consolation`.
+- Delivery requires pending delivery and an awarded award. Both statuses advance
+  atomically; server time, authenticated actor and required nonblank observations
+  are recorded. Resolution notes are retained on the award and audit; unaward
+  notes are retained in the audit reason. Delivery notes replace award notes,
+  while the original resolution audit retains the original observations.
+  Repeated resolve/deliver/annul calls fail state checks without duplicate
+  awards or audit rows.
+
+### Correction and immutable history
+
+- **Replacement model:** annul the incorrect prize, then create a new prize at
+  the same position and load the correct number on that new UUID. The active
+  position index replaces SAN-80's unconditional uniqueness; a full draw-FK
+  index remains. Multiple annulled historical positions are allowed, but only
+  one live prize per `(draw_id, position)` exists. Same-row reloading is never
+  allowed, and no loaded number, entry match or original result classification
+  is overwritten or deleted.
+- A winning-number result is **void by its parent prize's `annulled` status**,
+  not by rewriting SAN-80's immutable `result_status`. Consumers must include
+  the parent status when interpreting historical results. This deliberately
+  preserves the original eligibility classification and frozen match.
+- The general SAN-80 lifecycle graphs remain ordinary-write guards. Audited
+  correction is a separate narrow exception allowing any non-annulled prize
+  (including pending, unawarded, pending-delivery and delivered) and its active
+  award to become annulled. This implements `docs/corrections.md` even when an
+  incorrect number had no match, was ineligible or had already been delivered.
+  A transaction-local marker selects the correction guard, which permits
+  changing **only** status, dedicated annulment metadata and updated time.
+  Inserts and changes to original history are rejected on that path. Forging
+  the marker supplies neither table DML nor internal-helper EXECUTE.
+- Reason is required, trimmed and at most 1000 code points. Original award
+  timestamps, party identities, notes and delivered actor/time remain intact.
+  Delivery consistency explicitly permits a void delivered award retaining its
+  paired delivery metadata. Re-annulment is refused; original annul reasons
+  cannot be overwritten.
+- Exactly one audit row is inserted by each successful RPC, in its transaction.
+  Normal events carry the prize, winner and award snapshots plus campaign ID;
+  annulment carries all nine correction fields (type, affected entity, related
+  draw, reason, actor, date, previous/new snapshots and an empty compensatory
+  movement list). There are no financial side effects. The separate annulment
+  and replacement-loading audit events preserve both sides of a correction.
+
+### Consolation and concurrency
+
+- `draw_generate_roster(uuid,text)` is replaced faithfully from SAN-77, removing
+  the Phase-12 refusal and adding authoritative previous-award evaluation and
+  the configured consolation installment coverage. Its isolated payment-cutoff
+  helper, ordinary number participation, commercial/party snapshot, regeneration,
+  freeze protection, extraordinary allocation and all other behavior remain.
+  The prior fail-closed assertions in 038 and integration now verify generation;
+  SQL/TS parity covers consolation as well as the earlier three types.
+- **Previous** means ascending `(draw_date, created_at, id)` within the same
+  campaign, strictly less than the target draw. Date is primary, creation time
+  resolves same-date draws, and UUID is the deterministic exact-timestamp
+  tie-breaker. Current and later draws cannot exclude.
+- Only an `awarded` or `delivered` award of a non-annulled prize whose
+  `excludes_from_consolation` is true excludes a bond. Merely loading an eligible
+  number, an unawarded decision, a non-excluding prize, or an annulled award/prize
+  does not. Active manual-pata membership maps physical award bonds to effective
+  parents, propagating a member win to all participating members.
+- Reason precedence matches SAN-76: annulled, not sold, already won, missing
+  required installment, insufficient installment coverage. The configured
+  consolation rule resolves through the existing SAN-77 helper, including
+  camel-case/snake-case precedence and column fallback.
+- Every prize operation discovers parents without locks, then takes campaign
+  SHARE → draw UPDATE → prize UPDATE → winner UPDATE → awards UPDATE, sorted
+  by UUID within each level. The draw lock serializes same-draw admission,
+  edits, resolution, delivery, correction and closure; no financial or ledger
+  locks are involved. pgTAP 042 includes two real dblink sessions calling the
+  RPCs: simultaneous result loads serialize and the loser rechecks state;
+  lifecycle waits for a prize write; a prize write waits for committed closure
+  and then refuses without audit.
+- Consolation uses the same single-statement generation snapshot as other
+  roster inputs. Awards committed before that snapshot affect generation;
+  concurrent/later resolution or annulment does not retroactively rewrite a
+  generated or frozen roster. Regenerate before freeze to capture corrections.
+
+### Known gaps and validation
+
+- **SAN-77 (inherited product question):** payment cutoff remains the inclusive
+  Buenos Aires `payment_date`, not confirmation time, because payments have no
+  confirmation timestamp. This task neither invents that timestamp nor changes
+  cutoff semantics.
+- **SAN-81 scope:** no routes/UI, winner override, or automatic draw completion
+  is included; the task is SQL and services. Correction replacement is explicit,
+  not an automatic clone, and clients use the new prize ID. These are intentional
+  boundaries, not unimplemented RPC requirements.
+- Validation on the exclusively owned local DB: a clean local reset, then
+  `supabase test db` **before integration**, passed **41 files / 2919 assertions**
+  (042 plan **139**, including real two-session races); `pnpm seed:admin` followed
+  by `pnpm test:integration` passed **26 files / 208 tests**. `pnpm check` reported
+  **0 errors / 0 warnings**, `pnpm lint` passed, and `pnpm test` passed **135 files /
+  1692 tests**. The six new prize integration cases also passed individually and
+  shuffled with seed 81; each creates its own campaign and mutable records.
+  Existing SAN-77 coverage caught the required update of its historical
+  consolation-refusal assertion; SAN-80's FK-index check caught the need for a
+  full draw index after replacing position uniqueness with a partial index.
