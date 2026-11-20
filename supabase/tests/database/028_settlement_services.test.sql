@@ -1,4 +1,6 @@
 begin;
+-- current_date below is the Buenos Aires date, as in the RPCs (not UTC midnight).
+set local timezone = 'America/Argentina/Buenos_Aires';
 select plan(46);
 insert into auth.users(id,email) values ('a6280000-0000-0000-0000-000000000001','settle@example.com');
 insert into public.profiles(id,auth_user_id,full_name,email,status) values ('b6280000-0000-0000-0000-000000000001','a6280000-0000-0000-0000-000000000001','Settlement','settle@example.com','active');
