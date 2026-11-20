@@ -42,7 +42,7 @@ with x as (insert into public.payments(campaign_id,sale_id,collector_id,buyer_id
     'b6300000-0000-0000-0000-000000000001') returning id) insert into ids select 'pay',id from x;
 
 select columns_are('public','commission_adjustments',array['id','campaign_id','collector_id','settlement_id','payment_id','amount','direction','reason','created_by','created_at'],'adjustment columns');
-select columns_are('public','collector_ledger_entries',array['id','campaign_id','collector_id','settlement_id','payment_id','entry_type','direction','amount','status','occurred_at','created_by','created_at','reason','annulled_by','annulled_at','annul_reason'],'ledger columns');
+select columns_are('public','collector_ledger_entries',array['id','campaign_id','collector_id','settlement_id','payment_id','entry_type','direction','amount','status','occurred_at','created_by','created_at','reason','annulled_by','annulled_at','annul_reason','corrects_sale_id'],'ledger columns');
 select fk_ok('public','commission_adjustments','campaign_id','public','campaigns','id','adjustment campaign FK');
 select fk_ok('public','commission_adjustments','collector_id','public','collectors','id','adjustment collector FK');
 select fk_ok('public','commission_adjustments','settlement_id','public','settlements','id','adjustment settlement FK');

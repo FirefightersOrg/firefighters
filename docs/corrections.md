@@ -261,6 +261,129 @@ the older removal RPC and duplicating its audit.
   Tests `027`, `031` and `033` use Buenos Aires transaction-local timezone for fixture
   dates, avoiding UTC-midnight mismatches with the payment-date default.
 
+## Implemented in SAN-72
+
+Migration `20261220000000_sale_settlement_corrections.sql` and service
+`src/lib/server/services/sale-corrections.ts` implement the four sale/bond/settlement
+correction flows, without changing any earlier migration.
+
+- **Buyer:** `sale_correct_buyer` requires `sale.correct`, an active sale with a sold
+  bond, a different existing buyer, and a trimmed reason of 1–1000 Unicode code
+  points. It changes the sale and bond's current buyer while the sale stays active.
+  Both complete buyer
+  snapshots (including names and document) and the sale snapshots are in the audit.
+  Payments retain their historical `buyer_id`; they are not silently reassociated.
+- **Collector:** `sale_correct_collector` also requires `sale.correct`. Only the
+  destination collector must be active; an inactive original collector does not
+  prevent correction. Sale, sold bond and active custody move together. Original
+  custody is closed as `reassigned`, never rewritten or deleted, and the new custody
+  receives a reassignment delivery note.
+- **Open payments:** live payments in an open settlement cause a `55000` asking to
+  remove them first. Draft payments must also be resolved before moving the
+  collector: their immutable party snapshot must not later enter a settlement of
+  the wrong collector. Historical annulled/adjusted payments do not block a move.
+- **Collector compensation:** confirmed payments in historical closed (including
+  subsequently corrected) settlements retain their collector and settlement
+  snapshots. Each payment produces the old collector's commission debit, plus a
+  cash-retained commission credit for cash; the new collector receives commission
+  credit using **his** rules, plus cash-retained commission debit for cash. Every
+  positive movement uses `annulment`; zeros write no row. Positive balance still
+  means Firefighters owes the collector. Original settlements remain byte-for-byte
+  unchanged, including status, timestamps and totals. Manual commission adjustments
+  are not moved: they remain separately attributable historical differences.
+- **Attribution and linkage:** the first move reuses SAN-71's
+  `payment_correction_commission`; subsequent moves compute the outgoing collector's
+  current rule, rather than charging the immutable payment collector again. All
+  calculations use each original payment date, SAN-68 precedence and per-application
+  rounding. The inherited limitation remains: current rule definitions cannot
+  reconstruct a subsequently edited/annulled applied rule. Persisting applied rules
+  remains a follow-up, not a new rule snapshot invented by this migration.
+  New compensation links through immutable `collector_ledger_entries.corrects_sale_id`
+  and actual movement UUIDs in the sale correction audit. Its payment/settlement
+  columns are null on **both** sides: the existing cross-collector FK-reference
+  guards deliberately remain intact, so the new collector cannot falsely claim
+  ownership of the original payment/settlement. These entries cannot be annulled;
+  a further correction compensates them.
+- **Bond entry point:** `bond_correct_collector` delegates sold bonds to the sale
+  correction in the same transaction and produces that single sale audit, requiring
+  `sale.correct` (not an additional `bond.assign`). Unsold means
+  `delivered_to_collector`, not available/lost/annulled: it requires `bond.assign`
+  and an active campaign, reuses `delivery_lock_bonds`, `delivery_require_collector`
+  and `delivery_issue_note` plus the existing reassignment custody transitions.
+  It intentionally does not call the public `bond_reassign`, which emits two normal
+  audits; it writes one nine-field correction audit instead. A bond sold concurrently
+  after the initial discovery is refused with `55000`; retry selects the sale path.
+  The TS `sold` flag is a required caller state hint for fail-closed permission checks;
+  SQL independently chooses the actual path and checks its permission.
+- **Settlement design:** `settlement_correct` requires `settlement.correct`. We chose
+  a separate immutable `settlement_corrections` record with a unique FK to the
+  original settlement, rather than overloading ordinary settlement numbering,
+  payment admission and closing with a new kind. The original changes only
+  `closed → corrected` and its `updated_at`; the complete row except those two
+  fields is compared in pgTAP. Corrected settlements are terminal. Neither direct
+  status changes nor updates/deletes of the linked record are permitted. The linked
+  record can only be inserted through the closed-settlement correction flag, and a
+  deferred constraint requires its original to finish in `corrected` status.
+- **Adjustment contract:** `p_adjustments` is an object containing exactly
+  `commission_delta` and `cash_retained_delta`, each a signed `numeric(12,2)` amount;
+  at least one must be nonzero. Although the SQL parameter has a null default for
+  named-call ergonomics, null is rejected: a reason alone cannot invent a monetary
+  difference. Deltas are not replacement totals. Corrected commission and retention
+  must be nonnegative, and retention must not exceed corrected commission or original
+  cash received. Positive commission delta credits the collector; positive retained
+  commission delta debits him (negative deltas reverse those directions). Thus cash
+  here means **retained commission**, not cash principal; SAN-68 intentionally keeps
+  principal amounts out of the commission-balance ledger. Gross cash/transfer totals
+  are never edited. Adjustment records are readable under the original settlement's
+  RLS, and the linked ledger entries already appear in the current-account report.
+  Closed or corrected settlement ledger history cannot be annulled through SAN-69.
+- **Locks:** discovery reads are unlocked; sale corrections then lock all existing
+  campaign settlements in UUID order, sale payments in UUID order, the sale,
+  installments in UUID order, both campaign/collector advisory locks in sorted
+  collector UUID order, then the bond and delivery-note sequence. This deliberately
+  favors correctness over campaign-wide correction throughput. The sale lock
+  serializes admission's sale SHARE lock; after acquiring it, the payment UUID set
+  is rechecked to refuse a concurrent admission through a newly created settlement
+  (`55000`, reload/retry). Parent/payment locks use `NO KEY UPDATE`: they still
+  serialize admission/closing/corrections, but allow FK `KEY SHARE` from manual ledger
+  services that already hold the ledger lock. This avoids an FK-induced reverse-lock
+  deadlock. Settlement corrections lock their settlement before the same ledger
+  advisory lock. pgTAP runs two real dblink sessions proving blocking on **each**
+  collector ledger lock and on the settlement correction ledger lock; fixtures and
+  audits stay in an uncommitted remote transaction and are rolled back.
+- **Later payment corrections:** SAN-71 assumes the historical payment collector
+  still owns its commission. After a sale collector move, its payment adjustment or
+  annulment therefore fails safely with `55000` instead of debiting the wrong
+  collector twice. Correct the sale collector back first, then correct the payment
+  and reapply the sale move if needed. Attribution-aware payment corrections across
+  collector moves are a documented follow-up. Buyer-only corrections do not impose
+  this restriction.
+- **Security/audit:** all new public RPCs are audited `SECURITY DEFINER` functions
+  with empty `search_path`; only authenticated gets EXECUTE. Internal helpers and
+  trigger functions have no API EXECUTE. Financial tables have no API-role DML or
+  write RLS; legacy nonfinancial bond/delivery service-role grants are unchanged.
+  Transaction-local sale/settlement UUID flags are restored before return and permit
+  only their narrow guard paths; setting a GUC alone gives authenticated no DML.
+  Each successful public call writes exactly one audit with the nine minimum fields,
+  old/new snapshots, trimmed reason, actor and request ID. Request IDs correlate
+  requests, not idempotency keys; same-target corrections fail validation and a
+  second settlement correction fails state validation with no extra entries/audit.
+- **TypeScript/testing:** explicit `{ requestId, permissions }` context fails closed
+  before any RPC; Zod validates UUIDs, code-point reasons and signed decimal-cent
+  deltas without doing money arithmetic in JS. SQLSTATEs use the existing settlement
+  error mapper (400/403/404/409/500). No routes or UI were added. pgTAP `034` covers
+  all flows, exact per-collector ledger effects/balances, full settlement equality,
+  scoped denial atomicity, inactive targets/source, audit fields, table grants and
+  real concurrency. Existing `008`/`021` truncate lists now include the linked
+  adjustment table, `027` uses the audited closed-to-corrected transition, and `030`
+  acknowledges the immutable sale-compensation reference; their plans are unchanged.
+
+Validation on the local database after a fresh reset, with pgTAP **before**
+integration: `supabase test db` passed **34 files / 2102 assertions** (`034` plan:
+**103**, including two-session dblink cases); `pnpm test:integration` passed
+**21 files / 181 tests** after `pnpm seed:admin`; `pnpm check` reported **0 errors /
+0 warnings**; `pnpm lint` passed; `pnpm test` passed **99 files / 1379 tests**.
+
 ### Known follow-up (SAN-71 review): cash/transfer totals of a corrected closed settlement
 
 When a payment method is corrected (cash ↔ transfer) for a payment of a **closed** settlement, the
@@ -269,4 +392,13 @@ edited), and `settlement_correct` (SAN-72) only records `commission_delta` / `ca
 So those two totals do **not** reflect the corrected method. Reports by payment method must not
 read them as live data: derive cash/transfer from the payments (non-adjusted originals excluded,
 replacements included). A way to record cash/transfer deltas on the settlement correction is a
+follow-up.
+
+### Known limitation (SAN-72 review): payment corrections after a collector move
+
+After `sale_correct_collector` moves a sale, its historical payments still carry the original
+collector. Annulling or correcting one of them would post compensation to the wrong collector, so
+the `moved_payment_correction_guard` trigger refuses it (55000, shown as a 409 conflict with the
+message "This payment's sale was moved to another collector. Correct the sale collector back
+before annulling or correcting this payment."). Making payment corrections collector-aware is a
 follow-up.
