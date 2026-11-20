@@ -15,7 +15,7 @@ vi.mock('$lib/server/services/sales', async (o) => ({
 	registerSale: vi.fn()
 }));
 vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
-import { actions, _firstDueDateBounds as firstDueDateBounds, load } from './+page.server';
+import { actions, _firstDueDateBounds, load } from './+page.server';
 import {
 	getBuyer,
 	getCollectorsByIds,
@@ -108,7 +108,7 @@ describe('new sale', () => {
 		});
 	});
 	it('accepts full payments without a due date and validates installment due-date bounds', async () => {
-		const { min, max } = firstDueDateBounds();
+		const { min, max } = _firstDueDateBounds();
 		const date = (value: string, days: number) => {
 			const [year, month, day] = value.split('-').map(Number);
 			return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
