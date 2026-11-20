@@ -181,7 +181,7 @@ begin
     perform id from public.settlements where campaign_id=v_old.campaign_id order by id for no key update;
   else
     perform s.id from public.settlements s
-    where s.id in (select p.settlement_id from public.payments p where p.sale_id=p_sale_id)
+    where s.id in (select pay.settlement_id from public.payments pay where pay.sale_id=p_sale_id)
     order by s.id for no key update;
   end if;
   select coalesce(array_agg(id order by id),'{}') into v_payments from public.payments where sale_id=p_sale_id;
