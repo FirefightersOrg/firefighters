@@ -38,7 +38,9 @@ export const updateDrawSchema = z.object({ drawId: z.guid(), ...fields });
 export const annulDrawSchema = z.object({ drawId: z.guid(), reason: text(DRAW_REASON_MAX) });
 export type CreateDrawInput = z.input<typeof createDrawSchema>;
 export type UpdateDrawInput = z.input<typeof updateDrawSchema>;
+export const completeDrawSchema = z.object({ drawId: z.guid() });
 export type AnnulDrawInput = z.input<typeof annulDrawSchema>;
+export type CompleteDrawInput = z.input<typeof completeDrawSchema>;
 async function write<T extends z.ZodType>(
 	client: SupabaseClient,
 	input: z.input<T>,
@@ -99,5 +101,16 @@ export function annulDraw(client: SupabaseClient, input: AnnulDrawInput, ctx: Dr
 	return write(client, input, ctx, 'draw.update', annulDrawSchema, 'draw_annul', (p) => ({
 		p_draw_id: p.drawId,
 		p_reason: p.reason
+	})).then(() => undefined);
+}
+
+/** SAN-123: roster_frozen -> completed; every prize must be resolved first (409 otherwise). */
+export function completeDraw(
+	client: SupabaseClient,
+	input: CompleteDrawInput,
+	ctx: DrawRequestContext
+) {
+	return write(client, input, ctx, 'draw.update', completeDrawSchema, 'draw_complete', (p) => ({
+		p_draw_id: p.drawId
 	})).then(() => undefined);
 }

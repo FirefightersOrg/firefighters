@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { render } from 'svelte/server';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
-import { annulDraw, createDraw } from '$lib/server/services/draws';
+import { annulDraw, completeDraw, createDraw } from '$lib/server/services/draws';
 import { generateDrawRoster, freezeDrawRoster } from '$lib/server/services/draw-rosters';
 import {
 	createPrize,
@@ -254,6 +254,41 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 		).rejects.toMatchObject({ status: 409 });
 		expect(await audits(annulledRequest.requestId)).toEqual([]);
 		expect(await row('prizes', annulledPrize)).toEqual(annulledBefore);
+	});
+
+	it('C1 completes a frozen draw through the public API only once every prize is resolved (SAN-123)', async () => {
+		const f = await fixture();
+		const prizeId = await f.prize();
+		const blocked = ctx();
+		await expect(completeDraw(admin, { drawId: f.drawId }, blocked)).rejects.toMatchObject({
+			status: 409
+		});
+		expect(await audits(blocked.requestId)).toEqual([]);
+		expect((await row('draws', f.drawId)).status).toBe('roster_frozen');
+		const denied = ctx();
+		await expect(completeDraw(readOnly, { drawId: f.drawId }, denied)).rejects.toMatchObject({
+			status: 403
+		});
+		expect(await audits(denied.requestId)).toEqual([]);
+		await loadWinningNumber(admin, { prizeId, numberValue: 9999, notes: null }, ctx());
+		const done = ctx();
+		await completeDraw(admin, { drawId: f.drawId }, done);
+		expect((await row('draws', f.drawId)).status).toBe('completed');
+		expect(await audits(done.requestId)).toMatchObject([
+			{ action: 'draw.complete', entity_type: 'draw', entity_id: f.drawId }
+		]);
+		const late = ctx();
+		await expect(
+			createPrize(admin, { drawId: f.drawId, name: 'Late', description: null, position: 2 }, late)
+		).rejects.toMatchObject({ status: 409 });
+		expect(await audits(late.requestId)).toEqual([]);
+		// Void-only correction stays possible on a completed draw; loading is never possible again.
+		await annulPrize(admin, { prizeId, reason: 'Wrong number after completion' }, ctx());
+		const reload = ctx();
+		await expect(
+			loadWinningNumber(admin, { prizeId, numberValue: 100, notes: null }, reload)
+		).rejects.toMatchObject({ status: 409 });
+		expect(await audits(reload.requestId)).toEqual([]);
 	});
 
 	it('C5 propagates a physical manual-pata member win to every member in a later same-date consolation', async () => {
