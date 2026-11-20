@@ -131,3 +131,79 @@ export function compareCommissionRules(a: CommissionRule, b: CommissionRule): nu
 		a.createdAt.localeCompare(b.createdAt)
 	);
 }
+
+export interface CommissionApplication {
+	collectorId: string;
+	paymentDate: string;
+	paymentMode: 'full_payment' | 'installments';
+	installmentNumber: number;
+	installmentCount: number;
+	amountApplied: number;
+	installmentAmount: number;
+}
+
+/** True when a rule covers the application; validity endpoints are inclusive. */
+export function commissionRuleMatches(
+	rule: CommissionRule,
+	application: CommissionApplication
+): boolean {
+	if (
+		rule.status !== 'active' ||
+		(rule.appliesToCollectorId !== null && rule.appliesToCollectorId !== application.collectorId) ||
+		application.paymentDate < rule.validFrom ||
+		(rule.validTo !== null && application.paymentDate > rule.validTo)
+	)
+		return false;
+	if (rule.ruleType === 'custom') return rule.installmentNumber === application.installmentNumber;
+	if (rule.ruleType === 'cash_full_payment') return application.paymentMode === 'full_payment';
+	if (rule.ruleType === 'installment_first')
+		return application.paymentMode === 'installments' && application.installmentNumber === 1;
+	if (rule.ruleType === 'installment_middle')
+		return (
+			application.paymentMode === 'installments' &&
+			application.installmentNumber >= 2 &&
+			application.installmentNumber <= application.installmentCount - 1
+		);
+	return (
+		application.paymentMode === 'installments' &&
+		application.installmentCount > 1 &&
+		application.installmentNumber === application.installmentCount
+	);
+}
+
+/** SQL precedence: collector-specific, custom, newest validFrom, then lexicographically newest id. */
+export function selectCommissionRule(
+	rules: readonly CommissionRule[],
+	application: CommissionApplication
+): CommissionRule | null {
+	return (
+		rules
+			.filter((rule) => commissionRuleMatches(rule, application))
+			.slice()
+			.sort(
+				(a, b) =>
+					Number(b.appliesToCollectorId !== null) - Number(a.appliesToCollectorId !== null) ||
+					Number(b.ruleType === 'custom') - Number(a.ruleType === 'custom') ||
+					b.validFrom.localeCompare(a.validFrom) ||
+					b.id.localeCompare(a.id)
+			)[0] ?? null
+	);
+}
+
+/**
+ * Preview only: binary floating-point rounding may differ at half-cent boundaries.
+ * PostgreSQL numeric `round(..., 2)` in settlement_application_commission is authoritative
+ * for persisted settlement totals and ledger entries; never post this preview as money.
+ */
+export function calculateApplicationCommission(
+	rules: readonly CommissionRule[],
+	application: CommissionApplication
+): number {
+	const rule = selectCommissionRule(rules, application);
+	if (!rule) return 0;
+	const raw =
+		rule.percentage !== null
+			? (application.amountApplied * Number(rule.percentage)) / 100
+			: (application.amountApplied * Number(rule.fixedAmount)) / application.installmentAmount;
+	return Math.round((raw + Number.EPSILON) * 100) / 100;
+}

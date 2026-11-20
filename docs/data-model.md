@@ -585,6 +585,13 @@ Suggested fields:
 Rule:
 
 - Every adjustment must generate a current account entry and audit.
+- Implemented in SAN-67 (`20261216000000_commission_ledger.sql`): adjustments are immutable,
+  direct DML is revoked, and future SAN-68/69 audited functions will check
+  `commission.adjust` / `commission.settle` / `collector.ledger.adjust`. `amount` is positive
+  `numeric(12,2)` (not `NaN`), the required reason is trimmed, non-blank and at most 1,000
+  characters, and `direction` is `in_favor_of_collector` or `in_favor_of_firefighters`.
+  Optional settlement and payment references are checked to belong to the adjustment's campaign
+  and collector. Readers need `commission.view`, `commission.adjust`, or `commission.settle`.
 
 Types:
 
@@ -621,6 +628,15 @@ Suggested fields:
 Rule:
 
 - Collector balance is calculated by summing non-annulled entries.
+- Implemented in SAN-67 (`20261216000000_commission_ledger.sql`): entries are append-only.
+  Their amount is positive `numeric(12,2)` (not `NaN`); their seven types and the three statuses
+  are defined in `docs/state-machines.md`. A recorded entry can only become `annulled` (with
+  actor, timestamp and a required trimmed `annul_reason`, at most 1000 characters) or `compensated`.
+  The original `reason` is immutable, including during annulment; `annul_reason`, `annulled_by`
+  and `annulled_at` must all be null for non-annulled entries. All historical fields are
+  immutable. Optional settlement/payment references must match the entry campaign and collector.
+  Readers need `collector.ledger.view` or `collector.ledger.adjust`, while a collector login can
+  read only its own rows. Future SAN-68/69 audited functions own all writes.
 
 ### draws
 
@@ -876,3 +892,17 @@ Suggested fields:
 - Do not calculate balances from editable manual fields.
 - Do not confirm imports with blocking errors.
 - Do not apply commission adjustments without reason and audit.
+
+## Maximum text lengths (SAN-97)
+
+Free-text columns written by the audited functions have a `char_length(col) <= N` CHECK with the
+same N as the Zod schema that validates the field, so a caller that skips the app cannot save
+longer text. Migration `20261213000000_text_length_checks.sql` lists every column with its source
+constant; pgTAP `026_text_length_checks` covers each limit (over-length fails with 23514, the
+boundary value succeeds). New text columns written by an RPC must get a CHECK and a Zod `.max()`
+with the same number.
+
+- `audit_log.reason` (1000) is shared by every audited function, so it takes the largest per-function
+  limit. The tighter ones (500 for rule changes and imports) stay in Zod and in the per-column CHECKs.
+- `bonds.internal_code`, `bonds.barcode` and `bond_numbers.barcode` take 200: manual entry is limited
+  to 100 by Zod, but an import carries codes of up to 200 characters.

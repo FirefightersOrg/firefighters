@@ -1,5 +1,7 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
+-- Dates below are Buenos Aires dates, as in the guards (not UTC midnight).
+set local timezone = 'America/Argentina/Buenos_Aires';
 select plan(82);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
@@ -73,7 +75,7 @@ select is((select settlement_id from public.payments where id=pg_temp.id('draft'
 select throws_ok($$delete from public.payment_installments where payment_id=pg_temp.id('draft')$$,'23001',null,'applications never deleted');
 select throws_ok($$delete from public.payments where id=pg_temp.id('draft')$$,'23001',null,'payments never deleted');
 select throws_ok($$delete from public.settlements where id=pg_temp.id('set')$$,'23001',null,'settlements never deleted');
-select throws_ok($$truncate public.payment_installments,public.payments,public.settlements$$,'23001',null,'tables cannot truncate');
+select throws_ok($$truncate public.payment_installments,public.commission_adjustments,public.collector_ledger_entries,public.payments,public.settlements$$,'23001',null,'tables cannot truncate');
 select ok(has_table_privilege('authenticated','public.payments','select') and not has_table_privilege('authenticated','public.payments','insert') and not has_table_privilege('authenticated','public.settlements','update'),'authenticated select only');
 select ok(not has_table_privilege('service_role','public.payments','delete') and not has_table_privilege('anon','public.payments','select'),'no anonymous or delete privileges');
 select ok(not has_function_privilege('authenticated','public.payments_guard_update()','execute') and has_function_privilege('authenticated','public.payment_can_read()','execute'),'function privileges');
