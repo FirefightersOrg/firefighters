@@ -405,3 +405,22 @@ integration: `supabase test db` passed **34 files / 2102 assertions** (`034` pla
 - The reassociation form accepts one destination installment per submission. The SAN-71 service
   and RPC still accept multiple applications; expanding the no-JavaScript UI to add arbitrary
   application rows is a known follow-up.
+
+### Known follow-up (SAN-71 review): cash/transfer totals of a corrected closed settlement
+
+When a payment method is corrected (cash ↔ transfer) for a payment of a **closed** settlement, the
+settlement's `total_cash` / `total_transfer` stay as the closing snapshot (closed totals are never
+edited), and `settlement_correct` (SAN-72) only records `commission_delta` / `cash_retained_delta`.
+So those two totals do **not** reflect the corrected method. Reports by payment method must not
+read them as live data: derive cash/transfer from the payments (non-adjusted originals excluded,
+replacements included). A way to record cash/transfer deltas on the settlement correction is a
+follow-up.
+
+### Known limitation (SAN-72 review): payment corrections after a collector move
+
+After `sale_correct_collector` moves a sale, its historical payments still carry the original
+collector. Annulling or correcting one of them would post compensation to the wrong collector, so
+the `moved_payment_correction_guard` trigger refuses it (55000, shown as a 409 conflict with the
+message "This payment's sale was moved to another collector. Correct the sale collector back
+before annulling or correcting this payment."). Making payment corrections collector-aware is a
+follow-up.
