@@ -4,9 +4,18 @@ import type { Draw, DrawRoster, DrawRosterEntry, DrawStatus, DrawType } from '$l
 
 type Row = Record<string, unknown>;
 const PAGE_SIZE = 500;
-const snapshotName = (value: unknown, fallback: string) => {
+const snapshotText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const buyerSnapshotName = (value: unknown) => {
 	const row = (value ?? {}) as Record<string, unknown>;
-	return String(row.display_name ?? row.displayName ?? row.name ?? fallback);
+	return (
+		snapshotText(row.business_name) ||
+		[snapshotText(row.first_name), snapshotText(row.last_name)].filter(Boolean).join(' ') ||
+		'No buyer'
+	);
+};
+const collectorSnapshotName = (value: unknown) => {
+	const row = (value ?? {}) as Record<string, unknown>;
+	return snapshotText(row.display_name) || 'No collector';
 };
 export interface DrawRosterListEntry extends DrawRosterEntry {
 	numberKind: 'base' | 'associated' | 'extraordinary';
@@ -123,8 +132,8 @@ const mapEntry = (row: Row): DrawRosterListEntry => {
 		numberKind: (number.number_kind ?? 'base') as DrawRosterListEntry['numberKind'],
 		bondKind: (bond.kind ?? 'simple') as DrawRosterListEntry['bondKind'],
 		bondLabel: String(bond.internal_code ?? row.bond_id),
-		buyerName: snapshotName(row.buyer_snapshot, 'No buyer'),
-		collectorName: snapshotName(row.collector_snapshot, 'No collector')
+		buyerName: buyerSnapshotName(row.buyer_snapshot),
+		collectorName: collectorSnapshotName(row.collector_snapshot)
 	};
 };
 export async function listDrawRosterEntries(
@@ -155,6 +164,7 @@ export async function listBondDrawRosterEntries(
 		)
 		.eq('bond_id', bondId)
 		.eq('draw_rosters.draws.campaign_id', campaignId)
+		.in('draw_rosters.status', ['generated', 'frozen'])
 		.order('number_value')
 		.order('id');
 	const result = await pages((from, to) =>

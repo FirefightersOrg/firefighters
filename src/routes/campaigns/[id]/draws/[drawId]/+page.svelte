@@ -9,11 +9,11 @@
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
 	import { DRAW_STATUS_LABELS, DRAW_TYPE_LABELS } from '$lib/domain/draws';
+	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
-	const localCutoff = $derived(
-		data.draw.paymentCutoffAt.replace(/([+-]\d\d:\d\d|Z)$/, '').slice(0, 16)
-	);
+	const localCutoff = $derived(buenosAiresDateTimeLocal(data.draw.paymentCutoffAt));
+	const cutoffDisplay = $derived(localCutoff.replace('T', ' '));
 </script>
 
 <svelte:head><title>{data.draw.name} - {data.campaign.name}</title></svelte:head>
@@ -42,7 +42,7 @@
 		<dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
 			<div>
 				<dt class="text-slate-500">Payment cutoff</dt>
-				<dd>{data.draw.paymentCutoffAt} (Buenos Aires)</dd>
+				<dd>{cutoffDisplay} (Buenos Aires)</dd>
 			</div>
 			<div>
 				<dt class="text-slate-500">Required installment</dt>

@@ -20,6 +20,7 @@ import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
 import { annulDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
+import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
 const DRAW_ID = 'd0000000-0000-4000-8000-000000000001';
 const url = `http://localhost/campaigns/${CAMPAIGN_ID}/draws/${DRAW_ID}`;
@@ -111,5 +112,35 @@ describe('draw detail', () => {
 		expect(await run('generate', ['campaign.view', 'draw.generate_roster'])).toMatchObject({
 			status: 409
 		});
+	});
+	it('preserves a UTC cutoff instant through load, edit form value, and save', async () => {
+		const utcCutoff = '2026-11-20T03:00:00+00:00';
+		vi.mocked(getDraw).mockResolvedValue({
+			data: { ...draw, paymentCutoffAt: utcCutoff },
+			error: null
+		} as never);
+		const loaded = (await load({
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.update'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never)) as { draw: typeof draw };
+		const paymentCutoffLocal = buenosAiresDateTimeLocal(loaded.draw.paymentCutoffAt);
+
+		await run('update', ['campaign.view', 'draw.update'], {
+			name: draw.name,
+			drawDate: draw.drawDate,
+			paymentCutoffLocal,
+			requiredInstallmentNumber: '3',
+			consolationRequiredInstallmentNumber: ''
+		});
+
+		expect(paymentCutoffLocal).toBe('2026-11-20T00:00');
+		expect(updateDraw).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({ paymentCutoffAt: '2026-11-20T00:00:00-03:00' }),
+			expect.anything()
+		);
+		const saved = vi.mocked(updateDraw).mock.calls.at(-1)?.[1].paymentCutoffAt;
+		expect(Date.parse(saved as string)).toBe(Date.parse(utcCutoff));
 	});
 });

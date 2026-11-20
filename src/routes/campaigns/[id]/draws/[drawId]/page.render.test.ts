@@ -32,6 +32,13 @@ describe('draw detail render', () => {
 		expect(body).toContain('Generate roster');
 		expect(body).toContain('Annul draw');
 	});
+	it('converts a UTC cutoff instant near midnight to the Buenos Aires wall clock', () => {
+		const value = data('scheduled');
+		value.draw.paymentCutoffAt = '2026-11-20T02:30:00+00:00';
+		const body = render(Page, { props: { data: value, form: null } as any }).body;
+		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('value="2026-11-19T23:30"');
+	});
 	it('renders generated actions and consolation warning', () => {
 		expect(
 			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
