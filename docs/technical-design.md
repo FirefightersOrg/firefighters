@@ -457,3 +457,12 @@ To facilitate later migration:
 - Avoid complex triggers without documentation.
 - Use standard PostgreSQL wherever sufficient.
 - Document RLS and permissions.
+
+### Settlement services (SAN-63)
+
+`settlement_open`, `settlement_add_payment`, `settlement_remove_payment`, `settlement_totals` and
+`settlement_close` are SECURITY DEFINER RPCs. They are the only payment/settlement write path: removal
+annuls a pending payment, totals are derived from payment applications and active commission rules, and
+closing locks the open settlement before confirming payments and snapshotting totals.
+`collector_credit_balance` deliberately returns `0` until the future
+`collector_ledger_entries` implementation is available; it must then be derived from that ledger.
