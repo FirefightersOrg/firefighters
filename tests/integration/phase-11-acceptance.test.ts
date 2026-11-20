@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
-import { createDraw } from '$lib/server/services/draws';
+import { annulDraw, createDraw, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { load as rosterLoad } from '../../src/routes/campaigns/[id]/draws/[drawId]/roster/+page.server';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -39,6 +39,7 @@ interface Fixture {
 }
 let admin: Caller;
 let financialReader: SupabaseClient;
+let readOnly: Caller;
 let campaignId: string;
 let collectorId: string;
 let buyerId: string;
@@ -76,6 +77,20 @@ async function audit(requestId: string) {
 	if (error) throw new Error(error.message);
 	return data ?? [];
 }
+async function drawRow(drawId: string) {
+	const { data, error } = await admin.client.from('draws').select('*').eq('id', drawId).single();
+	if (error) throw new Error(error.message);
+	return data;
+}
+async function rosterRow(rosterId: string) {
+	const { data, error } = await admin.client
+		.from('draw_rosters')
+		.select('*')
+		.eq('id', rosterId)
+		.single();
+	if (error) throw new Error(error.message);
+	return data;
+}
 async function rosterEntries(rosterId: string) {
 	const { data, error } = await admin.client
 		.from('draw_roster_entries')
@@ -87,7 +102,7 @@ async function rosterEntries(rosterId: string) {
 	if (error) throw new Error(error.message);
 	return data ?? [];
 }
-async function sale(label: keyof typeof fixtures, bases: number[]) {
+async function createSale(label: string, bases: number[]): Promise<Fixture> {
 	const bondId = await rpc<string>('bond_create', {
 		p_campaign_id: campaignId,
 		p_base_numbers: bases,
@@ -115,12 +130,15 @@ async function sale(label: keyof typeof fixtures, bases: number[]) {
 		.order('installment_number')
 		.order('id');
 	if (error || !data) throw new Error(error?.message ?? 'Missing installments');
-	fixtures[label] = {
+	return {
 		bondId,
 		saleId,
 		installments: data.map((row) => ({ ...row, amount: Number(row.amount) })),
 		paymentIds: []
 	};
+}
+async function sale(label: keyof typeof fixtures, bases: number[]) {
+	fixtures[label] = await createSale(label, bases);
 }
 async function payment(
 	fixture: Fixture,
@@ -173,6 +191,9 @@ async function draw(
 beforeAll(async () => {
 	financialReader = createClient(supabaseUrl, serviceRoleKey, options);
 	admin = await signIn(seed.admin.email, seed.admin.password);
+	const readOnlyFixture = seed.fixtures.find((fixture) => fixture.roleNames.includes('read-only'));
+	if (!readOnlyFixture) throw new Error('Missing seeded read-only fixture');
+	readOnly = await signIn(readOnlyFixture.email, readOnlyFixture.password);
 	campaignId = await rpc<string>('campaign_create', {
 		p_name: `[it-p11 ${RUN_ID}] draw roster`,
 		p_simple_bond_value: 100,
@@ -225,6 +246,7 @@ beforeAll(async () => {
 	await sale('pata', [nextBase++, nextBase++]);
 	await payment(fixtures.monthly, [1, 2], cutoffDay);
 	await payment(fixtures.late, [1], cutoffDay);
+	// baDate(-1) is the day after cutoffDay = baDate(-2), so it is recorded but not covered.
 	await payment(fixtures.late, [2], baDate(-1));
 	await payment(fixtures.full, [1, 2], cutoffDay);
 	await payment(fixtures.partial, [1], cutoffDay);
@@ -421,7 +443,10 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 		).toBe(`Roster buyer ${RUN_ID}`);
 	});
 
-	it('C4 freezes full rows: later cutoff-valid confirmation and correction do not alter them; regenerate is refused and repeat freeze is audit-free', async () => {
+	it('C4 freezes full rows: later cutoff-valid confirmation and correction do not alter them; regeneration is refused and repeat freeze is audit-free', async () => {
+		// Dedicated fixture: this test never mutates the shared C1 coverage fixtures.
+		const c4Partial = await createSale('c4-partial', [nextBase++]);
+		await payment(c4Partial, [1], cutoffDay);
 		const drawId = await draw('monthly');
 		const rosterId = await generateDrawRoster(
 			admin.client,
@@ -433,23 +458,28 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 			{ drawId },
 			{ requestId: rid('freeze'), permissions: admin.permissions }
 		);
-		const before = await rosterEntries(rosterId);
+		const beforeEntries = await rosterEntries(rosterId);
+		const beforeRoster = await rosterRow(rosterId);
 		// This settlement changes live eligibility after the snapshot, but never its frozen rows.
-		await payment(fixtures.partial, [2], cutoffDay);
+		await payment(c4Partial, [2], cutoffDay);
 		await rpc('payment_correct_method', {
-			p_payment_id: fixtures.monthly.paymentIds[0],
+			p_payment_id: c4Partial.paymentIds[0],
 			p_new_method: 'transfer',
 			p_reason: 'phase 11 frozen roster correction',
 			p_request_id: rid('frozen-correction')
 		});
-		expect(await rosterEntries(rosterId)).toEqual(before);
+		expect(await rosterEntries(rosterId)).toEqual(beforeEntries);
+		const regenerateRequest = rid('frozen-regenerate');
 		await expect(
 			generateDrawRoster(
 				admin.client,
 				{ drawId },
-				{ requestId: rid('frozen-regenerate'), permissions: admin.permissions }
+				{ requestId: regenerateRequest, permissions: admin.permissions }
 			)
 		).rejects.toMatchObject({ status: 409 });
+		expect(await audit(regenerateRequest)).toEqual([]);
+		expect(await rosterEntries(rosterId)).toEqual(beforeEntries);
+		expect(await rosterRow(rosterId)).toEqual(beforeRoster);
 		const repeatRequest = rid('repeat-freeze');
 		await freezeDrawRoster(
 			admin.client,
@@ -457,12 +487,155 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 			{ requestId: repeatRequest, permissions: admin.permissions }
 		);
 		expect(await audit(repeatRequest)).toEqual([]);
-		const { data, error } = await admin.client
-			.from('draws')
-			.select('status')
-			.eq('id', drawId)
-			.single();
-		if (error) throw new Error(error.message);
-		expect(data?.status).toBe('roster_frozen');
+		expect((await drawRow(drawId))?.status).toBe('roster_frozen');
+	});
+
+	it('C5 rejects a forged read-only caller without audit writes or changing draw and roster rows', async () => {
+		const drawId = await draw('monthly');
+		const rosterId = await generateDrawRoster(
+			admin.client,
+			{ drawId },
+			{ requestId: rid('denied-setup-generate'), permissions: admin.permissions }
+		);
+		const beforeDraw = await drawRow(drawId);
+		const beforeEntries = await rosterEntries(rosterId);
+		const rawCode = (name: string, args: Record<string, unknown>) =>
+			codeOf(
+				readOnly.client.rpc(name, args).then(({ error }) => {
+					if (error) throw Object.assign(new Error(error.message), { code: error.code });
+				})
+			);
+		const denied = async (
+			requestId: string,
+			operation: () => Promise<unknown>,
+			raw: () => PromiseLike<string | undefined>
+		) => {
+			await operation().then(
+				() => expect.unreachable('The read-only caller must be denied.'),
+				(error: { status?: number }) => expect(error.status).toBe(403)
+			);
+			expect(await raw()).toBe('42501');
+			expect(await audit(requestId)).toEqual([]);
+			expect(await drawRow(drawId)).toEqual(beforeDraw);
+			expect(await rosterEntries(rosterId)).toEqual(beforeEntries);
+		};
+		const createRequest = rid('denied-create');
+		await denied(
+			createRequest,
+			() =>
+				createDraw(
+					readOnly.client,
+					{
+						campaignId,
+						drawType: 'monthly',
+						name: 'Denied draw',
+						drawDate: baDate(1),
+						paymentCutoffAt: cutoff,
+						requiredInstallmentNumber: 2,
+						eligibilityRule: {}
+					},
+					{ requestId: createRequest, permissions: ['draw.create'] }
+				),
+			() =>
+				rawCode('draw_create', {
+					p_campaign_id: campaignId,
+					p_draw_type: 'monthly',
+					p_name: 'Denied draw',
+					p_draw_date: baDate(1),
+					p_payment_cutoff_at: cutoff,
+					p_required_installment_number: 2,
+					p_eligibility_rule: {},
+					p_request_id: createRequest
+				})
+		);
+		const updateRequest = rid('denied-update');
+		await denied(
+			updateRequest,
+			() =>
+				updateDraw(
+					readOnly.client,
+					{
+						drawId,
+						name: 'Denied update',
+						drawDate: baDate(1),
+						paymentCutoffAt: cutoff,
+						requiredInstallmentNumber: 2,
+						eligibilityRule: {}
+					},
+					{ requestId: updateRequest, permissions: ['draw.update'] }
+				),
+			() =>
+				rawCode('draw_update', {
+					p_draw_id: drawId,
+					p_name: 'Denied update',
+					p_draw_date: baDate(1),
+					p_payment_cutoff_at: cutoff,
+					p_required_installment_number: 2,
+					p_eligibility_rule: {},
+					p_request_id: updateRequest
+				})
+		);
+		const annulRequest = rid('denied-annul');
+		await denied(
+			annulRequest,
+			() =>
+				annulDraw(
+					readOnly.client,
+					{ drawId, reason: 'Denied annulment' },
+					{ requestId: annulRequest, permissions: ['draw.update'] }
+				),
+			() =>
+				rawCode('draw_annul', {
+					p_draw_id: drawId,
+					p_reason: 'Denied annulment',
+					p_request_id: annulRequest
+				})
+		);
+		for (const [action, fn] of [
+			['generate', generateDrawRoster],
+			['freeze', freezeDrawRoster]
+		] as const) {
+			const requestId = rid(`denied-${action}`);
+			await denied(
+				requestId,
+				() =>
+					fn(readOnly.client, { drawId }, { requestId, permissions: [`draw.${action}_roster`] }),
+				() => rawCode(`draw_${action}_roster`, { p_draw_id: drawId, p_request_id: requestId })
+			);
+		}
+		await freezeDrawRoster(
+			admin.client,
+			{ drawId },
+			{ requestId: rid('denied-direct-freeze'), permissions: admin.permissions }
+		);
+		const frozenRoster = await rosterRow(rosterId);
+		const frozenEntries = await rosterEntries(rosterId);
+		const entry = frozenEntries[0]!;
+		const update = await readOnly.client
+			.from('draw_roster_entries')
+			.update({ number_value: entry.number_value })
+			.eq('id', entry.id)
+			.select();
+		expect(update.error?.code).toBe('42501');
+		const remove = await readOnly.client
+			.from('draw_roster_entries')
+			.delete()
+			.eq('id', entry.id)
+			.select();
+		expect(remove.error?.code).toBe('42501');
+		const rosterUpdate = await readOnly.client
+			.from('draw_rosters')
+			.update({ status: 'frozen' })
+			.eq('id', rosterId)
+			.select();
+		expect(rosterUpdate.error?.code).toBe('42501');
+		const rosterDelete = await readOnly.client
+			.from('draw_rosters')
+			.delete()
+			.eq('id', rosterId)
+			.select();
+		expect(rosterDelete.error?.code).toBe('42501');
+		expect(await rosterRow(rosterId)).toEqual(frozenRoster);
+		expect(await rosterEntries(rosterId)).toEqual(frozenEntries);
 	});
 });
