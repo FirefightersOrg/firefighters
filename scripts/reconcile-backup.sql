@@ -71,5 +71,14 @@ from public.audit_log
 group by entity_type
 order by entity_type;
 
-\echo '== 6. frozen rosters: PENDING (Phase 11 tables do not exist yet; add the count per draw here)'
--- TODO(SAN-90 follow-up): select draw_id, count(*) from the frozen roster table once it exists.
+\echo '== 6. frozen rosters: entries per frozen roster (compare with the source; one frozen roster per draw)'
+select d.campaign_id, d.id as draw_id, r.id as roster_id, r.frozen_at, count(e.id) as entries
+from public.draw_rosters r
+join public.draws d on d.id = r.draw_id
+left join public.draw_roster_entries e on e.draw_roster_id = r.id
+where r.status = 'frozen'
+group by d.campaign_id, d.id, r.id, r.frozen_at
+order by d.campaign_id, d.draw_date, d.id;
+
+\echo '== 6b. winners and prizes: PENDING (Phase 12 tables do not exist yet; add the counts here)'
+-- TODO(SAN-113): count winners and prizes per draw once the Phase 12 tables exist.

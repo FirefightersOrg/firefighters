@@ -123,6 +123,7 @@ Generated on demand as CSV (UTF-8 with BOM, CRLF, formula-safe text cells) at
 | Payments by period         | `payments`         | `payments` (`?from=&to=` on `payment_date`)                | `payment.view`          |
 | Settlements                | `settlements`      | `settlements` + collector name                             | `settlement.view`       |
 | Collector current accounts | `collector-ledger` | `collector_ledger_entries` (`?from=&to=` on `occurred_at`) | `collector.ledger.view` |
+| Frozen rosters             | `frozen-rosters`   | `draw_roster_entries` of `frozen` rosters + draw           | `draw.view`             |
 
 Rules: `report.export` is required (only the administrator holds it today) together with the view
 permission of the exported data; RLS still applies. Exports are read-only, paginated in 1000-row
@@ -130,10 +131,14 @@ pages with a total order (PostgREST `max_rows` is 1000) and streamed; a failure 
 the download instead of producing a file that looks complete. Each export is logged
 (`[backups] export generated`).
 
-Pending (tables do not exist yet): **frozen rosters** (Phase 11) and **winners and prizes**
-(Phase 12). Hooks are marked `TODO(SAN-90 follow-up)` in `src/lib/domain/backup-exports.ts` and
-`scripts/reconcile-backup.sql`. Follow-up ticket: SAN-113 "Backup exports for frozen rosters
-and winners/prizes".
+Frozen rosters (SAN-113): one row per entry of every `frozen` roster of the campaign (generated and
+superseded rosters are excluded), with draw id/name/type/date, roster id, `frozen_at` (Buenos Aires
+time), entry number, bond id, eligibility and reason, and the buyer and collector snapshots taken
+when the roster was generated. Ordered by (`draw_roster_id`, `number_value`), which is unique.
+
+Pending (Phase 12 tables do not exist yet): **winners and prizes**. Hooks are marked
+`TODO(SAN-113)` in `src/lib/domain/backup-exports.ts` and `scripts/reconcile-backup.sql`
+(SAN-113 stays open for it).
 
 ### Checklist in the app
 
