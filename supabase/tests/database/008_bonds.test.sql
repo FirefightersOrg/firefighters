@@ -1042,10 +1042,11 @@ select throws_ok(
 select throws_ok(
   -- Every table referencing bonds is listed so the FK check does not fail first:
   -- import_session_items (SAN-44), delivery_note_items and bond_assignments (SAN-53), and the
-  -- sales tables (SAN-58).
+  -- sales tables (SAN-58), and commission/ledger history (SAN-67).
   $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items,
     public.delivery_note_items, public.bond_assignments, public.installments,
-    public.payment_installments, public.payments, public.settlements, public.payment_plans, public.sales$$,
+    public.payment_installments, public.commission_adjustments, public.collector_ledger_entries,
+    public.payments, public.settlements, public.payment_plans, public.sales$$,
   '23001', null,
   'truncate: bonds and bond_numbers (owner)'
 );
