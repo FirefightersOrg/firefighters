@@ -1,5 +1,7 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
+-- Dates below are Buenos Aires dates, as in the guards (not UTC midnight).
+set local timezone = 'America/Argentina/Buenos_Aires';
 select plan(82);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
