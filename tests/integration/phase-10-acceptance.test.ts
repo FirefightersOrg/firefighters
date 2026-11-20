@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient, type User } from '@supabase/supabase
 import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
+import { load as auditLoad } from '../../src/routes/campaigns/[id]/audit/+page.server';
+import { isHttpError } from '@sveltejs/kit';
 
 /** Phase 10 (SAN-74) acceptance: corrections are exercised through real authenticated users. */
 const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
@@ -664,5 +666,59 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 		).toEqual(before.data);
 	});
 
-	it.todo('C5 audit viewer /campaigns/[id]/audit shows the 9 fields (part 2, after SAN-73)');
+	it('C5 the campaign audit viewer lists the corrections and shows their 9 fields', async () => {
+		const auditEvent = async (caller: Caller, query = '') => {
+			const { data: profile } = await service
+				.from('profiles')
+				.select('*')
+				.eq('auth_user_id', caller.user.id)
+				.single();
+			const url = new URL(`http://localhost/campaigns/${campaignId}/audit${query}`);
+			return {
+				locals: {
+					supabase: caller.client,
+					safeGetSession: async () => ({ session: null, user: caller.user }),
+					session: null,
+					user: caller.user,
+					profile,
+					permissions: caller.permissions,
+					requestId: rid('audit-view')
+				},
+				params: { id: campaignId },
+				url
+			} as never;
+		};
+		const { data: rows } = await service
+			.from('audit_log')
+			.select('id, action')
+			.like('request_id', `it-p10-${RUN_ID}-%`)
+			.eq('action', 'payment.annul')
+			.limit(1);
+		const correction = rows?.[0];
+		expect(correction).toBeTruthy();
+		const listed = (await auditLoad(
+			await auditEvent(users.admin, '?action=payment.annul')
+		)) as Exclude<Awaited<ReturnType<typeof auditLoad>>, void>;
+		expect(listed.entries.items.map((entry: { id: string }) => entry.id)).toContain(correction!.id);
+		const detailed = (await auditLoad(
+			await auditEvent(users.admin, `?detail=${correction!.id}`)
+		)) as Exclude<Awaited<ReturnType<typeof auditLoad>>, void>;
+		expect(
+			Object.keys((detailed.detail?.newValue ?? {}) as Record<string, unknown>).sort()
+		).toEqual([
+			'affected_entity',
+			'correction_type',
+			'date',
+			'generated_compensatory_movements',
+			'new_value',
+			'previous_value',
+			'reason',
+			'related_entity',
+			'user'
+		]);
+		const denied = await Promise.resolve(auditLoad(await auditEvent(users['read-only']))).catch(
+			(e: unknown) => e
+		);
+		expect(isHttpError(denied) ? denied.status : denied).toBe(403);
+	});
 });
