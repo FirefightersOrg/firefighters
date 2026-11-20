@@ -58,7 +58,11 @@ select throws_ok($$update public.payments set payment_method='transfer' where id
 select throws_ok($$update public.payments set payment_date=current_date-1 where id=pg_temp.id('pay')$$,'23001',null,'date immutable');
 select lives_ok($$update public.settlements set total_cash=100, total_amount=100 where id=pg_temp.id('set')$$,'open totals editable');
 select lives_ok($$update public.settlements set status='closed',closed_at=now(),closed_by='b6270000-0000-0000-0000-000000000001' where id=pg_temp.id('set')$$,'open closes');
-select lives_ok($$update public.settlements set status='corrected' where id=pg_temp.id('set')$$,'closed corrects');
+-- SAN-72 requires the audited adjustment path, not a bare status update.
+select pg_temp.act_as(1);
+select lives_ok($$select public.settlement_correct(pg_temp.id('set'),'state machine fixture',
+ '{"commission_delta":1,"cash_retained_delta":0}')$$,'closed corrects through adjustment');
+set constraints public.settlement_corrections_check_original immediate;
 select throws_ok($$update public.settlements set total_cash=1 where id=pg_temp.id('set')$$,'23001',null,'corrected totals immutable');
 select throws_ok($$update public.settlements set status='open' where id=pg_temp.id('set')$$,'23514',null,'corrected final');
 with x as (insert into public.settlements(campaign_id,settlement_number,collector_id,created_by)
@@ -79,7 +83,7 @@ select is((select settlement_id from public.payments where id=pg_temp.id('draft'
 select throws_ok($$delete from public.payment_installments where payment_id=pg_temp.id('draft')$$,'23001',null,'applications never deleted');
 select throws_ok($$delete from public.payments where id=pg_temp.id('draft')$$,'23001',null,'payments never deleted');
 select throws_ok($$delete from public.settlements where id=pg_temp.id('set')$$,'23001',null,'settlements never deleted');
-select throws_ok($$truncate public.payment_installments,public.commission_adjustments,public.collector_ledger_entries,public.payments,public.settlements$$,'23001',null,'tables cannot truncate');
+select throws_ok($$truncate public.settlement_corrections,public.payment_installments,public.commission_adjustments,public.collector_ledger_entries,public.payments,public.settlements$$,'23001',null,'tables cannot truncate');
 select ok(has_table_privilege('authenticated','public.payments','select') and not has_table_privilege('authenticated','public.payments','insert') and not has_table_privilege('authenticated','public.settlements','update'),'authenticated select only');
 select ok(not has_table_privilege('service_role','public.payments','delete') and not has_table_privilege('anon','public.payments','select'),'no anonymous or delete privileges');
 select ok(not has_function_privilege('authenticated','public.payments_guard_update()','execute') and has_function_privilege('authenticated','public.payment_can_read()','execute'),'function privileges');
