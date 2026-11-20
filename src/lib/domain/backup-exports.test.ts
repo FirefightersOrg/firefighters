@@ -3,6 +3,7 @@ import { buildCsv } from './csv-export';
 import {
 	BACKUP_EXPORTS,
 	BACKUP_EXPORT_KINDS,
+	exportDateInBuenosAires,
 	exportFileName,
 	isBackupExportKind,
 	parseExportPeriod
@@ -62,5 +63,13 @@ describe('exports', () => {
 	});
 	it('names files by kind, campaign and day', () => {
 		expect(exportFileName('payments', 'c1', '2027-05-01')).toBe('payments-c1-2027-05-01.csv');
+	});
+});
+
+describe('exportDateInBuenosAires', () => {
+	it('uses the Buenos Aires date, not the UTC date', () => {
+		// 2027-05-02T01:30Z is still 2027-05-01 22:30 in Buenos Aires (UTC-3).
+		expect(exportDateInBuenosAires(new Date('2027-05-02T01:30:00Z'))).toBe('2027-05-01');
+		expect(exportDateInBuenosAires(new Date('2027-05-02T03:00:00Z'))).toBe('2027-05-02');
 	});
 });
