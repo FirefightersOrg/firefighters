@@ -185,6 +185,16 @@ export function parseExportPeriod(
 	return { from: f, to: t };
 }
 
+/** Buenos Aires calendar date (YYYY-MM-DD) of `now`, for export file names (not the UTC date). */
+export function exportDateInBuenosAires(now: Date = new Date()): string {
+	return new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Argentina/Buenos_Aires',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	}).format(now);
+}
+
 export function exportFileName(kind: BackupExportKind, campaignId: string, today: string): string {
 	return `${kind}-${campaignId}-${today}.csv`;
 }
