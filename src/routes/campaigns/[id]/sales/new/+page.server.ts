@@ -35,12 +35,12 @@ const addDays = (date: string, days: number) => {
 	const [year, month, day] = date.split('-').map(Number);
 	return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 };
-export const firstDueDateBounds = (today = argentinaToday()) => ({
+export const _firstDueDateBounds = (today = argentinaToday()) => ({
 	min: addDays(today, -31),
 	max: addDays(today, 365)
 });
 const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
-	const { min, max } = firstDueDateBounds(today);
+	const { min, max } = _firstDueDateBounds(today);
 	return saleRegisterSchema
 		.extend({ campaignId: z.literal(campaignId), firstDueDate: z.string().optional() })
 		.superRefine(({ paymentMode, firstDueDate }, context) => {
@@ -81,7 +81,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		buyerTotal: buyers.data?.total ?? 0,
 		canCreateBuyer: hasPermissionIn(locals.permissions, 'buyer.manage'),
 		today: argentinaToday(),
-		firstDueDateBounds: firstDueDateBounds()
+		firstDueDateBounds: _firstDueDateBounds()
 	};
 };
 
