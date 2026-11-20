@@ -111,6 +111,52 @@ describe('backup export route (local Supabase)', () => {
 		}
 	});
 
+	it('exports only frozen rosters with their entries (draw, snapshots, Buenos Aires time)', async () => {
+		const draw = await admin.client.rpc('draw_create', {
+			p_campaign_id: campaignId,
+			p_draw_type: 'final',
+			p_name: `=Final ${run}`,
+			p_draw_date: '2027-12-20',
+			p_payment_cutoff_at: '2027-12-15T23:59:59-03:00',
+			p_required_installment_number: null,
+			p_eligibility_rule: {}
+		});
+		expect(draw.error).toBeNull();
+		const generated = await admin.client.rpc('draw_generate_roster', { p_draw_id: draw.data });
+		expect(generated.error).toBeNull();
+		// Generated but not frozen yet: not part of the export.
+		let res = await call(admin, 'frozen-rosters');
+		expect(res.response?.status).toBe(200);
+		expect(parseCsv(await res.response!.text())).toHaveLength(1);
+
+		const frozen = await admin.client.rpc('draw_freeze_roster', { p_draw_id: draw.data });
+		expect(frozen.error).toBeNull();
+		res = await call(admin, 'frozen-rosters');
+		expect(res.response?.headers.get('content-disposition')).toContain('frozen-rosters-');
+		const rows = parseCsv(await res.response!.text()).map((r) => r.cells);
+		const header = rows[0]!;
+		const get = (r: string[], h: string) => r[header.indexOf(h)];
+		// Each bond contributes its base and associated number; ordered by number within the roster.
+		const numbers = rows.slice(1).map((r) => Number(get(r!, 'number')));
+		expect(numbers).toHaveLength(4);
+		expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+		expect(numbers.slice(0, 2)).toEqual([1, 2]);
+		expect(get(rows[1]!, 'draw_id')).toBe(draw.data);
+		expect(get(rows[1]!, 'draw_name')).toBe(`'=Final ${run}`);
+		expect(get(rows[1]!, 'draw_date')).toBe('2027-12-20');
+		expect(get(rows[1]!, 'frozen_at')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+		expect(get(rows[1]!, 'eligible')).toBe('false');
+		expect(get(rows[1]!, 'ineligibility_reason')).toBe('not_sold');
+	});
+
+	it('requires draw.view for frozen rosters and 404s for a missing campaign', async () => {
+		const { thrown } = await call(admin, 'frozen-rosters', { permissions: ['report.export'] });
+		expect(thrown?.status).toBe(403);
+		expect((await call(admin, 'frozen-rosters', { permissions: null })).thrown?.status).toBe(500);
+		expect((await call(admin, 'frozen-rosters', { id: randomUUID() })).thrown?.status).toBe(404);
+		expect((await call(operator, 'frozen-rosters')).thrown?.status).toBe(403);
+	});
+
 	it('denies a user without report.export with 403', async () => {
 		expect(operator.permissions).not.toContain('report.export');
 		const { thrown, response } = await call(operator, 'bonds');
@@ -124,7 +170,7 @@ describe('backup export route (local Supabase)', () => {
 	});
 
 	it('rejects unknown kinds, bad campaign ids and malformed periods', async () => {
-		expect((await call(admin, 'frozen-rosters')).thrown?.status).toBe(404);
+		expect((await call(admin, 'winners-prizes')).thrown?.status).toBe(404);
 		expect((await call(admin, 'bonds', { id: 'nope' })).thrown?.status).toBe(404);
 		expect((await call(admin, 'bonds', { id: randomUUID() })).thrown?.status).toBe(404);
 		expect(
