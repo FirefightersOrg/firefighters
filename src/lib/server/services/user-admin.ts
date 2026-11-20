@@ -5,13 +5,28 @@ import type { UserProfile } from '../../../app';
 /**
  * Validation schema for admin-managed user creation input.
  */
+export const PROFILE_FULL_NAME_MAX_LENGTH = 200;
+export const PROFILE_EMAIL_MAX_LENGTH = 254;
+export const REQUEST_ID_MAX_LENGTH = 100;
+
 export const createAdminManagedUserSchema = z.object({
-	email: z.string().trim().email('Invalid email address'),
+	email: z
+		.string()
+		.trim()
+		.max(PROFILE_EMAIL_MAX_LENGTH, `Email must be at most ${PROFILE_EMAIL_MAX_LENGTH} characters`)
+		.email('Invalid email address'),
 	password: z.string().min(8, 'Password must be at least 8 characters'),
-	fullName: z.string().trim().min(1, 'Full name is required'),
+	fullName: z
+		.string()
+		.trim()
+		.min(1, 'Full name is required')
+		.max(
+			PROFILE_FULL_NAME_MAX_LENGTH,
+			`Full name must be at most ${PROFILE_FULL_NAME_MAX_LENGTH} characters`
+		),
 	roleNames: z.array(z.string().trim().min(1)).default([]),
 	actorUserId: z.guid().nullable().optional(),
-	requestId: z.string().nullable().optional()
+	requestId: z.string().max(REQUEST_ID_MAX_LENGTH).nullable().optional()
 });
 
 export type CreateAdminManagedUserInput = z.input<typeof createAdminManagedUserSchema>;

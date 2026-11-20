@@ -1,7 +1,7 @@
 -- SAN-62: settlements, payments and payment_installments.
 begin;
--- Fixture dates must share the payment_date default's business timezone, including UTC midnight.
-set local time zone 'America/Argentina/Buenos_Aires';
+-- Dates below are Buenos Aires dates, as in the guards (not UTC midnight).
+set local timezone = 'America/Argentina/Buenos_Aires';
 select plan(82);
 insert into auth.users (id,email) select ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'pay-'||n||'@example.com' from generate_series(1,6)n;
 insert into public.profiles (id,auth_user_id,full_name,email,status) select ('b6270000-0000-0000-0000-00000000000'||n)::uuid, ('a6270000-0000-0000-0000-00000000000'||n)::uuid, 'Pay '||n, 'pay-'||n||'@example.com','active' from generate_series(1,6)n;
@@ -20,7 +20,7 @@ with x as (insert into public.payment_plans(sale_id,installment_count,total_amou
 with x as (insert into public.installments(payment_plan_id,installment_number,due_date,amount) select pg_temp.id('plan'),n,date '2026-01-01'+n,50 from generate_series(1,2)n returning id,installment_number) insert into ids select 'i'||installment_number,id from x;
 with x as (insert into public.settlements(campaign_id,settlement_number,collector_id,created_by) values(pg_temp.id('c'),1,pg_temp.id('ana'),'b6270000-0000-0000-0000-000000000001') returning id) insert into ids select 'set',id from x;
 select columns_are('public','settlements',array['id','campaign_id','settlement_number','collector_id','status','opened_at','closed_at','created_by','closed_by','total_cash','total_transfer','total_amount','commission_amount','commission_paid_amount','net_to_firefighters','notes','updated_at'],'settlement columns');
-select columns_are('public','payments',array['id','campaign_id','sale_id','collector_id','buyer_id','settlement_id','amount','payment_method','payment_date','status','created_by','created_at','updated_at','annulled_by','annulled_at','annulment_reason','replaces_payment_id'],'payment columns');
+select columns_are('public','payments',array['id','campaign_id','sale_id','collector_id','buyer_id','settlement_id','amount','payment_method','payment_date','status','created_by','created_at','updated_at','annulled_by','annulled_at','annulment_reason'],'payment columns');
 select columns_are('public','payment_installments',array['payment_id','installment_id','amount_applied'],'application columns');
 select ok((
   select pg_get_expr(ad.adbin, ad.adrelid) like '%America/Argentina/Buenos_Aires%'
@@ -47,11 +47,7 @@ select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,
 select throws_ok($$insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,amount,payment_method,created_by,annulled_by,annulled_at,annulment_reason) values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),1,'cash','b6270000-0000-0000-0000-000000000001','b6270000-0000-0000-0000-000000000001',now(),'x')$$,'23514',null,'annulment only annulled status');
 with x as (insert into public.payments(campaign_id,sale_id,collector_id,buyer_id,settlement_id,amount,payment_method,created_by,status) values(pg_temp.id('c'),pg_temp.id('sale'),pg_temp.id('ana'),pg_temp.id('buyer'),pg_temp.id('set'),100,'cash','b6270000-0000-0000-0000-000000000001','pending_in_settlement') returning id) insert into ids select 'pay',id from x;
 select lives_ok($$update public.payments set status='confirmed' where id=pg_temp.id('pay')$$,'pending confirms');
--- SAN-71 gates confirmed corrections. This privileged fixture exercises the underlying
--- state machine; 033 proves direct/API DML cannot enter the correction path.
-select set_config('app.payment_correction',pg_temp.id('pay')::text,true);
 select lives_ok($$update public.payments set status='adjusted' where id=pg_temp.id('pay')$$,'confirmed adjusts');
-select set_config('app.payment_correction','',true);
 select throws_ok($$update public.payments set status='confirmed' where id=pg_temp.id('pay')$$,'23514',null,'adjusted final');
 select throws_ok($$update public.payments set amount=99 where id=pg_temp.id('pay')$$,'23001',null,'amount immutable');
 select throws_ok($$update public.payments set payment_method='transfer' where id=pg_temp.id('pay')$$,'23001',null,'method immutable');
