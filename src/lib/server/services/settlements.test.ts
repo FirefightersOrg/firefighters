@@ -3,10 +3,25 @@ import {
 	addPaymentToSettlement,
 	addPaymentToSettlementSchema,
 	mapSettlementRpcError,
+	removePaymentFromSettlementSchema,
 	SettlementServiceError
 } from './settlements';
 const id = '00000000-0000-4000-8000-000000000001';
 describe('settlement services', () => {
+	it('counts annulment reasons like PostgreSQL char_length, not UTF-16 units', () => {
+		expect(
+			removePaymentFromSettlementSchema.safeParse({
+				paymentId: id,
+				reason: '😀'.repeat(1000)
+			}).success
+		).toBe(true);
+		expect(
+			removePaymentFromSettlementSchema.safeParse({
+				paymentId: id,
+				reason: '😀'.repeat(1001)
+			}).success
+		).toBe(false);
+	});
 	it('checks payment permission before RPC', async () => {
 		const rpc = vi.fn();
 		await expect(

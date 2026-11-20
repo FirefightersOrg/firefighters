@@ -5,6 +5,7 @@ import type {
 	CommissionRuleInput,
 	CommissionRuleUpdateInput
 } from '$lib/schemas/commission-rule';
+import { COMMISSION_REASON_MAX_LENGTH } from '$lib/schemas/commission-rule';
 
 /**
  * Commission rule use cases. Every write calls one audited SQL function with the USER-SCOPED
@@ -91,6 +92,10 @@ const CONSTRAINT_MESSAGES: Record<string, { field?: CommissionRuleFormField; mes
 	commission_rules_installment_number_custom: {
 		field: 'installmentNumber',
 		message: 'Installment number is only used (and required) for a specific installment rule.'
+	},
+	commission_rules_annul_reason_max_length: {
+		field: 'reason',
+		message: `Reason must be at most ${COMMISSION_REASON_MAX_LENGTH} characters.`
 	},
 	commission_rules_validity_order: {
 		field: 'validTo',

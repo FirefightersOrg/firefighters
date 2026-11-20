@@ -40,6 +40,24 @@ function page(manage: boolean, extra: Record<string, unknown> = {}) {
 }
 
 describe('/campaigns/[id]/collectors/[collectorId] page', () => {
+	it('renders the settlement record section', () => {
+		const body = page(false, {
+			settlements: [
+				{
+					id: 's',
+					settlementNumber: 4,
+					status: 'closed',
+					openedAt: '2026-01-01T02:59:59Z',
+					closedAt: '2026-01-02T02:59:59Z',
+					totals: { totalAmount: '12.00' }
+				}
+			]
+		});
+		expect(body).toContain('#4');
+		expect(body).toContain('/settlements/s');
+		expect(body).toContain('Dec 31, 2025');
+		expect(body).toContain('Jan 1, 2026');
+	});
 	it('renders the eight sections with their empty states', () => {
 		const body = page(false);
 		for (const title of [
