@@ -127,7 +127,7 @@ select is((select to_jsonb(s) from public.settlements s where id=pg_temp.id('clo
 select ok((select bool_and(collector_id=pg_temp.id('wrong')) from public.payments where id in (pg_temp.id('cash_payment'),pg_temp.id('transfer_payment'))),'payment collectors remain historical');
 select is((select count(*)::int from public.bond_assignments where bond_id=pg_temp.id('cash_bond')),2,'custody history retained');
 select is((select collector_id from public.bond_assignments where bond_id=pg_temp.id('cash_bond') and status='active'),pg_temp.id('right'),'active custody corrected');
-select throws_ok($$select public.payment_annul(pg_temp.id('cash_payment'),'later')$$,'55000',null,'later payment correction fails safely after collector move');
+select throws_ok($$select public.payment_annul(pg_temp.id('cash_payment'),'later')$$,'55000','This payment''s sale was moved to another collector. Correct the sale collector back before annulling or correcting this payment.','later payment correction fails safely after collector move, with a readable message');
 set local role authenticated;
 select lives_ok($$select public.bond_correct_collector(pg_temp.id('unsold_bond'),pg_temp.id('right'),'unsold','72-unsold')$$,'unsold reassignment');
 select lives_ok($$select public.bond_correct_collector(pg_temp.id('delegate_bond'),pg_temp.id('right'),'sold','72-delegate')$$,'sold delegates');

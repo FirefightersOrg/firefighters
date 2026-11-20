@@ -64,6 +64,23 @@ Must include:
 - Notes.
 - Signatures.
 
+### Settlement print limitations (SAN-65)
+
+- Open notes are marked PRELIMINARY / DRAFT. Annulled and corrected notes carry
+  ANULADA / CORREGIDA and NOT VALID on both copies.
+- Non-open notes list only currently confirmed payments, but use the stored
+  closing totals. Payments annulled after closing can therefore make the printed
+  row sum differ from the snapshot, especially on annulled/corrected notes.
+  These are not historical reconciliation reports.
+- The resulting collector balance for non-open notes is currently `0.00`, not a
+  reconstructed historical balance: no historical balance snapshot is stored.
+- The payment query is not paginated and inherits PostgREST's default 1000-row
+  cap. Notes above that size may omit rows even though snapshot totals are intact.
+
+The latter three limitations were explicitly accepted for now in review comment 4635161885. Historical payment membership/balance snapshots and complete pagination
+remain follow-up work; do not rely on these notes for historical reconciliation or
+settlements exceeding the row cap.
+
 ## Payment certificate
 
 Must include:
