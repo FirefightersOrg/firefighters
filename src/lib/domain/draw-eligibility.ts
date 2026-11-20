@@ -20,7 +20,13 @@ export const DRAW_TYPES: readonly DrawType[] = [
 ];
 
 export type DrawIneligibilityReason =
-	'not_sold' | 'annulled' | 'installments_not_covered' | 'not_fully_paid' | 'already_won';
+	| 'not_sold'
+	| 'annulled'
+	| 'installments_not_covered'
+	| 'not_fully_paid'
+	| 'already_won'
+	/** Consolation draw configured without any required installment (review of #77). */
+	| 'missing_required_installment';
 
 /** English labels match the language used by the existing application UI. */
 export const DRAW_INELIGIBILITY_REASON_LABELS: Record<DrawIneligibilityReason, string> = {
@@ -28,7 +34,8 @@ export const DRAW_INELIGIBILITY_REASON_LABELS: Record<DrawIneligibilityReason, s
 	annulled: 'Bond annulled',
 	installments_not_covered: 'Required installments not covered',
 	not_fully_paid: 'Bond not fully paid',
-	already_won: 'Bond already won an excluding draw'
+	already_won: 'Bond already won an excluding draw',
+	missing_required_installment: 'Draw has no required installment configured'
 };
 
 export const DRAW_INELIGIBILITY_REASON_LABELS_ES: Record<DrawIneligibilityReason, string> = {
@@ -36,7 +43,8 @@ export const DRAW_INELIGIBILITY_REASON_LABELS_ES: Record<DrawIneligibilityReason
 	annulled: 'Bono anulado',
 	installments_not_covered: 'Cuotas requeridas no cubiertas',
 	not_fully_paid: 'Bono sin pago total',
-	already_won: 'El bono ya ganó un sorteo excluyente'
+	already_won: 'El bono ya ganó un sorteo excluyente',
+	missing_required_installment: 'El sorteo no tiene cuota requerida configurada'
 };
 
 export interface DrawEligibilityDrawSnapshot {
@@ -245,11 +253,29 @@ export function evaluateDrawEligibility(input: DrawEligibilityInput): DrawEligib
 				rule?.requiredInstallmentNumber ??
 				rule?.required_installment_number ??
 				input.draw.requiredInstallmentNumber;
+			// A misconfigured consolation draw must not abort a whole roster generation: report a
+			// stable reason instead of throwing (configuration is also validated on draw create/update).
+			if (
+				required === null ||
+				required === undefined ||
+				!Number.isSafeInteger(required) ||
+				required < 1
+			) {
+				return { eligible: false, reason: 'missing_required_installment' };
+			}
 			return installmentsThroughAreCovered(coverage, required)
 				? { eligible: true }
 				: { eligible: false, reason: 'installments_not_covered' };
 		}
 	}
+}
+
+/**
+ * Locale-independent tie-breaker for ids: plain code-unit comparison, the same order PostgreSQL
+ * uses for lowercase canonical uuid text, keeping TS/SQL parity (review of #77).
+ */
+export function compareBinary(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export interface ExtraordinaryEligibleBond {
@@ -281,7 +307,7 @@ export class ExtraordinaryNumberAssignmentError extends DomainError<Extraordinar
 }
 
 function sortedBaseNumbers(bond: ExtraordinaryEligibleBond) {
-	return bond.baseNumbers.slice().sort((a, b) => a.value - b.value || a.id.localeCompare(b.id));
+	return bond.baseNumbers.slice().sort((a, b) => a.value - b.value || compareBinary(a.id, b.id));
 }
 
 /**
@@ -307,7 +333,7 @@ export function assignExtraordinaryNumbers(input: {
 			(a, b) =>
 				(a.bases[0]?.value ?? Number.POSITIVE_INFINITY) -
 					(b.bases[0]?.value ?? Number.POSITIVE_INFINITY) ||
-				a.bond.bondId.localeCompare(b.bond.bondId)
+				compareBinary(a.bond.bondId, b.bond.bondId)
 		);
 	const sources = bonds.flatMap(({ bond, bases }) =>
 		(bond.kind === 'simple' ? bases.slice(0, 1) : bases).map((base) => ({

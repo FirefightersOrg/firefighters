@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	compareBinary,
 	ExtraordinaryNumberAssignmentError,
 	assignExtraordinaryNumbers,
 	evaluateDrawEligibility,
@@ -164,6 +165,17 @@ describe('evaluateDrawEligibility', () => {
 		});
 	});
 
+	it('reports a misconfigured consolation draw instead of throwing (review of #77)', () => {
+		const input = eligibilityInput('consolation');
+		input.draw.requiredInstallmentNumber = null;
+		input.draw.consolationRule = {};
+		expect(() => evaluateDrawEligibility(input)).not.toThrow();
+		expect(evaluateDrawEligibility(input)).toEqual({
+			eligible: false,
+			reason: 'missing_required_installment'
+		});
+	});
+
 	it('excludes a previous winner only when that draw excludes from consolation', () => {
 		const allowed = eligibilityInput('consolation');
 		allowed.previousWins = [{ drawType: 'monthly', excludesFromConsolation: false }];
@@ -243,5 +255,18 @@ describe('assignExtraordinaryNumbers', () => {
 				available: 1
 			});
 		}
+	});
+});
+
+describe('compareBinary', () => {
+	it('orders ids by code units, independent of the locale (TS/SQL parity)', () => {
+		const ids = ['b0000000-0000-4000-8000-000000000001', 'A0000000', 'a0000000', '0f000000'];
+		expect([...ids].sort(compareBinary)).toEqual([
+			'0f000000',
+			'A0000000',
+			'a0000000',
+			'b0000000-0000-4000-8000-000000000001'
+		]);
+		expect(compareBinary('x', 'x')).toBe(0);
 	});
 });
