@@ -208,13 +208,15 @@ Possible results:
   calendar day of the cutoff, inclusively, and checks status at generation time. A confirmed
   payment on that day counts even if its confirmation occurred later. The product question about
   confirmation-timestamp semantics remains open; payments currently have no such timestamp.
-- Generation locks campaign FOR SHARE, draw FOR UPDATE, then existing rosters in UUID order.
+- Generation locks campaign FOR SHARE (except SAN-81 consolation, documented below),
+  draw FOR UPDATE, then existing rosters in UUID order.
   Generation also requires the locked campaign to be draft/active (55000 for closing, closed
   or annulled), before any extraordinary reservation or roster write. The existing campaign
   lock stabilizes the status check; this review does not change lock acquisition order.
   Regeneration is allowed only before freeze, supersedes previous generated rosters and preserves
-  all their entries. Freeze locks draw then the current generated roster; it never takes a
-  campaign lock after the draw lock. It sets freeze actor/time and `roster_frozen` atomically.
+  all their entries. Freeze locks campaign first (see SAN-81), then draw and the
+  current generated roster; it never takes a campaign lock after the draw lock.
+  It sets freeze actor/time and `roster_frozen` atomically.
   A repeated freeze of an already frozen roster is an idempotent no-op success (Santiago's
   decision on #79): nothing changes and no audit row is written.
   **Freeze decision (review 4642358561):** freezing an already generated roster remains allowed
@@ -417,12 +419,17 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
   RPCs: simultaneous result loads serialize and the loser rechecks state;
   lifecycle waits for a prize write; a prize write waits for committed closure
   and then refuses without audit.
-- Generation and freezing take campaign **UPDATE before draw UPDATE**; prize
-  operations still take campaign SHARE first. This serializes admission against
+- Only consolation generation and freezing take campaign **UPDATE before draw
+  UPDATE**; all other draw types retain campaign **SHARE before draw UPDATE**.
+  Both RPCs discover campaign ID and draw type without locks first; no API RPC
+  changes an existing draw's type. Prize operations take campaign SHARE first.
+  This serializes consolation admission against
   prior-prize mutations without locking previous draws out of order. Real dblink
   races verify both gates wait and recheck a newly committed pending prize with
-  no state or audit writes on refusal. The broader campaign lock also serializes
-  generation/freezing of different draws in that campaign (intentional tradeoff).
+  no state or audit writes on refusal. Two-session NOWAIT assertions also verify
+  ordinary generation and freezing permit a concurrent campaign SHARE lock,
+  avoiding campaign-wide exclusion of sales, deliveries and payment/prize RPCs
+  during ordinary draws; consolation alone retains that stronger serialization.
 - A resolved prize cannot revert to pending through the state machine. However,
   creation of a new pending excluding prize on a previous draw between generation
   and freeze is possible and tested: freeze refuses until resolution or annulment.
@@ -459,8 +466,9 @@ Review resolutions (PR #89):
   not an automatic clone, and clients use the new prize ID. These are intentional
   boundaries, not unimplemented RPC requirements.
 - Validation on the exclusively owned local DB: a clean local reset, then
-  `supabase test db` **before integration**, passed **41 files / 2955 assertions**
-  (042 plan **175**, including real two-session races); `pnpm seed:admin` followed
+  `supabase test db` **before integration**, passed **41 files / 2957 assertions**
+  (042 plan **177**, including real two-session races and ordinary-draw campaign
+  SHARE compatibility); `pnpm seed:admin` followed
   by `pnpm test:integration` passed **26 files / 210 tests**. `pnpm check` reported
   **0 errors / 0 warnings**, `pnpm lint` passed, and `pnpm test` passed **135 files /
   1696 tests**. The eight prize integration cases also passed individually and
@@ -468,3 +476,10 @@ Review resolutions (PR #89):
   Existing SAN-77 coverage caught the required update of its historical
   consolation-refusal assertion; SAN-80's FK-index check caught the need for a
   full draw index after replacing position uniqueness with a partial index.
+- **SAN-81 lock-follow-up validation note:** the first integration run had
+  209 passing tests and one unrelated Phase-5 search-fixture failure: its random
+  RUN_ID suffix `be8f7ada` contains `ada`, so the business fixture also matches the
+  case-insensitive `Ada <RUN_ID>` search. Database inspection confirmed the extra
+  result was `Business 20261120172700-be8f7ada`, not a roster side effect.
+  An unchanged full-suite rerun passed all 210 tests. That pre-existing fixture
+  flake is outside this SQL lock follow-up and remains unfixed.

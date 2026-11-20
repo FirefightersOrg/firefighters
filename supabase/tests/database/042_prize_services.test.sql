@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(175);
+select plan(177);
 insert into auth.users(id,email)
 values('a6420000-0000-0000-0000-000000000001','san81-admin@example.com'),
 ('a6420000-0000-0000-0000-000000000002','san81-reader@example.com');
@@ -337,6 +337,23 @@ select pg_temp.remote('san81_a','select pg_backend_pid()::text') as apid \gset
 select pg_temp.remote('san81_b','select pg_backend_pid()::text') as bpid \gset
 select extensions.dblink_exec(c,$q$set request.jwt.claims='{"sub":"a6421000-0000-0000-0000-000000000001","role":"authenticated"}';set role authenticated$q$)
 from unnest(array['san81_a','san81_b'])c;
+-- Keep the generation transaction open: its campaign lock must coexist with
+-- another session's SHARE lock. NOWAIT fails immediately if it is exclusive.
+select pg_temp.remote('san81_a',$q$select public.draw_create('c6421000-0000-0000-0000-000000000001',
+  'final','Shared campaign',(now() at time zone 'America/Argentina/Buenos_Aires')::date+2,
+  now(),null,'{}','042-race-shared-create')::text$q$) as race_shared \gset
+select extensions.dblink_exec('san81_a','begin');
+select pg_temp.remote('san81_a',format('select public.draw_generate_roster(%L,''042-race-shared-generate'')::text',:'race_shared'));
+select extensions.dblink_exec('san81_b','reset role');
+select lives_ok($q$select pg_temp.remote('san81_b',
+  'select id::text from public.campaigns where id=''c6421000-0000-0000-0000-000000000001'' for share nowait')$q$,
+  'non-consolation generation permits concurrent campaign SHARE');
+select pg_temp.remote('san81_a',format('select public.draw_freeze_roster(%L,''042-race-shared-freeze'')::text',:'race_shared'));
+select lives_ok($q$select pg_temp.remote('san81_b',
+  'select id::text from public.campaigns where id=''c6421000-0000-0000-0000-000000000001'' for share nowait')$q$,
+  'non-consolation freezing permits concurrent campaign SHARE');
+select extensions.dblink_exec('san81_a','rollback');
+select extensions.dblink_exec('san81_b','set role authenticated');
 select extensions.dblink_exec('san81_a','begin');
 select pg_temp.remote('san81_a',$q$select public.draw_load_winning_number('e6421000-0000-0000-0000-000000000001',999,null,'042-race-first')::text$q$);
 select extensions.dblink_send_query('san81_b',$q$select public.draw_load_winning_number('e6421000-0000-0000-0000-000000000001',998,null,'042-race-second')::text$q$);

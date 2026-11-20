@@ -280,7 +280,7 @@ grant execute on function public.prize_create(uuid,text,text,integer,boolean,tex
 
 -- SAN-77 generator adds authoritative previous-win evaluation, resolved-prize
 -- admission and campaign serialization. Cutoff remains in draw_payment_before_cutoff.
--- Caller holds the campaign UPDATE lock before locking the target draw. This
+-- Consolation caller holds campaign UPDATE before locking the target draw. This
 -- excludes concurrent prize mutations (campaign SHARE), including new prizes.
 create function public.draw_require_resolved_prizes(p_draw public.draws)
 returns void language plpgsql set search_path = '' as $$
@@ -303,6 +303,7 @@ returns uuid language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid := public.bond_require_actor('draw.generate_roster');
   v_campaign uuid;
+  v_draw_type text;
   v_max integer;
   v_campaign_status text;
   v_draw public.draws;
@@ -317,10 +318,15 @@ begin
   if p_draw_id is null then
     raise exception 'draw id is required' using errcode = '22023';
   end if;
-  select campaign_id into v_campaign from public.draws where id = p_draw_id;
+  select campaign_id,draw_type into v_campaign,v_draw_type from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
-  select max_number,status into v_max,v_campaign_status
-    from public.campaigns where id = v_campaign for update;
+  if v_draw_type = 'consolation' then
+    select max_number,status into v_max,v_campaign_status
+      from public.campaigns where id = v_campaign for update;
+  else
+    select max_number,status into v_max,v_campaign_status
+      from public.campaigns where id = v_campaign for share;
+  end if;
   if v_campaign_status not in ('draft','active') then
     raise exception 'draws require a draft or active campaign' using errcode = '55000';
   end if;
@@ -454,14 +460,19 @@ returns void language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid := public.bond_require_actor('draw.freeze_roster');
   v_campaign uuid;
+  v_draw_type text;
   v_draw public.draws;
   v_roster public.draw_rosters;
 begin
   if p_draw_id is null then raise exception 'draw id is required' using errcode = '22023'; end if;
-  select campaign_id into v_campaign from public.draws where id = p_draw_id;
+  select campaign_id,draw_type into v_campaign,v_draw_type from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
-  -- Same parent-first lock order as generation; excludes all prize RPC writes.
-  perform 1 from public.campaigns where id = v_campaign for update;
+  -- Only consolation excludes prize writes; ordinary draws retain campaign SHARE.
+  if v_draw_type = 'consolation' then
+    perform 1 from public.campaigns where id = v_campaign for update;
+  else
+    perform 1 from public.campaigns where id = v_campaign for share;
+  end if;
   select * into v_draw from public.draws where id = p_draw_id for update;
   perform public.draw_require_resolved_prizes(v_draw);
   -- Preserve the idempotent no-op when the admission gate still holds.
