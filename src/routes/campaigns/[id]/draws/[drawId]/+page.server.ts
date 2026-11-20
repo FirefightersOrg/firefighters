@@ -104,10 +104,14 @@ export const actions: Actions = {
 		const parsed = validateDrawFields(values, scoped.draw.drawType, campaign.data.installmentCount);
 		if ('failure' in parsed) return parsed.failure;
 		try {
-			await updateDraw(locals.supabase, params.drawId, parsed.data, {
-				requestId: locals.requestId,
-				permissions: locals.permissions ?? null
-			});
+			await updateDraw(
+				locals.supabase,
+				{ drawId: params.drawId, ...parsed.data },
+				{
+					requestId: locals.requestId ?? null,
+					permissions: locals.permissions ?? null
+				}
+			);
 			return { form: 'update', success: true, errors: {}, message: 'Draw updated.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'update', values);
@@ -132,7 +136,7 @@ export const actions: Actions = {
 				locals.supabase,
 				{ drawId: params.drawId, reason },
 				{
-					requestId: locals.requestId,
+					requestId: locals.requestId ?? null,
 					permissions: locals.permissions ?? null
 				}
 			);
@@ -152,7 +156,7 @@ export const actions: Actions = {
 				locals.supabase,
 				{ drawId: params.drawId },
 				{
-					requestId: locals.requestId,
+					requestId: locals.requestId ?? null,
 					permissions: locals.permissions ?? null
 				}
 			);
@@ -178,7 +182,7 @@ export const actions: Actions = {
 				locals.supabase,
 				{ drawId: params.drawId },
 				{
-					requestId: locals.requestId,
+					requestId: locals.requestId ?? null,
 					permissions: locals.permissions ?? null
 				}
 			);

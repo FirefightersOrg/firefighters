@@ -10,7 +10,8 @@ vi.mock('$lib/server/services/draws', async (original) => ({
 	updateDraw: vi.fn(),
 	annulDraw: vi.fn()
 }));
-vi.mock('$lib/server/services/draw-rosters', () => ({
+vi.mock('$lib/server/services/draw-rosters', async (original) => ({
+	...(await original<any>()),
 	generateDrawRoster: vi.fn(),
 	freezeDrawRoster: vi.fn()
 }));

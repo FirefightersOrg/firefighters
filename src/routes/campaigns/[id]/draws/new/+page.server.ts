@@ -58,7 +58,7 @@ export const actions: Actions = {
 					drawType: drawType as DrawType,
 					...parsed.data
 				},
-				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
 			);
 		} catch (cause) {
 			const serviceError = cause instanceof DrawServiceError ? cause : null;
