@@ -82,6 +82,26 @@ function renderPage(
 }
 
 describe('/campaigns/[id]/bonds/[bondId] page', () => {
+	it('renders ordinary and extraordinary draw roster history with eligibility', () => {
+		const body = renderPage(record(), null, {
+			canViewDraws: true,
+			drawRosterEntries: [
+				{
+					id: 'entry',
+					numberValue: 7,
+					numberKind: 'extraordinary',
+					eligible: false,
+					ineligibilityReason: 'not_fully_paid',
+					draw: { id: 'draw', name: 'Full payment special' }
+				}
+			]
+		});
+		expect(body).toContain('Draws and rosters');
+		expect(body).toContain('0007');
+		expect(body).toContain('Extraordinary');
+		expect(body).toContain('not_fully_paid');
+	});
+
 	it('renders confirmed payment certificates in the Payments section', () => {
 		const body = renderPage(record(), null, {
 			payments: [

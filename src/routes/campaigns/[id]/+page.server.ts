@@ -120,6 +120,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					'settlement.close',
 					'settlement.correct'
 				] as PermissionCode[]
+			).some((permission) => hasPermissionIn(permissions, permission)),
+			viewDraws: (
+				[
+					'draw.view',
+					'draw.create',
+					'draw.update',
+					'draw.generate_roster',
+					'draw.freeze_roster',
+					'draw.load_winner'
+				] as PermissionCode[]
 			).some((permission) => hasPermissionIn(permissions, permission))
 		}
 	};

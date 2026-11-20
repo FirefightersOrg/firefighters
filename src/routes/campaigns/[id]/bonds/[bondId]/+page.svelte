@@ -205,7 +205,42 @@
 	</section>
 	<BondPendingSection id="settlements" />
 	<BondPendingSection id="commissions" />
-	<BondPendingSection id="draws" />
+	<section
+		id="draws"
+		aria-labelledby="draws-title"
+		class="rounded-lg border border-slate-200 bg-white p-5"
+	>
+		<h2 id="draws-title" class="text-base font-semibold">
+			<span class="text-slate-400 tabular-nums">12.</span> Draws and rosters
+		</h2>
+		{#if data.canViewDraws === false}<p class="mt-2 text-sm text-slate-500">
+				You do not have permission to view draw rosters.
+			</p>
+		{:else if (data.drawRosterEntries ?? []).length}
+			<table class="mt-3 min-w-full text-sm">
+				<thead
+					><tr class="text-left"><th>Draw</th><th>Number</th><th>Kind</th><th>Eligibility</th></tr
+					></thead
+				><tbody>
+					{#each data.drawRosterEntries as entry (entry.id)}<tr class="border-t border-slate-100"
+							><td class="py-2"
+								><a
+									class="text-blue-700 underline"
+									href={resolve('/campaigns/[id]/draws/[drawId]/roster', {
+										id: campaign.id,
+										drawId: entry.draw.id
+									})}>{entry.draw.name}</a
+								></td
+							><td class="font-mono"
+								>{String(entry.numberValue).padStart(campaign.numberDigits, '0')}</td
+							><td>{entry.numberKind === 'extraordinary' ? 'Extraordinary' : entry.numberKind}</td
+							><td>{entry.eligible ? 'Eligible' : `Not eligible — ${entry.ineligibilityReason}`}</td
+							></tr
+						>{/each}
+				</tbody>
+			</table>
+		{:else}<p class="mt-2 text-sm text-slate-500">Not included in any draw roster.</p>{/if}
+	</section>
 	<BondPendingSection id="prizes" />
 	<BondAuditSection campaignId={campaign.id} audit={record.audit} />
 </div>

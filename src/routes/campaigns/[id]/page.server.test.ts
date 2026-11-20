@@ -112,6 +112,7 @@ describe('/campaigns/[id]', () => {
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
+				viewDraws: false,
 				viewSales: false,
 				viewSettlements: false
 			});
@@ -134,6 +135,7 @@ describe('/campaigns/[id]', () => {
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
+				viewDraws: false,
 				viewSales: false,
 				viewSettlements: false
 			});
@@ -156,6 +158,7 @@ describe('/campaigns/[id]', () => {
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
+				viewDraws: false,
 				viewSales: false,
 				viewSettlements: false
 			});
@@ -194,6 +197,7 @@ describe('/campaigns/[id]', () => {
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
+				viewDraws: false,
 				viewSales: false,
 				viewSettlements: false
 			});
