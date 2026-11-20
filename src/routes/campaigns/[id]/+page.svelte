@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import CampaignGeneralForm from '$lib/components/campaigns/CampaignGeneralForm.svelte';
 	import CampaignRulesForm from '$lib/components/campaigns/CampaignRulesForm.svelte';
 	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
@@ -44,7 +45,7 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements}
+		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements || data.can.exportBackups}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
 				{#if data.can.viewBonds}
 					<a
@@ -90,6 +91,12 @@
 					<a
 						href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
 						class="font-medium text-blue-700 hover:underline">Settlements →</a
+					>
+				{/if}
+				{#if data.can.exportBackups}
+					<a
+						href={resolve('/campaigns/[id]/backups', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Backup exports →</a
 					>
 				{/if}
 				{#if data.can.viewCommissions}
@@ -203,6 +210,15 @@
 	{#if data.can.transitions.length > 0}
 		<section class={cardClass} aria-labelledby="status-title">
 			<h2 id="status-title" class="mb-4 text-base font-semibold">Status</h2>
+			{#if data.can.transitions.includes('closing') || data.can.transitions.includes('closed')}
+				<div class="mb-4">
+					<RiskyOperationChecklist
+						campaignId={campaign.id}
+						operation="closing the campaign"
+						canExport={data.can.exportBackups}
+					/>
+				</div>
+			{/if}
 			<div class="flex flex-wrap items-start gap-3">
 				{#each data.can.transitions as toStatus (toStatus)}
 					<TransitionAction
@@ -229,6 +245,11 @@
 		{/if}
 
 		{#if data.can.editRules}
+			<RiskyOperationChecklist
+				campaignId={campaign.id}
+				operation="changing the campaign rules"
+				canExport={data.can.exportBackups}
+			/>
 			<CampaignRulesForm {campaign} result={rulesResult} />
 		{/if}
 	{/key}
