@@ -9,6 +9,14 @@ import {
 } from './backup-exports';
 
 describe('parseExportPeriod', () => {
+	it('rejects impossible calendar dates', () => {
+		for (const d of ['2027-02-29', '2027-02-30', '2027-04-31', '2027-13-01']) {
+			expect(parseExportPeriod(d, null)).toBeNull();
+			expect(parseExportPeriod(null, d)).toBeNull();
+		}
+		expect(parseExportPeriod('2028-02-29', null)).toEqual({ from: '2028-02-29', to: null });
+	});
+
 	it('accepts empty, partial and full periods', () => {
 		expect(parseExportPeriod(null, null)).toEqual({ from: null, to: null });
 		expect(parseExportPeriod('2027-01-01', '')).toEqual({ from: '2027-01-01', to: null });

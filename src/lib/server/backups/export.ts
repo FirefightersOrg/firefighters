@@ -5,26 +5,44 @@ import { CSV_BOM, csvHeaderLine, csvRowLines } from '$lib/domain/csv-export';
 /** Must not exceed PostgREST `max_rows` (1000 in supabase/config.toml). */
 export const EXPORT_PAGE_SIZE = 1000;
 
+/** Reads one page of rows strictly after `after` (null = from the start), in the total order. */
 export type FetchPage = (
-	from: number,
-	to: number
+	after: ExportRow | null
 ) => Promise<{ data: ExportRow[] | null; error: unknown }>;
 
 /**
- * Reads every page (offset ranges over a total, stable order) until a short page. Throws on error,
- * so a failed export never yields a truncated file that looks complete.
+ * Reads every page with keyset pagination (each page starts after the last row of the previous
+ * one) until a short page, so rows inserted or removed meanwhile never shift pages into duplicates
+ * or gaps. Throws on error, so a failed export never yields a truncated file that looks complete.
  */
 export async function* paginateAll(
 	fetchPage: FetchPage,
 	pageSize = EXPORT_PAGE_SIZE
 ): AsyncGenerator<ExportRow[]> {
-	for (let offset = 0; ; offset += pageSize) {
-		const { data, error } = await fetchPage(offset, offset + pageSize - 1);
+	let after: ExportRow | null = null;
+	for (;;) {
+		const { data, error } = await fetchPage(after);
 		if (error) throw error;
 		const rows = data ?? [];
 		if (rows.length > 0) yield rows;
 		if (rows.length < pageSize) return;
+		after = rows[rows.length - 1];
 	}
+}
+
+const quote = (v: unknown) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+/**
+ * PostgREST `or` filter for "strictly after `last`" in the ascending order `columns`:
+ * (c1 > v1) or (c1 = v1 and c2 > v2) or ... Order columns must be non-null and in the select.
+ */
+export function keysetFilter(columns: readonly string[], last: ExportRow): string {
+	return columns
+		.map((c, i) => {
+			const eq = columns.slice(0, i).map((p) => `${p}.eq.${quote(last[p])}`);
+			return `and(${[...eq, `${c}.gt.${quote(last[c])}`].join(',')})`;
+		})
+		.join(',');
 }
 
 export interface ExportPeriod {
@@ -45,7 +63,7 @@ export function exportPageFetcher(
 	period: ExportPeriod
 ): FetchPage {
 	const def = BACKUP_EXPORTS[kind];
-	return async (from, to) => {
+	return async (after) => {
 		let q = supabase.from(def.table).select(def.select).eq('campaign_id', campaignId);
 		if (def.periodColumn) {
 			const isDate = def.periodColumn === 'payment_date';
@@ -58,8 +76,9 @@ export function exportPageFetcher(
 					: q.lt(def.periodColumn, `${nextDay(period.to)}T00:00:00-03:00`);
 			}
 		}
+		if (after) q = q.or(keysetFilter(def.order, after));
 		for (const column of def.order) q = q.order(column, { ascending: true });
-		const { data, error } = await q.range(from, to);
+		const { data, error } = await q.limit(EXPORT_PAGE_SIZE);
 		return { data: data as unknown as ExportRow[] | null, error };
 	};
 }

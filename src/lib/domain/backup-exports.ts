@@ -32,7 +32,7 @@ export interface BackupExportDefinition {
 	table: string;
 	/** PostgREST select list (money cast to text, embeds for readable names). */
 	select: string;
-	/** Stable total order: unique tiebreaker last, so pages never skip or repeat rows. */
+	/** Stable total order: unique tiebreaker last, so keyset pages never skip or repeat rows. Every column must be in `select` and non-null. */
 	order: readonly string[];
 	/** Permissions required besides `report.export` (all of them). */
 	permissions: readonly (
@@ -171,8 +171,13 @@ export function parseExportPeriod(
 	from: string | null,
 	to: string | null
 ): { from: string | null; to: string | null } | null {
-	const ok = (v: string | null) =>
-		v === null || v === '' || (DATE.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)));
+	// Date.parse normalizes overflow dates (2027-02-30 -> 2027-03-02), so require a round trip.
+	const ok = (v: string | null) => {
+		if (v === null || v === '') return true;
+		if (!DATE.test(v)) return false;
+		const d = new Date(`${v}T00:00:00Z`);
+		return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+	};
 	if (!ok(from) || !ok(to)) return null;
 	const f = from || null;
 	const t = to || null;
