@@ -611,30 +611,34 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 		const frozenRoster = await rosterRow(rosterId);
 		const frozenEntries = await rosterEntries(rosterId);
 		const entry = frozenEntries[0]!;
-		const update = await readOnly.client
-			.from('draw_roster_entries')
-			.update({ number_value: entry.number_value })
-			.eq('id', entry.id)
-			.select();
-		expect(update.error?.code).toBe('42501');
-		const remove = await readOnly.client
-			.from('draw_roster_entries')
-			.delete()
-			.eq('id', entry.id)
-			.select();
-		expect(remove.error?.code).toBe('42501');
-		const rosterUpdate = await readOnly.client
-			.from('draw_rosters')
-			.update({ status: 'frozen' })
-			.eq('id', rosterId)
-			.select();
-		expect(rosterUpdate.error?.code).toBe('42501');
-		const rosterDelete = await readOnly.client
-			.from('draw_rosters')
-			.delete()
-			.eq('id', rosterId)
-			.select();
-		expect(rosterDelete.error?.code).toBe('42501');
+		// Direct DML is revoked from every authenticated role, admins included: only the audited
+		// SECURITY DEFINER functions write rosters (review of #87).
+		for (const caller of [readOnly, admin]) {
+			const update = await caller.client
+				.from('draw_roster_entries')
+				.update({ number_value: entry.number_value })
+				.eq('id', entry.id)
+				.select();
+			expect(update.error?.code).toBe('42501');
+			const remove = await caller.client
+				.from('draw_roster_entries')
+				.delete()
+				.eq('id', entry.id)
+				.select();
+			expect(remove.error?.code).toBe('42501');
+			const rosterUpdate = await caller.client
+				.from('draw_rosters')
+				.update({ status: 'frozen' })
+				.eq('id', rosterId)
+				.select();
+			expect(rosterUpdate.error?.code).toBe('42501');
+			const rosterDelete = await caller.client
+				.from('draw_rosters')
+				.delete()
+				.eq('id', rosterId)
+				.select();
+			expect(rosterDelete.error?.code).toBe('42501');
+		}
 		expect(await rosterRow(rosterId)).toEqual(frozenRoster);
 		expect(await rosterEntries(rosterId)).toEqual(frozenEntries);
 	});
