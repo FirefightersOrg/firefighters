@@ -11,6 +11,7 @@ import {
 	keepTimestampIfSameDay
 } from '$lib/domain/campaigns';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
+import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import {
 	campaignFormFailure,
 	campaignFormSuccess,
@@ -109,7 +110,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			viewSales:
 				hasPermissionIn(permissions, 'sale.view') ||
 				hasPermissionIn(permissions, 'sale.create') ||
-				hasPermissionIn(permissions, 'bond.view')
+				hasPermissionIn(permissions, 'bond.view'),
+			viewSettlements: (
+				[
+					'settlement.view',
+					'settlement.create',
+					'settlement.update_open',
+					'settlement.close',
+					'settlement.correct'
+				] as PermissionCode[]
+			).some((permission) => hasPermissionIn(permissions, permission))
 		}
 	};
 };
