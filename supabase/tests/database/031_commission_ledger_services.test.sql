@@ -1,7 +1,7 @@
 -- SAN-68: three-tier rule selection and settlement ledger services.
 begin;
--- current_date below is the Buenos Aires date, as in the RPCs (not UTC midnight).
-set local timezone = 'America/Argentina/Buenos_Aires';
+-- Rule validity fixtures and default payment_date must use the same business day.
+set local time zone 'America/Argentina/Buenos_Aires';
 select plan(33);
 insert into auth.users(id,email) values
   ('a6310000-0000-0000-0000-000000000001','admin631@example.com'),
