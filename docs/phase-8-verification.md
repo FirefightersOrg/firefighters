@@ -12,7 +12,7 @@ business operation is made by its RLS-scoped user client.
 
 | #   | Criterion                           | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                          | Result                                                  |
 | --- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| C1  | Open-settlement totals              | Opens a settlement, adds cash and transfer applications, then removes cash and re-reads `settlement_totals`. It verifies cash, transfer, total, percentage commission, collector-specific fixed-rule override, commission settled, Firefighters net, and the documented zero credit balance.                                                                                                                                      | **Pass**                                                |
+| C1  | Open-settlement totals              | Opens a settlement, adds cash and transfer applications, then removes cash and re-reads `settlement_totals`. It verifies cash, transfer, total, percentage commission, collector-specific fixed-rule override, commission retained from cash, Firefighters net, and the real campaign/collector ledger balance.                                                                                                                   | **Pass**                                                |
 | C2  | Atomic closing                      | Adds payments for several sales, captures preliminary totals, closes as treasurer, and verifies confirmed payments, `paid`/`paid_advance`, split installment confirmation across two settlements, stored totals, closer/timestamp, financial snapshots (`partial_payments`, `overdue`, `fully_paid`), and one audit row for each add/close operation. An empty close is rejected and remains `open`, evidencing no partial state. | **Pass**                                                |
 | C3  | Closed settlement immutability      | Rejects repeat close and removal with exact conflict/409, and direct authenticated PostgREST `UPDATE` with 403/42501. Every rejection compares full fixture rows and live totals before/after and counts audit rows by request id.                                                                                                                                                                                                | **Pass**                                                |
 | C4  | Permissions and own-collector scope | Read-only cannot open/add, operator cannot close, treasurer cannot remove a real pending payment (permission/403). Each denial asserts zero new audit rows and identical settlements, payments, applications, installments and live totals; the fixture remains open/pending. Collector RLS hides foreign settlements and foreign totals fail with exact 42501, also without writes.                                              | **Pass**                                                |
@@ -20,11 +20,12 @@ business operation is made by its RLS-scoped user client.
 
 ## Decisions and known gaps
 
-- `collector_credit_balance` is intentionally `0` until Phase 9 introduces
-  `collector_ledger_entries`; C1 documents and asserts that interim contract.
-- `commission_paid_amount` currently equals preliminary commission at settlement close;
-  separate settlement/payment of commissions belongs to the ledger work.
-- Audited manual commission adjustments remain pending **SAN-67**.
+- SAN-68 semantics are authoritative: `commission_paid_amount` is only commission retained
+  from cash payments, `net_to_firefighters = total_amount - commission_paid_amount`, and
+  `collector_credit_balance` is the real campaign/collector ledger balance. C1 covers a
+  cash-plus-transfer mix and removal of the cash payment so these values cannot regress to the
+  pre-ledger Phase 8 placeholders.
+- Audited manual commission adjustments were added in **SAN-67**.
 - Closed settlements are never reopened; corrections are future audited adjustments/annulments.
 - The settlement workspace and HTML-print routes are covered against the same local-Supabase
   data as the backend service checks.
