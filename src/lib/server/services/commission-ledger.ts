@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { LEDGER_REASON_MAX } from '$lib/domain/ledger';
 
-const uuid = z.string().uuid();
+const uuid = z.guid();
 export const commissionSettleSchema = z.object({
 	campaignId: uuid,
 	collectorId: uuid,
@@ -105,4 +105,121 @@ export async function getCollectorLedgerBalance(
 		p_campaign_id: parsed.data.campaignId,
 		p_collector_id: parsed.data.collectorId
 	});
+}
+
+const reason = z.string().trim().min(1).max(LEDGER_REASON_MAX);
+const amount = z.coerce.number().positive().multipleOf(0.01);
+export const commissionAdjustSchema = z.object({
+	campaignId: uuid,
+	collectorId: uuid,
+	amount,
+	direction: z.enum(['in_favor_of_collector', 'in_favor_of_firefighters']),
+	reason,
+	settlementId: uuid.nullish(),
+	paymentId: uuid.nullish()
+});
+export const ledgerAdjustSchema = z.object({
+	campaignId: uuid,
+	collectorId: uuid,
+	amount,
+	direction: z.enum(['collector_credit', 'collector_debit']),
+	reason
+});
+export const ledgerAnnulSchema = z.object({ entryId: uuid, reason });
+
+function parse<S extends z.ZodTypeAny>(schema: S, input: unknown, message: string): z.output<S> {
+	const parsed = schema.safeParse(input);
+	if (!parsed.success)
+		throw new CommissionLedgerServiceError('validation', message, { cause: parsed.error });
+	return parsed.data;
+}
+
+/** Tier-3 manual commission adjustment: a difference row plus its ledger entry (`commission.adjust`). */
+export async function adjustCommission(
+	client: SupabaseClient,
+	input: z.input<typeof commissionAdjustSchema>,
+	ctx: { requestId?: string | null } = {}
+): Promise<string> {
+	const d = parse(commissionAdjustSchema, input, 'Invalid commission adjustment.');
+	return rpc<string>(client, 'commission_adjust', {
+		p_campaign_id: d.campaignId,
+		p_collector_id: d.collectorId,
+		p_amount: d.amount,
+		p_direction: d.direction,
+		p_reason: d.reason,
+		p_settlement_id: d.settlementId ?? null,
+		p_payment_id: d.paymentId ?? null,
+		p_request_id: ctx.requestId ?? null
+	});
+}
+
+/** Manual current-account adjustment (`collector.ledger.adjust`). */
+export async function adjustCollectorLedger(
+	client: SupabaseClient,
+	input: z.input<typeof ledgerAdjustSchema>,
+	ctx: { requestId?: string | null } = {}
+): Promise<string> {
+	const d = parse(ledgerAdjustSchema, input, 'Invalid ledger adjustment.');
+	return rpc<string>(client, 'collector_ledger_adjust', {
+		p_campaign_id: d.campaignId,
+		p_collector_id: d.collectorId,
+		p_amount: d.amount,
+		p_direction: d.direction,
+		p_reason: d.reason,
+		p_request_id: ctx.requestId ?? null
+	});
+}
+
+/** Annuls a recorded entry (`collector.ledger.adjust`); closed-settlement entries are refused. */
+export async function annulCollectorLedgerEntry(
+	client: SupabaseClient,
+	input: z.input<typeof ledgerAnnulSchema>,
+	ctx: { requestId?: string | null } = {}
+): Promise<void> {
+	const d = parse(ledgerAnnulSchema, input, 'Invalid ledger annulment.');
+	await rpc<null>(client, 'collector_ledger_annul_entry', {
+		p_entry_id: d.entryId,
+		p_reason: d.reason,
+		p_request_id: ctx.requestId ?? null
+	});
+}
+
+export interface LedgerEntryView {
+	id: string;
+	occurredAt: string;
+	entryType: string;
+	direction: 'collector_credit' | 'collector_debit';
+	amount: number;
+	status: string;
+	settlementId: string | null;
+	paymentId: string | null;
+	reason: string | null;
+	annulReason: string | null;
+	runningBalance: number;
+}
+
+/** Ledger entries in order with the running balance (annulled entries add 0). */
+export async function listCollectorLedger(
+	client: SupabaseClient,
+	input: z.input<typeof collectorLedgerBalanceSchema>
+): Promise<LedgerEntryView[]> {
+	const d = parse(collectorLedgerBalanceSchema, input, 'Invalid collector ledger request.');
+	const rows = await rpc<Record<string, unknown>[] | null>(
+		client,
+		'collector_ledger_entries_with_balance',
+		{ p_campaign_id: d.campaignId, p_collector_id: d.collectorId }
+	);
+	return (rows ?? []).map((r) => ({
+		id: String(r.id),
+		occurredAt: String(r.occurred_at),
+		entryType: String(r.entry_type),
+		direction: r.direction as LedgerEntryView['direction'],
+		amount: Number(r.amount),
+		status: String(r.status),
+		settlementId: (r.settlement_id as string | null) ?? null,
+		paymentId: (r.payment_id as string | null) ?? null,
+		reason: (r.reason as string | null) ?? null,
+		annulReason: (r.annul_reason as string | null) ?? null,
+		runningBalance: Number(r.running_balance)
+	}));
 }

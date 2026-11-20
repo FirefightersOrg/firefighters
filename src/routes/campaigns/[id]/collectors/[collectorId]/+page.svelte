@@ -16,6 +16,11 @@
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
 	import { formatMoney } from '$lib/domain/money';
+	import {
+		formatCommissionRuleType,
+		formatCommissionValue,
+		formatValidity
+	} from '$lib/domain/commissions';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
@@ -336,13 +341,57 @@
 				>
 			</table>{:else}<p class="text-sm text-slate-500">No settlements recorded.</p>{/if}
 	</section>
-	{#each [{ phase: 'Phase 9: current account' }, { phase: 'Phase 13: monthly report' }] as pending, i (pending.phase)}<section
-			id="section-{i + 5}"
-			class={cardClass}
-		>
-			<h2 class="mb-4 text-base font-semibold">{i + 6}. {sections[i + 5]}</h2>
-			<p class="text-sm text-slate-500">No data yet. Arrives with {pending.phase}.</p>
-		</section>{/each}
+	<section id="section-6" class={cardClass}>
+		<h2 class="mb-4 text-base font-semibold">6. {sections[5]}</h2>
+		{#if data.ledger}
+			<p class="text-sm">
+				Balance:
+				<strong class="tabular-nums" data-testid="collector-balance"
+					>{data.ledger.balance === null
+						? '—'
+						: formatMoney(data.ledger.balance.toFixed(2))}</strong
+				>
+				<a
+					class="ml-3 text-blue-700 hover:underline"
+					href={resolve('/campaigns/[id]/collectors/[collectorId]/ledger', {
+						id: data.campaign.id,
+						collectorId: data.collector.id
+					})}>View current account</a
+				>
+			</p>
+		{:else}
+			<p class="text-sm text-slate-500">You do not have permission to view the current account.</p>
+		{/if}
+		{#if data.can.viewRules}
+			<h3 class="mt-4 mb-2 text-sm font-semibold">Special commission rules</h3>
+			{#if data.specialRules.length === 0}
+				<p class="text-sm text-slate-500">No special rules for this collector.</p>
+			{:else}
+				<ul class="text-sm" data-testid="special-rules">
+					{#each data.specialRules as rule (rule.id)}
+						<li
+							class={['border-t py-1', rule.status === 'annulled' && 'text-slate-500 line-through']}
+						>
+							{formatCommissionRuleType(rule)} — {formatCommissionValue(rule)} — {formatValidity(
+								rule
+							)}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if data.can.manageRules}
+				<a
+					class="mt-2 inline-block text-sm text-blue-700 hover:underline"
+					href={resolve('/campaigns/[id]/commissions', { id: data.campaign.id })}
+					>Manage special rules</a
+				>
+			{/if}
+		{/if}
+	</section>
+	<section id="section-7" class={cardClass}>
+		<h2 class="mb-4 text-base font-semibold">7. {sections[6]}</h2>
+		<p class="text-sm text-slate-500">No data yet. Arrives with Phase 13: monthly report.</p>
+	</section>
 	<section id="section-8" class={cardClass}>
 		<h2 class="mb-4 text-base font-semibold">8. Audit</h2>
 		{#if !data.can.audit}<p class="text-sm text-slate-500">

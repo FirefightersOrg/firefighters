@@ -38,7 +38,8 @@
 		rule = null,
 		installmentCount,
 		result = null,
-		campaignId
+		campaignId,
+		collectors = []
 	}: {
 		/** The rule being edited, or null to create one. */
 		rule?: CommissionRule | null;
@@ -52,6 +53,8 @@
 		} | null;
 		/** "Cancel" and a successful edit go back to this campaign's rule list. */
 		campaignId: string;
+		/** Active collectors; when given, a new rule can target one of them (SAN-69 special rule). */
+		collectors?: { id: string; displayName: string }[];
 	} = $props();
 
 	const editing = $derived(rule !== null);
@@ -294,6 +297,33 @@
 				</p>
 				<FieldError id="{fieldId('validTo')}-error" errors={errors.validTo} />
 			</div>
+			{#if !editing && collectors.length > 0}
+				<div>
+					<label for={fieldId('appliesToCollectorId')} class={labelClass}>Applies to</label>
+					<select
+						id={fieldId('appliesToCollectorId')}
+						name="appliesToCollectorId"
+						class={inputClass}
+						aria-describedby="{fieldId('appliesToCollectorId')}-hint"
+					>
+						<option value="">All collectors (general rule)</option>
+						{#each collectors as collector (collector.id)}
+							<option
+								value={collector.id}
+								selected={result?.values?.appliesToCollectorId === collector.id}
+								>{collector.displayName}</option
+							>
+						{/each}
+					</select>
+					<p id="{fieldId('appliesToCollectorId')}-hint" class={hintClass}>
+						A special rule for one collector takes precedence over the general rules.
+					</p>
+					<FieldError
+						id="{fieldId('appliesToCollectorId')}-error"
+						errors={errors.appliesToCollectorId}
+					/>
+				</div>
+			{/if}
 			<div>
 				<label for={fieldId('reason')} class={labelClass}>Note (optional)</label>
 				<input

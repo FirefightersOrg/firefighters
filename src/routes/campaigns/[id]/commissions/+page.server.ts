@@ -15,8 +15,10 @@ import {
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
 	getCommissionRuleById,
+	listCollectorCommissionRules,
 	listGeneralCommissionRules
 } from '$lib/server/repositories/commission-rules';
+import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	annulCommissionRule,
@@ -49,15 +51,18 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	}
 
-	const [campaignResult, rulesResult] = await Promise.all([
+	const [campaignResult, rulesResult, specialResult, collectorsResult] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
-		listGeneralCommissionRules(locals.supabase, params.id)
+		listGeneralCommissionRules(locals.supabase, params.id),
+		listCollectorCommissionRules(locals.supabase, params.id),
+		listActiveCollectorOptions(locals.supabase)
 	]);
-	if (campaignResult.error || rulesResult.error) {
+	if (campaignResult.error || rulesResult.error || specialResult.error || collectorsResult.error) {
 		console.error('[commission-rules] load failed', {
 			requestId: locals.requestId,
 			campaignId: params.id,
-			error: campaignResult.error ?? rulesResult.error
+			error:
+				campaignResult.error ?? rulesResult.error ?? specialResult.error ?? collectorsResult.error
 		});
 		error(500, { message: 'Could not load the commission rules. Please try again.' });
 	}
@@ -75,12 +80,21 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const editId = url.searchParams.get('edit');
 	const editRule =
 		canManage && editId
-			? (rules.find((r) => r.id === editId && r.status === 'active') ?? null)
+			? ([...rules, ...(specialResult.data ?? [])].find(
+					(r) => r.id === editId && r.status === 'active'
+				) ?? null)
 			: null;
 
+	const collectors = collectorsResult.data ?? [];
+	const collectorNames = new Map(collectors.map((c) => [c.id, c.displayName]));
 	return {
 		campaign,
 		rules,
+		specialRules: (specialResult.data ?? []).map((rule) => ({
+			...rule,
+			collectorName: collectorNames.get(rule.appliesToCollectorId ?? '') ?? 'Collector'
+		})),
+		collectors: canManage ? collectors : [],
 		today: todayInArgentina(),
 		editRuleId: editRule?.id ?? null,
 		editNotFound: canManage && !!editId && !editRule,
@@ -140,7 +154,16 @@ export const actions: Actions = {
 		const prepared = await prepare(event, 'create');
 		if ('failure' in prepared) return prepared.failure;
 
-		const values = readFormFields(await event.request.formData(), COMMISSION_RULE_FIELDS);
+		const formData = await event.request.formData();
+		const values = readFormFields(formData, COMMISSION_RULE_FIELDS);
+		const collectorField = formData.get('appliesToCollectorId');
+		const appliesToCollectorId = typeof collectorField === 'string' ? collectorField.trim() : '';
+		if (appliesToCollectorId && !isUuid(appliesToCollectorId)) {
+			return commissionRuleFormFailure('create', 400, 'Choose a valid collector.', {
+				values: { ...values, appliesToCollectorId },
+				errors: { appliesToCollectorId: ['Choose a valid collector.'] }
+			});
+		}
 		const parsed = commissionRuleSchema(prepared.campaign.installmentCount).safeParse(values);
 		if (!parsed.success) return commissionRuleValidationFailure('create', parsed.error, values);
 
@@ -149,7 +172,8 @@ export const actions: Actions = {
 				event.locals.supabase,
 				prepared.campaign.id,
 				parsed.data,
-				{ requestId: event.locals.requestId }
+				{ requestId: event.locals.requestId },
+				appliesToCollectorId || null
 			);
 			return commissionRuleFormSuccess('create', 'Rule added.', id);
 		} catch (err) {

@@ -260,17 +260,26 @@ function ruleArgs(input: CommissionRuleInput) {
 	};
 }
 
-/** Creates a general rule (`commission.rule_manage`). Returns the new rule id. */
+/**
+ * Creates a rule (`commission.rule_manage`). Returns the new rule id. With `appliesToCollectorId`
+ * it is a special per-collector rule (SAN-69), which takes precedence over general rules.
+ */
 export async function createCommissionRule(
 	supabase: SupabaseClient,
 	campaignId: string,
 	input: CommissionRuleInput,
-	ctx: CommissionRuleRequestContext = {}
+	ctx: CommissionRuleRequestContext = {},
+	appliesToCollectorId: string | null = null
 ): Promise<string> {
 	const data = await callCommissionRuleRpc(
 		supabase,
 		'commission_rule_create',
-		{ p_campaign_id: campaignId, ...ruleArgs(input), p_request_id: ctx.requestId ?? null },
+		{
+			p_campaign_id: campaignId,
+			...ruleArgs(input),
+			p_request_id: ctx.requestId ?? null,
+			...(appliesToCollectorId ? { p_applies_to_collector_id: appliesToCollectorId } : {})
+		},
 		ctx
 	);
 	if (typeof data !== 'string' || data.length === 0) {
