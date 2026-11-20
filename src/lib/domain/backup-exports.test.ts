@@ -4,6 +4,7 @@ import { parseCsv } from './csv';
 import {
 	BACKUP_EXPORTS,
 	BACKUP_EXPORT_KINDS,
+	exportDateInBuenosAires,
 	exportFileName,
 	isBackupExportKind,
 	buenosAiresDateTime,
@@ -64,6 +65,34 @@ describe('exports', () => {
 		expect(line).toContain('base:7');
 		expect(line).not.toContain('4878');
 	});
+	it('exports the correction links and settlement corrections', () => {
+		const header = (kind: (typeof BACKUP_EXPORT_KINDS)[number]) =>
+			BACKUP_EXPORTS[kind].columns.map((c) => c.header);
+		expect(header('payments')).toContain('replaces_payment_id');
+		expect(BACKUP_EXPORTS.payments.select).toContain('replaces_payment_id');
+		expect(header('collector-ledger')).toContain('corrects_sale_id');
+		expect(BACKUP_EXPORTS['collector-ledger'].select).toContain('corrects_sale_id');
+		const def = BACKUP_EXPORTS['settlement-corrections'];
+		expect(def.order).toEqual(['created_at', 'id']);
+		expect(def.campaignColumn).toBe('settlements.campaign_id');
+		const csv = buildCsv(def.columns, [
+			{
+				id: 'k1',
+				settlement_id: 's1',
+				commission_delta: '-150.00',
+				cash_retained_delta: '25.50',
+				reason: '=HYPERLINK("x")',
+				created_by: 'u1',
+				created_at: '2027-05-01T00:00:00Z',
+				settlements: { settlement_number: 7, collector_id: 'c1' }
+			}
+		]);
+		const [head, line] = csv.replace('﻿', '').split('\r\n');
+		expect(head).toContain('withheld_commission_delta');
+		expect(line).toContain('-150.00');
+		expect(line).toContain('25.50');
+		expect(line).toContain("'=HYPERLINK");
+	});
 	it('names files by kind, campaign and day', () => {
 		expect(exportFileName('payments', 'c1', '2027-05-01')).toBe('payments-c1-2027-05-01.csv');
 	});
@@ -121,5 +150,13 @@ describe('frozen roster export mapping', () => {
 		expect(snapshotBuyerName({ business_name: 'ACME', first_name: 'x' })).toBe('ACME');
 		expect(buenosAiresDateTime(null)).toBeNull();
 		expect(buenosAiresDateTime('garbage')).toBeNull();
+	});
+});
+
+describe('exportDateInBuenosAires', () => {
+	it('uses the Buenos Aires date, not the UTC date', () => {
+		// 2027-05-02T01:30Z is still 2027-05-01 22:30 in Buenos Aires (UTC-3).
+		expect(exportDateInBuenosAires(new Date('2027-05-02T01:30:00Z'))).toBe('2027-05-01');
+		expect(exportDateInBuenosAires(new Date('2027-05-02T03:00:00Z'))).toBe('2027-05-02');
 	});
 });

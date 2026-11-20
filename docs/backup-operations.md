@@ -117,13 +117,19 @@ Even if backups exist, the system must allow exporting administrative reports:
 Generated on demand as CSV (UTF-8 with BOM, CRLF, formula-safe text cells) at
 `/campaigns/[id]/backups` (page) and `/campaigns/[id]/backups/export/[kind]` (download):
 
-| Export                     | `kind`             | Source                                                     | Extra permission        |
-| -------------------------- | ------------------ | ---------------------------------------------------------- | ----------------------- |
-| Bonds per campaign         | `bonds`            | `bonds` + active `bond_numbers`                            | `bond.view`             |
-| Payments by period         | `payments`         | `payments` (`?from=&to=` on `payment_date`)                | `payment.view`          |
-| Settlements                | `settlements`      | `settlements` + collector name                             | `settlement.view`       |
-| Collector current accounts | `collector-ledger` | `collector_ledger_entries` (`?from=&to=` on `occurred_at`) | `collector.ledger.view` |
-| Frozen rosters             | `frozen-rosters`   | `draw_roster_entries` of `frozen` rosters + draw           | `draw.view`             |
+| Export                     | `kind`                   | Source                                                     | Extra permission        |
+| -------------------------- | ------------------------ | ---------------------------------------------------------- | ----------------------- |
+| Bonds per campaign         | `bonds`                  | `bonds` + active `bond_numbers`                            | `bond.view`             |
+| Payments by period         | `payments`               | `payments` (`?from=&to=` on `payment_date`)                | `payment.view`          |
+| Settlements                | `settlements`            | `settlements` + collector name                             | `settlement.view`       |
+| Collector current accounts | `collector-ledger`       | `collector_ledger_entries` (`?from=&to=` on `occurred_at`) | `collector.ledger.view` |
+| Settlement corrections     | `settlement-corrections` | `settlement_corrections` (via its settlement's campaign)   | `settlement.view`       |
+| Frozen rosters             | `frozen-rosters`         | `draw_roster_entries` of `frozen` rosters + draw           | `draw.view`             |
+
+Correction links (SAN-114): `payments` includes `replaces_payment_id` (links an `adjusted` payment to
+its replacement), `collector-ledger` includes `corrects_sale_id` (links cross-collector
+compensation to the corrected sale) and `settlement-corrections` carries `commission_delta` and
+`withheld_commission_delta`.
 
 Rules: `report.export` is required (only the administrator holds it today) together with the view
 permission of the exported data; RLS still applies. Exports are read-only, paginated in 1000-row
@@ -201,7 +207,7 @@ diff before.txt restored.txt
 ```
 
 It reports: bonds per campaign and status (count and value), payments per campaign and status
-(count and amount), settlements per campaign and status (totals), collector balances per campaign
+(count and amount), correction link counts and deltas, settlements per campaign and status (totals), collector balances per campaign
 (credits minus debits, annulled entries excluded) and integrity checks that must return no rows.
 Frozen roster counts are pending (Phase 11). Differences must be explained by the accepted loss
 window only; anything else blocks reopening.

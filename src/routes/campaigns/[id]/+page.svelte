@@ -45,7 +45,7 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements || data.can.exportBackups}
+		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements || data.can.viewDraws || data.can.exportBackups}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
 				{#if data.can.viewBonds}
 					<a
@@ -91,6 +91,12 @@
 					<a
 						href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
 						class="font-medium text-blue-700 hover:underline">Settlements →</a
+					>
+				{/if}
+				{#if data.can.viewDraws}
+					<a
+						href={resolve('/campaigns/[id]/draws', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Draws →</a
 					>
 				{/if}
 				{#if data.can.exportBackups}

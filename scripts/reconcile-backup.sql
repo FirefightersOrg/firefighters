@@ -9,7 +9,7 @@
 --   docker exec -i supabase_db_firefighters psql -U postgres -v ON_ERROR_STOP=1 -X -A -F $'\t' \
 --     < scripts/reconcile-backup.sql
 --
--- Sections 1-4 are totals per campaign (bonds, payments, settlements, collector balances).
+-- Sections 1-4b are totals per campaign (bonds, payments, settlements, collector balances).
 -- Section 5 lists integrity checks that must return zero rows. Section 6 is pending (Phase 11).
 
 \echo '== 1. bonds per campaign and commercial status (count, total_value)'
@@ -43,6 +43,33 @@ from public.collector_ledger_entries
 where status <> 'annulled'
 group by campaign_id, collector_id
 order by campaign_id, collector_id;
+
+\echo '== 4b. correction links and settlement corrections per campaign (SAN-114)'
+select p.campaign_id, 'payments_replacing' as item, count(*)::text as value
+from public.payments p
+where p.replaces_payment_id is not null
+group by p.campaign_id
+union all
+select campaign_id, 'ledger_entries_correcting_sale', count(*)::text
+from public.collector_ledger_entries
+where corrects_sale_id is not null
+group by campaign_id
+union all
+select s.campaign_id, 'settlement_corrections', count(*)::text
+from public.settlement_corrections sc
+join public.settlements s on s.id = sc.settlement_id
+group by s.campaign_id
+union all
+select s.campaign_id, 'commission_delta', coalesce(sum(sc.commission_delta), 0)::text
+from public.settlement_corrections sc
+join public.settlements s on s.id = sc.settlement_id
+group by s.campaign_id
+union all
+select s.campaign_id, 'withheld_commission_delta', coalesce(sum(sc.cash_retained_delta), 0)::text
+from public.settlement_corrections sc
+join public.settlements s on s.id = sc.settlement_id
+group by s.campaign_id
+order by 1, 2;
 
 \echo '== 5a. integrity: bonds with a sale-side collector/buyer that no longer exists (expect 0 rows)'
 select b.id as bond_id

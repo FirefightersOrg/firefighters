@@ -16,6 +16,9 @@ const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv
 const seedConfig = resolveSeedConfig(seedEnv);
 const options = { auth: { autoRefreshToken: false, persistSession: false } };
 const RUN = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+// Digits-only seed for document numbers: duplicate detection compares digits, so the numbers of
+// different tests in this file must differ in their digits, not just their letters.
+const NUM = String(Date.now()).slice(-8);
 let service: SupabaseClient;
 let campaignId: string;
 let seq = 0;
@@ -181,10 +184,10 @@ describe('buyers (local Supabase)', () => {
 	});
 
 	it('warns about duplicates and read-only cannot enter', async () => {
-		const first = await create(operator, individual({ documentNumber: `DUP-${RUN}` }));
+		const first = await create(operator, individual({ documentNumber: `${NUM}1` }));
 		const second = await create(
 			operator,
-			individual({ documentNumber: `OTHER-${RUN}`, firstName: `Other-${RUN}` })
+			individual({ documentNumber: `${NUM}2`, firstName: `Other-${RUN}` })
 		);
 		const current = (await buyerLoad(event(operator, `/buyers/${second}`, undefined, second))) as {
 			buyer: { updatedAt: string };
@@ -194,7 +197,7 @@ describe('buyers (local Supabase)', () => {
 				operator,
 				`/buyers/${second}`,
 				{
-					...individual({ documentNumber: `DUP-${RUN}`, firstName: `Other-${RUN}` }),
+					...individual({ documentNumber: `${NUM}1`, firstName: `Other-${RUN}` }),
 					updatedAt: current.buyer.updatedAt
 				},
 				second
@@ -203,5 +206,24 @@ describe('buyers (local Supabase)', () => {
 		expect(duplicate.status).toBe(409);
 		expect(first).toBeTruthy();
 		await expect(buyersLoad(event(readOnly, '/buyers'))).rejects.toMatchObject({ status: 403 });
+	});
+
+	it('warns about a duplicate whose document number is formatted differently', async () => {
+		const plain = `${NUM}3`;
+		const dotted = `${plain.slice(0, 2)}.${plain.slice(2, 5)}.${plain.slice(5)}`;
+		const existing = await create(
+			operator,
+			individual({ documentNumber: plain, firstName: `Fmt-${RUN}` })
+		);
+		expect(existing).toBeTruthy();
+		const warned = (await newBuyerActions.default(
+			event(
+				operator,
+				'/buyers/new',
+				individual({ documentNumber: ` ${dotted} `, firstName: `Fmt2-${RUN}` })
+			)
+		)) as { status: number; data: { duplicates?: { id: string }[] } };
+		expect(warned.status).toBe(409);
+		expect(warned.data.duplicates?.map((b) => b.id)).toContain(existing);
 	});
 });

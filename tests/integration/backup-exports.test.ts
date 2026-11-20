@@ -104,7 +104,7 @@ describe('backup export route (local Supabase)', () => {
 	});
 
 	it('returns only the header for exports without rows', async () => {
-		for (const kind of ['payments', 'settlements', 'collector-ledger']) {
+		for (const kind of ['payments', 'settlements', 'collector-ledger', 'settlement-corrections']) {
 			const { response } = await call(admin, kind, { query: '?from=2027-01-01&to=2027-12-31' });
 			expect(response?.status, kind).toBe(200);
 			expect(parseCsv(await response!.text())).toHaveLength(1);
