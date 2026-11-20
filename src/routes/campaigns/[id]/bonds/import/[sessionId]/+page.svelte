@@ -12,6 +12,7 @@
 		primaryButtonClass,
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
+	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import ImportItemStatusBadge from '$lib/components/imports/ImportItemStatusBadge.svelte';
 	import ImportSessionStatusBadge from '$lib/components/imports/ImportSessionStatusBadge.svelte';
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
@@ -161,6 +162,11 @@
 	</section>
 
 	{#if data.canEdit}
+		<RiskyOperationChecklist
+			campaignId={data.campaign.id}
+			operation="confirming a bulk import"
+			canExport={data.canExport}
+		/>
 		<section class="{cardClass} flex flex-wrap items-center gap-3" aria-label="Import actions">
 			<form method="POST" action="?/validate" use:enhance={submitting('validate')}>
 				<button
