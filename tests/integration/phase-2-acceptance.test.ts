@@ -517,7 +517,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				viewCollectors: true,
 				viewBuyers: true,
 				viewDeliveries: true,
-				viewSales: true
+				viewSales: true,
+				// SAN-64: admins can navigate to the settlement workspace.
+				viewSettlements: true
 			});
 
 			const audit = await expectOneAudit(requestId, {
@@ -1176,7 +1178,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					viewBuyers: role === 'operator',
 					// SAN-55: every one of these roles has bond.view.
 					viewDeliveries: true,
-					viewSales: true
+					viewSales: true,
+					// SAN-64: settlement action/view permissions expose the workspace link.
+					viewSettlements: role !== 'read-only'
 				});
 
 				await expect(

@@ -42,6 +42,7 @@ import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$lib/schemas/bond';
 import { readFormFields } from '$lib/schemas/campaign';
 import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
+import { listBondPayments } from '$lib/server/repositories/settlements';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -155,6 +156,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		? await listInstallmentsForSale(locals.supabase, activeSaleResult.data.sale.id)
 		: { data: [], error: null };
 	if (installmentsResult.error) fail500(installmentsResult.error);
+	const paymentsResult = await listBondPayments(locals.supabase, bond.id);
+	if (paymentsResult.error) fail500(paymentsResult.error);
 
 	return {
 		campaign,
@@ -180,7 +183,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			permissions: locals.permissions ?? []
 		}),
 		sale: activeSaleResult.data,
-		installments: installmentsResult.data ?? []
+		installments: installmentsResult.data ?? [],
+		payments: paymentsResult.data ?? []
 	};
 };
 
