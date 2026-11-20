@@ -61,7 +61,11 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 	};
 }
 
-function renderPage(loaded: BondRecord, form: Record<string, unknown> | null = null) {
+function renderPage(
+	loaded: BondRecord,
+	form: Record<string, unknown> | null = null,
+	extra: Record<string, unknown> = {}
+) {
 	const data = {
 		campaign,
 		record: loaded,
@@ -69,7 +73,8 @@ function renderPage(loaded: BondRecord, form: Record<string, unknown> | null = n
 			history: [],
 			collectors: [],
 			can: { returnBond: false, reassign: false, markLost: false }
-		}
+		},
+		...extra
 	};
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 	const props = { data, form, params: { id: CAMPAIGN_ID, bondId: loaded.general.id } } as any;
@@ -77,6 +82,25 @@ function renderPage(loaded: BondRecord, form: Record<string, unknown> | null = n
 }
 
 describe('/campaigns/[id]/bonds/[bondId] page', () => {
+	it('renders confirmed payment certificates in the Payments section', () => {
+		const body = renderPage(record(), null, {
+			payments: [
+				{
+					id: 'payment',
+					date: '2026-01-01',
+					amount: '12.00',
+					method: 'cash',
+					status: 'confirmed',
+					settlementId: null,
+					settlementNumber: null
+				}
+			]
+		});
+		expect(body).toContain('Payments');
+		expect(body).toContain(
+			'/campaigns/f0000000-0000-0000-0000-000000000001/payments/payment/print'
+		);
+	});
 	it('shows the general data and the formatted numbers of a simple bond', () => {
 		const body = renderPage(record());
 		expect(body).toContain('Simple bond 0068');

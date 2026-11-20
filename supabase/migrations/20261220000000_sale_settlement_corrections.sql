@@ -174,7 +174,16 @@ begin
   -- New settlements can appear meanwhile; the payment-id recheck below refuses that race.
   -- NO KEY UPDATE still serializes state changes/admission, but permits FK KEY SHARE
   -- from existing manual ledger services (which may already hold a ledger lock).
-  perform id from public.settlements where campaign_id=v_old.campaign_id order by id for no key update;
+  -- A collector correction may move commission between collectors, so it serializes against
+  -- every settlement of the campaign. A buyer correction touches no payment or ledger row:
+  -- it only locks the settlements of this sale's own payments (review of #72).
+  if p_kind='collector' then
+    perform id from public.settlements where campaign_id=v_old.campaign_id order by id for no key update;
+  else
+    perform s.id from public.settlements s
+    where s.id in (select pay.settlement_id from public.payments pay where pay.sale_id=p_sale_id)
+    order by s.id for no key update;
+  end if;
   select coalesce(array_agg(id order by id),'{}') into v_payments from public.payments where sale_id=p_sale_id;
   perform id from public.payments where id=any(v_payments) order by id for no key update;
   select * into v_old from public.sales where id=p_sale_id for update;
@@ -372,7 +381,7 @@ begin
   if old.status='confirmed' and new.status in ('annulled','adjusted') and exists(
     select 1 from public.sales s where s.id=old.sale_id and s.collector_id<>old.collector_id
   ) then
-    raise exception 'correct the sale collector back before correcting this historical payment'
+    raise exception 'This payment''s sale was moved to another collector. Correct the sale collector back before annulling or correcting this payment.'
       using errcode='object_not_in_prerequisite_state';
   end if;
   return new;

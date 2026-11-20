@@ -11,6 +11,7 @@ import {
 	keepTimestampIfSameDay
 } from '$lib/domain/campaigns';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
+import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import {
 	campaignFormFailure,
 	campaignFormSuccess,
@@ -96,6 +97,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				!hasBonds,
 			transitions: availableCampaignTransitions(campaign.status, permissions),
 			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
+			viewAudit: hasPermissionIn(permissions, 'audit.view'),
 			viewBonds: hasPermissionIn(permissions, 'bond.view'),
 			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status),
 			// Reading needs X.view or X.manage (same rule as the RLS of collectors / buyers).
@@ -109,7 +111,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			viewSales:
 				hasPermissionIn(permissions, 'sale.view') ||
 				hasPermissionIn(permissions, 'sale.create') ||
-				hasPermissionIn(permissions, 'bond.view')
+				hasPermissionIn(permissions, 'bond.view'),
+			viewSettlements: (
+				[
+					'settlement.view',
+					'settlement.create',
+					'settlement.update_open',
+					'settlement.close',
+					'settlement.correct'
+				] as PermissionCode[]
+			).some((permission) => hasPermissionIn(permissions, permission))
 		}
 	};
 };

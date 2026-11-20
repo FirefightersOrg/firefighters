@@ -106,12 +106,14 @@ describe('/campaigns/[id]', () => {
 				editRules: true,
 				transitions: ['active', 'annulled'],
 				viewCommissions: false,
+				viewAudit: false,
 				viewBonds: false,
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
-				viewSales: false
+				viewSales: false,
+				viewSettlements: false
 			});
 		});
 
@@ -126,12 +128,14 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: ['closing', 'annulled'],
 				viewCommissions: false,
+				viewAudit: false,
 				viewBonds: false,
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
-				viewSales: false
+				viewSales: false,
+				viewSettlements: false
 			});
 		});
 
@@ -146,12 +150,14 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: ['closed'],
 				viewCommissions: false,
+				viewAudit: false,
 				viewBonds: false,
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
-				viewSales: false
+				viewSales: false,
+				viewSettlements: false
 			});
 		});
 
@@ -182,12 +188,14 @@ describe('/campaigns/[id]', () => {
 				editRules: false,
 				transitions: [],
 				viewCommissions: false,
+				viewAudit: false,
 				viewBonds: false,
 				loadBonds: false,
 				viewCollectors: false,
 				viewBuyers: false,
 				viewDeliveries: false,
-				viewSales: false
+				viewSales: false,
+				viewSettlements: false
 			});
 		});
 

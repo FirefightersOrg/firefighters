@@ -310,7 +310,12 @@ describe('custody from the bond and collector records (local Supabase)', () => {
 			event(admin, { id: campaignId, bondId: bonds[0] }, bondPath(bonds[0]))
 		)) as { custody: { history: { assignmentType: string }[]; can: Record<string, boolean> } };
 		expect(record.custody.history.map((a) => a.assignmentType)).toEqual(['delivery']);
-		expect(record.custody.can).toEqual({ returnBond: true, reassign: true, markLost: true });
+		expect(record.custody.can).toEqual({
+			returnBond: true,
+			reassign: true,
+			markLost: true,
+			correctCollector: true
+		});
 
 		// The operator can return and reassign, but not mark a bond lost.
 		const operatorView = (await bondLoad(
@@ -319,7 +324,8 @@ describe('custody from the bond and collector records (local Supabase)', () => {
 		expect(operatorView.custody.can).toEqual({
 			returnBond: true,
 			reassign: true,
-			markLost: false
+			markLost: false,
+			correctCollector: true
 		});
 		expect(
 			await run(
