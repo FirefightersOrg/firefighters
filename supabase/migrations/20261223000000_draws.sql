@@ -112,6 +112,11 @@ begin
   if tg_op = 'INSERT' or new.required_installment_number is distinct from old.required_installment_number then
     -- Serialize rule admission with draft campaign count reductions. Status-only
     -- writes do not acquire a campaign lock after a draw lock.
+    -- LOCK ORDER CAVEAT (review of #78): on an UPDATE of required_installment_number this
+    -- trigger runs with the draw row already locked and then takes the campaign FOR SHARE,
+    -- i.e. draw -> campaign, the reverse of the documented campaign -> draw order. The audited
+    -- write RPCs (SAN-77 draw_update) lock the campaign first, so they never invert it. Any other
+    -- privileged writer that updates this column must also lock the campaign before the draw.
     select installment_count into v_count from public.campaigns where id = new.campaign_id for share;
     if new.required_installment_number > v_count then
       raise exception 'required installment exceeds campaign count' using errcode = '23514';
