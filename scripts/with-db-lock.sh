@@ -9,7 +9,7 @@
 # the git common dir, so all worktrees of this repo share it.
 #
 # Portable `mkdir` lock (macOS has no `flock`). A lock is stale when its owner pid is gone or it is
-# older than DB_LOCK_STALE_SECONDS (default 3600). DB_LOCK_WAIT_SECONDS bounds the wait (default
+# older than DB_LOCK_STALE_SECONDS (default 3600; a lock still being initialised counts as fresh). DB_LOCK_WAIT_SECONDS bounds the wait (default
 # 3600; 0 = forever).
 set -u
 
@@ -33,15 +33,34 @@ max_wait=${DB_LOCK_WAIT_SECONDS:-3600}
 
 owner_pid() { cat "$lock_dir/pid" 2>/dev/null; }
 
+# mtime of the lock dir (BSD stat on macOS, GNU stat on Linux).
+lock_mtime() { stat -f %m "$lock_dir" 2>/dev/null || stat -c %Y "$lock_dir" 2>/dev/null || echo 0; }
+
 lock_is_stale() {
 	local pid started now
 	pid=$(owner_pid)
 	if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
 		return 0
 	fi
-	started=$(cat "$lock_dir/started" 2>/dev/null || echo 0)
+	# The owner writes pid/started right after `mkdir`. A lock that has no `started` yet is brand
+	# new, not ancient: fall back to the directory mtime so a waiter never steals it.
+	started=$(cat "$lock_dir/started" 2>/dev/null)
+	[ -n "$started" ] || started=$(lock_mtime)
 	now=$(date +%s)
 	[ $((now - started)) -ge "$stale_after" ]
+}
+
+# Removes a lock judged stale. The lock is first renamed (atomic) so a lock that another waiter
+# re-created in the meantime is only deleted if it is still the one we judged stale.
+remove_stale_lock() {
+	local seen_pid=$1 trash="$lock_dir.stale.$$"
+	mv "$lock_dir" "$trash" 2>/dev/null || return 0
+	if [ "$(cat "$trash/pid" 2>/dev/null)" = "$seen_pid" ]; then
+		rm -rf "$trash"
+	else
+		# Someone replaced the lock between the check and the rename: put it back if still free.
+		mv -n "$trash" "$lock_dir" 2>/dev/null || rm -rf "$trash"
+	fi
 }
 
 held=0
@@ -61,8 +80,9 @@ waited=0
 announced=0
 until mkdir "$lock_dir" 2>/dev/null; do
 	if lock_is_stale; then
-		echo "with-db-lock: removing stale lock (owner pid $(owner_pid))" >&2
-		rm -rf "$lock_dir"
+		stale_pid=$(owner_pid)
+		echo "with-db-lock: removing stale lock (owner pid ${stale_pid:-unknown})" >&2
+		remove_stale_lock "$stale_pid"
 		continue
 	fi
 	if [ "$announced" = "0" ]; then

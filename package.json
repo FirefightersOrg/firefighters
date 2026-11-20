@@ -14,9 +14,9 @@
 		"lint": "prettier --check . && eslint .",
 		"test": "vitest run",
 		"test:integration": "scripts/with-db-lock.sh vitest run --config vitest.integration.config.ts",
-		"db:reset": "scripts/with-db-lock.sh supabase db reset",
-		"db:test": "scripts/with-db-lock.sh supabase test db",
-		"seed:admin": "tsx scripts/seed-admin.ts",
+		"db:reset": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" db reset",
+		"db:test": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" test db",
+		"seed:admin": "scripts/with-db-lock.sh tsx scripts/seed-admin.ts",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
 	},
