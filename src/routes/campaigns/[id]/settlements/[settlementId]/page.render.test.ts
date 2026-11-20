@@ -72,3 +72,39 @@ describe('settlement workspace render', () => {
 		expect(body).not.toContain('/payments/p/print');
 	});
 });
+
+describe('settlement workspace corrections (SAN-73)', () => {
+	const closed = (can: Record<string, boolean>) =>
+		render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					settlement: { ...settlement, status: 'closed' },
+					totals,
+					payments: [
+						{ id: 'p', date: '2026-01-01', amount: '3.00', method: 'cash', status: 'confirmed' }
+					],
+					candidates: [],
+					reasonMax: 1000,
+					can: { add: false, remove: false, close: false, ...can }
+				},
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+
+	it('shows payment correction forms with the indicative ledger preview only with permission', () => {
+		const allowed = closed({ correctPayment: true });
+		expect(allowed).toContain('?/annulPayment');
+		expect(allowed).toContain('Indicative preview');
+		const denied = closed({ correctPayment: false });
+		expect(denied).not.toContain('?/annulPayment');
+		expect(denied).not.toContain('Indicative preview');
+	});
+
+	it('shows the settlement correction with its ledger preview only with settlement.correct', () => {
+		const allowed = closed({ correctSettlement: true });
+		expect(allowed).toContain('Indicative ledger preview');
+		expect(allowed).toContain('name="commissionDelta"');
+		expect(closed({ correctSettlement: false })).not.toContain('Indicative ledger preview');
+	});
+});
