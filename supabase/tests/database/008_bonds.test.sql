@@ -1046,7 +1046,8 @@ select throws_ok(
   $$truncate public.bonds, public.bond_numbers, public.bond_groups, public.import_session_items,
     public.delivery_note_items, public.bond_assignments, public.installments,
     public.payment_installments, public.commission_adjustments, public.collector_ledger_entries,
-    public.payments, public.settlements, public.settlement_corrections, public.payment_plans, public.sales$$,
+    public.payments, public.settlements, public.settlement_corrections, public.payment_plans, public.sales,
+    public.draw_roster_entries$$,
   '23001', null,
   'truncate: bonds and bond_numbers (owner)'
 );

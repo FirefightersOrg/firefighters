@@ -663,6 +663,68 @@ Types:
 
 ### draw_rosters
 
+#### SAN-75 storage decisions
+
+Implemented by `20261223000000_draws.sql`, pgTAP `037`, and `src/lib/domain/draws.ts`.
+No write RPC is introduced: all API roles (including service_role) lack DML; future audited
+SECURITY DEFINER RPCs must write the audit row in the same transaction.
+
+- Draw names are trimmed, non-blank, at most 200 Unicode code points. Monthly draws require
+  an installment; any non-null installment is in 1..campaign.installment_count. Other types may
+  supply one (notably consolation) or leave it null. Eligibility configuration is a JSON object,
+  default `{}`: draw type and installment define the documented baseline, while future generation
+  code interprets optional configuration for consolation exclusions/extraordinary numbers. This
+  migration does not compute eligibility, generate extra numbers, or validate a configuration schema.
+- Draws start scheduled and follow exactly the Draw state machine. Only scheduled rules can be
+  edited. Closed and annulled rows are wholly immutable. Scheduled annulment requires
+  `annulled_at`, `annulled_by`, and a separate trimmed non-blank `annul_reason` (1000 code points).
+  Dates are calendar dates; cutoff is an absolute timestamptz. No undocumented cutoff/date ordering
+  or prohibition on historical draws is imposed.
+- The docs do not specify roster states: choose `generated -> frozen | superseded`, both terminal.
+  Regeneration supersedes the generated row and creates a new row; it never deletes history.
+  A frozen roster cannot even become superseded. One frozen roster per draw is enforced by a
+  partial unique index. Freeze actor and timestamp exist iff frozen. Multiple generated rows are
+  allowed so a future transactional generation RPC can publish a replacement.
+- Entries are editable only under a generated roster, never moved between rosters. A trigger
+  verifies the bond, bond-number identity, stored number value, and draw all match one campaign
+  on INSERT and UPDATE. Immutable draw/roster campaign ancestry prevents later mismatches.
+  Both `(draw_roster_id, bond_number_id)` and `(draw_roster_id, number_value)` are unique:
+  even a released/reused number cannot occur twice in the same historical roster. The latter
+  index also serves the requested composite lookup. Snapshots are required JSON objects;
+  unavailable buyer/collector information may use `{}`. Ineligibility needs a trimmed non-blank
+  reason of at most 1000 code points iff not eligible.
+- Entry admission/edits lock the roster FOR SHARE to serialize against freeze. Future write RPCs
+  must lock draw, then roster, then entries; they must not acquire a draw lock after roster locks.
+  These tables never take a financial ledger lock. Real two-session dblink tests cover freeze
+  first and admission first. Delete and truncate are forbidden for all three tables.
+- Campaign count reductions cannot invalidate existing draws. Draw creation/installment edits
+  take a campaign SHARE lock, and the reverse campaign guard checks draws. Future rule-edit RPCs
+  must acquire campaign before draw (then roster/entries); status-only draw writes do not acquire
+  campaign locks. Two further dblink races cover both admission/count-reduction orderings.
+- Read RLS accepts any seeded draw permission, including load_winner. The original seed has all
+  six permissions: admin has all, operator has load_winner, treasurer freeze_roster/load_winner;
+  later SAN-93 grants their implied draw.view. Thus admin/operator/treasurer read all three
+  tables, collector and read_only read none. There is deliberately no collector-own snapshot
+  exception: permissions.md reserves portfolio access for a later feature, and snapshots expose
+  other buyers. The RLS helper has an explicit authenticated EXECUTE grant (SAN-102); internal
+  triggers have none.
+- State/roster synchronization, nonempty roster generation, campaign operational status, audit
+  request context, and permission-checked write APIs belong to subsequent draw RPC tickets.
+  The storage guard does not assume those future RPCs exist or introduce a fake write API.
+- Existing pgTAP 008's explicit truncate dependency list now includes roster entries, because
+  their new bond FK must not mask the original owner-level prohibition with a missing-table error.
+
+Validation: local reset and `supabase test db` passed **37 files / 2323 assertions**, including
+**190 assertions** in 037 and four real two-session races (no concurrency skips).
+`pnpm check`: **0 errors / 0 warnings**; `pnpm lint`: passed; `pnpm test`:
+**117 files / 1482 tests**; after local admin/fixture seeding, `pnpm test:integration`:
+**22 files / 186 tests**. The first integration attempt lacked seeded users and failed sign-in;
+seeding and rerunning passed. Run pgTAP after reset, before integration: pre-existing suites
+027/028/030/032 use global financial/audit counts and fail on integration leftovers; those unrelated
+assertions are not changed here. All 037 counts/denial audits are scoped to its own fixtures.
+Race cleanup uses transaction-local `session_replication_role = replica` in the owner-only test
+connection and exact fixture ids, avoiding ALTER TABLE locks against the local test transaction.
+
 Draw rosters.
 
 Suggested fields:
