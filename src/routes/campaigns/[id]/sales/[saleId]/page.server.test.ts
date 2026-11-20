@@ -136,4 +136,18 @@ describe('sale correction actions', () => {
 			).toMatchObject({ success: true });
 		}
 	);
+	it.each(['correctBuyer', 'correctCollector'] as const)(
+		'%s rejects a sale outside the route campaign before service work',
+		async (action) => {
+			vi.mocked(getSaleDetail).mockResolvedValueOnce({ data: null, error: null } as never);
+			expect(
+				await run(action, ['campaign.view', 'sale.correct'], {
+					...(action === 'correctBuyer' ? { newBuyerId: BUYER } : { newCollectorId: COLLECTOR }),
+					reason: 'Reason'
+				})
+			).toMatchObject({ status: 404 });
+			expect(correctSaleBuyer).not.toHaveBeenCalled();
+			expect(correctSaleCollector).not.toHaveBeenCalled();
+		}
+	);
 });

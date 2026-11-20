@@ -27,6 +27,19 @@ const correctionFailure = (cause: unknown, form: string, values: Record<string, 
 		message: service?.message ?? 'Could not record correction.'
 	});
 };
+async function saleForAction(
+	locals: App.Locals,
+	params: { id: string; saleId: string },
+	form: string,
+	values: Record<string, string>
+) {
+	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
+		return fail(404, { form, values, errors: {}, message: 'Sale not found.' });
+	const sale = await getSaleDetail(locals.supabase, params.id, params.saleId);
+	if (sale.error) return correctionFailure(sale.error, form, values);
+	if (!sale.data) return fail(404, { form, values, errors: {}, message: 'Sale not found.' });
+	return null;
+}
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
@@ -99,6 +112,8 @@ export const actions: Actions = {
 			});
 		const data = await request.formData();
 		const values = { newBuyerId: field(data, 'newBuyerId'), reason: field(data, 'reason') };
+		const missingSale = await saleForAction(locals, params, 'correctBuyer', values);
+		if (missingSale) return missingSale;
 		try {
 			await correctSaleBuyer(
 				locals.supabase,
@@ -126,6 +141,8 @@ export const actions: Actions = {
 			});
 		const data = await request.formData();
 		const values = { newCollectorId: field(data, 'newCollectorId'), reason: field(data, 'reason') };
+		const missingSale = await saleForAction(locals, params, 'correctCollector', values);
+		if (missingSale) return missingSale;
 		try {
 			await correctSaleCollector(
 				locals.supabase,

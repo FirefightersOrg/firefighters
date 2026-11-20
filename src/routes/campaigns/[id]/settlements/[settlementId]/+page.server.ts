@@ -106,6 +106,20 @@ function serviceFailure(err: unknown, form: string, values: Record<string, strin
 		message: e?.message ?? 'Something went wrong. Please try again.'
 	});
 }
+async function settlementForPaymentCorrection(
+	locals: App.Locals,
+	params: { id: string; settlementId: string },
+	form: string,
+	values: Record<string, string>
+) {
+	if (!uuid.safeParse(params.id).success || !uuid.safeParse(params.settlementId).success)
+		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+	const settlement = await getSettlement(locals.supabase, params.id, params.settlementId);
+	if (settlement.error) return serviceFailure(settlement.error, form, values);
+	if (!settlement.data)
+		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+	return null;
+}
 export const actions: Actions = {
 	add: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
@@ -193,7 +207,7 @@ export const actions: Actions = {
 			return serviceFailure(e, 'add');
 		}
 	},
-	annulPayment: async ({ request, locals, url }) => {
+	annulPayment: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, {
 				form: 'annulPayment',
@@ -209,6 +223,13 @@ export const actions: Actions = {
 			});
 		const f = await request.formData();
 		const values = { paymentId: field(f, 'paymentId'), reason: field(f, 'reason') };
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'annulPayment',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
 		try {
 			await annulPayment(locals.supabase, values, {
 				requestId: locals.requestId ?? null,
@@ -219,7 +240,7 @@ export const actions: Actions = {
 			return serviceFailure(e, 'annulPayment', values);
 		}
 	},
-	correctPaymentMethod: async ({ request, locals, url }) => {
+	correctPaymentMethod: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, {
 				form: 'correctPaymentMethod',
@@ -239,6 +260,13 @@ export const actions: Actions = {
 			newMethod: field(f, 'newMethod'),
 			reason: field(f, 'reason')
 		};
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'correctPaymentMethod',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
 		try {
 			await correctPaymentMethod(
 				locals.supabase,
@@ -255,7 +283,7 @@ export const actions: Actions = {
 			return serviceFailure(e, 'correctPaymentMethod', values);
 		}
 	},
-	reassociateTransfer: async ({ request, locals, url }) => {
+	reassociateTransfer: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, {
 				form: 'reassociateTransfer',
@@ -277,6 +305,13 @@ export const actions: Actions = {
 			amountApplied: field(f, 'amountApplied'),
 			reason: field(f, 'reason')
 		};
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'reassociateTransfer',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
 		try {
 			await reassociateTransfer(
 				locals.supabase,

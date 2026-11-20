@@ -267,6 +267,50 @@ describe('settlement workspace', () => {
 			expect(await run(action, permission, valid)).toMatchObject({ success: true });
 		}
 	);
+	it.each(['annulPayment', 'correctPaymentMethod', 'reassociateTransfer'] as const)(
+		'%s rejects a settlement outside the route campaign before service work',
+		async (action) => {
+			vi.mocked(getSettlement).mockResolvedValueOnce({ data: null, error: null } as never);
+			const fields: Record<string, string> =
+				action === 'annulPayment'
+					? { paymentId: SETTLEMENT, reason: 'Reason' }
+					: action === 'correctPaymentMethod'
+						? { paymentId: SETTLEMENT, newMethod: 'transfer', reason: 'Reason' }
+						: {
+								paymentId: SETTLEMENT,
+								newSaleId: SALE,
+								installmentId: INSTALLMENT,
+								amountApplied: '3.00',
+								reason: 'Reason'
+							};
+			expect(await run(action, ['campaign.view', 'payment.annul'], fields)).toMatchObject({
+				status: 404
+			});
+			expect(annulPayment).not.toHaveBeenCalled();
+			expect(correctPaymentMethod).not.toHaveBeenCalled();
+			expect(reassociateTransfer).not.toHaveBeenCalled();
+		}
+	);
+	it('preserves the moved-payment guard message', async () => {
+		vi.mocked(correctPaymentMethod).mockRejectedValueOnce(
+			new SettlementServiceError(
+				'conflict',
+				'This payment was already moved by a correction and cannot be corrected again.'
+			)
+		);
+		expect(
+			await run('correctPaymentMethod', ['campaign.view', 'payment.annul'], {
+				paymentId: SETTLEMENT,
+				newMethod: 'transfer',
+				reason: 'Reason'
+			})
+		).toMatchObject({
+			status: 409,
+			data: {
+				message: 'This payment was already moved by a correction and cannot be corrected again.'
+			}
+		});
+	});
 	it('requires payment.create in addition to settlement.update_open for adds', async () => {
 		expect(await run('add', ['campaign.view', 'settlement.update_open'])).toMatchObject({
 			status: 403
