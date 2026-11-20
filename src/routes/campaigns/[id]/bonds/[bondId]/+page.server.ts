@@ -51,6 +51,7 @@ import {
 	correctBondCollector,
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
+import { listBondDrawRosterEntries } from '$lib/server/repositories/draws';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -157,15 +158,28 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				canDeliver &&
 				hasPermissionIn(locals.permissions, 'bond.assign'))
 	};
-	const [historyResult, collectorsResult, activeSaleResult] = await Promise.all([
+	const canViewDraws = (
+		[
+			'draw.view',
+			'draw.create',
+			'draw.update',
+			'draw.generate_roster',
+			'draw.freeze_roster',
+			'draw.load_winner'
+		] as const
+	).some((permission) => hasPermissionIn(locals.permissions, permission));
+	const [historyResult, collectorsResult, activeSaleResult, drawEntriesResult] = await Promise.all([
 		listBondAssignments(locals.supabase, bond.id),
 		can.reassign || can.correctCollector
 			? listActiveCollectorOptions(locals.supabase)
 			: Promise.resolve({ data: [], error: null }),
-		getActiveSaleForBond(locals.supabase, bond.id)
+		getActiveSaleForBond(locals.supabase, bond.id),
+		canViewDraws
+			? listBondDrawRosterEntries(locals.supabase, campaign.id, bond.id)
+			: Promise.resolve({ data: [], error: null })
 	]);
-	if (historyResult.error || activeSaleResult.error)
-		fail500(historyResult.error ?? activeSaleResult.error);
+	if (historyResult.error || activeSaleResult.error || drawEntriesResult.error)
+		fail500(historyResult.error ?? activeSaleResult.error ?? drawEntriesResult.error);
 	if (collectorsResult.error) fail500(collectorsResult.error);
 	const installmentsResult = activeSaleResult.data
 		? await listInstallmentsForSale(locals.supabase, activeSaleResult.data.sale.id)
@@ -199,7 +213,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		}),
 		sale: activeSaleResult.data,
 		installments: installmentsResult.data ?? [],
-		payments: paymentsResult.data ?? []
+		payments: paymentsResult.data ?? [],
+		drawRosterEntries: drawEntriesResult.data ?? [],
+		canViewDraws
 	};
 };
 

@@ -40,7 +40,8 @@ const can = {
 	viewCollectors: false,
 	viewBuyers: false,
 	viewDeliveries: false,
-	viewSales: false
+	viewSales: false,
+	viewDraws: false
 };
 
 function renderPage(
@@ -57,6 +58,14 @@ function renderPage(
 	const props = { data, form, params: { id: loaded.id } } as any;
 	return render(Page, { props }).body;
 }
+
+describe('campaign draw navigation', () => {
+	it('shows Draws when any draw capability grants read access', () => {
+		const body = renderPage(campaign(), null, { can: { viewDraws: true } });
+		expect(body).toContain('/draws');
+		expect(body).toContain('Draws →');
+	});
+});
 
 /** `value` of the input named `name` inside the form posting to `action`. */
 function inputValue(body: string, action: string, name: string): string | undefined {
