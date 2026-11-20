@@ -1,7 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import { buildBondRecord } from '$lib/server/bonds/record';
 import {
 	bondFormFailure,
@@ -43,6 +47,10 @@ import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$
 import { readFormFields } from '$lib/schemas/campaign';
 import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
 import { listBondPayments } from '$lib/server/repositories/settlements';
+import {
+	correctBondCollector,
+	SaleCorrectionServiceError
+} from '$lib/server/services/sale-corrections';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -62,6 +70,8 @@ const isUuid = (value: string) => z.guid().safeParse(value).success;
  *   reason required). Its numbers are released so they can be entered again.
  */
 export const load: PageServerLoad = async ({ locals, params, url }) => {
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Could not load permissions.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'bond.view');
 	if (!isUuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
@@ -140,11 +150,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			open &&
 			!isActiveManualPataMember &&
 			(status === 'available' || status === 'delivered_to_collector') &&
-			hasPermissionIn(locals.permissions, 'bond.mark_lost')
+			hasPermissionIn(locals.permissions, 'bond.mark_lost'),
+		correctCollector:
+			(status === 'sold' && hasPermissionIn(locals.permissions, 'sale.correct')) ||
+			(status === 'delivered_to_collector' &&
+				canDeliver &&
+				hasPermissionIn(locals.permissions, 'bond.assign'))
 	};
 	const [historyResult, collectorsResult, activeSaleResult] = await Promise.all([
 		listBondAssignments(locals.supabase, bond.id),
-		can.reassign
+		can.reassign || can.correctCollector
 			? listActiveCollectorOptions(locals.supabase)
 			: Promise.resolve({ data: [], error: null }),
 		getActiveSaleForBond(locals.supabase, bond.id)
@@ -273,7 +288,56 @@ export const actions: Actions = {
 	},
 	return: returnAction,
 	reassign: reassignAction,
-	markLost: markLostAction
+	markLost: markLostAction,
+	correctCollector: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'correctCollector',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireActiveUser(locals, url.pathname);
+		const data = await request.formData();
+		const sold = field(data, 'sold') === 'true';
+		const permission = sold ? 'sale.correct' : 'bond.assign';
+		if (!hasPermissionIn(locals.permissions, permission))
+			return fail(403, { form: 'correctCollector', errors: {}, message: BOND_MESSAGES.permission });
+		const scoped = await getBondCampaignId(locals.supabase, params.bondId);
+		if (scoped.error)
+			return fail(500, {
+				form: 'correctCollector',
+				errors: {},
+				message: 'Could not load the bond.'
+			});
+		if (scoped.data !== params.id)
+			return fail(404, {
+				form: 'correctCollector',
+				errors: {},
+				message: BOND_MESSAGES.bondNotFound
+			});
+		const values = { newCollectorId: field(data, 'newCollectorId'), reason: field(data, 'reason') };
+		try {
+			await correctBondCollector(
+				locals.supabase,
+				{ bondId: params.bondId, sold, ...values },
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'correctCollector',
+				success: true,
+				message: 'Collector corrected.',
+				errors: {}
+			};
+		} catch (cause) {
+			const service = cause instanceof SaleCorrectionServiceError ? cause : null;
+			return fail(service?.status ?? 500, {
+				form: 'correctCollector',
+				values,
+				errors: {},
+				message: service?.message ?? 'Could not record correction.'
+			});
+		}
+	}
 };
 
 // ---------------------------------------------------------------------------

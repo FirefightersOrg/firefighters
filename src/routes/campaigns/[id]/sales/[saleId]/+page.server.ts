@@ -1,6 +1,6 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { z } from 'zod';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import {
 	hasPermissionIn,
 	permissionsUnavailable,
@@ -10,6 +10,23 @@ import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getSaleDetail } from '$lib/server/repositories/sales';
 import { calculateFinancialStatus } from '$lib/domain/financial-status';
+import { listActiveCollectorOptions, listBuyers } from '$lib/server/repositories/parties';
+import {
+	correctSaleBuyer,
+	correctSaleCollector,
+	SaleCorrectionServiceError
+} from '$lib/server/services/sale-corrections';
+
+const field = (form: FormData, name: string) => String(form.get(name) ?? '').trim();
+const correctionFailure = (cause: unknown, form: string, values: Record<string, string>) => {
+	const service = cause instanceof SaleCorrectionServiceError ? cause : null;
+	return fail(service?.status ?? 500, {
+		form,
+		values,
+		errors: {},
+		message: service?.message ?? 'Could not record correction.'
+	});
+};
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
@@ -22,11 +39,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		requirePermissionIn(locals.permissions, 'bond.view');
 	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
 		error(404, { message: 'Sale not found.' });
-	const [campaign, sale] = await Promise.all([
+	const canCorrect = hasPermissionIn(locals.permissions, 'sale.correct');
+	const [campaign, sale, buyers, collectors] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
-		getSaleDetail(locals.supabase, params.id, params.saleId)
+		getSaleDetail(locals.supabase, params.id, params.saleId),
+		canCorrect
+			? listBuyers(locals.supabase, { pageSize: 500 })
+			: Promise.resolve({ data: null, error: null }),
+		canCorrect
+			? listActiveCollectorOptions(locals.supabase)
+			: Promise.resolve({ data: [], error: null })
 	]);
-	if (campaign.error || sale.error) error(500, { message: 'Could not load sale.' });
+	if (campaign.error || sale.error || buyers.error || collectors.error)
+		error(500, { message: 'Could not load sale.' });
 	if (!campaign.data) error(404, { message: 'Campaign not found.' });
 	if (!sale.data) error(404, { message: 'Sale not found.' });
 	const today = new Intl.DateTimeFormat('en-CA', {
@@ -35,6 +60,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		sale: sale.data,
+		correction: canCorrect
+			? {
+					buyers: buyers.data?.items ?? [],
+					collectors: collectors.data ?? []
+				}
+			: null,
 		financialStatusSnapshot: sale.data.financialStatus,
 		financialStatus: calculateFinancialStatus({
 			saleStatus: sale.data.sale.status,
@@ -49,4 +80,66 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			}))
 		})
 	};
+};
+
+export const actions: Actions = {
+	correctBuyer: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'correctBuyer',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (!hasPermissionIn(locals.permissions, 'sale.correct'))
+			return fail(403, {
+				form: 'correctBuyer',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const data = await request.formData();
+		const values = { newBuyerId: field(data, 'newBuyerId'), reason: field(data, 'reason') };
+		try {
+			await correctSaleBuyer(
+				locals.supabase,
+				{ saleId: params.saleId, ...values },
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return { form: 'correctBuyer', success: true, message: 'Buyer corrected.', errors: {} };
+		} catch (cause) {
+			return correctionFailure(cause, 'correctBuyer', values);
+		}
+	},
+	correctCollector: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'correctCollector',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (!hasPermissionIn(locals.permissions, 'sale.correct'))
+			return fail(403, {
+				form: 'correctCollector',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const data = await request.formData();
+		const values = { newCollectorId: field(data, 'newCollectorId'), reason: field(data, 'reason') };
+		try {
+			await correctSaleCollector(
+				locals.supabase,
+				{ saleId: params.saleId, ...values },
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'correctCollector',
+				success: true,
+				message: 'Collector corrected.',
+				errors: {}
+			};
+		} catch (cause) {
+			return correctionFailure(cause, 'correctCollector', values);
+		}
+	}
 };

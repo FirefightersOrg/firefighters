@@ -724,6 +724,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			},
 			ctx(users.operator)
 		);
+		const liveOpenTotals = numericTotals(await totals(users.operator, settlementId));
 		const routeParams = { id: campaignId, settlementId };
 		const openPrint = (await settlementPrintLoad(
 			event(users.admin, `/campaigns/${campaignId}/settlements/${settlementId}/print`, routeParams)
@@ -758,7 +759,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			commission: formatMoney('0.00'),
 			commissionPaid: formatMoney('0.00'),
 			net: formatMoney('100.00'),
-			balance: formatMoney('0.00')
+			balance: formatMoney(liveOpenTotals.collector_credit_balance.toFixed(2))
 		});
 		const openWorkspace = (await settlementLoad(
 			event(users.operator, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
@@ -770,7 +771,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			commissionAmount: '0.00',
 			commissionPaidAmount: '0.00',
 			netToFirefighters: '100.00',
-			collectorCreditBalance: '0.00'
+			collectorCreditBalance: liveOpenTotals.collector_credit_balance.toFixed(2)
 		});
 		expect(openWorkspace.can).toMatchObject({ add: true, remove: true, close: false });
 		expect(
@@ -888,7 +889,13 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			netToFirefighters: Number(stored!.net_to_firefighters).toFixed(2),
 			collectorCreditBalance: liveClosedTotals.collector_credit_balance.toFixed(2)
 		});
-		expect(closedWorkspace.can).toEqual({ add: false, remove: false, close: false });
+		expect(closedWorkspace.can).toEqual({
+			add: false,
+			remove: false,
+			close: false,
+			correctPayment: true,
+			correctSettlement: true
+		});
 		const deniedLoadRequest = rid('load-denied');
 		await noWrites(deniedLoadRequest, async () =>
 			expect(

@@ -383,3 +383,25 @@ integration: `supabase test db` passed **34 files / 2102 assertions** (`034` pla
 **103**, including two-session dblink cases); `pnpm test:integration` passed
 **21 files / 181 tests** after `pnpm seed:admin`; `pnpm check` reported **0 errors /
 0 warnings**; `pnpm lint` passed; `pnpm test` passed **99 files / 1379 tests**.
+
+## Implemented in SAN-73
+
+- Sale, bond, payment and closed-settlement record pages expose permission-gated, progressively
+  enhanced HTML forms for the SAN-71/72 RPCs. Reasons are required and validated by the service
+  at 1000 Unicode code points; no native `maxlength` is used because it counts UTF-16 code units.
+- Correction panels include an explicitly **indicative** ledger preview. Closed-settlement deltas
+  can be shown exactly from the entered signed amounts. Payment and cross-collector previews
+  describe direction and rule effects where the loaded record does not contain enough immutable
+  rule-attribution data to reproduce an amount. This is intentional: SAN-71/72 document that
+  current rules cannot reconstruct rules edited after a historical payment, and PostgreSQL
+  numeric calculation and the generated movement ids remain authoritative. No read-only SQL
+  preview RPC or migration was added.
+- `/campaigns/[id]/audit` requires `audit.view`, fails closed when permissions are unavailable,
+  filters actor/action/entity/date using Buenos Aires day boundaries, and uses explicit 50-row
+  ranges ordered by `created_at, id`. Detail renders an old/new field diff, correction movement
+  ids, and affected-record links. Campaign scoping accepts the campaign entity itself and
+  snapshots whose top-level old/new value contains `campaign_id`; legacy audit snapshots that
+  omitted campaign identity cannot be safely attributed and are intentionally excluded.
+- The reassociation form accepts one destination installment per submission. The SAN-71 service
+  and RPC still accept multiple applications; expanding the no-JavaScript UI to add arbitrary
+  application rows is a known follow-up.

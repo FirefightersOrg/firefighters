@@ -119,7 +119,12 @@ describe('bond record custody', () => {
 
 	it('a delivered bond offers return, reassign and loss to an admin', async () => {
 		const data = (await load(loadEvent(setup())))!;
-		expect(data.custody.can).toEqual({ returnBond: true, reassign: true, markLost: true });
+		expect(data.custody.can).toEqual({
+			returnBond: true,
+			reassign: true,
+			markLost: true,
+			correctCollector: true
+		});
 		// The current collector is not offered as the reassignment target.
 		expect(data.custody.collectors.map((c: { displayName: string }) => c.displayName)).toEqual([
 			'Beto'
@@ -130,24 +135,28 @@ describe('bond record custody', () => {
 		expect((await load(loadEvent(setup(ADMIN, 'available'))))!.custody.can).toEqual({
 			returnBond: false,
 			reassign: false,
-			markLost: true
+			markLost: true,
+			correctCollector: false
 		});
 		expect((await load(loadEvent(setup(ADMIN, 'sold'))))!.custody.can).toEqual({
 			returnBond: false,
 			reassign: false,
-			markLost: false
+			markLost: false,
+			correctCollector: false
 		});
 		expect(
 			(await load(loadEvent(setup(ADMIN, 'delivered_to_collector', 'closing'))))!.custody.can
 		).toEqual({
 			returnBond: false,
 			reassign: false,
-			markLost: false
+			markLost: false,
+			correctCollector: false
 		});
 		expect((await load(loadEvent(setup(OPERATOR))))!.custody.can).toEqual({
 			returnBond: false,
 			reassign: true,
-			markLost: false
+			markLost: false,
+			correctCollector: true
 		});
 	});
 

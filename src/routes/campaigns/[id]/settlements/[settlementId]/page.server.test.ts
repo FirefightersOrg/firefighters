@@ -146,7 +146,7 @@ describe('settlement workspace', () => {
 			} as never)
 		).rejects.toMatchObject({ status: 404 });
 	});
-	it('uses RPC totals while open and stored totals while closed', async () => {
+	it('uses RPC totals while open and stored totals plus live balance while closed', async () => {
 		await load({
 			locals: makeLocals({ permissions: ['campaign.view', 'settlement.view'] }),
 			params: { id: CAMPAIGN_ID, settlementId: SETTLEMENT },
@@ -163,7 +163,7 @@ describe('settlement workspace', () => {
 			url: new URL(url)
 		} as never);
 		expect(out.totals).toEqual(totals);
-		expect(getSettlementTotals).toHaveBeenCalledTimes(1);
+		expect(getSettlementTotals).toHaveBeenCalledTimes(2);
 	});
 	it('denies each action without its permission', async () => {
 		expect(await run('add', ['campaign.view'])).toMatchObject({ status: 403 });

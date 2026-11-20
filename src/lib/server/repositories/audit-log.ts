@@ -43,7 +43,7 @@ export const AUDIT_LOG_COLUMNS =
 	'id, action, entity_type, entity_id, actor_user_id, old_value, new_value, reason, created_at, ' +
 	'request_id, actor:profiles!audit_log_actor_user_id_fkey(full_name)';
 
-function mapAuditRow(row: AuditLogRow): AuditEntry {
+export function mapAuditRow(row: AuditLogRow): AuditEntry {
 	return {
 		id: row.id,
 		action: row.action,
@@ -57,6 +57,76 @@ function mapAuditRow(row: AuditLogRow): AuditEntry {
 		createdAt: row.created_at,
 		requestId: row.request_id
 	};
+}
+
+export const AUDIT_PAGE_SIZE = 50;
+
+export interface CampaignAuditFilters {
+	actor?: string | null;
+	action?: string | null;
+	entityType?: string | null;
+	from?: string | null;
+	to?: string | null;
+	page?: number;
+}
+
+/**
+ * Campaign audit viewer query. Explicit ranges avoid PostgREST's 1,000-row ceiling and the
+ * created_at/id order makes paging deterministic. Correction snapshots carry campaign_id; the
+ * campaign row itself is included by entity id.
+ */
+export async function listCampaignAuditEntries(
+	supabase: SupabaseClient,
+	campaignId: string,
+	filters: CampaignAuditFilters = {}
+): Promise<
+	RepositoryResult<{ items: AuditEntry[]; total: number; page: number; pageSize: number }>
+> {
+	const page = Math.max(1, filters.page ?? 1);
+	let query = supabase
+		.from('audit_log')
+		.select(AUDIT_LOG_COLUMNS, { count: 'exact' })
+		.or(
+			`entity_id.eq.${campaignId},old_value->>campaign_id.eq.${campaignId},new_value->>campaign_id.eq.${campaignId}`
+		);
+	if (filters.actor) query = query.eq('actor_user_id', filters.actor);
+	if (filters.action) query = query.eq('action', filters.action);
+	if (filters.entityType) query = query.eq('entity_type', filters.entityType);
+	if (filters.from) query = query.gte('created_at', `${filters.from}T00:00:00-03:00`);
+	if (filters.to) query = query.lte('created_at', `${filters.to}T23:59:59.999999-03:00`);
+	const { data, error, count } = await query
+		.order('created_at', { ascending: false })
+		.order('id', { ascending: false })
+		.range((page - 1) * AUDIT_PAGE_SIZE, page * AUDIT_PAGE_SIZE - 1)
+		.overrideTypes<AuditLogRow[], { merge: false }>();
+	return error
+		? { data: null, error }
+		: {
+				data: {
+					items: (data ?? []).map(mapAuditRow),
+					total: count ?? 0,
+					page,
+					pageSize: AUDIT_PAGE_SIZE
+				},
+				error: null
+			};
+}
+
+export async function getCampaignAuditEntry(
+	supabase: SupabaseClient,
+	campaignId: string,
+	id: string
+): Promise<RepositoryResult<AuditEntry | null>> {
+	const { data, error } = await supabase
+		.from('audit_log')
+		.select(AUDIT_LOG_COLUMNS)
+		.eq('id', id)
+		.or(
+			`entity_id.eq.${campaignId},old_value->>campaign_id.eq.${campaignId},new_value->>campaign_id.eq.${campaignId}`
+		)
+		.maybeSingle()
+		.overrideTypes<AuditLogRow | null, { merge: false }>();
+	return error ? { data: null, error } : { data: data ? mapAuditRow(data) : null, error: null };
 }
 
 /**

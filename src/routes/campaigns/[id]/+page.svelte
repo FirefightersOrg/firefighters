@@ -44,7 +44,7 @@
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
 			<CampaignStatusBadge status={campaign.status} />
 		</div>
-		{#if data.can.viewCommissions || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements}
+		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
 				{#if data.can.viewBonds}
 					<a
@@ -96,6 +96,12 @@
 					<a
 						href={resolve('/campaigns/[id]/commissions', { id: campaign.id })}
 						class="font-medium text-blue-700 hover:underline">Commission rules →</a
+					>
+				{/if}
+				{#if data.can.viewAudit}
+					<a
+						href={resolve('/campaigns/[id]/audit', { id: campaign.id })}
+						class="font-medium text-blue-700 hover:underline">Audit log →</a
 					>
 				{/if}
 			</nav>

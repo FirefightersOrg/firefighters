@@ -56,7 +56,9 @@ describe('printable payments repository', () => {
 			expect(result.data?.payments).toHaveLength(1);
 			expect(result.data?.payments[0].amount).toBe('100.00');
 			expect(chains.payments[0].in).toHaveBeenCalledWith('status', ['confirmed']);
-			expect(rpc).not.toHaveBeenCalled();
+			expect(rpc).toHaveBeenCalledWith('settlement_totals', {
+				p_settlement_id: 'settlement'
+			});
 		}
 	);
 });
