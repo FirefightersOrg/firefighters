@@ -12,7 +12,7 @@
 	} from '$lib/components/campaigns/styles';
 	import { BOND_COMMERCIAL_STATUS_LABELS } from '$lib/domain/bonds';
 	import { deliveryNoteLabel } from '$lib/domain/deliveries';
-	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { campaignNumberingConfig, formatCampaignDate } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
 	import { formatMoney } from '$lib/domain/money';
@@ -314,8 +314,32 @@
 		</ul>
 	</section>
 	<section id="section-5" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">5. {sections[4]}</h2>
-		<p class="text-sm text-slate-500">No data yet. Arrives with Phase 8: settlements.</p>
+		<h2 class="mb-4 text-base font-semibold">5. Settlements</h2>
+		{#if (data.settlements ?? []).length}<table class="min-w-full text-sm">
+				<thead class="text-left text-xs uppercase text-slate-500"
+					><tr
+						><th class="py-2 pr-3">Number</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"
+							>Total</th
+						><th>Dates</th></tr
+					></thead
+				><tbody
+					>{#each data.settlements ?? [] as settlement (settlement.id)}<tr
+							><td class="py-2 pr-3"
+								><a
+									class="text-blue-700 hover:underline"
+									href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+										id: data.campaign.id,
+										settlementId: settlement.id
+									})}>#{settlement.settlementNumber}</a
+								></td
+							><td>{settlement.status}</td><td>{formatMoney(settlement.totals.totalAmount)}</td><td
+								>{formatCampaignDate(settlement.openedAt)}{settlement.closedAt
+									? ` — ${formatCampaignDate(settlement.closedAt)}`
+									: ''}</td
+							></tr
+						>{/each}</tbody
+				>
+			</table>{:else}<p class="text-sm text-slate-500">No settlements recorded.</p>{/if}
 	</section>
 	<section id="section-6" class={cardClass}>
 		<h2 class="mb-4 text-base font-semibold">6. {sections[5]}</h2>
