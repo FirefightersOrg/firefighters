@@ -15,6 +15,8 @@
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let saleId = $state('');
+	let commissionDelta = $state('0.00');
+	let cashRetainedDelta = $state('0.00');
 	const selected = $derived(data.candidates.filter((x) => x.saleId === saleId));
 	const metric = (label: string, value: string) => ({ label, value });
 	const metrics = $derived([
@@ -142,12 +144,143 @@
 									/><button class={secondaryButtonClass}>Remove</button>
 								</form>
 							</td>{/if}
+						{#if data.can.correctPayment}<td class="space-y-2">
+								<details>
+									<summary class="cursor-pointer text-blue-700">Correct / annul</summary>
+									<div class="mt-2 space-y-3 rounded border p-3">
+										<p class="text-xs text-amber-800">
+											<strong>Indicative preview:</strong> the database is authoritative. Annulment reverses
+											generated commission and, for cash, credits retained commission. Method correction
+											posts only the cash-retention difference.
+										</p>
+										<form method="POST" action="?/annulPayment" class="space-y-2">
+											<input type="hidden" name="paymentId" value={p.id} />
+											<label class={labelClass} for="annul-reason-{p.id}"
+												>Annulment reason (max. {data.reasonMax} Unicode characters)</label
+											>
+											<textarea class={inputClass} id="annul-reason-{p.id}" name="reason" required
+											></textarea>
+											<button class={secondaryButtonClass}>Annul payment</button>
+										</form>
+										<form method="POST" action="?/correctPaymentMethod" class="space-y-2">
+											<input type="hidden" name="paymentId" value={p.id} />
+											<label class={labelClass} for="method-{p.id}">Correct method</label>
+											<select class={inputClass} id="method-{p.id}" name="newMethod"
+												><option value="cash">Cash</option><option value="transfer">Transfer</option
+												></select
+											>
+											<label class={labelClass} for="method-reason-{p.id}"
+												>Reason (max. {data.reasonMax} Unicode characters)</label
+											>
+											<textarea class={inputClass} id="method-reason-{p.id}" name="reason" required
+											></textarea>
+											<button class={secondaryButtonClass}>Confirm method correction</button>
+										</form>
+										{#if p.method === 'transfer'}<form
+												method="POST"
+												action="?/reassociateTransfer"
+												class="space-y-2"
+											>
+												<input type="hidden" name="paymentId" value={p.id} />
+												<label class={labelClass} for="destination-{p.id}"
+													>Destination sale / installment</label
+												>
+												<select
+													class={inputClass}
+													id="destination-{p.id}"
+													name="installmentId"
+													required
+												>
+													<option value="">Choose…</option>
+													{#each data.candidates as candidate (candidate.id)}<option
+															value={candidate.id}
+															>{candidate.bond} — {candidate.buyer} — installment {candidate.number} —
+															remaining {formatMoney(candidate.amount)}</option
+														>{/each}
+												</select>
+												<label class={labelClass} for="destination-sale-{p.id}"
+													>Destination sale id</label
+												>
+												<input
+													class={inputClass}
+													id="destination-sale-{p.id}"
+													name="newSaleId"
+													required
+												/>
+												<label class={labelClass} for="destination-amount-{p.id}"
+													>Amount applied</label
+												>
+												<input
+													class={inputClass}
+													id="destination-amount-{p.id}"
+													name="amountApplied"
+													value={p.amount}
+													required
+												/>
+												<label class={labelClass} for="destination-reason-{p.id}"
+													>Reason (max. {data.reasonMax} Unicode characters)</label
+												>
+												<textarea
+													class={inputClass}
+													id="destination-reason-{p.id}"
+													name="reason"
+													required></textarea>
+												<button class={secondaryButtonClass}>Confirm reassociation</button>
+											</form>{/if}
+									</div>
+								</details>
+							</td>{/if}
 					</tr>
 				{:else}<tr><td colspan="6" class="py-3 text-slate-500">No payments recorded.</td></tr>
 				{/each}
 			</tbody>
 		</table>
 	</section>
+	{#if data.can.correctSettlement}<section class={cardClass}>
+			<h2 class="text-base font-semibold">Correct closed settlement</h2>
+			<p class="mt-2 text-sm text-slate-600">
+				Creates an immutable correction; the original totals are not edited.
+			</p>
+			<form method="POST" action="?/correctSettlement" class="mt-3 space-y-3">
+				<div class="grid gap-3 sm:grid-cols-2">
+					<div>
+						<label class={labelClass} for="commissionDelta">Commission delta</label><input
+							class={inputClass}
+							id="commissionDelta"
+							name="commissionDelta"
+							bind:value={commissionDelta}
+						/>
+					</div>
+					<div>
+						<label class={labelClass} for="cashRetainedDelta">Cash-retained commission delta</label
+						><input
+							class={inputClass}
+							id="cashRetainedDelta"
+							name="cashRetainedDelta"
+							bind:value={cashRetainedDelta}
+						/>
+					</div>
+				</div>
+				<div class="rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+					<strong>Indicative ledger preview:</strong> commission {Number(commissionDelta) >= 0
+						? 'credit'
+						: 'debit'}
+					{formatMoney(String(Math.abs(Number(commissionDelta) || 0)))}; cash retained {Number(
+						cashRetainedDelta
+					) >= 0
+						? 'debit'
+						: 'credit'}
+					{formatMoney(String(Math.abs(Number(cashRetainedDelta) || 0)))}. PostgreSQL numeric
+					validation and persisted movements are authoritative.
+				</div>
+				<label class={labelClass} for="settlement-correction-reason"
+					>Reason (max. {data.reasonMax} Unicode characters)</label
+				>
+				<textarea class={inputClass} id="settlement-correction-reason" name="reason" required
+				></textarea>
+				<button class={primaryButtonClass}>Record correction</button>
+			</form>
+		</section>{/if}
 	{#if data.can.close}<section class={cardClass}>
 			<h2 class="text-base font-semibold">Close settlement</h2>
 			<p class="mt-2 text-sm">

@@ -98,6 +98,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			transitions: availableCampaignTransitions(campaign.status, permissions),
 			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
 			exportBackups: hasPermissionIn(permissions, 'report.export'),
+			viewAudit: hasPermissionIn(permissions, 'audit.view'),
 			viewBonds: hasPermissionIn(permissions, 'bond.view'),
 			loadBonds: hasPermissionIn(permissions, 'bond.create') && canLoadBonds(campaign.status),
 			// Reading needs X.view or X.manage (same rule as the RLS of collectors / buyers).

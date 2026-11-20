@@ -13,6 +13,16 @@ vi.mock('$lib/server/services/settlements', async (o) => ({
 	removePaymentFromSettlement: vi.fn(),
 	closeSettlement: vi.fn()
 }));
+vi.mock('$lib/server/services/payment-corrections', async (o) => ({
+	...(await o<any>()),
+	annulPayment: vi.fn(),
+	correctPaymentMethod: vi.fn(),
+	reassociateTransfer: vi.fn()
+}));
+vi.mock('$lib/server/services/sale-corrections', async (o) => ({
+	...(await o<any>()),
+	correctSettlement: vi.fn()
+}));
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
@@ -27,6 +37,15 @@ import {
 	removePaymentFromSettlement,
 	SettlementServiceError
 } from '$lib/server/services/settlements';
+import {
+	annulPayment,
+	annulPaymentSchema,
+	correctPaymentMethod,
+	correctPaymentMethodSchema,
+	reassociateTransfer,
+	reassociateTransferSchema
+} from '$lib/server/services/payment-corrections';
+import { correctSettlement, correctSettlementSchema } from '$lib/server/services/sale-corrections';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
 const SETTLEMENT = 'd0000000-0000-0000-0000-000000000001',
 	SALE = 'a0000000-0000-0000-0000-000000000001',
@@ -75,6 +94,13 @@ beforeEach(() => {
 		data: [{ id: INSTALLMENT, saleId: SALE, amount: '10.00' }],
 		error: null
 	} as never);
+	for (const service of [
+		annulPayment,
+		correctPaymentMethod,
+		reassociateTransfer,
+		correctSettlement
+	])
+		vi.mocked(service).mockReset();
 });
 describe('settlement workspace', () => {
 	it.each(['add', 'remove', 'close'] as const)(
@@ -146,7 +172,7 @@ describe('settlement workspace', () => {
 			} as never)
 		).rejects.toMatchObject({ status: 404 });
 	});
-	it('uses RPC totals while open and stored totals while closed', async () => {
+	it('uses RPC totals while open and stored totals plus live balance while closed', async () => {
 		await load({
 			locals: makeLocals({ permissions: ['campaign.view', 'settlement.view'] }),
 			params: { id: CAMPAIGN_ID, settlementId: SETTLEMENT },
@@ -163,12 +189,127 @@ describe('settlement workspace', () => {
 			url: new URL(url)
 		} as never);
 		expect(out.totals).toEqual(totals);
-		expect(getSettlementTotals).toHaveBeenCalledTimes(1);
+		expect(getSettlementTotals).toHaveBeenCalledTimes(2);
 	});
 	it('denies each action without its permission', async () => {
 		expect(await run('add', ['campaign.view'])).toMatchObject({ status: 403 });
 		expect(await run('remove', ['campaign.view'])).toMatchObject({ status: 403 });
 		expect(await run('close', ['campaign.view'])).toMatchObject({ status: 403 });
+	});
+	it.each([
+		'annulPayment',
+		'correctPaymentMethod',
+		'reassociateTransfer',
+		'correctSettlement'
+	] as const)('%s fails closed at 500 and denies at 403 before service work', async (action) => {
+		expect(await run(action, null)).toMatchObject({ status: 500 });
+		expect(await run(action, ['campaign.view'])).toMatchObject({ status: 403 });
+		expect(annulPayment).not.toHaveBeenCalled();
+		expect(correctPaymentMethod).not.toHaveBeenCalled();
+		expect(reassociateTransfer).not.toHaveBeenCalled();
+		expect(correctSettlement).not.toHaveBeenCalled();
+	});
+	it.each([
+		['annulPayment', annulPayment, annulPaymentSchema, { paymentId: SETTLEMENT, reason: 'Reason' }],
+		[
+			'correctPaymentMethod',
+			correctPaymentMethod,
+			correctPaymentMethodSchema,
+			{ paymentId: SETTLEMENT, newMethod: 'transfer', reason: 'Reason' }
+		],
+		[
+			'reassociateTransfer',
+			reassociateTransfer,
+			reassociateTransferSchema,
+			{
+				paymentId: SETTLEMENT,
+				newSaleId: SALE,
+				installmentId: INSTALLMENT,
+				amountApplied: '3.00',
+				reason: 'Reason'
+			}
+		],
+		[
+			'correctSettlement',
+			correctSettlement,
+			correctSettlementSchema,
+			{ commissionDelta: '1.00', cashRetainedDelta: '0.00', reason: 'Reason' }
+		]
+	] as const)(
+		'%s validates, maps 400/404/409, and succeeds',
+		async (action, service, schema, valid) => {
+			vi.mocked(service).mockImplementation(async (_client, input) => {
+				const parsed = schema.safeParse(input);
+				if (!parsed.success) throw new SettlementServiceError('validation', 'Invalid correction.');
+				return null;
+			});
+			const permission =
+				action === 'correctSettlement'
+					? ['campaign.view', 'settlement.correct']
+					: ['campaign.view', 'payment.annul'];
+			for (const fields of [
+				{ ...valid, reason: '' },
+				{ ...valid, reason: '😀'.repeat(1001) },
+				action === 'correctSettlement'
+					? { ...valid, commissionDelta: 'bad' }
+					: { ...valid, paymentId: 'bad' }
+			])
+				expect(await run(action, permission, fields)).toMatchObject({ status: 400 });
+			for (const [kind, status] of [
+				['conflict', 409],
+				['validation', 400],
+				['not_found', 404]
+			] as const) {
+				vi.mocked(service).mockRejectedValueOnce(new SettlementServiceError(kind, kind));
+				expect(await run(action, permission, valid)).toMatchObject({ status });
+			}
+			vi.mocked(service).mockResolvedValueOnce(null);
+			expect(await run(action, permission, valid)).toMatchObject({ success: true });
+		}
+	);
+	it.each(['annulPayment', 'correctPaymentMethod', 'reassociateTransfer'] as const)(
+		'%s rejects a settlement outside the route campaign before service work',
+		async (action) => {
+			vi.mocked(getSettlement).mockResolvedValueOnce({ data: null, error: null } as never);
+			const fields: Record<string, string> =
+				action === 'annulPayment'
+					? { paymentId: SETTLEMENT, reason: 'Reason' }
+					: action === 'correctPaymentMethod'
+						? { paymentId: SETTLEMENT, newMethod: 'transfer', reason: 'Reason' }
+						: {
+								paymentId: SETTLEMENT,
+								newSaleId: SALE,
+								installmentId: INSTALLMENT,
+								amountApplied: '3.00',
+								reason: 'Reason'
+							};
+			expect(await run(action, ['campaign.view', 'payment.annul'], fields)).toMatchObject({
+				status: 404
+			});
+			expect(annulPayment).not.toHaveBeenCalled();
+			expect(correctPaymentMethod).not.toHaveBeenCalled();
+			expect(reassociateTransfer).not.toHaveBeenCalled();
+		}
+	);
+	it('preserves the moved-payment guard message', async () => {
+		vi.mocked(correctPaymentMethod).mockRejectedValueOnce(
+			new SettlementServiceError(
+				'conflict',
+				'This payment was already moved by a correction and cannot be corrected again.'
+			)
+		);
+		expect(
+			await run('correctPaymentMethod', ['campaign.view', 'payment.annul'], {
+				paymentId: SETTLEMENT,
+				newMethod: 'transfer',
+				reason: 'Reason'
+			})
+		).toMatchObject({
+			status: 409,
+			data: {
+				message: 'This payment was already moved by a correction and cannot be corrected again.'
+			}
+		});
 	});
 	it('requires payment.create in addition to settlement.update_open for adds', async () => {
 		expect(await run('add', ['campaign.view', 'settlement.update_open'])).toMatchObject({

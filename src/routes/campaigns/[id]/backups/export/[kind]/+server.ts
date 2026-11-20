@@ -9,6 +9,7 @@ import {
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { requirePermissionIn } from '$lib/server/auth/permissions';
 import { streamExportCsv } from '$lib/server/backups/export';
+import { getCampaignById } from '$lib/server/repositories/campaigns';
 
 /**
  * GET /campaigns/[id]/backups/export/[kind]?from=YYYY-MM-DD&to=YYYY-MM-DD (SAN-90).
@@ -31,6 +32,18 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
 	const period = parseExportPeriod(url.searchParams.get('from'), url.searchParams.get('to'));
 	if (!period) error(400, { message: 'Invalid period: use from/to as YYYY-MM-DD, from <= to.' });
+
+	// A syntactically valid id must also be an existing campaign visible to the caller (RLS).
+	const campaign = await getCampaignById(locals.supabase, id);
+	if (campaign.error) {
+		console.error('[backups] campaign lookup failed', {
+			requestId: locals.requestId,
+			campaignId: id,
+			error: campaign.error
+		});
+		error(500, { message: 'Could not generate the export. Please try again.' });
+	}
+	if (!campaign.data) error(404, { message: 'Campaign not found.' });
 
 	let body: ReadableStream<Uint8Array>;
 	try {

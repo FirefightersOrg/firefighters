@@ -65,14 +65,16 @@ export async function getSettlementPrint(
 		commission: settlement.commission_amount,
 		commissionPaid: settlement.commission_paid_amount,
 		net: settlement.net_to_firefighters,
-		balance: '0.00' // No historical balance snapshot is stored; not a reconstructed balance.
+		balance: '0.00'
 	};
+	// Balance is deliberately live (there is no historical balance snapshot). The RPC returns
+	// the real campaign/collector ledger balance for both open and closed settlements.
+	const { data, error: totalsError } = await supabase.rpc('settlement_totals', {
+		p_settlement_id: settlementId
+	});
+	if (totalsError) return { data: null, error: totalsError };
+	const t = Array.isArray(data) ? data[0] : data;
 	if (settlement.status === 'open') {
-		const { data, error: totalsError } = await supabase.rpc('settlement_totals', {
-			p_settlement_id: settlementId
-		});
-		if (totalsError) return { data: null, error: totalsError };
-		const t = Array.isArray(data) ? data[0] : data;
 		totals = {
 			cash: String(t.total_cash),
 			transfer: String(t.total_transfer),
@@ -80,8 +82,11 @@ export async function getSettlementPrint(
 			commission: String(t.commission_amount),
 			commissionPaid: String(t.commission_paid_amount),
 			net: String(t.net_to_firefighters),
-			balance: String(t.collector_credit_balance ?? 0)
+			balance: String(t?.collector_credit_balance ?? 0)
 		};
+	} else {
+		totals.balance =
+			t?.collector_credit_balance == null ? '0.00' : String(t.collector_credit_balance);
 	}
 	return {
 		data: {

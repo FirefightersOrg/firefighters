@@ -724,11 +724,11 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			},
 			ctx(users.operator)
 		);
+		const liveOpenTotals = numericTotals(await totals(users.operator, settlementId));
 		const routeParams = { id: campaignId, settlementId };
 		const openPrint = (await settlementPrintLoad(
 			event(users.admin, `/campaigns/${campaignId}/settlements/${settlementId}/print`, routeParams)
 		)) as Exclude<Awaited<ReturnType<typeof settlementPrintLoad>>, void>;
-		const liveOpenTotals = numericTotals(await totals(users.operator, settlementId));
 		const openDocument = openPrint.document;
 		expect(openDocument.preliminary).toBe(true);
 		expect(openDocument.closingDate).toBe('—');
@@ -824,6 +824,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		const closedPrint = (await settlementPrintLoad(
 			event(users.admin, `/campaigns/${campaignId}/settlements/${settlementId}/print`, routeParams)
 		)) as Exclude<Awaited<ReturnType<typeof settlementPrintLoad>>, void>;
+		const liveClosedTotals = numericTotals(await totals(users.treasurer, settlementId));
 		const document = closedPrint.document;
 		expect(document.preliminary).toBe(false);
 		expect(document).toMatchObject({
@@ -854,7 +855,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			commission: formatMoney(String(stored!.commission_amount)),
 			commissionPaid: formatMoney(String(stored!.commission_paid_amount)),
 			net: formatMoney(String(stored!.net_to_firefighters)),
-			balance: formatMoney('0.00') // closed prints keep the SAN-65 zero placeholder until SAN-73
+			balance: formatMoney(liveClosedTotals.collector_credit_balance.toFixed(2))
 		});
 		const certificate = (await paymentPrintLoad(
 			event(users.operator, `/campaigns/${campaignId}/payments/${confirmedPaymentId}/print`, {
@@ -886,9 +887,15 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			commissionAmount: Number(stored!.commission_amount).toFixed(2),
 			commissionPaidAmount: Number(stored!.commission_paid_amount).toFixed(2),
 			netToFirefighters: Number(stored!.net_to_firefighters).toFixed(2),
-			collectorCreditBalance: '0.00' // closed workspace: SAN-64 stored totals, balance 0 until SAN-73
+			collectorCreditBalance: liveClosedTotals.collector_credit_balance.toFixed(2)
 		});
-		expect(closedWorkspace.can).toEqual({ add: false, remove: false, close: false });
+		expect(closedWorkspace.can).toEqual({
+			add: false,
+			remove: false,
+			close: false,
+			correctPayment: true,
+			correctSettlement: true
+		});
 		const deniedLoadRequest = rid('load-denied');
 		await noWrites(deniedLoadRequest, async () =>
 			expect(

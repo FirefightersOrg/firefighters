@@ -384,6 +384,28 @@ integration: `supabase test db` passed **34 files / 2102 assertions** (`034` pla
 **21 files / 181 tests** after `pnpm seed:admin`; `pnpm check` reported **0 errors /
 0 warnings**; `pnpm lint` passed; `pnpm test` passed **99 files / 1379 tests**.
 
+## Implemented in SAN-73
+
+- Sale, bond, payment and closed-settlement record pages expose permission-gated, progressively
+  enhanced HTML forms for the SAN-71/72 RPCs. Reasons are required and validated by the service
+  at 1000 Unicode code points; no native `maxlength` is used because it counts UTF-16 code units.
+- Correction panels include an explicitly **indicative** ledger preview. Closed-settlement deltas
+  can be shown exactly from the entered signed amounts. Payment and cross-collector previews
+  describe direction and rule effects where the loaded record does not contain enough immutable
+  rule-attribution data to reproduce an amount. This is intentional: SAN-71/72 document that
+  current rules cannot reconstruct rules edited after a historical payment, and PostgreSQL
+  numeric calculation and the generated movement ids remain authoritative. No read-only SQL
+  preview RPC or migration was added.
+- `/campaigns/[id]/audit` requires `audit.view`, fails closed when permissions are unavailable,
+  filters actor/action/entity/date using Buenos Aires day boundaries, and uses explicit 50-row
+  ranges ordered by `created_at, id`. Detail renders an old/new field diff, correction movement
+  ids, and affected-record links. Campaign scoping accepts the campaign entity itself and
+  snapshots whose top-level old/new value contains `campaign_id`; legacy audit snapshots that
+  omitted campaign identity cannot be safely attributed and are intentionally excluded.
+- The reassociation form accepts one destination installment per submission. The SAN-71 service
+  and RPC still accept multiple applications; expanding the no-JavaScript UI to add arbitrary
+  application rows is a known follow-up.
+
 ### Known follow-up (SAN-71 review): cash/transfer totals of a corrected closed settlement
 
 When a payment method is corrected (cash ↔ transfer) for a payment of a **closed** settlement, the
@@ -402,3 +424,15 @@ the `moved_payment_correction_guard` trigger refuses it (55000, shown as a 409 c
 message "This payment's sale was moved to another collector. Correct the sale collector back
 before annulling or correcting this payment."). Making payment corrections collector-aware is a
 follow-up.
+
+### Campaign audit viewer: performance and coverage (SAN-73 review)
+
+`/campaigns/[id]/audit` selects rows whose `entity_id` is the campaign or whose `old_value` /
+`new_value` snapshot carries `campaign_id`. Migration `20261221000000_audit_log_campaign_indexes.sql`
+adds one index per OR branch (`entity_id`, `old_value->>'campaign_id'`, `new_value->>'campaign_id'`)
+so the filter and its exact count use a BitmapOr instead of scanning `audit_log`.
+
+**Coverage limit (follow-up):** only rows whose snapshot includes `campaign_id` appear (all SAN-71/72
+corrections do; older audited actions such as bond or sale registration generally do not). Showing
+the full campaign history needs a `campaign_id` column on `audit_log` written by every audited
+function, and a backfill of existing rows.

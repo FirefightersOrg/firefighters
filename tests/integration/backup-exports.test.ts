@@ -126,6 +126,7 @@ describe('backup export route (local Supabase)', () => {
 	it('rejects unknown kinds, bad campaign ids and malformed periods', async () => {
 		expect((await call(admin, 'frozen-rosters')).thrown?.status).toBe(404);
 		expect((await call(admin, 'bonds', { id: 'nope' })).thrown?.status).toBe(404);
+		expect((await call(admin, 'bonds', { id: randomUUID() })).thrown?.status).toBe(404);
 		expect(
 			(await call(admin, 'payments', { query: '?from=2027-02-01&to=2027-01-01' })).thrown?.status
 		).toBe(400);
