@@ -12,6 +12,8 @@ import { getSafeRedirectPath } from './redirect';
  * - `/login`: sign-in page and action.
  * - `/logout`: must work for a deactivated user who still holds a session cookie.
  * - `/robots.txt`, `/favicon.ico`: files from `static/` (normally served before the hook runs).
+ * - `/manifest.webmanifest`, `/service-worker.js`, `/offline.html`, `/icons/*`: PWA files the browser fetches without a
+ *   session; they must never redirect to `/login`.
  * - `/_app/version.json`, `/_app/env.js`: SvelteKit runtime files the login page also needs.
  *
  * There are no auth callback routes (no OAuth, magic links or email confirmation: users are
@@ -23,6 +25,9 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
 	'/logout',
 	'/robots.txt',
 	'/favicon.ico',
+	'/manifest.webmanifest',
+	'/service-worker.js',
+	'/offline.html',
 	'/_app/version.json',
 	'/_app/env.js'
 ]);
@@ -32,7 +37,7 @@ export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
  * the compiled JS, CSS and imported assets (e.g. `$lib/assets/favicon.svg`). Deliberately not all
  * of `/_app/`, which would also expose remote functions (`/_app/remote/...`).
  */
-export const PUBLIC_PATH_PREFIXES: readonly string[] = ['/_app/immutable/'];
+export const PUBLIC_PATH_PREFIXES: readonly string[] = ['/_app/immutable/', '/icons/'];
 
 /**
  * Routes that manage the Supabase session themselves (`/login` signs in and ends a session left
