@@ -511,6 +511,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				editRules: true,
 				transitions: ['active', 'annulled'],
 				viewCommissions: true,
+				viewAudit: true,
 				viewBonds: true,
 				loadBonds: true,
 				// SAN-52: campaign links to collectors / buyers.
@@ -1168,6 +1169,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					transitions: [],
 					// SAN-93: treasurer (commission.adjust) and read-only (decision) hold commission.view.
 					viewCommissions: role !== 'operator',
+					viewAudit: role === 'treasurer',
 					// SAN-26: every one of these roles has bond.view (bonds list link).
 					viewBonds: true,
 					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
@@ -2178,7 +2180,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				const { count, error } = await serviceClient
 					.from('audit_log')
 					.select('id', { count: 'exact', head: true })
-					.eq('entity_id', entityId);
+					.eq('entity_id', entityId)
+					.like('request_id', `${REQUEST_PREFIX}%`);
 				expect(error).toBeNull();
 				expect(count, `audit rows for entity ${entityId}`).toBe(expected);
 			}

@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { cardClass } from '$lib/components/campaigns/styles';
+	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import {
+		cardClass,
+		inputClass,
+		labelClass,
+		secondaryButtonClass
+	} from '$lib/components/campaigns/styles';
 	import { PAYMENT_MODE_LABELS, INSTALLMENT_STATUS_LABELS } from '$lib/domain/sales';
 	import { formatMoney } from '$lib/domain/money';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	const numbering = $derived(campaignNumberingConfig(data.campaign));
 	const bondLabel = $derived(
 		data.sale.bondNumberPairs
@@ -27,6 +33,10 @@
 		href={resolve('/campaigns/[id]/sales', { id: data.campaign.id })}>← Sales</a
 	>
 	<h1 class="text-2xl font-bold">Sale</h1>
+	{#if form?.message}<FormAlert
+			kind={form.success ? 'success' : 'error'}
+			message={form.message}
+		/>{/if}
 	<section class={cardClass}>
 		<dl class="grid gap-3 text-sm sm:grid-cols-3">
 			<div>
@@ -79,6 +89,50 @@
 			</div>
 		</dl>
 	</section>
+	{#if data.correction}<section class={cardClass}>
+			<h2 class="font-semibold">Audited corrections</h2>
+			<p class="mt-1 text-xs text-amber-800">
+				<strong>Indicative preview:</strong> buyer changes do not move ledger entries. Collector changes
+				compensate historical commission between collectors using current rule precedence; persisted database
+				calculations are authoritative.
+			</p>
+			<div class="mt-3 grid gap-4 sm:grid-cols-2">
+				<form method="POST" action="?/correctBuyer" class="space-y-2">
+					<label class={labelClass} for="newBuyerId">Correct buyer</label>
+					<select class={inputClass} id="newBuyerId" name="newBuyerId" required
+						><option value="">Choose…</option
+						>{#each data.correction.buyers as buyer (buyer.id)}<option value={buyer.id}
+								>{buyer.businessName ??
+									[buyer.firstName, buyer.lastName].filter(Boolean).join(' ')}</option
+							>{/each}</select
+					>
+					{#if (data.correction.buyersTotal ?? 0) > data.correction.buyers.length}<p
+							class="text-xs text-amber-800"
+							data-testid="buyers-truncated"
+						>
+							Showing the first {data.correction.buyers.length} of {data.correction.buyersTotal} buyers.
+							If the right buyer is missing, open their record from the buyers list.
+						</p>{/if}
+					<label class={labelClass} for="buyer-reason">Reason (max. 1000 Unicode characters)</label>
+					<textarea class={inputClass} id="buyer-reason" name="reason" required></textarea>
+					<button class={secondaryButtonClass}>Confirm buyer correction</button>
+				</form>
+				<form method="POST" action="?/correctCollector" class="space-y-2">
+					<label class={labelClass} for="newCollectorId">Correct collector</label>
+					<select class={inputClass} id="newCollectorId" name="newCollectorId" required
+						><option value="">Choose…</option
+						>{#each data.correction.collectors as collector (collector.id)}<option
+								value={collector.id}>{collector.displayName}</option
+							>{/each}</select
+					>
+					<label class={labelClass} for="collector-reason"
+						>Reason (max. 1000 Unicode characters)</label
+					>
+					<textarea class={inputClass} id="collector-reason" name="reason" required></textarea>
+					<button class={secondaryButtonClass}>Confirm collector correction</button>
+				</form>
+			</div>
+		</section>{/if}
 	<section class={cardClass}>
 		<h2 class="mb-3 font-semibold">Installment schedule</h2>
 		<table class="min-w-full text-sm">

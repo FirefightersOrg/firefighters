@@ -20,6 +20,12 @@ import {
 	removePaymentFromSettlement,
 	SettlementServiceError
 } from '$lib/server/services/settlements';
+import {
+	annulPayment,
+	correctPaymentMethod,
+	reassociateTransfer
+} from '$lib/server/services/payment-corrections';
+import { correctSettlement } from '$lib/server/services/sale-corrections';
 import { PAYMENT_ANNULMENT_REASON_MAX } from '$lib/domain/payments';
 import { centsToDecimalString, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
@@ -53,12 +59,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaign.data) error(404, { message: 'Campaign not found.' });
 	if (!settlement.data) error(404, { message: 'Settlement not found.' });
 	const open = settlement.data.status === 'open';
+	const canCorrectPayment = hasPermissionIn(locals.permissions, 'payment.annul');
+	const canCorrectSettlement =
+		settlement.data.status === 'closed' &&
+		hasPermissionIn(locals.permissions, 'settlement.correct');
 	const [totals, payments, candidates] = await Promise.all([
-		open
-			? getSettlementTotals(locals.supabase, params.settlementId)
-			: Promise.resolve({ data: settlement.data.totals, error: null }),
+		getSettlementTotals(locals.supabase, params.settlementId),
 		listSettlementPayments(locals.supabase, params.settlementId),
-		open
+		open || canCorrectPayment
 			? listCollectorPaymentCandidates(locals.supabase, params.id, settlement.data.collectorId)
 			: Promise.resolve({ data: [], error: null })
 	]);
@@ -67,7 +75,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		settlement: settlement.data,
-		totals: totals.data,
+		totals: open
+			? totals.data
+			: {
+					...settlement.data.totals,
+					collectorCreditBalance:
+						totals.data?.collectorCreditBalance ?? settlement.data.totals.collectorCreditBalance
+				},
 		payments: payments.data ?? [],
 		candidates: candidates.data ?? [],
 		reasonMax: PAYMENT_ANNULMENT_REASON_MAX,
@@ -77,7 +91,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				hasPermissionIn(locals.permissions, 'settlement.update_open') &&
 				hasPermissionIn(locals.permissions, 'payment.create'),
 			remove: open && hasPermissionIn(locals.permissions, 'settlement.update_open'),
-			close: open && hasPermissionIn(locals.permissions, 'settlement.close')
+			close: open && hasPermissionIn(locals.permissions, 'settlement.close'),
+			correctPayment: canCorrectPayment,
+			correctSettlement: canCorrectSettlement
 		}
 	};
 };
@@ -89,6 +105,20 @@ function serviceFailure(err: unknown, form: string, values: Record<string, strin
 		errors: {},
 		message: e?.message ?? 'Something went wrong. Please try again.'
 	});
+}
+async function settlementForPaymentCorrection(
+	locals: App.Locals,
+	params: { id: string; settlementId: string },
+	form: string,
+	values: Record<string, string>
+) {
+	if (!uuid.safeParse(params.id).success || !uuid.safeParse(params.settlementId).success)
+		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+	const settlement = await getSettlement(locals.supabase, params.id, params.settlementId);
+	if (settlement.error) return serviceFailure(settlement.error, form, values);
+	if (!settlement.data)
+		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+	return null;
 }
 export const actions: Actions = {
 	add: async ({ request, locals, params, url }) => {
@@ -175,6 +205,177 @@ export const actions: Actions = {
 			return { form: 'add', success: true, message: 'Payment added.', errors: {} };
 		} catch (e) {
 			return serviceFailure(e, 'add');
+		}
+	},
+	annulPayment: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'annulPayment',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (denied(locals, 'payment.annul'))
+			return fail(403, {
+				form: 'annulPayment',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const f = await request.formData();
+		const values = { paymentId: field(f, 'paymentId'), reason: field(f, 'reason') };
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'annulPayment',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
+		try {
+			await annulPayment(locals.supabase, values, {
+				requestId: locals.requestId ?? null,
+				permissions: locals.permissions ?? null
+			});
+			return { form: 'annulPayment', success: true, message: 'Payment annulled.', errors: {} };
+		} catch (e) {
+			return serviceFailure(e, 'annulPayment', values);
+		}
+	},
+	correctPaymentMethod: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'correctPaymentMethod',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (denied(locals, 'payment.annul'))
+			return fail(403, {
+				form: 'correctPaymentMethod',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const f = await request.formData();
+		const values = {
+			paymentId: field(f, 'paymentId'),
+			newMethod: field(f, 'newMethod'),
+			reason: field(f, 'reason')
+		};
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'correctPaymentMethod',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
+		try {
+			await correctPaymentMethod(
+				locals.supabase,
+				values as Parameters<typeof correctPaymentMethod>[1],
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'correctPaymentMethod',
+				success: true,
+				message: 'Payment method corrected.',
+				errors: {}
+			};
+		} catch (e) {
+			return serviceFailure(e, 'correctPaymentMethod', values);
+		}
+	},
+	reassociateTransfer: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'reassociateTransfer',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (denied(locals, 'payment.annul'))
+			return fail(403, {
+				form: 'reassociateTransfer',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const f = await request.formData();
+		const values = {
+			paymentId: field(f, 'paymentId'),
+			newSaleId: field(f, 'newSaleId'),
+			installmentId: field(f, 'installmentId'),
+			amountApplied: field(f, 'amountApplied'),
+			reason: field(f, 'reason')
+		};
+		const missingSettlement = await settlementForPaymentCorrection(
+			locals,
+			params,
+			'reassociateTransfer',
+			values
+		);
+		if (missingSettlement) return missingSettlement;
+		try {
+			await reassociateTransfer(
+				locals.supabase,
+				{
+					paymentId: values.paymentId,
+					newSaleId: values.newSaleId,
+					applications: [
+						{ installmentId: values.installmentId, amountApplied: values.amountApplied }
+					],
+					reason: values.reason
+				},
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'reassociateTransfer',
+				success: true,
+				message: 'Transfer reassociated.',
+				errors: {}
+			};
+		} catch (e) {
+			return serviceFailure(e, 'reassociateTransfer', values);
+		}
+	},
+	correctSettlement: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'correctSettlement',
+				errors: {},
+				message: 'Could not load permissions.'
+			});
+		requireCampaignViewer(locals, url);
+		if (denied(locals, 'settlement.correct'))
+			return fail(403, {
+				form: 'correctSettlement',
+				errors: {},
+				message: 'You do not have permission to perform this action.'
+			});
+		const f = await request.formData();
+		const values = {
+			commissionDelta: field(f, 'commissionDelta'),
+			cashRetainedDelta: field(f, 'cashRetainedDelta'),
+			reason: field(f, 'reason')
+		};
+		try {
+			await correctSettlement(
+				locals.supabase,
+				{
+					settlementId: params.settlementId,
+					reason: values.reason,
+					adjustments: {
+						commissionDelta: values.commissionDelta,
+						cashRetainedDelta: values.cashRetainedDelta
+					}
+				},
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'correctSettlement',
+				success: true,
+				message: 'Settlement correction recorded.',
+				errors: {}
+			};
+		} catch (e) {
+			return serviceFailure(e, 'correctSettlement', values);
 		}
 	},
 	remove: async ({ request, locals, url }) => {

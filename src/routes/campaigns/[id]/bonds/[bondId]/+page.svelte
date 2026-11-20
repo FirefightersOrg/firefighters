@@ -13,6 +13,7 @@
 	import { formatMoney } from '$lib/domain/money';
 	import { BOND_RECORD_SECTIONS } from '$lib/components/bonds/record/types';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import { inputClass, labelClass, secondaryButtonClass } from '$lib/components/campaigns/styles';
 	import type { PageProps } from './$types';
 
 	/**
@@ -33,9 +34,16 @@
 			: general.typeLabel
 	);
 	const errors = $derived({
-		ungroup: form?.form === 'ungroup' && !form.success ? form.errors.reason : undefined,
-		annul: form?.form === 'annul' && !form.success ? form.errors.reason : undefined
+		ungroup:
+			form?.form === 'ungroup' && !form.success
+				? (form.errors as Record<string, string[]>).reason
+				: undefined,
+		annul:
+			form?.form === 'annul' && !form.success
+				? (form.errors as Record<string, string[]>).reason
+				: undefined
 	});
+	const formErrors = $derived((form?.errors ?? {}) as Record<string, string[]>);
 </script>
 
 <svelte:head>
@@ -74,7 +82,7 @@
 
 	{#if form?.success}
 		<FormAlert kind="success" message={form.message} />
-	{:else if form?.message && !form.errors.reason?.length}
+	{:else if form?.message && !formErrors.reason?.length}
 		<FormAlert message={form.message} />
 	{/if}
 
@@ -83,6 +91,31 @@
 	<BondNumbersSection campaignId={campaign.id} bondId={general.id} numbers={record.numbers} />
 	<BondBarcodeSection barcode={record.barcode} />
 	<BondPartySection role="collector" party={record.collector} />
+	{#if data.custody.can.correctCollector}
+		<details class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+			<summary class="cursor-pointer font-semibold">Correct collector</summary>
+			<p class="mt-2 text-xs text-amber-800">
+				<strong>Indicative preview:</strong> an unsold bond moves custody only. A sold bond compensates
+				historical commission between collectors; database rule precedence and persisted ledger movements
+				are authoritative.
+			</p>
+			<form method="POST" action="?/correctCollector" class="mt-3 space-y-2">
+				<input type="hidden" name="sold" value={data.sale ? 'true' : 'false'} />
+				<label class={labelClass} for="correctCollectorId">New collector</label>
+				<select class={inputClass} id="correctCollectorId" name="newCollectorId" required
+					><option value="">Choose…</option
+					>{#each data.custody.collectors as collector (collector.id)}<option value={collector.id}
+							>{collector.displayName}</option
+						>{/each}</select
+				>
+				<label class={labelClass} for="correctCollectorReason"
+					>Reason (max. 1000 Unicode characters)</label
+				>
+				<textarea class={inputClass} id="correctCollectorReason" name="reason" required></textarea>
+				<button class={secondaryButtonClass}>Confirm collector correction</button>
+			</form>
+		</details>
+	{/if}
 	<BondCustodySection
 		campaignId={campaign.id}
 		fromCollectorId={data.custody.fromCollectorId}

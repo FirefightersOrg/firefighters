@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { AUDIT_ENTRIES_LIMIT, listAuditEntriesForEntities } from './audit-log';
+import {
+	AUDIT_ENTRIES_LIMIT,
+	AUDIT_PAGE_SIZE,
+	listAuditEntriesForEntities,
+	listCampaignAuditEntries
+} from './audit-log';
 
-function queryMock(result: { data: unknown; error: unknown }) {
+function queryMock(result: { data: unknown; error: unknown; count?: number }) {
 	const calls: Array<[string, unknown[]]> = [];
 	const builder: Record<string, unknown> = {};
-	for (const method of ['select', 'eq', 'in', 'order', 'limit']) {
+	for (const method of ['select', 'eq', 'in', 'or', 'gte', 'lte', 'order', 'limit', 'range']) {
 		builder[method] = (...args: unknown[]) => {
 			calls.push([method, args]);
 			return builder;
@@ -80,5 +85,31 @@ describe('audit log repository', () => {
 			data: null,
 			error: { message: 'boom' }
 		});
+	});
+
+	it('uses deterministic explicit ranges beyond PostgREST row 1000 with BA date boundaries', async () => {
+		const { supabase, calls } = queryMock({ data: [], error: null, count: 1051 });
+		const result = await listCampaignAuditEntries(
+			supabase,
+			'f0000000-0000-4000-8000-000000000001',
+			{
+				actor: 'a0000000-0000-4000-8000-000000000001',
+				action: 'payment.annul',
+				entityType: 'payment',
+				from: '2026-11-01',
+				to: '2026-11-19',
+				page: 21
+			}
+		);
+		expect(result.data).toMatchObject({
+			total: 1051,
+			page: 21,
+			pageSize: AUDIT_PAGE_SIZE
+		});
+		expect(calls).toContainEqual(['gte', ['created_at', '2026-11-01T00:00:00-03:00']]);
+		expect(calls).toContainEqual(['lte', ['created_at', '2026-11-19T23:59:59.999999-03:00']]);
+		expect(calls).toContainEqual(['order', ['created_at', { ascending: false }]]);
+		expect(calls).toContainEqual(['order', ['id', { ascending: false }]]);
+		expect(calls).toContainEqual(['range', [1000, 1049]]);
 	});
 });
