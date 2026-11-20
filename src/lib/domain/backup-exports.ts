@@ -10,7 +10,8 @@ export const BACKUP_EXPORT_KINDS = [
 	'bonds',
 	'payments',
 	'settlements',
-	'collector-ledger'
+	'collector-ledger',
+	'settlement-corrections'
 ] as const;
 export type BackupExportKind = (typeof BACKUP_EXPORT_KINDS)[number];
 
@@ -38,6 +39,8 @@ export interface BackupExportDefinition {
 	permissions: readonly (
 		'bond.view' | 'payment.view' | 'settlement.view' | 'collector.ledger.view'
 	)[];
+	/** Column holding the campaign id; embedded path when the table has none. Default `campaign_id`. */
+	campaignColumn?: string;
 	/** Column filtered by the optional `from`/`to` period (date or timestamp). */
 	periodColumn?: string;
 	columns: readonly CsvColumn<ExportRow>[];
@@ -93,7 +96,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 		label: 'Payments by period',
 		table: 'payments',
 		select:
-			'id, sale_id, collector_id, buyer_id, settlement_id, amount::text, payment_method, payment_date, status, created_at, annulled_at, annulment_reason',
+			'id, sale_id, collector_id, buyer_id, settlement_id, replaces_payment_id, amount::text, payment_method, payment_date, status, created_at, annulled_at, annulment_reason',
 		order: ['payment_date', 'created_at', 'id'],
 		permissions: ['payment.view'],
 		periodColumn: 'payment_date',
@@ -107,6 +110,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			col('collector_id', 'collector_id'),
 			col('buyer_id', 'buyer_id'),
 			col('settlement_id', 'settlement_id'),
+			col('replaces_payment_id', 'replaces_payment_id'),
 			col('created_at', 'created_at'),
 			col('annulled_at', 'annulled_at'),
 			col('annulment_reason', 'annulment_reason', true)
@@ -142,7 +146,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 		label: 'Collector current accounts',
 		table: 'collector_ledger_entries',
 		select:
-			'id, collector_id, settlement_id, payment_id, entry_type, direction, amount::text, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
+			'id, collector_id, settlement_id, payment_id, corrects_sale_id, entry_type, direction, amount::text, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
 		order: ['collector_id', 'occurred_at', 'id'],
 		permissions: ['collector.ledger.view'],
 		periodColumn: 'occurred_at',
@@ -157,9 +161,32 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			col('status', 'status'),
 			col('settlement_id', 'settlement_id'),
 			col('payment_id', 'payment_id'),
+			col('corrects_sale_id', 'corrects_sale_id'),
 			col('reason', 'reason', true),
 			col('annulled_at', 'annulled_at'),
 			col('annul_reason', 'annul_reason', true)
+		]
+	},
+	'settlement-corrections': {
+		kind: 'settlement-corrections',
+		label: 'Closed settlement corrections',
+		table: 'settlement_corrections',
+		// The table has no campaign_id: it is filtered through the inner-joined settlement.
+		campaignColumn: 'settlements.campaign_id',
+		select:
+			'id, settlement_id, commission_delta::text, cash_retained_delta::text, reason, created_by, created_at, settlements!inner(campaign_id, settlement_number, collector_id)',
+		order: ['created_at', 'id'],
+		permissions: ['settlement.view'],
+		columns: [
+			col('correction_id', 'id'),
+			col('settlement_id', 'settlement_id'),
+			nested('settlement_number', 'settlements', 'settlement_number', false),
+			nested('collector_id', 'settlements', 'collector_id', false),
+			col('commission_delta', 'commission_delta'),
+			col('withheld_commission_delta', 'cash_retained_delta'),
+			col('reason', 'reason', true),
+			col('created_by', 'created_by'),
+			col('created_at', 'created_at')
 		]
 	}
 };
@@ -183,6 +210,16 @@ export function parseExportPeriod(
 	const t = to || null;
 	if (f && t && f > t) return null;
 	return { from: f, to: t };
+}
+
+/** Buenos Aires calendar date (YYYY-MM-DD) of `now`, for export file names (not the UTC date). */
+export function exportDateInBuenosAires(now: Date = new Date()): string {
+	return new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Argentina/Buenos_Aires',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	}).format(now);
 }
 
 export function exportFileName(kind: BackupExportKind, campaignId: string, today: string): string {

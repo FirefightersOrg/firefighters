@@ -2,6 +2,7 @@ import { error, type RequestHandler } from '@sveltejs/kit';
 import { z } from 'zod';
 import {
 	BACKUP_EXPORTS,
+	exportDateInBuenosAires,
 	exportFileName,
 	isBackupExportKind,
 	parseExportPeriod
@@ -63,7 +64,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		campaignId: id,
 		userId: locals.profile?.id
 	});
-	const today = new Date().toISOString().slice(0, 10);
+	const today = exportDateInBuenosAires();
 	return new Response(body, {
 		headers: {
 			'content-type': 'text/csv; charset=utf-8',
