@@ -27,6 +27,7 @@ import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { listCollectorPendingInstallments } from '$lib/server/repositories/sales';
 import { listCollectorCommissionRules } from '$lib/server/repositories/commission-rules';
 import { getCollectorLedgerBalance } from '$lib/server/services/commission-ledger';
+import { listSettlements } from '$lib/server/repositories/settlements';
 import {
 	DeliveryServiceError,
 	reassignBondsToCollector,
@@ -52,7 +53,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collectorResult.data) error(404, { message: notFound });
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
-	const [bonds, buyers, profiles, audit, installments] = await Promise.all([
+	const [bonds, buyers, profiles, audit, installments, settlements] = await Promise.all([
 		listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
 		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
 		listAvailableCollectorProfileOptions(locals.supabase),
@@ -61,9 +62,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					limit: AUDIT_ENTRIES_LIMIT + 1
 				})
 			: Promise.resolve(null),
-		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId)
+		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId),
+		listSettlements(locals.supabase, params.id, { collectorId: params.collectorId })
 	]);
-	if (bonds.error || buyers.error || profiles.error || audit?.error || installments.error)
+	if (
+		bonds.error ||
+		buyers.error ||
+		profiles.error ||
+		audit?.error ||
+		installments.error ||
+		settlements.error
+	)
 		error(500, { message: 'Could not load the collector. Please try again.' });
 	const collector = collectorResult.data;
 	const assigned = bonds.data?.items ?? [];
@@ -131,6 +140,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		buyersTotal: buyers.data?.total ?? 0,
 		installments: installments.data?.items ?? [],
 		installmentsTotal: installments.data?.total ?? 0,
+		settlements: settlements.data ?? [],
 		profiles: profileOptions,
 		ledger: ledgerAllowed ? { balance: balance === null ? null : Number(balance) } : null,
 		specialRules: specialRules.data ?? [],

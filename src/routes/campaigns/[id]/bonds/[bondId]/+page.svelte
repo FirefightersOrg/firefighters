@@ -132,7 +132,44 @@
 				>
 			</table>{:else}<p class="mt-2 text-sm text-slate-500">No installment plan.</p>{/if}
 	</section>
-	<BondPendingSection id="payments" />
+	<section
+		id="payments"
+		aria-labelledby="payments-title"
+		class="rounded-lg border border-slate-200 bg-white p-5"
+	>
+		<h2 id="payments-title" class="text-base font-semibold">
+			<span class="text-slate-400 tabular-nums">9.</span> Payments
+		</h2>
+		{#if (data.payments ?? []).length}<table class="mt-2 text-sm">
+				<thead
+					><tr
+						><th class="pr-3 text-left">Date</th><th class="pr-3 text-left">Amount</th><th
+							class="pr-3 text-left">Method</th
+						><th class="pr-3 text-left">Status</th><th class="pr-3">Settlement</th><th>Document</th
+						></tr
+					></thead
+				><tbody
+					>{#each data.payments ?? [] as payment (payment.id)}<tr
+							><td>{payment.date}</td><td>{formatMoney(payment.amount)}</td><td>{payment.method}</td
+							><td>{payment.status}</td><td
+								>{#if payment.settlementId}<a
+										class="text-blue-700 underline"
+										href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+											id: campaign.id,
+											settlementId: payment.settlementId
+										})}>#{payment.settlementNumber}</a
+									>{:else}—{/if}</td
+							><td
+								>{#if payment.status === 'confirmed'}<a
+										class="text-blue-700 underline"
+										href={resolve(`/campaigns/${campaign.id}/payments/${payment.id}/print`)}
+										>Certificate</a
+									>{:else}—{/if}</td
+							></tr
+						>{/each}</tbody
+				>
+			</table>{:else}<p class="mt-2 text-sm text-slate-500">No payments recorded.</p>{/if}
+	</section>
 	<BondPendingSection id="settlements" />
 	<BondPendingSection id="commissions" />
 	<BondPendingSection id="draws" />

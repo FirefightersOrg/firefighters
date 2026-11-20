@@ -8,6 +8,7 @@ import type {
 	CampaignRulesUpdateInput,
 	CampaignTransitionInput
 } from '$lib/schemas/campaign';
+import { CAMPAIGN_NAME_MAX_LENGTH } from '$lib/schemas/campaign';
 
 /**
  * Campaign use cases. Every write calls one audited SQL function with the USER-SCOPED client
@@ -80,6 +81,10 @@ export const CAMPAIGN_MESSAGES = {
 /** Friendly messages for the table CHECK constraints (SAN-16), by constraint name. */
 const CONSTRAINT_MESSAGES: Record<string, { field: CampaignFormField; message: string }> = {
 	campaigns_name_not_blank: { field: 'name', message: 'Name is required.' },
+	campaigns_name_max_length: {
+		field: 'name',
+		message: `Name must be at most ${CAMPAIGN_NAME_MAX_LENGTH} characters.`
+	},
 	campaigns_dates_order: { field: 'endsOn', message: 'End date must be after the start date.' },
 	campaigns_simple_bond_value_positive: {
 		field: 'simpleBondValue',
