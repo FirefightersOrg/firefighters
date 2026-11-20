@@ -13,6 +13,7 @@ import {
 	isPrecachablePath,
 	staleCacheNames
 } from '$lib/pwa/cache-policy';
+import { isSkipWaitingMessage } from '$lib/pwa/update';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -22,11 +23,14 @@ const PRECACHED_PATHS: ReadonlySet<string> = new Set(PRECACHE);
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches
-			.open(CACHE)
-			.then((cache) => cache.addAll(PRECACHE))
-			.then(() => self.skipWaiting())
+		// No skipWaiting() here: an updated worker waits until the page asks for it (SKIP_WAITING),
+		// so an open tab never gets its assets swapped mid-session.
+		caches.open(CACHE).then((cache) => cache.addAll(PRECACHE))
 	);
+});
+
+self.addEventListener('message', (event) => {
+	if (isSkipWaitingMessage(event.data)) void self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
