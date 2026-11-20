@@ -46,12 +46,14 @@ Requirements:
 ## Calculation priority
 
 ```txt
-1. Active special collector rule
-2. General campaign rule
-3. Authorized manual adjustment
+1. Active collector-specific rule beats a general rule.
+2. At equal specificity, custom for the exact installment beats the type rule.
+3. Remaining ties use newest valid_from, then greatest rule id.
 ```
 
-The manual adjustment does not replace the original rule; it must be recorded as a difference.
+One-installment plans use `installment_first`. The manual adjustment does not replace the
+original rule; it is a difference row in `commission_adjustments`, never a rule or a change to
+the calculated commission.
 
 ## Normal flow
 
@@ -137,8 +139,7 @@ Decisions:
 - **Rule types**: `cash_full_payment`, `installment_first`, `installment_middle`,
   `installment_last` and `custom`. `custom` targets one specific installment
   (`installment_number`, 1..the campaign's `installment_count`, required); every other type has no
-  installment number. Which rule wins when several match a payment (for example `custom` #1 vs
-  `installment_first`) is decided by the calculation in Phase 9.
+  installment number. Rule precedence is defined in "Calculation priority" above.
 - **Value**: exactly one of `percentage` (0 < p <= 100, 2 decimals, typed `25`, `12,5`, `12,50`
   and shown `25 %`, `12,5 %`) or `fixed_amount` (> 0, Argentine money format, shown
   `$ 1.500,00`). Values with more decimals are rejected, never rounded.
@@ -158,7 +159,10 @@ Decisions:
   audited with old and new values. The edit form carries the rule's `updated_at` as loaded
   (hidden `expectedUpdatedAt`): if someone else changed the rule meanwhile, nothing is saved and
   the user is asked to reload (409). Once settlements consume rules (Phase 9), editing a rule that
-  was already applied should probably be blocked in favor of ending it and creating a new one.
+  was already applied must be blocked in favor of ending it and creating a new one. This requires
+  persisting the selected rule with a closed application; until that attribution is added, the
+  database cannot reliably distinguish a historical use from a rule which merely matches today,
+  so enforcement is a follow-up.
 - **Permissions**: viewing requires `commission.view` (RLS); create, edit and annul require
   `commission.rule_manage` and run through `commission_rule_create`, `commission_rule_update`
   and `commission_rule_annul`, which write the change and its `audit_log` row
@@ -175,3 +179,28 @@ Decisions:
 - Reason.
 - User.
 - Date.
+
+## Collector ledger and settlement close (SAN-68)
+
+The balance is reconstructed as non-annulled `collector_credit` less non-annulled
+`collector_debit`; a positive balance is owed by Firefighters to the collector. Closing records
+one `commission_generated` credit for the calculated commission and, only when positive, one
+`commission_settled` debit for commission retained from cash applications. Transfer commission
+remains credit until an explicit `commission_settle`.
+
+`cash_settled` and `transfer_received_by_firefighters` are intentionally not created at close:
+their positive amount cannot be represented by one directed ledger row without changing the
+commission balance. Payments and closed-settlement snapshots remain the authoritative
+cash/transfer trace. `commission_paid_amount` is cash-retained commission,
+`net_to_firefighters` is total payment amount less that value, and preliminary
+`settlement_totals.collector_credit_balance` is the current reconstructed campaign balance with
+this settlement's generated and cash-settled commission applied.
+
+Campaign dates are not currently enforced as a rule-validity boundary; that validation is a
+follow-up.
+
+Applied rules: editing a commission rule already used by a closed settlement is not blocked yet,
+because settlements do not store which rule was applied to each payment application. Follow-up:
+persist the applied rule id per application and block edits/annulments of applied rules (end-date
+the rule and create a new one instead). Manual adjustments must be written as difference rows and their matching ledger
+entries by the adjustment service; they never modify a rule or computed commission.
