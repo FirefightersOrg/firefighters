@@ -404,7 +404,16 @@ export async function listBuyerBonds(
 	};
 }
 
-/** Other buyers with the same document number or tax id (possible duplicates to warn about). */
+/**
+ * Digits only, or null when there are none. Mirrors the generated `*_normalized` columns on
+ * `buyers`, so '30.111.222', '30111222' and ' 30 111 222 ' are the same identification.
+ */
+export function normalizeIdentification(value: string | null | undefined): string | null {
+	const digits = (value ?? '').replace(/\D/g, '');
+	return digits === '' ? null : digits;
+}
+
+/** Other buyers with the same document number or tax id, compared by digits only (possible duplicates to warn about). */
 export async function findBuyersByIdentification(
 	supabase: SupabaseClient,
 	identification: {
@@ -414,11 +423,10 @@ export async function findBuyersByIdentification(
 	}
 ): Promise<RepositoryResult<Buyer[]>> {
 	const filters: string[] = [];
-	const clean = (v: string | null | undefined) => (v ?? '').replace(/[,()*"\\]/g, '').trim();
-	if (clean(identification.documentNumber)) {
-		filters.push(`document_number.eq.${clean(identification.documentNumber)}`);
-	}
-	if (clean(identification.taxId)) filters.push(`tax_id.eq.${clean(identification.taxId)}`);
+	const documentNumber = normalizeIdentification(identification.documentNumber);
+	const taxId = normalizeIdentification(identification.taxId);
+	if (documentNumber) filters.push(`document_number_normalized.eq.${documentNumber}`);
+	if (taxId) filters.push(`tax_id_normalized.eq.${taxId}`);
 	if (filters.length === 0) return { data: [], error: null };
 	let query = supabase.from('buyers').select(BUYER_COLUMNS).or(filters.join(','));
 	if (identification.excludeId) query = query.neq('id', identification.excludeId);

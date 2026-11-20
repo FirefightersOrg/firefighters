@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import UpdatePrompt from '$lib/pwa/UpdatePrompt.svelte';
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
@@ -10,3 +11,5 @@
 </svelte:head>
 
 {@render children()}
+
+<UpdatePrompt />
