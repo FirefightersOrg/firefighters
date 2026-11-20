@@ -7,6 +7,22 @@ $$;
 revoke all on function public.draw_payment_before_cutoff(text,date,timestamptz)
   from public,anon,authenticated,service_role;
 
+-- Same precedence as SAN-76; invalid legacy configuration has a stable null result.
+create function public.draw_consolation_required(p_required integer,p_rule jsonb)
+returns integer language plpgsql immutable set search_path = '' as $$
+declare v jsonb := coalesce(nullif(p_rule->'requiredInstallmentNumber','null'::jsonb),
+  nullif(p_rule->'required_installment_number','null'::jsonb),to_jsonb(p_required));
+begin
+  if jsonb_typeof(v) = 'number' then
+    if v::numeric between 1 and 2147483647 and trunc(v::numeric) = v::numeric then
+      return v::integer;
+    end if;
+  end if;
+  return null;
+end $$;
+revoke all on function public.draw_consolation_required(integer,jsonb)
+  from public,anon,authenticated,service_role;
+
 -- Extras are campaign-wide, immutable reservations, reusable by subsequent draws.
 create unique index bond_numbers_one_extraordinary_per_base
   on public.bond_numbers(source_base_number_id)
@@ -18,6 +34,7 @@ declare
   v_actor uuid := public.bond_require_actor('draw.generate_roster');
   v_campaign uuid;
   v_max integer;
+  v_campaign_status text;
   v_draw public.draws;
   v_roster uuid;
   v_snapshot jsonb;
@@ -32,7 +49,11 @@ begin
   -- Discover parent without locking, then acquire the documented parent-first order.
   select campaign_id into v_campaign from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
-  select max_number into v_max from public.campaigns where id = v_campaign for share;
+  select max_number,status into v_max,v_campaign_status
+    from public.campaigns where id = v_campaign for share;
+  if v_campaign_status not in ('draft','active') then
+    raise exception 'draws require a draft or active campaign' using errcode = '55000';
+  end if;
   select * into v_draw from public.draws where id = p_draw_id for update;
   perform 1 from public.draw_rosters where draw_id = p_draw_id order by id for update;
   if v_draw.status not in ('scheduled','roster_generated')
@@ -87,6 +108,9 @@ begin
     select *,case
       when annulled_at is not null or commercial_status = 'annulled' then 'annulled'
       when commercial_status <> 'sold' then 'not_sold'
+      when v_draw.draw_type = 'consolation'
+        and public.draw_consolation_required(v_draw.required_installment_number,v_draw.eligibility_rule) is null
+        then 'missing_required_installment'
       when v_draw.draw_type = 'monthly' and not coalesce(up_to_date,false) then 'installments_not_covered'
       when v_draw.draw_type in ('final','extraordinary_full_payment') and not coalesce(fully_paid,false) then 'not_fully_paid'
       else null end as reason
@@ -126,8 +150,13 @@ begin
       order by s.position
     loop
       v_position := v_position + 1;
-      insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind,source_base_number_id)
-        values(v_campaign,v_source.bond_id,v_values[v_position],'extraordinary',v_source.id);
+      begin
+        insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind,source_base_number_id)
+          values(v_campaign,v_source.bond_id,v_values[v_position],'extraordinary',v_source.id);
+      exception when unique_violation then
+        -- Ordinary creation may reserve a free value; the raised error rolls back everything.
+        raise exception 'number allocation changed concurrently; retry generation' using errcode = '55000';
+      end;
     end loop;
   end if;
 
@@ -147,9 +176,6 @@ begin
     values(v_actor,'draw.generate_roster','draw_roster',v_roster,
       jsonb_build_object('draw_id',p_draw_id,'campaign_id',v_campaign,'roster_id',v_roster),p_request_id);
   return v_roster;
-exception when unique_violation then
-  -- A simultaneous ordinary bond creation can reserve a free value: rollback EVERYTHING.
-  raise exception 'number allocation changed concurrently; retry generation' using errcode = '55000';
 end $$;
 
 create function public.draw_freeze_roster(p_draw_id uuid, p_request_id text default null)
@@ -194,6 +220,10 @@ begin
     or p_rule is null or jsonb_typeof(p_rule) <> 'object' then
     raise exception 'invalid draw data' using errcode = '22023';
   end if;
+  if p_type = 'consolation' and public.draw_consolation_required(p_required,p_rule) is null then
+    raise exception 'consolation draw requires a positive required installment in required_installment_number or eligibility_rule'
+      using errcode = '22023';
+  end if;
 end $$;
 revoke all on function public.draw_validate_input(text,text,date,timestamptz,integer,jsonb)
   from public,anon,authenticated,service_role;
@@ -232,6 +262,7 @@ create function public.draw_update(
 declare
   v_actor uuid := public.bond_require_actor('draw.update');
   v_campaign uuid;
+  v_campaign_status text;
   v_old public.draws;
   v_new public.draws;
 begin
@@ -239,7 +270,10 @@ begin
   select campaign_id into v_campaign from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
   -- Changing required installment invokes SAN-75's campaign count guard: parent first.
-  perform 1 from public.campaigns where id = v_campaign for share;
+  select status into v_campaign_status from public.campaigns where id = v_campaign for share;
+  if v_campaign_status not in ('draft','active') then
+    raise exception 'draws require a draft or active campaign' using errcode = '55000';
+  end if;
   select * into v_old from public.draws where id = p_draw_id for update;
   if v_old.status <> 'scheduled' then
     raise exception 'only scheduled draws can be edited' using errcode = '55000';

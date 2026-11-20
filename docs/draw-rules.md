@@ -143,7 +143,8 @@ Possible results:
   inside the database and never accepts client-supplied entries or eligibility flags.
   `draw_freeze_roster(draw_id, request_id)` returns void (the SAN-78 UI contract).
 - The scope also includes `draw_create` (UUID result), `draw_update` and `draw_annul` (void).
-  Create requires `draw.create` and a draft/active campaign. Update requires `draw.update`,
+  Create requires `draw.create` and a draft/active campaign. Update requires `draw.update`
+  and a draft/active campaign (55000 otherwise),
   preserves draw type and only edits scheduled draws; changing the installment takes the campaign
   lock before the draw lock and remains bounded by the campaign's installment count.
 - There is no `draw.annul` permission in `docs/permissions.md`, so annulment uses `draw.update`.
@@ -154,7 +155,11 @@ Possible results:
   date-only; the payment cutoff is a timestamp. Monthly configuration requires a positive
   installment number. Eligibility configuration is a JSON object, as in SAN-75; final and
   extraordinary draws always require the complete active plan regardless of installment setting.
-  Consolation configuration can be saved even though generation is currently unavailable.
+  Consolation configuration can be saved even though generation is currently unavailable,
+  but create/update reject a missing or invalid required installment with 22023 and an explicit
+  message. The positive integer can come from the column or the JSON rule; matching SAN-76,
+  `requiredInstallmentNumber` takes precedence over `required_installment_number`, then the
+  column. JSON null falls through; an invalid non-null rule does not silently fall back.
 - Every RPC uses `SECURITY DEFINER`, an empty search path, an active-profile permission check,
   and exactly one audit row on success in the same transaction. Only authenticated callers get
   EXECUTE; helpers are internal. Existing direct-write revocations and read RLS remain intact.
@@ -189,10 +194,17 @@ Possible results:
   payment on that day counts even if its confirmation occurred later. The product question about
   confirmation-timestamp semantics remains open; payments currently have no such timestamp.
 - Generation locks campaign FOR SHARE, draw FOR UPDATE, then existing rosters in UUID order.
+  Generation also requires the locked campaign to be draft/active (55000 for closing, closed
+  or annulled), before any extraordinary reservation or roster write. The existing campaign
+  lock stabilizes the status check; this review does not change lock acquisition order.
   Regeneration is allowed only before freeze, supersedes previous generated rosters and preserves
   all their entries. Freeze locks draw then the current generated roster; it never takes a
   campaign lock after the draw lock. It sets freeze actor/time and `roster_frozen` atomically.
   A second freeze is a 55000 conflict, not an idempotent success, and adds no audit row.
+  **Freeze decision (review 4642358561):** freezing an already generated roster remains allowed
+  after campaign closure. It seals the existing snapshot, does not recompute eligibility or
+  reserve numbers, and satisfies the documented requirement to freeze before winner loading.
+  No campaign lock/status gate is added to freeze; pgTAP proves closed-campaign freeze and audit.
 - Frozen rosters are immutable snapshots: later confirmations, payments and audited payment
   corrections cannot update their entries. Tests compare **full entry rows**, including ids and
   timestamps, after a late confirmation and an actual `payment_annul` correction.
@@ -216,6 +228,13 @@ Possible results:
   lower any ledger balance. Ordinary concurrent bond creation does not take the new advisory
   lock: a uniqueness collision aborts generation with 55000 and asks the caller to retry,
   without partial writes.
+  **Review 4642358564:** only the individual `bond_numbers` insertion has a
+  `unique_violation` handler. A uniqueness error elsewhere keeps SQLSTATE 23505 and its original
+  constraint message; pgTAP installs a fixture-only roster index and verifies that failure rolls
+  back supersession, creates no roster and writes no audit.
+- PostgreSQL UUID ordering is byte-order, matching SAN-76's merged `compareBinary` tie-breaker
+  for canonical UUIDs (no locale collation). The existing extraordinary integration parity
+  comparison still passes after merging the SAN-75/SAN-76 review fixes.
 - pgTAP uses two real dblink sessions calling the RPCs: freeze waits for generation, generation
   waits for and refuses a committed freeze, and two different extraordinary draws serialize
   allocation and reuse the same persisted extra without duplicates.
@@ -229,6 +248,10 @@ Possible results:
   Enable generation only when authoritative previous-result storage exists, then apply SAN-76's
   `already_won` precedence and configured required-installment rule. The pure TS consolation
   evaluator remains unchanged and available for preview with explicit previous-win snapshots.
+  The SQL evaluator includes the same `missing_required_installment` reason for legacy missing
+  consolation configuration, using the shared SQL resolver also used by create/update validation.
+  This reason branch remains unreachable through roster generation while the Phase 12 gate is
+  in place; no claim of end-to-end consolation parity is made without authoritative winners.
 - `038_draw_roster_services.test.sql` covers exact monthly/final/extraordinary rows and reasons,
   the consolation refusal, identity snapshots, base-linked deterministic extras, regeneration,
   exhaustion rollback, freeze and history guards, late confirmation/correction independence,
@@ -240,6 +263,6 @@ Possible results:
   draws, compares extraordinary assignments, generates/freezes through the services and proves
   that forged TS permissions cannot bypass database authorization.
 - Validation: clean local reset followed by `supabase test db` **before** seeding/integration:
-  38 database files / 2450 assertions passed (038 plan: 127); `pnpm test:integration`:
+  38 database files / 2475 assertions passed (038 plan: 152); `pnpm test:integration`:
   23 files / 192 tests passed; `pnpm check`: 0 errors / 0 warnings; `pnpm lint`: passed;
-  `pnpm test`: 121 files / 1575 tests passed.
+  `pnpm test`: 121 files / 1577 tests passed.

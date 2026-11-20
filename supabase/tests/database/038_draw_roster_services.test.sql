@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(127);
+select plan(152);
 insert into auth.users(id,email)
 select ('a6380000-0000-0000-0000-00000000000'||n)::uuid,'roster-'||n||'@example.com' from generate_series(1,2)n;
 insert into public.profiles(id,auth_user_id,full_name,email,status)
@@ -346,5 +346,61 @@ from unnest(array['anon','service_role'])r cross join unnest(array[
   'public.draw_create(uuid,text,text,date,timestamptz,integer,jsonb,text)',
   'public.draw_update(uuid,text,date,timestamptz,integer,jsonb,text)',
   'public.draw_annul(uuid,text,text)'])f;
+-- Review #79: unrelated uniqueness errors retain their original SQLSTATE/message.
+do $$begin
+  execute format('create unique index review_roster_unique on public.draw_rosters(draw_id) where draw_id = %L',pg_temp.id('final'));
+end $$;
+set local role authenticated;
+select throws_ok($$select public.draw_generate_roster(pg_temp.id('final'),'038-review-unique')$$,
+  '23505','duplicate key value violates unique constraint "review_roster_unique"',
+  'non-allocation unique violation is not masked');
+reset role;
+drop index public.review_roster_unique;
+select is((select status from public.draw_rosters where id=pg_temp.id('r-final')),'generated','unique failure rolls back supersession');
+select is((select count(*)::int from public.draw_rosters where draw_id=pg_temp.id('final')),1,'unique failure leaves no new roster');
+select is((select count(*)::int from public.audit_log where request_id='038-review-unique'),0,'unique failure leaves no audit');
+
+set local role authenticated;
+select throws_ok($$select pg_temp.new_draw('consolation','Missing',null,'{}','038-review-consolation-create')$$,
+  '22023','consolation draw requires a positive required installment in required_installment_number or eligibility_rule','consolation create requires installment');
+select throws_ok($$select pg_temp.edit_draw(pg_temp.id('consolation'),'Missing',null,'{}','038-review-consolation-update')$$,
+  '22023','consolation draw requires a positive required installment in required_installment_number or eligibility_rule','consolation update requires installment');
+select throws_ok($$select pg_temp.new_draw('consolation','Invalid',null,'{"requiredInstallmentNumber":0}','038-review-consolation-invalid')$$,
+  '22023',null,'consolation rule must contain positive integer');
+select ok((select name='consolation' and required_installment_number=1 and eligibility_rule='{}' and status='scheduled'
+  from public.draws where id=pg_temp.id('consolation')),'invalid consolation update preserves configuration');
+select lives_ok($$select pg_temp.new_draw('consolation','Column',1,'{}','038-review-consolation-column')$$,'consolation accepts column installment');
+select lives_ok($$select pg_temp.new_draw('consolation','Camel',null,'{"requiredInstallmentNumber":1}','038-review-consolation-camel')$$,'consolation accepts camelCase rule');
+select lives_ok($$select pg_temp.edit_draw(pg_temp.id('consolation'),'Snake',null,'{"required_installment_number":1}','038-review-consolation-snake')$$,'consolation update accepts snake_case rule');
+reset role;
+select is((select count(*)::int from public.audit_log where request_id in ('038-review-consolation-create','038-review-consolation-update','038-review-consolation-invalid')),0,'invalid consolation writes no audit');
+select is((select count(*)::int from public.draws where campaign_id=pg_temp.id('c') and name in ('Missing','Invalid')),0,'invalid consolation creates no draw');
+select is(public.draw_consolation_required(null,'{}'),null::int,'legacy missing rule resolves to missing_required_installment branch');
+
+-- Existing generated snapshots may be frozen after campaign closure, but not regenerated.
+insert into ids values('review-edit',gen_random_uuid()),('review-freeze',gen_random_uuid());
+insert into public.draws(id,campaign_id,draw_type,name,draw_date,payment_cutoff_at,created_by)
+select pg_temp.id(k),pg_temp.id('closing-campaign'),'extraordinary_full_payment',k,date '2026-01-01',now(),
+  'b6380000-0000-0000-0000-000000000001' from unnest(array['review-edit','review-freeze'])k;
+-- Privileged fixture: a pre-closure generated empty snapshot, no invented commercial data.
+insert into public.draw_rosters(draw_id,generated_by,created_by)
+values(pg_temp.id('review-freeze'),'b6380000-0000-0000-0000-000000000001','b6380000-0000-0000-0000-000000000001');
+update public.draws set status='roster_generated' where id=pg_temp.id('review-freeze');
+set local role authenticated;
+select throws_ok($$select public.draw_generate_roster(pg_temp.id('review-edit'),'038-review-closing-generate')$$,'55000','draws require a draft or active campaign','closing campaign cannot allocate extras');
+select throws_ok($$select pg_temp.edit_draw(pg_temp.id('review-edit'),'Changed',null,'{}','038-review-closing-update')$$,'55000','draws require a draft or active campaign','closing campaign cannot edit');
+reset role;
+update public.campaigns set status='closed' where id=pg_temp.id('closing-campaign');
+set local role authenticated;
+select throws_ok($$select public.draw_generate_roster(pg_temp.id('review-freeze'),'038-review-closed-generate')$$,'55000','draws require a draft or active campaign','closed campaign cannot regenerate');
+select throws_ok($$select pg_temp.edit_draw(pg_temp.id('review-edit'),'Changed',null,'{}','038-review-closed-update')$$,'55000','draws require a draft or active campaign','closed campaign cannot edit');
+select lives_ok($$select public.draw_freeze_roster(pg_temp.id('review-freeze'),'038-review-closed-freeze')$$,'closed campaign can freeze existing snapshot');
+reset role;
+select is((select name from public.draws where id=pg_temp.id('review-edit')),'review-edit','campaign refusals preserve configuration');
+select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('closing-campaign')),0,'campaign refusals allocate no numbers');
+select is((select count(*)::int from public.draw_rosters where draw_id in (pg_temp.id('review-edit'),pg_temp.id('review-freeze'))),1,'campaign refusals add no roster');
+select is((select count(*)::int from public.audit_log where request_id in ('038-review-closing-generate','038-review-closing-update','038-review-closed-generate','038-review-closed-update')),0,'campaign refusals write no audit');
+select is((select status from public.draws where id=pg_temp.id('review-freeze')),'roster_frozen','closed campaign freeze transitions draw');
+select is((select count(*)::int from public.audit_log where request_id='038-review-closed-freeze' and action='draw.freeze_roster'),1,'closed campaign freeze audited exactly once');
 select * from finish();
 rollback;
