@@ -106,6 +106,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		canEdit: open && canLoadBonds(campaign.status),
 		lockedMessage:
 			open && !canLoadBonds(campaign.status) ? campaignLockedMessage(campaign.status) : null,
+		canExport: hasPermissionIn(locals.permissions, 'report.export'),
 		canRollBack:
 			session.status === 'confirmed' &&
 			session.rolledBackAt === null &&

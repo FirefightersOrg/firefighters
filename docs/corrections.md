@@ -436,3 +436,13 @@ so the filter and its exact count use a BitmapOr instead of scanning `audit_log`
 corrections do; older audited actions such as bond or sale registration generally do not). Showing
 the full campaign history needs a `campaign_id` column on `audit_log` written by every audited
 function, and a backfill of existing rows.
+
+### Campaign audit viewer fix (found by SAN-74)
+
+Correction rows keep `campaign_id` inside the snapshot of the corrected row
+(`new_value.previous_value.payment|sale|settlement.campaign_id`), so the original top-level filter
+of `/campaigns/[id]/audit` matched no correction at all. Migration
+`20261222000000_audit_log_campaign_scope.sql` adds the stored generated column
+`audit_log.campaign_scope` (campaign from the top level or from those snapshots) with an index; the
+viewer now filters `entity_id = :campaign OR campaign_scope = :campaign`. Rows of older audited
+actions without any campaign in their snapshot are still not listed (see the coverage follow-up).
