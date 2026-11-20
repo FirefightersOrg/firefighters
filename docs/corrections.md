@@ -260,3 +260,13 @@ the older removal RPC and duplicating its audit.
   fixture; API and unflagged writes are independently denied in `033`.
   Tests `027`, `031` and `033` use Buenos Aires transaction-local timezone for fixture
   dates, avoiding UTC-midnight mismatches with the payment-date default.
+
+### Known follow-up (SAN-71 review): cash/transfer totals of a corrected closed settlement
+
+When a payment method is corrected (cash ↔ transfer) for a payment of a **closed** settlement, the
+settlement's `total_cash` / `total_transfer` stay as the closing snapshot (closed totals are never
+edited), and `settlement_correct` (SAN-72) only records `commission_delta` / `cash_retained_delta`.
+So those two totals do **not** reflect the corrected method. Reports by payment method must not
+read them as live data: derive cash/transfer from the payments (non-adjusted originals excluded,
+replacements included). A way to record cash/transfer deltas on the settlement correction is a
+follow-up.
