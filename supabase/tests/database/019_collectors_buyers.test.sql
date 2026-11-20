@@ -46,7 +46,8 @@ select columns_are('public', 'collectors', array['id', 'display_name', 'phone', 
   'user_profile_id', 'status', 'created_by', 'created_at', 'updated_at'], 'collectors columns');
 select columns_are('public', 'buyers', array['id', 'type', 'first_name', 'last_name',
   'business_name', 'document_number', 'tax_id', 'phone', 'address', 'usual_collector_id', 'notes',
-  'created_by', 'created_at', 'updated_at'], 'buyers columns');
+  'created_by', 'created_at', 'updated_at', 'document_number_normalized', 'tax_id_normalized'],
+  'buyers columns');
 select fk_ok('public', 'bonds', 'current_collector_id', 'public', 'collectors', 'id',
   'bonds.current_collector_id references collectors');
 select fk_ok('public', 'bonds', 'current_buyer_id', 'public', 'buyers', 'id',
