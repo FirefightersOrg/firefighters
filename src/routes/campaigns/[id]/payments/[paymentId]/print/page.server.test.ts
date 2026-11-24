@@ -9,13 +9,14 @@ const payment = {
 	bond: '68',
 	buyer: 'Buyer',
 	collector: 'Ana',
-	installments: 'Installment 1',
+	installments: 'Cuota 1',
 	amount: '100.00',
-	method: 'Cash',
+	method: 'Efectivo',
 	paymentDate: '2026-11-18',
 	createdAt: '2026-11-18T15:30:00Z',
 	registeredBy: 'Operator',
-	settlementNumber: 7
+	settlementNumber: 7,
+	legend: null
 };
 const event = (locals: App.Locals, paymentId = ID) =>
 	({
@@ -42,7 +43,7 @@ describe('payment certificate load', () => {
 		vi.mocked(getPaymentCertificate).mockResolvedValue({ data: null, error: null });
 		await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
 	});
-	it.each(['pending_in_settlement', 'annulled'])(
+	it.each(['pending_in_settlement', 'draft'])(
 		'does not issue certificates for %s payments',
 		async (status) => {
 			vi.mocked(getPaymentCertificate).mockResolvedValue({
@@ -52,9 +53,74 @@ describe('payment certificate load', () => {
 			await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
 		}
 	);
+	const legend = {
+		kind: 'annulled' as const,
+		eventAt: '2026-11-18T16:00:00Z',
+		actor: 'Admin',
+		reason: 'Wrong receipt',
+		relatedPaymentId: null,
+		correctionType: 'annul'
+	};
+	it.each([
+		['confirmed', null],
+		['annulled', legend],
+		['adjusted', { ...legend, kind: 'corrected' as const, correctionType: 'correct_method' }]
+	] as const)('issues certificates for %s payments', async (status, paymentLegend) => {
+		vi.mocked(getPaymentCertificate).mockResolvedValue({
+			data: { status, payment: { ...payment, legend: paymentLegend } },
+			error: null
+		} as never);
+		const result = await load(event(setup()));
+		expect(result?.document.receiptNumber).toContain('SET-0007');
+	});
+	it('404s an annulled payment without a legend (a pending payment removed from an open settlement)', async () => {
+		vi.mocked(getPaymentCertificate).mockResolvedValue({
+			data: { status: 'annulled', payment: { ...payment, legend: null } },
+			error: null
+		} as never);
+		await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
+	});
 	it('logs repository failures as 500', async () => {
 		vi.mocked(getPaymentCertificate).mockResolvedValue({ data: null, error: new Error('db') });
 		await expect(load(event(setup()))).rejects.toMatchObject({ status: 500 });
 		expect(console.error).toHaveBeenCalled();
+	});
+});
+
+describe('payment certificate registering user (SAN-122)', () => {
+	const withRpc = (rpc: { data: unknown; error: unknown }) => {
+		const mock = mockSupabase({
+			tables: { campaigns: { data: campaignRow(), error: null } },
+			rpc: rpc as never
+		});
+		return {
+			mock,
+			locals: makeLocals({
+				supabase: mock.supabase,
+				permissions: ['campaign.view', 'payment.view']
+			})
+		};
+	};
+	beforeEach(() => {
+		vi.mocked(getPaymentCertificate).mockReset();
+		vi.mocked(getPaymentCertificate).mockResolvedValue({
+			data: { status: 'confirmed', payment: { ...payment, registeredBy: '—' } },
+			error: null
+		} as never);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+	it('shows the name from document_actor_name even when profiles is not readable', async () => {
+		const { mock, locals } = withRpc({ data: 'Treasurer Two', error: null });
+		const result = (await load(event(locals)))!;
+		expect(result.document.registeredBy).toBe('Treasurer Two');
+		expect(mock.rpc).toHaveBeenCalledWith('document_actor_name', { p_kind: 'payment', p_id: ID });
+	});
+	it('falls back to a dash without an actor and answers 500 when the lookup fails', async () => {
+		expect(
+			(await load(event(withRpc({ data: null, error: null }).locals)))!.document.registeredBy
+		).toBe('—');
+		await expect(
+			load(event(withRpc({ data: null, error: { code: '42501', message: 'denied' } }).locals))
+		).rejects.toMatchObject({ status: 500 });
 	});
 });

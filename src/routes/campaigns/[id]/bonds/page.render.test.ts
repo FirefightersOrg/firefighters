@@ -93,8 +93,8 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toContain('4939');
 		expect(body).toContain('Simple bond');
 		expect(body).toContain('INT-1');
-		expect(body).toContain('Available');
-		expect(body).toContain('No payments');
+		expect(body).toContain('Disponible');
+		expect(body).toContain('Sin pagos');
 		expect(body).toContain('$\u00a060.000,00');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
 		expect(body).toContain('View record');

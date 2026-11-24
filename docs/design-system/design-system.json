@@ -1,0 +1,33 @@
+{
+	"v": 3,
+	"assetGroups": {},
+	"blobs": {},
+	"createdOnFiles": {
+		"at": "2026-11-24T12:00:00Z",
+		"v": 1
+	},
+	"docs": {
+		"sections": []
+	},
+	"groups": [],
+	"lastChange": {
+		"at": "2026-11-24T12:00:00Z",
+		"by": "Santiago Musso",
+		"note": "Primera versión: rediseño agnóstico a partir del inventario de estilos y componentes de una app SvelteKit + Tailwind.",
+		"via": "Claude Code"
+	},
+	"layout": "files",
+	"libraries": [
+		{
+			"name": "react",
+			"version": "18"
+		},
+		{
+			"name": "react-dom",
+			"version": "18"
+		}
+	],
+	"namespace": "Cimiento",
+	"sections": {},
+	"title": "Cimiento"
+}

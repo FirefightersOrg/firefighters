@@ -72,9 +72,8 @@ export interface CampaignAuditFilters {
 
 /**
  * Campaign audit viewer query. Explicit ranges avoid PostgREST's 1,000-row ceiling and the
- * created_at/id order makes paging deterministic. Rows match by the generated, indexed
- * `campaign_scope` (campaign_id from the top level or from the corrected row snapshot, SAN-74 fix)
- * or, for the campaign row itself, by entity id.
+ * created_at/id order makes paging deterministic. Frozen campaign membership includes sparse
+ * snapshots and campaign rows, using the composite campaign/history index (SAN-112).
  */
 export async function listCampaignAuditEntries(
 	supabase: SupabaseClient,
@@ -87,7 +86,7 @@ export async function listCampaignAuditEntries(
 	let query = supabase
 		.from('audit_log')
 		.select(AUDIT_LOG_COLUMNS, { count: 'exact' })
-		.or(`entity_id.eq.${campaignId},campaign_scope.eq.${campaignId}`);
+		.eq('campaign_id', campaignId);
 	if (filters.actor) query = query.eq('actor_user_id', filters.actor);
 	if (filters.action) query = query.eq('action', filters.action);
 	if (filters.entityType) query = query.eq('entity_type', filters.entityType);
@@ -120,7 +119,7 @@ export async function getCampaignAuditEntry(
 		.from('audit_log')
 		.select(AUDIT_LOG_COLUMNS)
 		.eq('id', id)
-		.or(`entity_id.eq.${campaignId},campaign_scope.eq.${campaignId}`)
+		.eq('campaign_id', campaignId)
 		.maybeSingle()
 		.overrideTypes<AuditLogRow | null, { merge: false }>();
 	return error ? { data: null, error } : { data: data ? mapAuditRow(data) : null, error: null };
