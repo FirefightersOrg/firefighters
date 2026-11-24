@@ -94,7 +94,7 @@ describe('draw detail', () => {
 			error: null
 		} as never);
 		const result = await load({
-			locals: makeLocals({ permissions: ['campaign.view', 'draw.annul'] }),
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.view', 'draw.annul'] }),
 			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
 			url: new URL(url)
 		} as never);

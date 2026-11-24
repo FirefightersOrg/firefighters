@@ -7,25 +7,52 @@ select r.id,p.id from public.roles r cross join public.permissions p
 where r.name = 'admin' and p.code in ('draw.annul','draw.complete');
 
 -- Only the authorization changes: preserve locks, validation, state and audit.
+-- Rebased on SAN-117 (20270102): identical body (generated-extraordinary annulment, extra-number
+-- release, audit of released ids); only the actor permission changes to draw.annul.
 create or replace function public.draw_annul(p_draw_id uuid,p_reason text,p_request_id text default null)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid := public.bond_require_actor('draw.annul');
+  v_campaign uuid;
   v_old public.draws;
   v_new public.draws;
+  v_released uuid[] := '{}';
 begin
   if p_draw_id is null or p_reason is null or btrim(p_reason) = '' or char_length(btrim(p_reason)) > 1000 then
     raise exception 'draw id and reason (1..1000 characters) are required' using errcode = '22023';
   end if;
-  select * into v_old from public.draws where id = p_draw_id for update;
+  select campaign_id into v_campaign from public.draws where id = p_draw_id;
   if not found then raise exception 'draw not found' using errcode = 'P0002'; end if;
-  if v_old.status <> 'scheduled' then
-    raise exception 'only scheduled draws can be annulled' using errcode = '55000';
+  -- Match generation's parent-first order. No campaign status restriction on annulment.
+  perform 1 from public.campaigns where id = v_campaign for share;
+  select * into v_old from public.draws where id = p_draw_id for update;
+  perform 1 from public.draw_rosters where draw_id = p_draw_id order by id for update;
+  if (v_old.status <> 'scheduled' and not
+      (v_old.status = 'roster_generated' and v_old.draw_type = 'extraordinary_full_payment'))
+    or exists (select 1 from public.draw_rosters where draw_id = p_draw_id and status = 'frozen') then
+    raise exception 'only scheduled or generated extraordinary draws can be annulled before freeze' using errcode = '55000';
+  end if;
+  if v_old.draw_type = 'extraordinary_full_payment' then
+    -- Serialize reference creation/reuse and release across different draws.
+    perform pg_advisory_xact_lock(hashtextextended(v_campaign::text,77));
   end if;
   update public.draws set status = 'annulled',annulled_at = now(),annulled_by = v_actor,
     annul_reason = btrim(p_reason) where id = p_draw_id returning * into v_new;
+  if v_old.draw_type = 'extraordinary_full_payment' then
+    with released as (
+      update public.bond_numbers n set released_at = now(),released_by = v_actor
+      where n.campaign_id = v_campaign and n.number_kind = 'extraordinary' and n.released_at is null
+        and exists (select 1 from public.draw_roster_entries e join public.draw_rosters r on r.id = e.draw_roster_id
+          where e.bond_number_id = n.id and r.draw_id = p_draw_id)
+        and not exists (select 1 from public.draw_roster_entries e
+          join public.draw_rosters r on r.id = e.draw_roster_id join public.draws d on d.id = r.draw_id
+          where e.bond_number_id = n.id and d.status <> 'annulled')
+      returning n.id
+    ) select coalesce(array_agg(id order by id),'{}'::uuid[]) into v_released from released;
+  end if;
   insert into public.audit_log(actor_user_id,action,entity_type,entity_id,old_value,new_value,reason,request_id)
-    values(v_actor,'draw.annul','draw',p_draw_id,to_jsonb(v_old),to_jsonb(v_new),btrim(p_reason),p_request_id);
+    values(v_actor,'draw.annul','draw',p_draw_id,to_jsonb(v_old),
+      to_jsonb(v_new) || jsonb_build_object('released_number_ids',v_released),btrim(p_reason),p_request_id);
 end $$;
 revoke all on function public.draw_annul(uuid,text,text) from public, anon, service_role;
 grant execute on function public.draw_annul(uuid,text,text) to authenticated;
