@@ -27,10 +27,13 @@ const source = {
 	deliveryNotes: 'Received & signed'
 } as unknown as PrizeCertificateSource;
 
+/** ICU emits a regular, no-break or narrow no-break space (U+202F) before `p. m.` depending on version. */
+const plainSpaces = (value: string) => value.replace(/\s/gu, ' ');
+
 describe('prize delivery certificate', () => {
 	it('builds every field, pads numbers and converts UTC instants to Buenos Aires', () => {
 		const doc = buildPrintablePrizeDeliveryCertificate(campaign, source, 'Firefighters');
-		expect(doc).toEqual({
+		expect({ ...doc, deliveryDate: plainSpaces(doc.deliveryDate) }).toEqual({
 			institutionName: 'Firefighters',
 			draw: 'December & summer (Monthly)',
 			drawDate: '31/12/26',
