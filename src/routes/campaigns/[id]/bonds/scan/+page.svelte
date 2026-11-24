@@ -122,7 +122,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/import', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 hover:underline">Importar un archivo →</a
+			class="text-primary-text underline-offset-2 underline">Importar un archivo →</a
 		>
 	</p>
 

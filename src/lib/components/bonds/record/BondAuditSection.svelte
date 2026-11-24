@@ -37,7 +37,7 @@
 											id: campaignId,
 											bondId: entry.viaPata.pataId
 										})}
-										class="font-mono text-primary-text underline-offset-2 hover:underline"
+										class="font-mono text-primary-text underline-offset-2 underline"
 										>{entry.viaPata.label}</a
 									>
 								</span>

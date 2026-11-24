@@ -41,6 +41,12 @@
 		sans-serif;
 	cursor: pointer;
 }
+@media (pointer: coarse) {
+	.doc-toolbar button {
+		min-height: var(--touch-target);
+	}
+}
+
 .doc-toolbar button:hover {
 	background: var(--primary-hover);
 }

@@ -31,7 +31,7 @@
 	<p class="m-0 mt-1 text-caption">
 		<a
 			href={resolve('/campaigns/[id]/bonds/[bondId]', { id: campaignId, bondId: conflict.bondId })}
-			class="font-medium text-primary-text underline-offset-2 hover:underline"
+			class="font-medium text-primary-text underline-offset-2 underline"
 		>
 			{label(conflict.numbers)}
 		</a>

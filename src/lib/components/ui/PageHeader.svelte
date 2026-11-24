@@ -38,7 +38,7 @@
 							{#if crumb.href && !last}
 								<a
 									href={crumb.href}
-									class="rounded-sm text-primary-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+									class="rounded-sm text-primary-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:inline-flex pointer-coarse:min-h-touch pointer-coarse:items-center"
 									>{crumb.label}</a
 								>
 							{:else}

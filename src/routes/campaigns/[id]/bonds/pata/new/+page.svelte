@@ -185,7 +185,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 hover:underline">Cargar bonos simples →</a
+			class="text-primary-text underline-offset-2 underline">Cargar bonos simples →</a
 		>
 	</p>
 
@@ -197,14 +197,16 @@
 			<a
 				href={pageWith('mode=printed')}
 				aria-current={data.mode === 'printed' ? 'page' : undefined}
-				class="-mb-px border-b-2 px-3 py-2 {data.mode === 'printed'
+				class="-mb-px inline-flex items-center border-b-2 px-3 py-2 pointer-coarse:min-h-touch {data.mode ===
+				'printed'
 					? 'border-primary text-primary-text'
 					: 'border-transparent text-muted hover:text-text'}">Pata impresa</a
 			>
 			<a
 				href={pageWith(groupingQuery({}))}
 				aria-current={data.mode === 'grouping' ? 'page' : undefined}
-				class="-mb-px border-b-2 px-3 py-2 {data.mode === 'grouping'
+				class="-mb-px inline-flex items-center border-b-2 px-3 py-2 pointer-coarse:min-h-touch {data.mode ===
+				'grouping'
 					? 'border-primary text-primary-text'
 					: 'border-transparent text-muted hover:text-text'}">Agrupar bonos simples</a
 			>

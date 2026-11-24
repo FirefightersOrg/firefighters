@@ -104,7 +104,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 hover:underline">Cargar una pata →</a
+			class="text-primary-text underline-offset-2 underline">Cargar una pata →</a
 		>
 	</p>
 
