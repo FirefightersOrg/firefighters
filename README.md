@@ -1577,3 +1577,5 @@ Recommended order:
 8. Prioritize MVP.
 9. Design AWS infrastructure.
 10. Implement backend, frontend, and database.
+
+**End-to-end tests (Playwright, SAN-91):** the two critical flows (campaign → bond → delivery → sale → payment → closed settlement, and generate/freeze roster → load and validate the winning number) run in Chromium against the local Supabase and a dev server Playwright starts itself. After `pnpm db:reset` and `APP_ENV=local pnpm seed:admin`, run `APP_ENV=local pnpm test:e2e` with `PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` exported (from `supabase status -o env`). The first time, install the browser with `pnpm exec playwright install chromium`. Every run creates its own campaign, so runs don't depend on each other.
