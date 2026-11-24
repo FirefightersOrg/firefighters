@@ -33,3 +33,7 @@ supabase/.temp
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# Playwright (SAN-91)
+/test-results/
+/playwright-report/
