@@ -103,6 +103,8 @@ describe('frozen roster export mapping', () => {
 		id: 'e1',
 		draw_roster_id: 'r1',
 		bond_id: 'b1',
+		bond_number_id: 'n2',
+		bond_numbers: { number_kind: 'associated', source_base_number_id: 'n1' },
 		number_value: 42,
 		eligible: false,
 		ineligibility_reason: '=not_sold',
@@ -134,6 +136,9 @@ describe('frozen roster export mapping', () => {
 		expect(get('draw_date')).toBe('2027-03-05');
 		expect(get('frozen_at')).toBe('2027-02-28 22:30:00');
 		expect(get('number')).toBe('42');
+		expect(get('bond_number_id')).toBe('n2');
+		expect(get('number_kind')).toBe('associated');
+		expect(get('source_base_number_id')).toBe('n1');
 		expect(get('ineligibility_reason')).toBe("'=not_sold");
 		expect(get('buyer')).toBe("'-Perez, Ana");
 		expect(get('buyer_document')).toBe('30111222');
