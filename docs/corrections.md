@@ -198,6 +198,9 @@ the older removal RPC and duplicating its audit.
   replacement chains are allowed, but correcting an already adjusted/annulled original is
   rejected. Original applications remain immutable. Both annulled and adjusted payments are
   excluded from reservation/coverage checks; only confirmed payments count for paid status.
+  Their payment certificates remain printable as history: annulled certificates are marked
+  invalid with actor/date/reason, while adjusted originals and confirmed replacements cross-reference
+  each other and show the correction actor/date/reason.
 - **Settlements:** a replacement retains the original settlement link, amount and payment
   date. SAN-110 supersedes the frozen method totals for method corrections only; annulment and
   reassociation retain the closing totals.
