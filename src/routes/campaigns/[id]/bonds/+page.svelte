@@ -1,7 +1,7 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
-	import BondStatusBadge from '$lib/components/bonds/BondStatusBadge.svelte';
 	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import {
 		cardClass,
@@ -276,7 +276,9 @@
 										</div>{/if}
 									{#if !bond.barcode && !bond.internalCode}—{/if}
 								</td>
-								<td class="px-4 py-3"><BondStatusBadge status={bond.commercialStatus} /></td>
+								<td class="px-4 py-3"
+									><StatusBadge kind="bondCommercial" status={bond.commercialStatus} /></td
+								>
 								<td class="px-4 py-3 text-slate-600">
 									{BOND_FINANCIAL_STATUS_LABELS[bond.financialStatus]}
 								</td>

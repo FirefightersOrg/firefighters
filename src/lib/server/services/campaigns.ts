@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
+import { statusWord } from '$lib/domain/status-word';
 import type {
 	CampaignCreateInput,
 	CampaignFormField,
@@ -151,7 +151,7 @@ const COLUMN_FIELDS: Record<string, CampaignFormField> = {
 };
 
 function statusLabel(status: string): string {
-	return CAMPAIGN_STATUS_LABELS[status as CampaignStatus]?.toLowerCase() ?? status;
+	return statusWord(status);
 }
 
 /** Maps a PostgREST/Postgres error from a `campaign_*` function to a `CampaignServiceError`. */

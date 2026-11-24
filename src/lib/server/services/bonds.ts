@@ -1,10 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-	BOND_COMMERCIAL_STATUS_LABELS,
-	BOND_COMMERCIAL_STATUSES,
-	type BondNumberKind
-} from '$lib/domain/bonds';
-import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
+import { statusWord } from '$lib/domain/status-word';
+import { BOND_COMMERCIAL_STATUSES, type BondNumberKind } from '$lib/domain/bonds';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import type {
@@ -108,11 +104,7 @@ const STATUS_WORD = new RegExp(`\\b(${BOND_COMMERCIAL_STATUSES.join('|')})\\b`, 
 
 /** Database message → sentence for people: status codes as labels, capitalized, final period. */
 function humanize(message: string): string {
-	const text = message.replace(STATUS_WORD, (status) =>
-		BOND_COMMERCIAL_STATUS_LABELS[
-			status as keyof typeof BOND_COMMERCIAL_STATUS_LABELS
-		].toLowerCase()
-	);
+	const text = message.replace(STATUS_WORD, (status) => statusWord(status));
 	const sentence = text.charAt(0).toUpperCase() + text.slice(1);
 	return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
@@ -230,8 +222,7 @@ export function mapBondRpcError(
 		case '55000': {
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
-				const label =
-					CAMPAIGN_STATUS_LABELS[window[1] as CampaignStatus]?.toLowerCase() ?? window[1];
+				const label = statusWord(window[1]);
 				return err('conflict', `${BOND_MESSAGES.campaignLocked} This campaign is ${label}.`);
 			}
 			if (message.startsWith('a manually grouped pata cannot be annulled directly')) {
