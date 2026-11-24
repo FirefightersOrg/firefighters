@@ -85,8 +85,10 @@ describe('GET /campaigns/[id]/reports/export/[report]', () => {
 			/^attachment; filename="report-collector-accounts-f0000000-\d{4}-\d{2}-\d{2}\.csv"$/
 		);
 		expect(response.headers.get('cache-control')).toBe('no-store');
-		const text = await response.text();
-		expect(text.startsWith('﻿Collector,Entries,')).toBe(true);
+		const bytes = new Uint8Array(await response.arrayBuffer());
+		expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+		const text = new TextDecoder().decode(bytes);
+		expect(text).toContain('Collector,Entries,');
 		expect(text).toContain("'=cmd|calc,2,20.00,25.00,-5.00,2027-03-20");
 		expect(rpc.mock.calls[0]![1]).toMatchObject({ p_campaign_id: CAMPAIGN_ID });
 	});
@@ -95,7 +97,7 @@ describe('GET /campaigns/[id]/reports/export/[report]', () => {
 		const { locals } = setup(OPERATIONAL);
 		const response = await GET(event(locals, 'bonds-by-status'));
 		expect(response.status).toBe(200);
-		expect(await response.text()).toContain('Sold,Overdue,2,200.00');
+		expect(await response.text()).toContain('Vendido,En mora,2,200.00');
 	});
 
 	it('exports Excel with amounts as numbers and neutralized text', async () => {
