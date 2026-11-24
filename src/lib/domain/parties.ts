@@ -15,8 +15,8 @@ export const BUYER_TYPES = ['individual', 'business'] as const;
 export type BuyerType = (typeof BUYER_TYPES)[number];
 
 export const BUYER_TYPE_LABELS: Record<BuyerType, string> = {
-	individual: 'Individual',
-	business: 'Business'
+	individual: 'Persona',
+	business: 'Empresa'
 };
 
 /** Field limits, the same as the database CHECK constraints. */

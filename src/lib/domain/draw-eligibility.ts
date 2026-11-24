@@ -29,16 +29,8 @@ export type DrawIneligibilityReason =
 	| 'missing_required_installment';
 
 /** English labels match the language used by the existing application UI. */
+/** Spanish labels shown in screens, certificates and exports (docs/copy.md). */
 export const DRAW_INELIGIBILITY_REASON_LABELS: Record<DrawIneligibilityReason, string> = {
-	not_sold: 'Bond not sold',
-	annulled: 'Bond annulled',
-	installments_not_covered: 'Required installments not covered',
-	not_fully_paid: 'Bond not fully paid',
-	already_won: 'Bond already won an excluding draw',
-	missing_required_installment: 'Draw has no required installment configured'
-};
-
-export const DRAW_INELIGIBILITY_REASON_LABELS_ES: Record<DrawIneligibilityReason, string> = {
 	not_sold: 'Bono no vendido',
 	annulled: 'Bono anulado',
 	installments_not_covered: 'Cuotas requeridas no cubiertas',
@@ -46,6 +38,9 @@ export const DRAW_INELIGIBILITY_REASON_LABELS_ES: Record<DrawIneligibilityReason
 	already_won: 'El bono ya ganó un sorteo excluyente',
 	missing_required_installment: 'El sorteo no tiene cuota requerida configurada'
 };
+
+/** @deprecated Same as DRAW_INELIGIBILITY_REASON_LABELS (kept for existing imports). */
+export const DRAW_INELIGIBILITY_REASON_LABELS_ES = DRAW_INELIGIBILITY_REASON_LABELS;
 
 export interface DrawEligibilityDrawSnapshot {
 	type: DrawType;

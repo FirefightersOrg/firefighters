@@ -31,17 +31,17 @@ const data = (detail: typeof entry | null = null) => ({
 describe('campaign audit render', () => {
 	it('renders filters, rows and pagination beyond 1000 entries', () => {
 		const body = render(Page, { props: { data: data(), params: { id: campaignId } } as any }).body;
-		expect(body).toContain('1051 entries');
+		expect(body).toContain('1.051 registros');
 		expect(body).toContain('Treasurer');
 		expect(body).toContain('payment.annul');
 		expect(body).toContain('name="entityType"');
-		expect(body).toContain('Next');
+		expect(body).toContain('Siguiente');
 	});
 	it('renders before/after diff, reason and compensating movement link', () => {
 		const body = render(Page, {
 			props: { data: data(entry), params: { id: campaignId } } as any
 		}).body;
-		expect(body).toContain('Change detail');
+		expect(body).toContain('Detalle del cambio');
 		expect(body).toContain('Duplicate receipt');
 		expect(body).toContain('confirmed');
 		expect(body).toContain('annulled');

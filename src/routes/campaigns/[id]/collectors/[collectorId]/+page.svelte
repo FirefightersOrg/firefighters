@@ -1,29 +1,34 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import CollectorForm from '$lib/components/collectors/CollectorForm.svelte';
 	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
-	import { BOND_COMMERCIAL_STATUS_LABELS } from '$lib/domain/bonds';
+		Alert,
+		Button,
+		Checkbox,
+		EmptyState,
+		Field,
+		PageHeader,
+		Section,
+		Select,
+		Stat,
+		StatusBadge,
+		Table
+	} from '$lib/components/ui';
+	import type { TableColumn } from '$lib/components/ui';
 	import { deliveryNoteLabel } from '$lib/domain/deliveries';
-	import { campaignNumberingConfig, formatCampaignDate } from '$lib/domain/campaigns';
+	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
-	import { COLLECTOR_STATUSES, COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
-	import { formatMoney } from '$lib/domain/money';
+	import { COLLECTOR_STATUS_LABELS } from '$lib/domain/parties';
 	import {
-		formatCommissionRuleType,
-		formatCommissionValue,
-		formatValidity
+		describeCommissionRuleType,
+		describeCommissionValue,
+		describeValidity
 	} from '$lib/domain/commissions';
+	import { formatDate, formatDateTime, formatMoney, formatNumber } from '$lib/format';
 	import type { PageProps } from './$types';
+
 	let { data, form }: PageProps = $props();
-	let submitting = $state(false);
 	const numbering = $derived(campaignNumberingConfig(data.campaign));
 	/** "0068 / 4939" for a simple bond, "Pata 0100, 0101" for a pata. */
 	function bondLabel(bond: { kind: string; baseNumbers: number[]; associatedNumbers: number[] }) {
@@ -34,385 +39,400 @@
 			: `Pata ${fmt(bond.baseNumbers)}`;
 	}
 	const sections = [
-		'General data',
-		'Assigned bonds',
-		'Associated buyers',
-		'Pending installments',
-		'Settlements',
-		'Current account',
-		'Monthly report',
-		'Audit'
+		'Datos generales',
+		'Bonos asignados',
+		'Compradores asociados',
+		'Cuotas pendientes',
+		'Rendiciones',
+		'Cuenta corriente',
+		'Informe mensual',
+		'Auditoría'
 	];
 	const canBulk = $derived(data.custody.can.returnBonds || data.custody.can.reassignBonds);
 	/** A bulk return / reassignment result (its errors belong to section 2, not the edit form). */
 	const custodyForm = $derived(
 		form && 'form' in form && form.form === 'custody'
-			? (form as { errors?: Record<string, string[]> })
+			? (form as { message?: string; errors?: Record<string, string[]> })
 			: null
 	);
 	const collectorForm = $derived(
-		(custodyForm ? { message: form?.message, success: form?.success } : (form ?? {})) as {
-			success?: boolean;
-			message?: string;
-			values?: Record<string, string>;
-			errors?: Record<string, string[]>;
-		}
+		custodyForm
+			? null
+			: ((form ?? null) as {
+					success?: boolean;
+					message?: string;
+					values?: Record<string, string>;
+					errors?: Record<string, string[]>;
+				} | null)
 	);
+	const dash = (value: string | null) => value ?? '—';
+
+	type BondRow = (typeof data.bonds)[number] & Record<string, unknown>;
+	const bondColumns = $derived<TableColumn<BondRow>[]>([
+		...(canBulk ? [{ key: 'select', header: 'Seleccionar', width: '6rem' }] : []),
+		{ key: 'bond', header: 'Bono', mono: true },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'note', header: 'Remito de entrega' }
+	]);
+
+	const installmentRows = $derived(
+		(data.installments ?? []).map((installment) => ({
+			id: installment.id,
+			saleId: installment.saleId,
+			bonds: installment.bondNumbers.join(', '),
+			buyer: installment.buyerName,
+			dueDate: formatDate(installment.dueDate),
+			amount: formatMoney(installment.amount, { decimals: 'always' }),
+			status: installment.status
+		}))
+	);
+	type InstallmentRow = (typeof installmentRows)[number];
+	const installmentColumns: TableColumn<InstallmentRow>[] = [
+		{ key: 'bonds', header: 'Bono', mono: true },
+		{ key: 'buyer', header: 'Comprador' },
+		{ key: 'dueDate', header: 'Vencimiento' },
+		{ key: 'amount', header: 'Monto', align: 'right' },
+		{ key: 'status', header: 'Estado' }
+	];
+
+	const settlementRows = $derived(
+		(data.settlements ?? []).map((settlement) => ({
+			id: settlement.id,
+			number: `#${settlement.settlementNumber}`,
+			status: settlement.status,
+			total: formatMoney(settlement.totals.totalAmount, { decimals: 'always' }),
+			dates: `${formatDate(settlement.openedAt)}${
+				settlement.closedAt ? ` – ${formatDate(settlement.closedAt)}` : ''
+			}`
+		}))
+	);
+	type SettlementRow = (typeof settlementRows)[number];
+	const settlementColumns: TableColumn<SettlementRow>[] = [
+		{ key: 'number', header: 'Número' },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'total', header: 'Total', align: 'right' },
+		{ key: 'dates', header: 'Fechas' }
+	];
+
+	const ruleRows = $derived(
+		data.specialRules.map((rule) => ({
+			id: rule.id,
+			type: describeCommissionRuleType(rule),
+			commission: describeCommissionValue(rule),
+			validity: describeValidity(rule),
+			status: rule.status
+		}))
+	);
+	type RuleRow = (typeof ruleRows)[number];
+	const ruleColumns: TableColumn<RuleRow>[] = [
+		{ key: 'type', header: 'Tipo' },
+		{ key: 'commission', header: 'Comisión', align: 'right' },
+		{ key: 'validity', header: 'Vigencia' },
+		{ key: 'status', header: 'Estado' }
+	];
+	const listHref = $derived(resolve('/campaigns/[id]/collectors', { id: data.campaign.id }));
 </script>
 
 <svelte:head
 	><title>{data.collector.displayName} - {data.campaign.name} - Firefighters</title></svelte:head
 >
-<div class="space-y-6">
-	<div>
-		<nav class="text-sm">
-			<a
-				href={resolve('/campaigns/[id]', { id: data.campaign.id })}
-				class="text-blue-700 hover:underline">← {data.campaign.name}</a
-			>
-			/
-			<a
-				href={resolve('/campaigns/[id]/collectors', { id: data.campaign.id })}
-				class="text-blue-700 hover:underline">Collectors</a
-			>
-		</nav>
-		<h1 class="mt-2 text-2xl font-bold">{data.collector.displayName}</h1>
-		{#if data.can.viewReports}
-			<a
-				href="{resolve('/campaigns/[id]/reports', { id: data.campaign.id })}?collector={data
-					.collector.id}#monthly-title"
-				class="mt-1 inline-block text-sm text-blue-700 hover:underline"
-				>Monthly operational summary →</a
-			>
-		{/if}
-		<nav class="mt-3 text-xs">
-			{#each sections as section, i (section)}<a
+
+<PageHeader
+	title={data.collector.displayName}
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
+		{ label: 'Cobradores', href: listHref },
+		{ label: data.collector.displayName }
+	]}
+>
+	{#snippet actions()}
+		<StatusBadge kind="collector" status={data.collector.status} />
+	{/snippet}
+</PageHeader>
+
+{#if data.can.viewReports}
+	<p class="mb-4 text-body-sm">
+		<a
+			href="{resolve('/campaigns/[id]/reports', { id: data.campaign.id })}?collector={data.collector
+				.id}#monthly-title"
+			class="text-primary-text underline-offset-2 hover:underline">Resumen operativo mensual →</a
+		>
+	</p>
+{/if}
+
+<nav aria-label="Secciones del registro" class="mb-6">
+	<ol class="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-body-sm">
+		{#each sections as section, i (section)}
+			<li>
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- in-page anchor -->
+				<a
 					href="#section-{i + 1}"
-					class="mr-3 text-blue-700 hover:underline">{i + 1}. {section}</a
-				>{/each}
-		</nav>
-	</div>
-	{#if collectorForm.message}<FormAlert
-			kind={collectorForm.success ? 'success' : 'error'}
-			message={collectorForm.message}
-		/>{/if}
-	<section id="section-1" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">1. General data</h2>
-		{#if data.can.manage}<form
-				method="POST"
-				action="?/update"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update }) => {
-						await update();
-						submitting = false;
-					};
-				}}
-				class="space-y-4"
-			>
-				<input type="hidden" name="updatedAt" value={data.collector.updatedAt} />
-				<div>
-					<label class={labelClass} for="displayName">Display name</label><input
-						class={inputClass}
-						id="displayName"
-						name="displayName"
-						value={collectorForm.values?.displayName ?? data.collector.displayName}
-					/><FieldError id="displayName-error" errors={collectorForm.errors?.displayName} />
-				</div>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div>
-						<label class={labelClass} for="phone">Phone</label><input
-							class={inputClass}
-							id="phone"
-							name="phone"
-							value={collectorForm.values?.phone ?? data.collector.phone ?? ''}
-						/><FieldError id="phone-error" errors={collectorForm.errors?.phone} />
-					</div>
-					<div>
-						<label class={labelClass} for="email">Email</label><input
-							class={inputClass}
-							id="email"
-							name="email"
-							value={collectorForm.values?.email ?? data.collector.email ?? ''}
-						/><FieldError id="email-error" errors={collectorForm.errors?.email} />
-					</div>
-				</div>
-				<div>
-					<label class={labelClass} for="address">Address</label><input
-						class={inputClass}
-						id="address"
-						name="address"
-						value={collectorForm.values?.address ?? data.collector.address ?? ''}
-					/>
-				</div>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div>
-						<label class={labelClass} for="status">Status</label><select
-							class={inputClass}
-							id="status"
-							name="status"
-							>{#each COLLECTOR_STATUSES as status (status)}<option
-									value={status}
-									selected={(collectorForm.values?.status ?? data.collector.status) === status}
-									>{COLLECTOR_STATUS_LABELS[status]}</option
-								>{/each}</select
-						>
-					</div>
-					<div>
-						<label class={labelClass} for="userProfileId">Linked user</label><select
-							class={inputClass}
-							id="userProfileId"
-							name="userProfileId"
-							><option value="">None</option>{#each data.profiles as profile (profile.id)}<option
-									value={profile.id}
-									selected={(collectorForm.values?.userProfileId ??
-										data.collector.userProfileId) === profile.id}
-									>{profile.fullName}{profile.email ? ` — ${profile.email}` : ''}</option
-								>{/each}</select
-						>
-					</div>
-				</div>
-				<button disabled={submitting} class={primaryButtonClass}
-					>{submitting ? 'Saving…' : 'Save changes'}</button
+					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+					>{i + 1}. {section}</a
 				>
-			</form>{:else}<dl class="grid gap-3 text-sm sm:grid-cols-2">
+			</li>
+		{/each}
+	</ol>
+</nav>
+
+<div class="flex flex-col gap-6">
+	<Section id="section-1" number={1} title={sections[0]}>
+		{#if data.can.manage}
+			<CollectorForm
+				collector={data.collector}
+				profiles={data.profiles}
+				form={collectorForm}
+				action="?/update"
+				submitLabel="Guardar cambios"
+			/>
+		{:else}
+			<dl class="m-0 grid gap-4 sm:grid-cols-2">
 				<div>
-					<dt class="text-slate-500">Phone</dt>
-					<dd>{data.collector.phone ?? '—'}</dd>
+					<dt class="text-label text-muted">Teléfono</dt>
+					<dd class="m-0">{dash(data.collector.phone)}</dd>
 				</div>
 				<div>
-					<dt class="text-slate-500">Email</dt>
-					<dd>{data.collector.email ?? '—'}</dd>
+					<dt class="text-label text-muted">Correo electrónico</dt>
+					<dd class="m-0">{dash(data.collector.email)}</dd>
 				</div>
 				<div>
-					<dt class="text-slate-500">Address</dt>
-					<dd>{data.collector.address ?? '—'}</dd>
+					<dt class="text-label text-muted">Domicilio</dt>
+					<dd class="m-0">{dash(data.collector.address)}</dd>
 				</div>
 				<div>
-					<dt class="text-slate-500">Status</dt>
-					<dd>{COLLECTOR_STATUS_LABELS[data.collector.status]}</dd>
+					<dt class="text-label text-muted">Estado</dt>
+					<dd class="m-0">{COLLECTOR_STATUS_LABELS[data.collector.status]}</dd>
 				</div>
-			</dl>{/if}
-	</section>
-	<section id="section-2" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">2. Assigned bonds</h2>
-		{#if data.bonds.length === 0}<p class="text-sm text-slate-500">
-				No bonds are assigned in this campaign.
-			</p>{:else}
-			<p class="mb-2 text-sm text-slate-500">
-				{data.bondsTotal} bond{data.bondsTotal === 1 ? '' : 's'}{data.bondsTotal > data.bonds.length
-					? ` (showing the first ${data.bonds.length})`
+			</dl>
+		{/if}
+	</Section>
+
+	<Section id="section-2" number={2} title={sections[1]}>
+		{#if custodyForm?.message}
+			<div class="mb-4"><Alert tone="danger">{custodyForm.message}</Alert></div>
+		{/if}
+		{#if data.bonds.length === 0}
+			<EmptyState title="No hay bonos asignados en esta campaña" />
+		{:else}
+			<p class="m-0 mb-3 text-body-sm text-muted">
+				{formatNumber(data.bondsTotal)}
+				{data.bondsTotal === 1 ? 'bono' : 'bonos'}{data.bondsTotal > data.bonds.length
+					? ` (se muestran los primeros ${formatNumber(data.bonds.length)})`
 					: ''}
 			</p>
-			<form method="POST" use:enhance>
-				<table class="min-w-full text-sm">
-					<thead class="text-left text-xs text-slate-500 uppercase">
-						<tr>
-							{#if canBulk}<th class="w-8 py-2"><span class="sr-only">Select</span></th>{/if}
-							<th class="py-2 pr-3 font-medium">Bond</th>
-							<th class="py-2 pr-3 font-medium">Status</th>
-							<th class="py-2 font-medium">Delivery note</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100">
-						{#each data.bonds as bond (bond.id)}
-							<tr>
-								{#if canBulk}<td class="py-1">
-										{#if bond.commercialStatus === 'delivered_to_collector'}<input
-												type="checkbox"
-												name="bondIds"
-												value={bond.id}
-												aria-label="Select {bondLabel(bond)}"
-											/>{/if}
-									</td>{/if}
-								<td class="py-1 pr-3">
-									<a
-										class="font-mono text-blue-700 hover:underline"
-										href={resolve('/campaigns/[id]/bonds/[bondId]', {
-											id: data.campaign.id,
-											bondId: bond.id
-										})}>{bondLabel(bond)}</a
-									>
-								</td>
-								<td class="py-1 pr-3">{BOND_COMMERCIAL_STATUS_LABELS[bond.commercialStatus]}</td>
-								<td class="py-1">
-									{#if bond.note}<a
-											class="text-blue-700 hover:underline"
-											href={resolve('/campaigns/[id]/deliveries/[noteId]', {
-												id: data.campaign.id,
-												noteId: bond.note.noteId
-											})}>{deliveryNoteLabel(bond.note.noteNumber)}</a
-										>{:else}—{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-				<FieldError id="bondIds-error" errors={custodyForm?.errors?.bondIds} />
-				{#if canBulk}
-					<div class="mt-4 flex flex-wrap items-end gap-3">
-						{#if data.custody.can.returnBonds}
-							<button type="submit" formaction="?/returnBonds" class={secondaryButtonClass}
-								>Return selected</button
+			<form method="POST" use:enhance class="flex flex-col gap-4">
+				<Table columns={bondColumns} rows={data.bonds as BondRow[]} caption="Bonos asignados">
+					{#snippet cell({ row, column })}
+						{#if column.key === 'select'}
+							{#if row.commercialStatus === 'delivered_to_collector'}
+								<Checkbox name="bondIds" value={row.id} aria-label="Seleccionar {bondLabel(row)}" />
+							{/if}
+						{:else if column.key === 'bond'}
+							<a
+								class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+								href={resolve('/campaigns/[id]/bonds/[bondId]', {
+									id: data.campaign.id,
+									bondId: row.id
+								})}>{bondLabel(row)}</a
 							>
+						{:else if column.key === 'status'}
+							<StatusBadge kind="bondCommercial" status={row.commercialStatus} />
+						{:else if row.note}
+							<a
+								class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+								href={resolve('/campaigns/[id]/deliveries/[noteId]', {
+									id: data.campaign.id,
+									noteId: row.note.noteId
+								})}>{deliveryNoteLabel(row.note.noteNumber)}</a
+							>
+						{:else}—{/if}
+					{/snippet}
+				</Table>
+				{#if custodyForm?.errors?.bondIds?.[0]}
+					<p class="m-0 text-body-sm text-danger-text" id="bondIds-error">
+						{custodyForm.errors.bondIds[0]}
+					</p>
+				{/if}
+				{#if canBulk}
+					<div class="flex flex-wrap items-end gap-3">
+						{#if data.custody.can.returnBonds}
+							<Button type="submit" formaction="?/returnBonds">Devolver seleccionados</Button>
 						{/if}
 						{#if data.custody.can.reassignBonds}
-							<div>
-								<label for="targetCollectorId" class={labelClass}>Reassign selected to</label>
-								<select id="targetCollectorId" name="targetCollectorId" class={inputClass}>
-									<option value="">Choose…</option>
-									{#each data.custody.collectors as c (c.id)}<option value={c.id}
-											>{c.displayName}</option
-										>{/each}
-								</select>
-								<FieldError
-									id="targetCollectorId-error"
-									errors={custodyForm?.errors?.targetCollectorId}
-								/>
-							</div>
-							<button type="submit" formaction="?/reassignBonds" class={secondaryButtonClass}
-								>Reassign</button
+							<Field
+								label="Reasignar seleccionados a"
+								id="targetCollectorId"
+								error={custodyForm?.errors?.targetCollectorId?.[0]}
 							>
+								<Select
+									name="targetCollectorId"
+									options={[
+										{ value: '', label: 'Elegir cobrador…' },
+										...data.custody.collectors.map((c) => ({ value: c.id, label: c.displayName }))
+									]}
+								/>
+							</Field>
+							<Button type="submit" formaction="?/reassignBonds">Reasignar</Button>
 						{/if}
 					</div>
 				{/if}
 			</form>
 		{/if}
-	</section>
-	<section id="section-3" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">3. Associated buyers</h2>
-		{#if data.buyers.length === 0}<p class="text-sm text-slate-500">
-				No associated buyers.
-			</p>{:else}<ul>
-				{#each data.buyers as buyer (buyer.id)}<li>
+	</Section>
+
+	<Section id="section-3" number={3} title={sections[2]}>
+		{#if data.buyers.length === 0}
+			<EmptyState title="No hay compradores asociados" />
+		{:else}
+			<ul class="m-0 flex list-none flex-col gap-1 p-0">
+				{#each data.buyers as buyer (buyer.id)}
+					<li>
 						<!-- eslint-disable svelte/no-navigation-without-resolve -->
 						<a
-							class="text-blue-700 hover:underline"
+							class="rounded-sm text-primary-text underline-offset-2 hover:underline"
 							href={`${resolve('/campaigns/[id]', { id: data.campaign.id })}/buyers/${buyer.id}`}
 							>{buyer.businessName ??
 								[buyer.lastName, buyer.firstName].filter(Boolean).join(', ')}</a
 						>
 						<!-- eslint-enable svelte/no-navigation-without-resolve -->
-					</li>{/each}
+					</li>
+				{/each}
 			</ul>
-			{#if data.buyersTotal > data.buyers.length}<p class="mt-2 text-sm text-slate-500">
-					and {data.buyersTotal - data.buyers.length} more
-				</p>{/if}{/if}
-	</section>
-	<section id="section-4" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">4. Pending installments</h2>
-		<p class="mb-2 text-sm text-slate-500">
-			{data.installmentsTotal ?? 0} pending or overdue installment{data.installmentsTotal === 1
-				? ''
-				: 's'}{(data.installmentsTotal ?? 0) > (data.installments ?? []).length
-				? ` (showing the first ${(data.installments ?? []).length})`
+			{#if data.buyersTotal > data.buyers.length}
+				<p class="m-0 mt-2 text-body-sm text-muted">
+					y {formatNumber(data.buyersTotal - data.buyers.length)} más
+				</p>
+			{/if}
+		{/if}
+	</Section>
+
+	<Section id="section-4" number={4} title={sections[3]}>
+		<p class="m-0 mb-3 text-body-sm text-muted">
+			{formatNumber(data.installmentsTotal ?? 0)}
+			{data.installmentsTotal === 1
+				? 'cuota pendiente o vencida'
+				: 'cuotas pendientes o vencidas'}{(data.installmentsTotal ?? 0) >
+			(data.installments ?? []).length
+				? ` (se muestran las primeras ${formatNumber((data.installments ?? []).length)})`
 				: ''}
 		</p>
-		<ul class="text-sm">
-			{#each data.installments ?? [] as installment (installment.id)}<li class="border-t py-2">
+		<Table columns={installmentColumns} rows={installmentRows} caption="Cuotas pendientes">
+			{#snippet cell({ row, column })}
+				{#if column.key === 'bonds'}
 					<a
-						class="text-blue-700 underline"
+						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
 						href={resolve('/campaigns/[id]/sales/[saleId]', {
 							id: data.campaign.id,
-							saleId: installment.saleId
-						})}>Bond {installment.bondNumbers.join(', ')}</a
+							saleId: row.saleId
+						})}>Bono {row.bonds}</a
 					>
-					— {installment.buyerName} — {installment.dueDate} — {formatMoney(installment.amount)} — {installment.status}
-				</li>{:else}<li class="text-slate-500">No pending installments.</li>{/each}
-		</ul>
-	</section>
-	<section id="section-5" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">5. Settlements</h2>
-		{#if (data.settlements ?? []).length}<table class="min-w-full text-sm">
-				<thead class="text-left text-xs uppercase text-slate-500"
-					><tr
-						><th class="py-2 pr-3">Number</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3"
-							>Total</th
-						><th>Dates</th></tr
-					></thead
-				><tbody
-					>{#each data.settlements ?? [] as settlement (settlement.id)}<tr
-							><td class="py-2 pr-3"
-								><a
-									class="text-blue-700 hover:underline"
-									href={resolve('/campaigns/[id]/settlements/[settlementId]', {
-										id: data.campaign.id,
-										settlementId: settlement.id
-									})}>#{settlement.settlementNumber}</a
-								></td
-							><td>{settlement.status}</td><td>{formatMoney(settlement.totals.totalAmount)}</td><td
-								>{formatCampaignDate(settlement.openedAt)}{settlement.closedAt
-									? ` — ${formatCampaignDate(settlement.closedAt)}`
-									: ''}</td
-							></tr
-						>{/each}</tbody
-				>
-			</table>{:else}<p class="text-sm text-slate-500">No settlements recorded.</p>{/if}
-	</section>
-	<section id="section-6" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">6. {sections[5]}</h2>
+				{:else if column.key === 'status'}
+					<StatusBadge kind="installment" status={row.status} />
+				{:else}
+					{row[column.key as keyof InstallmentRow]}
+				{/if}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState title="No hay cuotas pendientes" />
+			{/snippet}
+		</Table>
+	</Section>
+
+	<Section id="section-5" number={5} title={sections[4]}>
+		<Table columns={settlementColumns} rows={settlementRows} caption="Rendiciones del cobrador">
+			{#snippet cell({ row, column })}
+				{#if column.key === 'number'}
+					<a
+						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+						href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+							id: data.campaign.id,
+							settlementId: row.id
+						})}>{row.number}</a
+					>
+				{:else if column.key === 'status'}
+					<StatusBadge kind="settlement" status={row.status} />
+				{:else}
+					{row[column.key as keyof SettlementRow]}
+				{/if}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState title="No hay rendiciones registradas" />
+			{/snippet}
+		</Table>
+	</Section>
+
+	<Section id="section-6" number={6} title={sections[5]}>
 		{#if data.ledger}
-			<p class="text-sm">
-				Balance:
-				<strong class="tabular-nums" data-testid="collector-balance"
-					>{data.ledger.balance === null
-						? '—'
-						: formatMoney(data.ledger.balance.toFixed(2))}</strong
-				>
-				<a
-					class="ml-3 text-blue-700 hover:underline"
+			<div class="flex flex-wrap items-center gap-4">
+				<div data-testid="collector-balance" class="min-w-48">
+					<Stat
+						label="Saldo del cobrador"
+						value={data.ledger.balance === null
+							? '—'
+							: formatMoney(data.ledger.balance, { decimals: 'always' })}
+					/>
+				</div>
+				<Button
 					href={resolve('/campaigns/[id]/collectors/[collectorId]/ledger', {
 						id: data.campaign.id,
 						collectorId: data.collector.id
-					})}>View current account</a
+					})}>Ver cuenta corriente</Button
 				>
-			</p>
+			</div>
 		{:else}
-			<p class="text-sm text-slate-500">You do not have permission to view the current account.</p>
+			<p class="m-0 text-muted">No hay permiso para ver la cuenta corriente.</p>
 		{/if}
 		{#if data.can.viewRules}
-			<h3 class="mt-4 mb-2 text-sm font-semibold">Special commission rules</h3>
-			{#if data.specialRules.length === 0}
-				<p class="text-sm text-slate-500">No special rules for this collector.</p>
-			{:else}
-				<ul class="text-sm" data-testid="special-rules">
-					{#each data.specialRules as rule (rule.id)}
-						<li
-							class={['border-t py-1', rule.status === 'annulled' && 'text-slate-500 line-through']}
-						>
-							{formatCommissionRuleType(rule)} — {formatCommissionValue(rule)} — {formatValidity(
-								rule
-							)}
-						</li>
-					{/each}
-				</ul>
-			{/if}
+			<h3 class="mt-6 mb-3 text-heading-3">Reglas especiales de comisión</h3>
+			<div data-testid="special-rules">
+				<Table columns={ruleColumns} rows={ruleRows} caption="Reglas especiales de comisión">
+					{#snippet cell({ row, column })}
+						{#if column.key === 'status'}
+							<StatusBadge kind="commissionRule" status={row.status} />
+						{:else}
+							{row[column.key as keyof RuleRow]}
+						{/if}
+					{/snippet}
+					{#snippet empty()}
+						<EmptyState title="Este cobrador no tiene reglas especiales" />
+					{/snippet}
+				</Table>
+			</div>
 			{#if data.can.manageRules}
-				<a
-					class="mt-2 inline-block text-sm text-blue-700 hover:underline"
-					href={resolve('/campaigns/[id]/commissions', { id: data.campaign.id })}
-					>Manage special rules</a
-				>
+				<div class="mt-3">
+					<Button href={resolve('/campaigns/[id]/commissions', { id: data.campaign.id })}
+						>Gestionar reglas especiales</Button
+					>
+				</div>
 			{/if}
 		{/if}
-	</section>
-	<section id="section-7" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">7. {sections[6]}</h2>
-		<p class="text-sm text-slate-500">No data yet. Arrives with Phase 13: monthly report.</p>
-	</section>
-	<section id="section-8" class={cardClass}>
-		<h2 class="mb-4 text-base font-semibold">8. Audit</h2>
-		{#if !data.can.audit}<p class="text-sm text-slate-500">
-				You do not have permission to view the audit log.
-			</p>{:else if data.audit?.entries.length === 0}<p class="text-sm text-slate-500">
-				No audit entries for this collector.
-			</p>{:else}<ol class="divide-y divide-slate-100 text-sm">
-				{#each data.audit?.entries ?? [] as entry (entry.id)}<li class="py-3">
+	</Section>
+
+	<Section id="section-7" number={7} title={sections[6]}>
+		<p class="m-0 text-muted">
+			Todavía no hay datos. El informe mensual se incorpora más adelante.
+		</p>
+	</Section>
+
+	<Section id="section-8" number={8} title={sections[7]}>
+		{#if !data.can.audit}
+			<p class="m-0 text-muted">No hay permiso para ver el registro de auditoría.</p>
+		{:else if data.audit?.entries.length === 0}
+			<EmptyState title="No hay movimientos de auditoría para este cobrador" />
+		{:else}
+			<ol class="m-0 flex list-none flex-col divide-y divide-border p-0">
+				{#each data.audit?.entries ?? [] as entry (entry.id)}
+					<li class="py-3">
 						<strong>{entry.action}</strong>
-						<span class="text-slate-500"
-							>· {entry.actorName ?? 'Unknown user'} · {entry.createdAt}</span
+						<span class="text-muted"
+							>· {entry.actorName ?? 'Usuario desconocido'} · {formatDateTime(
+								entry.createdAt
+							)}</span
 						>
-					</li>{/each}
-			</ol>{/if}
-	</section>
+					</li>
+				{/each}
+			</ol>
+		{/if}
+	</Section>
 </div>

@@ -2,14 +2,20 @@
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
+		Button,
+		Card,
+		EmptyState,
+		Field,
+		PageHeader,
+		Select,
+		StatusBadge,
+		Table,
+		TextInput
+	} from '$lib/components/ui';
+	import type { TableColumn } from '$lib/components/ui';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
-	import { formatMoney } from '$lib/domain/money';
+	import type { BondFinancialStatus } from '$lib/domain/bonds';
+	import { formatMoney } from '$lib/format';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
@@ -31,119 +37,127 @@
 		const search = pairs.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
 		return (search ? `${href}?${search}` : href) as ResolvedPathname;
 	}
+	const rows = $derived(
+		data.sales.map((item) => ({
+			id: item.sale.id,
+			bond: bondLabel(item.bondNumberPairs),
+			buyerName: item.buyerName,
+			collectorName: item.collectorName,
+			mode: PAYMENT_MODE_LABELS[item.sale.paymentMode],
+			total: formatMoney(item.sale.totalAmount, { decimals: 'always' }),
+			financialStatus: item.financialStatus as BondFinancialStatus
+		}))
+	);
+	type Row = (typeof rows)[number];
+	const columns: TableColumn<Row>[] = [
+		{ key: 'bond', header: 'Bono', mono: true },
+		{ key: 'buyerName', header: 'Comprador' },
+		{ key: 'collectorName', header: 'Cobrador' },
+		{ key: 'mode', header: 'Modalidad' },
+		{ key: 'total', header: 'Total', align: 'right' },
+		{ key: 'financialStatus', header: 'Estado financiero' }
+	];
+	const collectorOptions = $derived([
+		{ value: '', label: 'Todos' },
+		...data.collectors.map((c) => ({ value: c.id, label: c.displayName }))
+	]);
+	const modeOptions = [
+		{ value: '', label: 'Todas' },
+		...Object.entries(PAYMENT_MODE_LABELS).map(([value, label]) => ({ value, label }))
+	];
+	const financialOptions = [
+		{ value: '', label: 'Todos' },
+		{ value: 'no_payments', label: 'Sin pagos' },
+		{ value: 'overdue', label: 'En mora' },
+		{ value: 'partial_payments', label: 'Pagos parciales' },
+		{ value: 'up_to_date', label: 'Al día' }
+	];
+	const filtered = $derived(Object.values(data.filters).some(Boolean));
 </script>
 
-<svelte:head><title>Sales - {data.campaign.name}</title></svelte:head>
+<svelte:head><title>Ventas - {data.campaign.name}</title></svelte:head>
+
+<PageHeader
+	title="Ventas"
+	description="Ventas registradas de la campaña."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
+		{ label: 'Ventas' }
+	]}
+>
+	{#snippet actions()}
+		{#if data.can.create}
+			<Button
+				variant="primary"
+				icon="plus"
+				href={resolve('/campaigns/[id]/sales/new', { id: data.campaign.id })}
+				>Registrar venta</Button
+			>
+		{/if}
+	{/snippet}
+</PageHeader>
+
 <div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<a
-				class="text-sm text-blue-700 hover:underline"
-				href={resolve('/campaigns/[id]', { id: data.campaign.id })}>← {data.campaign.name}</a
-			>
-			<h1 class="mt-2 text-2xl font-bold">Sales</h1>
-		</div>
-		{#if data.can.create}<a
-				class={primaryButtonClass}
-				href={resolve('/campaigns/[id]/sales/new', { id: data.campaign.id })}>Register sale</a
-			>{/if}
-	</div>
-	<form method="GET" class="{cardClass} grid gap-3 sm:grid-cols-5 sm:items-end">
-		<div>
-			<label class={labelClass} for="collector">Collector</label><select
-				class={inputClass}
-				id="collector"
-				name="collector"
-				><option value="">All</option>{#each data.collectors as collector (collector.id)}<option
-						value={collector.id}
-						selected={data.filters.collector === collector.id}>{collector.displayName}</option
-					>{/each}</select
-			>
-		</div>
-		<div>
-			<label class={labelClass} for="buyer">Buyer</label><input
-				class={inputClass}
-				id="buyer"
-				name="buyer"
-				value={data.filters.buyer}
-			/>
-		</div>
-		<div>
-			<label class={labelClass} for="paymentMode">Mode</label><select
-				class={inputClass}
-				id="paymentMode"
-				name="paymentMode"
-				><option value="">All</option
-				>{#each Object.entries(PAYMENT_MODE_LABELS) as [key, label] (key)}<option
-						value={key}
-						selected={data.filters.paymentMode === key}>{label}</option
-					>{/each}</select
-			>
-		</div>
-		<div>
-			<label class={labelClass} for="financialStatus">Financial status</label><select
-				class={inputClass}
-				id="financialStatus"
-				name="financialStatus"
-				><option value="">All</option><option
-					value="no_payments"
-					selected={data.filters.financialStatus === 'no_payments'}>No payments</option
-				><option value="overdue" selected={data.filters.financialStatus === 'overdue'}
-					>Overdue</option
-				><option
-					value="partial_payments"
-					selected={data.filters.financialStatus === 'partial_payments'}>Partial payments</option
-				><option value="up_to_date" selected={data.filters.financialStatus === 'up_to_date'}
-					>Up to date</option
-				></select
-			>
-		</div>
-		<div class="flex gap-2">
-			<button class={primaryButtonClass}>Filter</button><a class={secondaryButtonClass} {href}
-				>Clear</a
-			>
-		</div>
-	</form>
-	<section class={cardClass}>
-		<table class="min-w-full text-sm">
-			<thead class="text-left text-xs uppercase text-slate-500"
-				><tr
-					><th class="py-2 pr-3">Bond</th><th class="py-2 pr-3">Buyer</th><th class="py-2 pr-3"
-						>Collector</th
-					><th class="py-2 pr-3">Mode</th><th class="py-2 pr-3">Total</th><th class="py-2"
-						>Financial</th
-					></tr
-				></thead
-			><tbody class="divide-y divide-slate-100"
-				>{#each data.sales as item (item.sale.id)}<tr
-						><td class="py-2 pr-3"
-							><a
-								class="text-blue-700 hover:underline"
-								href={resolve('/campaigns/[id]/sales/[saleId]', {
-									id: data.campaign.id,
-									saleId: item.sale.id
-								})}>{bondLabel(item.bondNumberPairs)}</a
-							></td
-						><td>{item.buyerName}</td><td>{item.collectorName}</td><td
-							>{PAYMENT_MODE_LABELS[item.sale.paymentMode]}</td
-						><td>{formatMoney(item.sale.totalAmount)}</td><td
-							>{item.financialStatus.replaceAll('_', ' ')}</td
-						></tr
-					>{:else}<tr><td colspan="6" class="py-3 text-slate-500">No sales match.</td></tr
-					>{/each}</tbody
-			>
-		</table>
-		{#if data.pagination.pageCount > 1}<nav class="mt-4 flex justify-between text-sm">
-				<span>Page {data.pagination.page} of {data.pagination.pageCount}</span><span
-					class="flex gap-2"
-					>{#if data.pagination.page > 1}<a
-							class={secondaryButtonClass}
-							href={pageLink(data.pagination.page - 1)}>← Previous</a
-						>{/if}{#if data.pagination.page < data.pagination.pageCount}<a
-							class={secondaryButtonClass}
-							href={pageLink(data.pagination.page + 1)}>Next →</a
-						>{/if}</span
+	<Card>
+		<form method="GET" class="grid gap-4 sm:grid-cols-5 sm:items-end">
+			<Field label="Cobrador">
+				<Select name="collector" options={collectorOptions} value={data.filters.collector ?? ''} />
+			</Field>
+			<Field label="Comprador">
+				<TextInput name="buyer" value={data.filters.buyer ?? ''} />
+			</Field>
+			<Field label="Modalidad">
+				<Select name="paymentMode" options={modeOptions} value={data.filters.paymentMode ?? ''} />
+			</Field>
+			<Field label="Estado financiero">
+				<Select
+					name="financialStatus"
+					options={financialOptions}
+					value={data.filters.financialStatus ?? ''}
+				/>
+			</Field>
+			<div class="flex gap-2">
+				<Button type="submit" variant="primary">Filtrar</Button>
+				{#if filtered}<Button variant="ghost" {href}>Limpiar</Button>{/if}
+			</div>
+		</form>
+	</Card>
+
+	<Table {columns} {rows} caption="Ventas de la campaña">
+		{#snippet cell({ row, column })}
+			{#if column.key === 'bond'}
+				<a
+					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+					href={resolve('/campaigns/[id]/sales/[saleId]', { id: data.campaign.id, saleId: row.id })}
+					>{row.bond}</a
 				>
-			</nav>{/if}
-	</section>
+			{:else if column.key === 'total'}
+				<span class="tabular-nums">{row.total}</span>
+			{:else if column.key === 'financialStatus'}
+				<StatusBadge kind="bondFinancial" status={row.financialStatus} />
+			{:else}
+				{row[column.key as keyof Row]}
+			{/if}
+		{/snippet}
+		{#snippet empty()}
+			<EmptyState
+				title={filtered ? 'Ninguna venta coincide con el filtro' : 'Todavía no hay ventas'}
+			/>
+		{/snippet}
+	</Table>
+
+	{#if data.pagination.pageCount > 1}
+		<nav aria-label="Páginas de ventas" class="flex items-center justify-between text-body">
+			<span>Página {data.pagination.page} de {data.pagination.pageCount}</span>
+			<span class="flex gap-2">
+				{#if data.pagination.page > 1}
+					<Button href={pageLink(data.pagination.page - 1)}>Anterior</Button>
+				{/if}
+				{#if data.pagination.page < data.pagination.pageCount}
+					<Button href={pageLink(data.pagination.page + 1)}>Siguiente</Button>
+				{/if}
+			</span>
+		</nav>
+	{/if}
 </div>

@@ -211,7 +211,7 @@
 				<div class="mb-4">
 					<RiskyOperationChecklist
 						campaignId={campaign.id}
-						operation="closing the campaign"
+						operation="cerrar la campaña"
 						canExport={data.can.exportBackups}
 					/>
 				</div>
@@ -244,7 +244,7 @@
 		{#if data.can.editRules}
 			<RiskyOperationChecklist
 				campaignId={campaign.id}
-				operation="changing the campaign rules"
+				operation="cambiar las reglas de la campaña"
 				canExport={data.can.exportBackups}
 			/>
 			<CampaignRulesForm {campaign} result={rulesResult} />

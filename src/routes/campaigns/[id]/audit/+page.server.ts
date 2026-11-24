@@ -16,14 +16,14 @@ const optionalUuid = (value: string | null) =>
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'audit.view');
-	if (!z.guid().safeParse(params.id).success) error(404, { message: 'Campaign not found.' });
+	if (!z.guid().safeParse(params.id).success) error(404, { message: 'Campaña no encontrada.' });
 
 	const campaign = await getCampaignById(locals.supabase, params.id);
-	if (campaign.error) error(500, { message: 'Could not load audit log.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (campaign.error) error(500, { message: 'No se pudo cargar la auditoría.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 
 	const filters = {
 		actor: optionalUuid(url.searchParams.get('actor')),
@@ -42,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			? getCampaignAuditEntry(locals.supabase, params.id, detailId)
 			: Promise.resolve({ data: null, error: null })
 	]);
-	if (entries.error || detail.error) error(500, { message: 'Could not load audit log.' });
-	if (detailId && !detail.data) error(404, { message: 'Audit entry not found.' });
+	if (entries.error || detail.error) error(500, { message: 'No se pudo cargar la auditoría.' });
+	if (detailId && !detail.data) error(404, { message: 'Registro de auditoría no encontrado.' });
 	return { campaign: campaign.data, entries: entries.data!, detail: detail.data, filters };
 };

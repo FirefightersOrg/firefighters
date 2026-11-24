@@ -52,8 +52,8 @@ describe('buyer record page', () => {
 	});
 	it('renders empty bond states', () => {
 		const body = page();
-		expect(body).toContain('No bonds purchased in this campaign.');
-		expect(body).toContain('No historical numbers.');
+		expect(body).toContain('No compró bonos en esta campaña.');
+		expect(body).toContain('No hay números históricos.');
 	});
 	it('shows all buyer contact details to read-only users', () => {
 		const body = page();
@@ -112,10 +112,11 @@ describe('buyer record page', () => {
 				form: null
 			} as never
 		}).body;
-		expect(body).toContain('Prizes won (1)');
-		expect(body).toContain('Annulled — does not count as won');
+		expect(body).toContain('Premios ganados (1)');
+		expect(body).toContain('No cuenta como ganado');
+		expect(body).toContain('Anulado');
 		expect(body).toContain('#1 — Bike');
-		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('19/11/2026, 23:30 (hora de Buenos Aires)');
 		expect(body).toContain('/draws/draw/winners');
 	});
 });
@@ -147,7 +148,7 @@ describe('buyer sale sections', () => {
 					audit: null,
 					sales: [{ sale: { id: 's' }, bondId, bondNumbers: ['0068'] }],
 					installments: [
-						{ id: 'i', saleId: 's', dueDate: '2027-01-01', amount: '6000.00', status: 'pending' }
+						{ id: 'i', saleId: 's', dueDate: '01/01/2027', amount: '6000.00', status: 'pending' }
 					]
 				},
 				form: null,
@@ -155,7 +156,8 @@ describe('buyer sale sections', () => {
 			} as never
 		}).body;
 		expect(body).toContain(`/sales/s`);
-		expect(body).toContain('2027-01-01');
-		expect(body).toContain('Total pending');
+		expect(body).toMatch(/\$.6\.000,00/);
+		expect(body).toContain('01/01/2027');
+		expect(body).toContain('Total pendiente');
 	});
 });

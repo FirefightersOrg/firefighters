@@ -16,7 +16,7 @@ const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value);
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (
 		!hasPermissionIn(locals.permissions, 'sale.view') &&
@@ -24,8 +24,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	)
 		requirePermissionIn(locals.permissions, 'bond.view');
 	const campaign = await getCampaignById(locals.supabase, params.id);
-	if (campaign.error) error(500, { message: 'Could not load sales.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (campaign.error) error(500, { message: 'No se pudieron cargar las ventas.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	const collector = url.searchParams.get('collector') ?? '';
 	const buyer = url.searchParams.get('buyer') ?? '';
 	const paymentMode = url.searchParams.get('paymentMode') ?? '';
@@ -45,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		}),
 		listActiveCollectorOptions(locals.supabase)
 	]);
-	if (sales.error || collectors.error) error(500, { message: 'Could not load sales.' });
+	if (sales.error || collectors.error) error(500, { message: 'No se pudieron cargar las ventas.' });
 	return {
 		campaign: campaign.data,
 		sales: sales.data.items,

@@ -20,7 +20,7 @@ import { uuid } from '$lib/server/draws/route-helpers';
 const PAGE_SIZE = 50;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (
 		![
@@ -33,19 +33,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		].some((permission) => hasPermissionIn(locals.permissions, permission as never))
 	)
 		requirePermissionIn(locals.permissions, 'draw.view');
-	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Draw not found.' });
+	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Sorteo no encontrado.' });
 	const [campaign, draw] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getDraw(locals.supabase, params.id, params.drawId)
 	]);
-	if (campaign.error || draw.error) error(500, { message: 'Could not load roster.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!draw.data) error(404, { message: 'Draw not found.' });
+	if (campaign.error || draw.error) error(500, { message: 'No se pudo cargar el padrón.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!draw.data) error(404, { message: 'Sorteo no encontrado.' });
 	const roster = await getCurrentDrawRoster(locals.supabase, draw.data.id);
-	if (roster.error) error(500, { message: 'Could not load roster.' });
-	if (!roster.data) error(404, { message: 'Roster not found.' });
+	if (roster.error) error(500, { message: 'No se pudo cargar el padrón.' });
+	if (!roster.data) error(404, { message: 'Padrón no encontrado.' });
 	const result = await listDrawRosterEntries(locals.supabase, roster.data.id);
-	if (result.error) error(500, { message: 'Could not load roster.' });
+	if (result.error) error(500, { message: 'No se pudo cargar el padrón.' });
 	const query = (url.searchParams.get('q') ?? '').trim().toLowerCase();
 	const eligibility = url.searchParams.get('eligibility') ?? '';
 	const config = campaignNumberingConfig(campaign.data);

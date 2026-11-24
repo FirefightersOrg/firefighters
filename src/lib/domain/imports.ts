@@ -573,14 +573,14 @@ function columnFor(header: string): ImportColumn | null {
 export function rowsFromTable(table: readonly TableRow[], joiner = ','): ImportFileRow[] {
 	const nonBlank = table.filter((row) => row.cells.some((c) => normalizeField(c) !== null));
 	const [header, ...data] = nonBlank;
-	if (!header) throw new ImportFileError('empty_file', 'The file is empty');
+	if (!header) throw new ImportFileError('empty_file', 'El archivo está vacío');
 
 	const index = new Map<ImportColumn, number>();
 	header.cells.forEach((cell, i) => {
 		const column = columnFor(cell);
 		if (!column) return;
 		if (index.has(column)) {
-			throw new ImportFileError('duplicate_column', `The column ${column} appears more than once`);
+			throw new ImportFileError('duplicate_column', `La columna ${column} aparece más de una vez`);
 		}
 		index.set(column, i);
 	});
@@ -588,15 +588,16 @@ export function rowsFromTable(table: readonly TableRow[], joiner = ','): ImportF
 	if (missing.length > 0) {
 		throw new ImportFileError(
 			'missing_columns',
-			`Missing column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')} ` +
-				`(the header row must be ${IMPORT_COLUMNS.join(',')})`
+			`${missing.length > 1 ? 'Faltan las columnas' : 'Falta la columna'}: ${missing.join(', ')} ` +
+				`(la fila de encabezado debe ser ${IMPORT_COLUMNS.join(',')})`
 		);
 	}
-	if (data.length === 0) throw new ImportFileError('empty_file', 'The file has no data rows');
+	if (data.length === 0)
+		throw new ImportFileError('empty_file', 'El archivo no tiene filas de datos');
 	if (data.length > IMPORT_MAX_ROWS) {
 		throw new ImportFileError(
 			'too_many_rows',
-			`The file has ${data.length} rows; at most ${IMPORT_MAX_ROWS} can be imported at once`
+			`El archivo tiene ${data.length} filas; se pueden importar como máximo ${IMPORT_MAX_ROWS} a la vez`
 		);
 	}
 
@@ -606,7 +607,7 @@ export function rowsFromTable(table: readonly TableRow[], joiner = ','): ImportF
 			if (value.length > IMPORT_FIELD_MAX_LENGTH) {
 				throw new ImportFileError(
 					'value_too_long',
-					`Row ${row.rowNumber}: ${column} is longer than ${IMPORT_FIELD_MAX_LENGTH} characters`
+					`Fila ${row.rowNumber}: ${column} tiene más de ${IMPORT_FIELD_MAX_LENGTH} caracteres`
 				);
 			}
 			return normalizeField(value);

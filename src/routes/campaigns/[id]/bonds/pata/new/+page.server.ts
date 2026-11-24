@@ -35,7 +35,6 @@ import {
 } from '$lib/server/repositories/bonds';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { BOND_MESSAGES, createBond, groupBondsIntoPata } from '$lib/server/services/bonds';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	bondCreatePataSchema,
 	bondGroupSchema,
@@ -59,7 +58,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'bond.create');
 	if (!isUuid(params.id)) {
-		error(404, { message: CAMPAIGN_MESSAGES.notFound });
+		error(404, { message: BOND_MESSAGES.campaignNotFound });
 	}
 
 	const result = await getCampaignById(locals.supabase, params.id);
@@ -69,10 +68,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: params.id,
 			error: result.error
 		});
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	}
 	if (!result.data) {
-		error(404, { message: CAMPAIGN_MESSAGES.notFound });
+		error(404, { message: BOND_MESSAGES.campaignNotFound });
 	}
 
 	const campaign = result.data;
@@ -100,7 +99,7 @@ async function loadGrouping(locals: App.Locals, campaign: Campaign, url: URL) {
 			fromBase = parseCampaignNumber(query, config);
 		} catch (err) {
 			if (!(err instanceof NumberingError)) throw err;
-			searchError = `"${query}" is not a valid base number (use up to ${config.numberDigits} digits).`;
+			searchError = `«${query}» no es un número base válido (usar hasta ${config.numberDigits} dígitos).`;
 		}
 	}
 
@@ -120,7 +119,7 @@ async function loadGrouping(locals: App.Locals, campaign: Campaign, url: URL) {
 			campaignId: campaign.id,
 			error: searchResult.error ?? membersResult.error
 		});
-		error(500, { message: 'Could not load the bonds. Please try again.' });
+		error(500, { message: 'No se pudieron cargar los bonos. Volver a intentar.' });
 	}
 
 	const selected = describeGroupingMembers(selectedIds, membersResult.data, campaign.id, config);
@@ -151,7 +150,7 @@ async function campaignForAction(
 	const denied = checkBondActionPermission(locals, url, form, 'bond.create');
 	if (denied) return { failure: denied };
 	if (!isUuid(params.id)) {
-		return { failure: bondFormFailure(form, 404, CAMPAIGN_MESSAGES.notFound) };
+		return { failure: bondFormFailure(form, 404, BOND_MESSAGES.campaignNotFound) };
 	}
 	const result = await getCampaignById(locals.supabase, params.id);
 	if (result.error) {
@@ -163,7 +162,7 @@ async function campaignForAction(
 		return { failure: bondFormFailure(form, 500, BOND_MESSAGES.internal, { values }) };
 	}
 	const campaign = result.data;
-	if (!campaign) return { failure: bondFormFailure(form, 404, CAMPAIGN_MESSAGES.notFound) };
+	if (!campaign) return { failure: bondFormFailure(form, 404, BOND_MESSAGES.campaignNotFound) };
 	if (!canLoadBonds(campaign.status)) {
 		return {
 			failure: bondFormFailure(form, 409, campaignLockedMessage(campaign.status), { values })

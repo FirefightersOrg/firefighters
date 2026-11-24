@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
-	import { cardClass, inputClass, secondaryButtonClass } from '$lib/components/campaigns/styles';
+	import { Button, Card, Field, PageHeader, TextInput } from '$lib/components/ui';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -19,58 +19,57 @@
 	};
 </script>
 
-<svelte:head><title>Backup exports - {campaign.name} - Firefighters</title></svelte:head>
+<svelte:head><title>Exportaciones de respaldo - {campaign.name} - Firefighters</title></svelte:head>
+
+<PageHeader
+	title="Exportaciones de respaldo"
+	description="Archivos CSV generados en el momento con los datos actuales. Descargarlos antes de cualquier operación riesgosa."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
+		{ label: 'Exportaciones de respaldo' }
+	]}
+/>
 
 <div class="space-y-6">
-	<div>
-		<a
-			href={resolve('/campaigns/[id]', { id: campaign.id })}
-			class="text-sm text-blue-700 hover:underline">← {campaign.name}</a
-		>
-		<h1 class="mt-2 text-2xl font-bold tracking-tight">Backup exports</h1>
-		<p class="mt-1 text-sm text-slate-600">
-			CSV files generated on demand from the current data. Run them before any risky operation.
-		</p>
-	</div>
-
 	<RiskyOperationChecklist
 		campaignId={campaign.id}
-		operation="a risky operation (bulk import, rule change, bulk correction, closure)"
+		operation="una operación riesgosa (importación masiva, cambio de reglas, corrección masiva, cierre)"
 		canExport={true}
 	/>
 
-	<section class={cardClass} aria-labelledby="period-title">
-		<h2 id="period-title" class="mb-2 text-base font-semibold">Period (optional)</h2>
-		<p class="mb-3 text-xs text-slate-500">
-			Filters payments (payment date) and collector accounts (entry date), inclusive.
-		</p>
-		<div class="flex flex-wrap gap-3 text-sm">
-			<label>From <input type="date" bind:value={from} class={inputClass} /></label>
-			<label>To <input type="date" bind:value={to} class={inputClass} /></label>
+	<Card
+		title="Período"
+		description="Opcional. Filtra los pagos (por fecha de pago) y las cuentas de cobradores (por fecha del movimiento), con los extremos incluidos."
+	>
+		<div class="grid gap-4 sm:grid-cols-2">
+			<Field label="Desde" optional>
+				<TextInput type="date" bind:value={from} />
+			</Field>
+			<Field label="Hasta" optional>
+				<TextInput type="date" bind:value={to} />
+			</Field>
 		</div>
-	</section>
+	</Card>
 
-	<section class={cardClass} aria-labelledby="exports-title">
-		<h2 id="exports-title" class="mb-3 text-base font-semibold">Exports</h2>
-		<ul class="space-y-2 text-sm">
+	<Card title="Exportaciones">
+		<ul class="divide-y divide-border text-body">
 			{#each data.exports as e (e.kind)}
-				<li class="flex items-center justify-between gap-3">
+				<li class="flex items-center justify-between gap-3 py-2">
 					<span>{e.label}</span>
 					{#if e.allowed}
-						<a href={href(e.kind, e.hasPeriod)} download class={secondaryButtonClass}
-							>Download CSV</a
-						>
+						<Button href={href(e.kind, e.hasPeriod)} download icon="download">Descargar CSV</Button>
 					{:else}
-						<span class="text-xs text-slate-500">Not allowed for your role</span>
+						<span class="text-body-sm text-muted">Sin permiso de exportación</span>
 					{/if}
 				</li>
 			{/each}
 			{#each data.pending as p (p)}
-				<li class="flex items-center justify-between gap-3 text-slate-500">
-					<span>{p === 'winners-prizes' ? 'Winners and prizes' : p}</span>
-					<span class="text-xs">Pending (Phase 12)</span>
+				<li class="flex items-center justify-between gap-3 py-2 text-muted">
+					<span>{p === 'winners-prizes' ? 'Ganadores y premios' : p}</span>
+					<span class="text-body-sm">Pendiente</span>
 				</li>
 			{/each}
 		</ul>
-	</section>
+	</Card>
 </div>

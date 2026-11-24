@@ -153,7 +153,7 @@ describe('/campaigns/[id]/buyers/[buyerId]', () => {
 	it('updates after discarding individual fields, handles stale conflicts and no-ops', async () => {
 		const { locals, rpc } = setup();
 		const result = await actions.update(event(locals));
-		expect(result).toMatchObject({ success: true, message: 'Buyer updated.' });
+		expect(result).toMatchObject({ success: true, message: 'Comprador actualizado.' });
 		expect(rpc).toHaveBeenCalledWith(
 			'buyer_update',
 			expect.objectContaining({
@@ -174,8 +174,8 @@ describe('/campaigns/[id]/buyers/[buyerId]', () => {
 		)) as ActionFailure;
 		expect(invalid.status).toBe(400);
 		expect(invalid.data).toMatchObject({
-			message: 'Please correct the highlighted fields.',
-			errors: { businessName: ['Enter a business name.'] }
+			message: 'Revisar los campos marcados.',
+			errors: { businessName: ['Ingresar la razón social.'] }
 		});
 		const version = (await actions.update(
 			event(setup().locals, fields({ updatedAt: 'not-a-date' }))

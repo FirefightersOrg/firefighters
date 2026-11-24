@@ -42,12 +42,13 @@ export class DeliveryServiceError extends Error {
 }
 
 export const DELIVERY_MESSAGES = {
-	permission: 'You do not have permission to perform this action.',
+	permission: 'No hay permiso para esta acción.',
 	bondNotFound: 'A selected bond no longer exists.',
-	collectorNotFound: 'Collector not found.',
-	campaignLocked: 'Bonds can only be delivered or changed while the campaign is a draft or active.',
-	internal: 'Something went wrong. Please try again.',
-	invalid: 'Some values are invalid. Please review them.'
+	collectorNotFound: 'Cobrador no encontrado.',
+	campaignLocked:
+		'Los bonos solo se pueden entregar o cambiar mientras la campaña está en borrador o activa.',
+	internal: 'Algo salió mal. Volver a intentar.',
+	invalid: 'Hay valores inválidos. Revisarlos.'
 } as const;
 
 interface PostgrestLikeError {
@@ -86,10 +87,10 @@ export function mapDeliveryRpcError(rpcError: PostgrestLikeError): DeliveryServi
 		case '22007':
 		case '22008':
 			// A well-formed but impossible date (2026-02-31) fails the cast of p_lost_on.
-			return err('validation', 'Enter a real calendar date.', 'lostOn');
+			return err('validation', 'Ingresar una fecha válida.', 'lostOn');
 		case '22023':
 			if (/one collector at a time/.test(message)) {
-				return err('validation', 'Return the bonds of one collector at a time.', 'bondIds');
+				return err('validation', 'Devolver los bonos de a un cobrador por vez.', 'bondIds');
 			}
 			return err(
 				'validation',
@@ -105,7 +106,7 @@ export function mapDeliveryRpcError(rpcError: PostgrestLikeError): DeliveryServi
 			if (/only while the campaign is active/.test(message)) {
 				return err(
 					'conflict',
-					'Bonds are delivered to collectors only while the campaign is active.'
+					'Los bonos se entregan a los cobradores solo mientras la campaña está activa.'
 				);
 			}
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);

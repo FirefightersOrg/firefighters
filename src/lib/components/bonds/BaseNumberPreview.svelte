@@ -18,31 +18,25 @@
 <div
 	{id}
 	aria-live="polite"
-	class="rounded-lg border p-4 text-sm {preview.state === 'invalid'
-		? 'border-red-200 bg-red-50 text-red-800'
-		: 'border-slate-200 bg-slate-50 text-slate-700'}"
+	class="rounded-lg border p-4 text-body-sm {preview.state === 'invalid'
+		? 'border-danger bg-danger-soft text-danger-text'
+		: 'border-border bg-surface-sunken text-text'}"
 >
-	<h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-		Numbers of this bond
-	</h3>
+	<h3 class="m-0 text-label text-muted">Números de este bono</h3>
 	{#if preview.state === 'empty'}
-		<p class="mt-2 text-slate-500">Type the base number to see its associated number.</p>
+		<p class="m-0 mt-2 text-muted">Ingresar el número base para ver su número asociado.</p>
 	{:else if preview.state === 'invalid'}
-		<p class="mt-2 font-medium">{preview.message}.</p>
+		<p class="m-0 mt-2 font-medium">{preview.message}.</p>
 	{:else}
-		<dl class="mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+		<dl class="m-0 mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-2">
 			<div>
-				<dt class="text-xs text-slate-500">Base number</dt>
-				<dd class="font-mono text-2xl font-semibold tabular-nums text-slate-900">
-					{preview.baseFormatted}
-				</dd>
+				<dt class="text-caption text-muted">Número base</dt>
+				<dd class="m-0 font-mono text-number-lg tabular-nums">{preview.baseFormatted}</dd>
 			</div>
-			<div aria-hidden="true" class="text-xl text-slate-400">→</div>
+			<div aria-hidden="true" class="text-heading-2 text-subtle">→</div>
 			<div>
-				<dt class="text-xs text-slate-500">Associated number</dt>
-				<dd class="font-mono text-2xl font-semibold tabular-nums text-slate-900">
-					{preview.associatedFormatted}
-				</dd>
+				<dt class="text-caption text-muted">Número asociado</dt>
+				<dd class="m-0 font-mono text-number-lg tabular-nums">{preview.associatedFormatted}</dd>
 			</div>
 		</dl>
 	{/if}

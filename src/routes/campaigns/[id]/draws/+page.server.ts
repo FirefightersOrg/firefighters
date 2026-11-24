@@ -21,7 +21,7 @@ const DRAW_PERMISSIONS: PermissionCode[] = [
 ];
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!DRAW_PERMISSIONS.some((permission) => hasPermissionIn(locals.permissions, permission)))
 		requirePermissionIn(locals.permissions, 'draw.view');
@@ -34,8 +34,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			status: DRAW_STATUSES.includes(status as DrawStatus) ? (status as DrawStatus) : null
 		})
 	]);
-	if (campaign.error || draws.error) error(500, { message: 'Could not load draws.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (campaign.error || draws.error) error(500, { message: 'No se pudieron cargar los sorteos.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	return {
 		campaign: campaign.data,
 		draws: draws.data ?? [],

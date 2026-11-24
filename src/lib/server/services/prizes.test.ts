@@ -24,16 +24,19 @@ const fields = { name: 'Prize', description: null, position: 1, excludesFromCons
 it.each([
 	[
 		'this prize already has a loaded winning number',
-		'This prize already has a loaded winning number.'
+		'Este premio ya tiene un número ganador cargado.'
 	],
 	[
 		'a delivered prize cannot be annulled; pending product decision',
-		'A delivered prize cannot be annulled. Reverse the delivery first.'
+		'Un premio entregado no se puede anular. Primero hay que revertir la entrega.'
 	],
-	['completed draws cannot configure prizes', 'Completed draws cannot configure prizes.'],
+	[
+		'completed draws cannot configure prizes',
+		'En un sorteo completado no se pueden configurar premios.'
+	],
 	[
 		'previous draws of the campaign have unresolved prizes that exclude from consolation',
-		'Previous draws of the campaign have unresolved prizes that exclude from consolation.'
+		'Hay sorteos anteriores de la campaña con premios sin resolver que excluyen del consuelo.'
 	]
 ])('maps review conflict %s', (message, expected) => {
 	expect(mapPrizeRpcError({ code: '55000', message })).toMatchObject({

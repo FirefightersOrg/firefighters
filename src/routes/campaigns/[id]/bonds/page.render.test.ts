@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import type { Campaign } from '$lib/domain/campaigns';
+import { formatMoney } from '$lib/format';
 import type { BondListItem } from '$lib/server/bonds/list';
 import Page from './+page.svelte';
 
@@ -35,7 +36,7 @@ function bond(overrides: Partial<BondListItem> = {}): BondListItem {
 		id: BOND_ID,
 		kind: 'simple',
 		origin: 'printed',
-		typeLabel: 'Simple bond',
+		typeLabel: 'Bono simple',
 		baseFormatted: ['0068'],
 		associatedFormatted: ['4939'],
 		internalCode: 'INT-1',
@@ -91,21 +92,21 @@ describe('/campaigns/[id]/bonds page', () => {
 		const body = renderPage();
 		expect(body).toContain('0068');
 		expect(body).toContain('4939');
-		expect(body).toContain('Simple bond');
+		expect(body).toContain('Bono simple');
 		expect(body).toContain('INT-1');
 		expect(body).toContain('Disponible');
 		expect(body).toContain('Sin pagos');
-		expect(body).toContain('$\u00a060.000,00');
+		expect(body).toContain(formatMoney('60000.00'));
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
-		expect(body).toContain('View record');
-		expect(body).toContain('Showing 1–1 of 1 bond');
+		expect(body).toContain('Ver ficha');
+		expect(body).toContain('Mostrando 1–1 de 1 bono');
 	});
 
 	it('a grouped member says which pata it is in, with a link', () => {
 		const body = renderPage({
 			bonds: [bond({ inPata: { pataId: PATA_ID, label: '0068 + 0069' } })]
 		});
-		expect(body).toContain('In pata');
+		expect(body).toContain('En la pata');
 		expect(body).toContain('0068 + 0069');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 	});
@@ -121,12 +122,10 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toMatch(/<option value="pata"\sselected="">/);
 		expect(body).toMatch(/<option value="sold"\sselected="">/);
 		expect(body).toMatch(/<option value="overdue"\sselected="">/);
-		expect(body).toMatch(/<select id="filter-collector"[^>]*\sdisabled=""/);
-		expect(body).toMatch(/<select id="filter-buyer"[^>]*\sdisabled=""/);
-		expect(body).toContain(
-			'Collector and buyer filters arrive with collectors and buyers in Phase 5.'
-		);
-		expect(body).toContain('Clear filters');
+		expect(body).toMatch(/<select[^>]*id="filter-collector"[^>]*\sdisabled=""/);
+		expect(body).toMatch(/<select[^>]*id="filter-buyer"[^>]*\sdisabled=""/);
+		expect(body).toContain('Disponible con cobradores y compradores (fase 5).');
+		expect(body).toContain('Quitar filtros');
 	});
 
 	it('quick actions: create, scan and import only when allowed; assignment disabled with its phase', () => {
@@ -136,9 +135,9 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/import"`);
 		expect(viewer).toMatch(
-			/<button type="button"[^>]*\sdisabled=""[^>]*aria-describedby="assign-action-note"[^>]*>\s*Assign to collector/
+			/<button[^>]*aria-describedby="assign-action-note"[^>]*\sdisabled=""[^>]*>[\s\S]*?Asignar a cobrador/
 		);
-		expect(viewer).toContain('Phase 6');
+		expect(viewer).toContain('Fase 6');
 
 		const importer = renderPage({ canScan: true, canImport: true });
 		expect(importer).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
@@ -147,31 +146,31 @@ describe('/campaigns/[id]/bonds page', () => {
 		const operator = renderPage({ canCreate: true });
 		expect(operator).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/new"`);
 		expect(operator).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/pata/new"`);
-		expect(operator).toContain('Create bond');
-		expect(operator).toContain('Create pata');
+		expect(operator).toContain('Cargar bono');
+		expect(operator).toContain('Cargar pata');
 	});
 
 	it('paginates keeping the filters in the links', () => {
 		const body = renderPage({ values: { status: 'available' }, page: 2, total: 60 });
-		expect(body).toContain('Page 2 of 3');
+		expect(body).toContain('Página 2 de 3');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds?status=available"`);
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds?status=available&amp;page=3"`);
-		expect(body).toContain('Showing 26–50 of 60 bonds');
+		expect(body).toContain('Mostrando 26–50 de 60 bonos');
 	});
 
 	it('empty states and invalid filters', () => {
-		expect(renderPage({ bonds: [] })).toContain('This campaign has no bonds yet.');
+		expect(renderPage({ bonds: [] })).toContain('Todavía no hay bonos');
 		expect(renderPage({ bonds: [], values: { base: '1' } })).toContain(
-			'No bonds match these filters.'
+			'Ningún bono coincide con los filtros'
 		);
 		const invalid = renderPage({
 			bonds: [],
 			values: { base: '12345' },
-			errors: { base: 'Enter a number from 0000 to 9999.' }
+			errors: { base: 'Ingresar un número entre 0000 y 9999.' }
 		});
-		expect(invalid).toContain('Enter a number from 0000 to 9999.');
+		expect(invalid).toContain('Ingresar un número entre 0000 y 9999.');
 		expect(invalid).toMatch(/<input[^>]*name="base"[^>]*aria-invalid="true"/);
-		expect(invalid).toContain('Fix the highlighted filters to see bonds.');
-		expect(renderPage({ bonds: [], total: 3, page: 9 })).toContain('No bonds on this page.');
+		expect(invalid).toContain('Corregir los filtros marcados para ver los bonos.');
+		expect(renderPage({ bonds: [], total: 3, page: 9 })).toContain('No hay bonos en esta página');
 	});
 });

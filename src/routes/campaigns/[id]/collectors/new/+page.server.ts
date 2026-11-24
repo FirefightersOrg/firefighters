@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		listAvailableCollectorProfileOptions(locals.supabase)
 	]);
 	if (campaign.error || profiles.error)
-		error(500, { message: 'Could not load the form. Please try again.' });
+		error(500, { message: 'No se pudo cargar el formulario. Volver a intentar.' });
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	return { campaign: campaign.data, profiles: profiles.data ?? [] };
 };
@@ -35,7 +35,7 @@ export const actions: Actions = {
 			return fail(400, {
 				values,
 				errors: parsed.error.flatten().fieldErrors,
-				message: 'Please review the form.'
+				message: 'Revisar el formulario.'
 			});
 		let collectorId: string;
 		try {
@@ -48,7 +48,7 @@ export const actions: Actions = {
 			return fail(party?.status ?? 500, {
 				values,
 				errors: party?.field ? { [party.field]: [party.message] } : {},
-				message: party?.message ?? 'Something went wrong. Please try again.'
+				message: party?.message ?? 'Algo salió mal. Volver a intentar.'
 			});
 		}
 		redirect(303, `/campaigns/${params.id}/collectors/${collectorId}`);

@@ -22,7 +22,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			requestId: locals.requestId,
 			error: result.error
 		});
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	}
 	if (!result.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	return {

@@ -31,36 +31,37 @@ export class PrizeServiceError extends Error {
 export function mapPrizeRpcError(error: { code?: string; message?: string }) {
 	switch (error.code) {
 		case '42501':
-			return new PrizeServiceError('permission', 'Prize permission is required.');
+			return new PrizeServiceError('permission', 'Hace falta el permiso de premios.');
 		case '55000':
 			return new PrizeServiceError(
 				'conflict',
 				(
 					{
 						'this prize already has a loaded winning number':
-							'This prize already has a loaded winning number.',
+							'Este premio ya tiene un número ganador cargado.',
 						'a delivered prize cannot be annulled; pending product decision':
-							'A delivered prize cannot be annulled. Reverse the delivery first.',
-						'completed draws cannot configure prizes': 'Completed draws cannot configure prizes.',
+							'Un premio entregado no se puede anular. Primero hay que revertir la entrega.',
+						'completed draws cannot configure prizes':
+							'En un sorteo completado no se pueden configurar premios.',
 						'previous draws of the campaign have unresolved prizes that exclude from consolation':
-							'Previous draws of the campaign have unresolved prizes that exclude from consolation.'
+							'Hay sorteos anteriores de la campaña con premios sin resolver que excluyen del consuelo.'
 					} as Record<string, string>
 				)[error.message ?? ''] ||
 					error.message ||
-					'Prize state conflicts.'
+					'El estado del premio no permite esta acción.'
 			);
 		case '23505':
 			return new PrizeServiceError(
 				'conflict',
-				error.message || 'Prize state or position conflicts.'
+				error.message || 'El estado o la posición del premio entran en conflicto.'
 			);
 		case '22023':
 		case '23514':
-			return new PrizeServiceError('validation', error.message || 'Invalid prize data.');
+			return new PrizeServiceError('validation', error.message || 'Datos del premio inválidos.');
 		case 'P0002':
-			return new PrizeServiceError('not_found', 'Prize or draw not found.');
+			return new PrizeServiceError('not_found', 'Premio o sorteo no encontrado.');
 		default:
-			return new PrizeServiceError('internal', 'Could not change prize.', { cause: error });
+			return new PrizeServiceError('internal', 'No se pudo modificar el premio.', { cause: error });
 	}
 }
 const text = (max: number) =>
@@ -118,12 +119,14 @@ async function write<T extends z.ZodType>(
 	args: (p: z.output<T>) => Record<string, unknown>
 ) {
 	if (ctx?.permissions == null)
-		throw new PrizeServiceError('internal', 'Could not load prize permissions.');
+		throw new PrizeServiceError('internal', 'No se pudieron cargar los permisos de premios.');
 	if (!hasPermissionIn(ctx.permissions, permission))
-		throw new PrizeServiceError('permission', 'Prize permission is required.');
+		throw new PrizeServiceError('permission', 'Hace falta el permiso de premios.');
 	const parsed = schema.safeParse(input);
 	if (!parsed.success)
-		throw new PrizeServiceError('validation', 'Invalid prize data.', { cause: parsed.error });
+		throw new PrizeServiceError('validation', 'Datos del premio inválidos.', {
+			cause: parsed.error
+		});
 	try {
 		const { data, error } = await client.rpc(name, {
 			...args(parsed.data),
@@ -133,7 +136,7 @@ async function write<T extends z.ZodType>(
 		return data as string;
 	} catch (cause) {
 		if (cause instanceof PrizeServiceError) throw cause;
-		throw new PrizeServiceError('internal', 'Could not change prize.', { cause });
+		throw new PrizeServiceError('internal', 'No se pudo modificar el premio.', { cause });
 	}
 }
 const configArgs = (p: z.output<typeof createPrizeSchema> | UpdatePrizeInput) => ({
