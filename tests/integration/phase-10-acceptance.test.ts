@@ -666,6 +666,80 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 		).toEqual(before.data);
 	});
 
+	it('SAN-112 shows sale, payment, draw and prize creation in the campaign viewer', async () => {
+		await sale('history112');
+		const ownSettlement = await rpc<string>(users.admin, 'settlement_open', {
+			p_campaign_id: campaignId,
+			p_collector_id: collectorA,
+			p_request_id: rid('history112-settlement')
+		});
+		const payment = await rpc<string>(users.admin, 'settlement_add_payment', {
+			p_settlement_id: ownSettlement,
+			p_sale_id: sales.history112.saleId,
+			p_amount: 100,
+			p_payment_method: 'cash',
+			p_payment_date: baDate(),
+			p_applications: [{ installment_id: sales.history112.installmentId, amount_applied: 100 }],
+			p_request_id: rid('history112-payment')
+		});
+		const draw = await rpc<string>(users.admin, 'draw_create', {
+			p_campaign_id: campaignId,
+			p_draw_type: 'final',
+			p_name: 'Historial completo',
+			p_draw_date: baDate(1),
+			p_payment_cutoff_at: `${baDate()}T23:59:59-03:00`,
+			p_required_installment_number: null,
+			p_eligibility_rule: {},
+			p_request_id: rid('history112-draw')
+		});
+		const prize = await rpc<string>(users.admin, 'prize_create', {
+			p_draw_id: draw,
+			p_name: 'Premio de historial',
+			p_description: null,
+			p_position: 1,
+			p_excludes_from_consolation: true,
+			p_request_id: rid('history112-prize')
+		});
+		const { data: profile, error } = await users.admin.client
+			.from('profiles')
+			.select('*')
+			.eq('auth_user_id', users.admin.user.id)
+			.single();
+		expect(error).toBeNull();
+		const event = (query: string) =>
+			({
+				locals: {
+					supabase: users.admin.client,
+					user: users.admin.user,
+					profile,
+					permissions: users.admin.permissions,
+					requestId: rid('history112-view')
+				},
+				params: { id: campaignId },
+				url: new URL(`http://localhost/campaigns/${campaignId}/audit${query}`)
+			}) as never;
+		for (const [type, id, action] of [
+			['sale', sales.history112.saleId, 'sale.create'],
+			['payment', payment, 'payment.add'],
+			['draw', draw, 'draw.create'],
+			['prize', prize, 'prize.create']
+		]) {
+			const listed = (await auditLoad(event(`?entityType=${type}&action=${action}`))) as Exclude<
+				Awaited<ReturnType<typeof auditLoad>>,
+				void
+			>;
+			const entry = listed.entries.items.find(
+				(item: { entityId: string; id: string }) => item.entityId === id
+			);
+			expect(entry, `${type} creation visible`).toBeTruthy();
+			const detailed = (await auditLoad(event(`?detail=${entry!.id}`))) as Exclude<
+				Awaited<ReturnType<typeof auditLoad>>,
+				void
+			>;
+			expect(detailed.detail?.entityId).toBe(id);
+		}
+	});
+
 	it('C5 the campaign audit viewer lists the corrections and shows their 9 fields', async () => {
 		const auditEvent = async (caller: Caller, query = '') => {
 			const { data: profile } = await service

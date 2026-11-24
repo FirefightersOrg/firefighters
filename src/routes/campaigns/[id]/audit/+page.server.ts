@@ -34,6 +34,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		page: Math.max(1, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
 	};
 	const detailId = optionalUuid(url.searchParams.get('detail'));
+	// Both reads use frozen campaign membership, including sparse creation/state-change
+	// snapshots; a detail id must never bypass that campaign boundary (SAN-112).
 	const [entries, detail] = await Promise.all([
 		listCampaignAuditEntries(locals.supabase, params.id, filters),
 		detailId
