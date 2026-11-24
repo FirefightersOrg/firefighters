@@ -1,0 +1,150 @@
+/* Cimiento design tokens (v1). Source: docs/design-system/tokens.json (copy of the
+   published design system artifact). Light is the default; dark applies via
+   [data-theme='dark'] or the system preference (unless [data-theme='light'] forces light). */
+
+:root {
+	color-scheme: light;
+	--bg: #f5f6f8;
+	--surface: #ffffff;
+	--surface-sunken: #eceef2;
+	--surface-raised: #ffffff;
+	--surface-hover: #f0f2f5;
+	--border: #dde1e7;
+	--border-strong: #868e9a;
+	--text: #15181d;
+	--text-muted: #4c5462;
+	--text-subtle: #646c79;
+	--text-disabled: #9aa1ab;
+	--primary: #2350c4;
+	--primary-hover: #1b3f9e;
+	--on-primary: #ffffff;
+	--primary-soft: #e8eefc;
+	--primary-text: #1b3f9e;
+	--focus: #2350c4;
+	--success: #17703f;
+	--success-soft: #e6f4ec;
+	--success-text: #125a33;
+	--warning: #a85a00;
+	--warning-soft: #fcf1df;
+	--warning-text: #7a4100;
+	--danger: #c22e1c;
+	--danger-hover: #9e2316;
+	--on-danger: #ffffff;
+	--danger-soft: #fcebe8;
+	--danger-text: #a12617;
+	--neutral-soft: #eceef2;
+	--overlay: rgba(14, 16, 20, 0.48);
+	--shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.06);
+	--shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+	--shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14), 0 2px 6px rgba(16, 24, 40, 0.06);
+
+	--space-0: 2px;
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 20px;
+	--space-6: 24px;
+	--space-8: 32px;
+	--space-10: 40px;
+	--space-12: 48px;
+	--space-16: 64px;
+	--radius-sm: 4px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-full: 9999px;
+	--control-sm: 32px;
+	--control-md: 40px;
+	--control-lg: 48px;
+	--touch-target: 44px;
+	--icon-sm: 16px;
+	--icon-md: 20px;
+	--content-max: 1120px;
+	--form-max: 640px;
+	--prose-max: 68ch;
+	--z-sticky: 10;
+	--z-dropdown: 20;
+	--z-overlay: 40;
+	--z-modal: 50;
+	--z-toast: 60;
+
+	--motion-fast: 120ms;
+	--motion-base: 200ms;
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--bg: #0e1014;
+	--surface: #16191e;
+	--surface-sunken: #0a0c0f;
+	--surface-raised: #1d2128;
+	--surface-hover: #232831;
+	--border: #2a2f38;
+	--border-strong: #6f7784;
+	--text: #eceef1;
+	--text-muted: #a8afba;
+	--text-subtle: #8c939f;
+	--text-disabled: #5d6470;
+	--primary: #86a6ff;
+	--primary-hover: #a6bfff;
+	--on-primary: #0b1533;
+	--primary-soft: #1a2442;
+	--primary-text: #a6bfff;
+	--focus: #86a6ff;
+	--success: #5ccf8d;
+	--success-soft: #0f2a1b;
+	--success-text: #7ddca3;
+	--warning: #eaa94a;
+	--warning-soft: #2d2110;
+	--warning-text: #f2c27a;
+	--danger: #f2705f;
+	--danger-hover: #f7978a;
+	--on-danger: #2b0c08;
+	--danger-soft: #3a1612;
+	--danger-text: #ff9b8e;
+	--neutral-soft: #262b33;
+	--overlay: rgba(0, 0, 0, 0.64);
+	--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+	--shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']):not([data-theme='dark']) {
+		color-scheme: dark;
+		--bg: #0e1014;
+		--surface: #16191e;
+		--surface-sunken: #0a0c0f;
+		--surface-raised: #1d2128;
+		--surface-hover: #232831;
+		--border: #2a2f38;
+		--border-strong: #6f7784;
+		--text: #eceef1;
+		--text-muted: #a8afba;
+		--text-subtle: #8c939f;
+		--text-disabled: #5d6470;
+		--primary: #86a6ff;
+		--primary-hover: #a6bfff;
+		--on-primary: #0b1533;
+		--primary-soft: #1a2442;
+		--primary-text: #a6bfff;
+		--focus: #86a6ff;
+		--success: #5ccf8d;
+		--success-soft: #0f2a1b;
+		--success-text: #7ddca3;
+		--warning: #eaa94a;
+		--warning-soft: #2d2110;
+		--warning-text: #f2c27a;
+		--danger: #f2705f;
+		--danger-hover: #f7978a;
+		--on-danger: #2b0c08;
+		--danger-soft: #3a1612;
+		--danger-text: #ff9b8e;
+		--neutral-soft: #262b33;
+		--overlay: rgba(0, 0, 0, 0.64);
+		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+		--shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+	}
+}

@@ -22,7 +22,7 @@ const source = (status: 'open' | 'closed' = 'closed') => ({
 		balance: '0.00'
 	},
 	payments: [
-		{ bond: '68', buyer: 'Buyer', installments: 'Installment 1', method: 'Cash', amount: '100.00' }
+		{ bond: '68', buyer: 'Buyer', installments: 'Cuota 1', method: 'Efectivo', amount: '100.00' }
 	]
 });
 const event = (locals: App.Locals, settlementId = ID) =>

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { BOND_COMMERCIAL_STATUS_LABELS, BOND_COMMERCIAL_STATUSES } from '$lib/domain/bonds';
-import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
+import { statusWord } from '$lib/domain/status-word';
+import { BOND_COMMERCIAL_STATUSES } from '$lib/domain/bonds';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 
@@ -60,9 +60,7 @@ const STATUS_WORD = new RegExp(`\\b(${BOND_COMMERCIAL_STATUSES.join('|')})\\b`, 
 function humanize(message: string): string {
 	const text = message
 		.replace(/\s[0-9a-f]{8}-[0-9a-f-]{27}/gi, '')
-		.replace(STATUS_WORD, (s) =>
-			BOND_COMMERCIAL_STATUS_LABELS[s as keyof typeof BOND_COMMERCIAL_STATUS_LABELS].toLowerCase()
-		);
+		.replace(STATUS_WORD, (s) => statusWord(s));
 	const sentence = text.charAt(0).toUpperCase() + text.slice(1);
 	return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
@@ -112,8 +110,7 @@ export function mapDeliveryRpcError(rpcError: PostgrestLikeError): DeliveryServi
 			}
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
-				const label =
-					CAMPAIGN_STATUS_LABELS[window[1] as CampaignStatus]?.toLowerCase() ?? window[1];
+				const label = statusWord(window[1]);
 				return err('conflict', `${DELIVERY_MESSAGES.campaignLocked} This campaign is ${label}.`);
 			}
 			if (/no longer with that collector/.test(message)) {

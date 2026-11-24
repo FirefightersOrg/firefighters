@@ -20,9 +20,9 @@ export const SALE_STATUSES = ['active', 'annulled', 'corrected'] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
 export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
-	active: 'Active',
-	annulled: 'Annulled',
-	corrected: 'Corrected'
+	active: 'Activa',
+	annulled: 'Anulada',
+	corrected: 'Corregida'
 };
 
 export const PAYMENT_PLAN_STATUSES = ['active', 'annulled'] as const;
@@ -38,11 +38,11 @@ export const INSTALLMENT_STATUSES = [
 export type InstallmentStatus = (typeof INSTALLMENT_STATUSES)[number];
 
 export const INSTALLMENT_STATUS_LABELS: Record<InstallmentStatus, string> = {
-	pending: 'Pending',
-	paid: 'Paid',
-	paid_advance: 'Paid in advance',
-	overdue: 'Overdue',
-	annulled: 'Annulled'
+	pending: 'Pendiente',
+	paid: 'Pagada',
+	paid_advance: 'Pagada por adelantado',
+	overdue: 'Vencida',
+	annulled: 'Anulada'
 };
 
 /** Allowed installment transitions; the database guard (`installments_guard_update`) matches. */
