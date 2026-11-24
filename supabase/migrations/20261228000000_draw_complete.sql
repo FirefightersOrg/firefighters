@@ -1,6 +1,6 @@
 -- SAN-123: the missing roster_frozen -> completed draw transition (docs/state-machines.md).
 -- Permission: draw.update (same as draw_annul until SAN-118 splits draw permissions).
--- Precondition: every non-annulled prize of the draw is resolved (no pending_validation prize),
+-- Preconditions: at least one resolved non-annulled prize, and every non-annulled prize resolved (no pending_validation prize),
 -- so a completed draw never hides an unresolved winner. pending_delivery is resolved: delivery
 -- may happen after completion. Lock order: campaign SHARE -> draw UPDATE (prize_lock_draw), then
 -- the draw's prizes FOR SHARE, so a concurrent prize write either commits first or waits.
@@ -19,6 +19,12 @@ begin
   if exists (select 1 from public.prizes
              where draw_id = p_draw_id and status = 'pending_validation') then
     raise exception 'resolve every prize of the draw before completing it' using errcode = '55000';
+  end if;
+  -- Santi's decision (#93): a draw without at least one resolved, non-annulled prize cannot be
+  -- completed (zero prizes, or only annulled ones).
+  if not exists (select 1 from public.prizes
+                 where draw_id = p_draw_id and status not in ('pending_validation','annulled')) then
+    raise exception 'a draw needs at least one resolved prize to be completed' using errcode = '55000';
   end if;
   update public.draws set status = 'completed' where id = p_draw_id returning * into v_new;
   insert into public.audit_log(actor_user_id,action,entity_type,entity_id,old_value,new_value,request_id)

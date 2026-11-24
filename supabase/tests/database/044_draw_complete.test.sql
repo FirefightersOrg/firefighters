@@ -2,7 +2,7 @@
 -- precondition, refusals without writes, audit row, grants, and the completed-draw guards afterwards.
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(22);
+select plan(26);
 insert into auth.users(id,email)
 values('a6440000-0000-0000-0000-000000000001','san123-admin@example.com'),
 ('a6440000-0000-0000-0000-000000000002','san123-reader@example.com');
@@ -50,6 +50,8 @@ select is((select prosecdef from pg_proc where oid='public.draw_complete(uuid,te
 
 select pg_temp.act(1);
 set local role authenticated;
+select throws_ok($$select public.draw_complete(pg_temp.id('d'),'044-zero')$$,'55000',
+  'a draw needs at least one resolved prize to be completed','a draw without prizes cannot be completed');
 select lives_ok($$update ids set id=public.prize_create(pg_temp.id('d'),'First',null,1,true,'044-p') where k='p'$$,'prize 1');
 select lives_ok($$update ids set id=public.prize_create(pg_temp.id('d'),'Second',null,2,true,'044-p2') where k='p2'$$,'prize 2');
 select lives_ok($$select public.draw_load_winning_number(pg_temp.id('p'),1,null,'044-load')$$,'eligible winner pending validation');
@@ -70,7 +72,7 @@ select throws_ok($$select public.draw_complete(pg_temp.id('d'),'044-pending-unlo
 select lives_ok($$select public.prize_annul(pg_temp.id('p2'),'Not offered','044-annul')$$,'annul prize 2');
 reset role;
 select is((select status from public.draws where id=pg_temp.id('d')),'roster_frozen','refusals left the draw frozen');
-select is((select count(*)::int from public.audit_log where request_id in ('044-denied','044-scheduled','044-pending','044-pending-unloaded')),0,
+select is((select count(*)::int from public.audit_log where request_id in ('044-zero','044-denied','044-scheduled','044-pending','044-pending-unloaded')),0,
   'refusals wrote no audit rows');
 set local role authenticated;
 -- success: annulled prizes do not block, pending_delivery counts as resolved
@@ -89,5 +91,19 @@ select lives_ok($$select public.prize_deliver(pg_temp.id('p'),'Delivered after c
   'pending deliveries can still be delivered');
 reset role;
 select is((select status from public.prizes where id=pg_temp.id('p')),'delivered','delivered after completion');
+-- a frozen draw whose only prize was annulled cannot be completed either
+reset role;
+insert into ids values('d2',gen_random_uuid()),('r2',gen_random_uuid()),('p3',gen_random_uuid());
+insert into public.draws(id,campaign_id,draw_type,name,draw_date,payment_cutoff_at,created_by)
+values(pg_temp.id('d2'),pg_temp.id('c'),'final','d2',(now() at time zone 'America/Argentina/Buenos_Aires')::date,now(),pg_temp.actor());
+insert into public.draw_rosters(id,draw_id,generated_by,created_by) values(pg_temp.id('r2'),pg_temp.id('d2'),pg_temp.actor(),pg_temp.actor());
+update public.draws set status='roster_generated' where id=pg_temp.id('d2');
+update public.draw_rosters set status='frozen',frozen_at=now(),frozen_by=pg_temp.actor() where id=pg_temp.id('r2');
+update public.draws set status='roster_frozen' where id=pg_temp.id('d2');
+set local role authenticated;
+select lives_ok($$update ids set id=public.prize_create(pg_temp.id('d2'),'Only',null,1,true,'044-p3') where k='p3'$$,'only prize');
+select lives_ok($$select public.prize_annul(pg_temp.id('p3'),'Withdrawn','044-annul-only')$$,'annul the only prize');
+select throws_ok($$select public.draw_complete(pg_temp.id('d2'),'044-only-annulled')$$,'55000',
+  'a draw needs at least one resolved prize to be completed','only annulled prizes cannot complete a draw');
 select * from finish();
 rollback;

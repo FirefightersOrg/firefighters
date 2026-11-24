@@ -516,7 +516,8 @@ Review resolutions (PR #89):
 - `draw_complete(p_draw_id, p_request_id)` / `completeDraw` moves a draw from `roster_frozen` to
   `completed` (the only path to that state). Permission: `draw.update`, like `draw_annul`, until
   SAN-118 splits the draw permissions.
-- Precondition: no non-annulled prize of the draw is in `pending_validation` (with or without a
+- Preconditions: at least one resolved non-annulled prize (Santi, #93: a draw with no prizes, or
+  only annulled ones, cannot complete), and no non-annulled prize of the draw in `pending_validation` (with or without a
   loaded number). `pending_delivery` counts as resolved: deliveries can be recorded after completion.
   Otherwise `55000` ("resolve every prize of the draw before completing it"), with no write.
 - Locks: campaign SHARE → draw UPDATE (`prize_lock_draw`) → the draw's prizes FOR SHARE in id order,
