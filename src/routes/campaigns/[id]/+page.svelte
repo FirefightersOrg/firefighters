@@ -5,7 +5,23 @@
 	import CampaignRulesForm from '$lib/components/campaigns/CampaignRulesForm.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
 	import { campaignEditFormKey } from '$lib/components/campaigns/types';
-	import { Alert, Card, PageHeader, StatusBadge, statusMeta } from '$lib/components/ui';
+	import {
+		Alert,
+		Card,
+		PageHeader,
+		Stat,
+		StatusBadge,
+		Table,
+		statusMeta,
+		type TableColumn
+	} from '$lib/components/ui';
+	import {
+		countdownLabel,
+		cutoffCountdown,
+		DRAW_TYPE_LABELS_ES,
+		type AtRiskBond
+	} from '$lib/domain/dashboard';
+	import { formatSignedMoney } from '$lib/domain/financial-reports';
 	import {
 		BARCODE_MODE_LABELS_ES,
 		campaignNumberingConfig,
@@ -13,7 +29,13 @@
 		OVERFLOW_POLICY_LABELS
 	} from '$lib/domain/campaigns';
 	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
-	import { formatDate, formatMoney, formatNumber } from '$lib/format';
+	import {
+		formatDate,
+		formatDateTime,
+		formatMoney,
+		formatNumber,
+		formatPaddedNumber
+	} from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -30,6 +52,16 @@
 	const rulesFrozen = $derived(frozenByStatus || data.hasBonds);
 	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
 	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
+
+	const operational = $derived(data.dashboard.operational);
+	const financial = $derived(data.dashboard.financial);
+	const nextDraw = $derived(operational?.nextDraw ?? null);
+	const countdown = $derived(nextDraw ? cutoffCountdown(nextDraw.paymentCutoffAt) : null);
+	const atRiskColumns: TableColumn<AtRiskBond & Record<string, unknown>>[] = [
+		{ key: 'bond', header: 'Bono' },
+		{ key: 'collector', header: 'Cobrador' },
+		{ key: 'missing', header: 'Cuotas pendientes', align: 'right' }
+	];
 
 	/** Links to the campaign's other sections, shown only when the person may open them. */
 	const sections = $derived(
@@ -119,6 +151,167 @@
 
 	{#if transitionResult}
 		<Alert tone={transitionResult.success ? 'success' : 'danger'}>{transitionMessage}</Alert>
+	{/if}
+
+	{#if operational || financial}
+		<section aria-labelledby="dashboard-title" class="flex flex-col gap-6">
+			<h2 id="dashboard-title" class="m-0 text-heading-2">Tablero</h2>
+
+			{#if operational}
+				<Card title="Bonos" id="dash-bonds">
+					<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+						<Stat label="Total" value={formatNumber(operational.bonds.total)} />
+						<Stat label="Vendidos" value={formatNumber(operational.bonds.sold)} />
+						<Stat label="Disponibles" value={formatNumber(operational.bonds.available)} />
+						<Stat
+							label="Entregados"
+							value={formatNumber(operational.bonds.delivered)}
+							detail="Con cobrador, sin vender"
+						/>
+					</div>
+				</Card>
+
+				<Card title="Recaudación" id="dash-revenue" description="Cuotas de las ventas activas.">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+						<Stat label="Esperada" value={formatMoney(operational.revenue.expected)} />
+						<Stat
+							label="Cobrada"
+							value={formatMoney(operational.revenue.collected)}
+							detail="{operational.revenue.collectedPercent} % de lo esperado"
+						/>
+						<Stat
+							label="Pendiente"
+							value={formatMoney(operational.revenue.pending)}
+							detail="Vencido: {formatMoney(operational.revenue.overdue)}"
+						/>
+					</div>
+				</Card>
+			{/if}
+
+			{#if financial}
+				<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+						<Stat label="Efectivo" value={formatMoney(financial.cash.cash)} />
+						<Stat label="Transferencias" value={formatMoney(financial.cash.transfer)} />
+						<Stat label="Total cobrado" value={formatMoney(financial.cash.total)} />
+					</div>
+					<p class="m-0 mt-4 text-body-sm text-muted">
+						Rendido en {formatNumber(financial.commissions.closedSettlements)} rendiciones cerradas:
+						{formatMoney(financial.commissions.settledCash)} en efectivo y
+						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
+						{#if financial.commissions.openSettlements > 0}
+							Hay {formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.
+						{/if}
+					</p>
+				</Card>
+
+				<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+						<Stat label="Generadas" value={formatMoney(financial.commissions.generated)} />
+						<Stat label="Liquidadas" value={formatMoney(financial.commissions.settled)} />
+						<Stat label="Sin liquidar" value={formatSignedMoney(financial.commissions.pending)} />
+					</div>
+				</Card>
+
+				<Card title="Saldos de cobradores" id="dash-balances">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<Stat label="Saldo neto" value={formatSignedMoney(financial.balances.net)} />
+						<Stat
+							label="Cobradores con saldo a favor"
+							value={formatNumber(financial.balances.creditors)}
+						/>
+					</div>
+					{#if financial.balances.top.length}
+						<ul class="m-0 mt-4 list-none space-y-1 p-0 text-body-sm">
+							{#each financial.balances.top as row (row.collectorId)}
+								<li class="flex justify-between gap-4">
+									<span>{row.collectorName}</span>
+									<span class="tabular-nums">{formatSignedMoney(row.balance)}</span>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="m-0 mt-4 text-body-sm text-muted">
+							Todavía no hay movimientos en las cuentas corrientes.
+						</p>
+					{/if}
+				</Card>
+			{/if}
+
+			{#if operational}
+				<Card title="Próximo sorteo" id="dash-next-draw">
+					{#if nextDraw && countdown}
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							<Stat
+								label={DRAW_TYPE_LABELS_ES[nextDraw.type] ?? nextDraw.name}
+								value={formatDate(nextDraw.drawDate)}
+								detail={nextDraw.name}
+							/>
+							<Stat
+								label="Fecha de corte"
+								value={formatDateTime(nextDraw.paymentCutoffAt)}
+								detail={countdownLabel(countdown)}
+							/>
+							<Stat
+								label="Bonos en riesgo"
+								value={formatNumber(nextDraw.atRiskCount)}
+								detail={nextDraw.requiredInstallmentNumber
+									? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
+									: 'Requiere el pago total'}
+							/>
+						</div>
+					{:else}
+						<p class="m-0 text-body-sm text-muted">No hay sorteos programados.</p>
+					{/if}
+				</Card>
+
+				{#if nextDraw}
+					<Card
+						title="Bonos en riesgo"
+						id="dash-at-risk"
+						description="Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte."
+					>
+						{#if operational.atRisk.length}
+							<Table
+								caption="Bonos en riesgo para {nextDraw.name}"
+								columns={atRiskColumns}
+								rows={operational.atRisk.map((b) => ({ ...b, id: b.bondId }))}
+								rowKey="id"
+							>
+								{#snippet cell({ row, column })}
+									{#if column.key === 'bond'}
+										<a
+											href={resolve('/campaigns/[id]/bonds/[bondId]', {
+												id: campaign.id,
+												bondId: row.bondId
+											})}
+											class="font-mono text-primary-text underline-offset-2 hover:underline"
+											>{row.baseNumber === null
+												? 'Sin número'
+												: formatPaddedNumber(row.baseNumber, campaign.numberDigits)}</a
+										>
+									{:else if column.key === 'collector'}
+										{row.collectorName ?? 'Sin cobrador'}
+									{:else}
+										{formatNumber(row.missingInstallments)}
+									{/if}
+								{/snippet}
+							</Table>
+							{#if operational.atRisk[0] && operational.atRisk[0].totalCount > operational.atRisk.length}
+								<p class="m-0 mt-3 text-body-sm text-muted">
+									Se muestran {formatNumber(operational.atRisk.length)} de
+									{formatNumber(operational.atRisk[0].totalCount)} bonos en riesgo.
+								</p>
+							{/if}
+						{:else}
+							<p class="m-0 text-body-sm text-muted">
+								Ningún bono vendido está en riesgo para este sorteo.
+							</p>
+						{/if}
+					</Card>
+				{/if}
+			{/if}
+		</section>
 	{/if}
 
 	<Card title="Resumen" id="summary">
