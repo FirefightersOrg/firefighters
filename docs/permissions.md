@@ -100,17 +100,18 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 ### Draws and prizes
 
-| Permission             | Description                              |
-| ---------------------- | ---------------------------------------- |
-| `draw.view`            | View draws.                              |
-| `draw.create`          | Create draws.                            |
-| `draw.update`          | Edit scheduled draws.                    |
-| `draw.generate_roster` | Generate roster.                         |
-| `draw.freeze_roster`   | Freeze roster.                           |
-| `draw.load_winner`     | Load winning number.                     |
-| `prize.resolve`        | Resolve award or non-award.              |
-| `prize.deliver`        | Record prize delivery.                   |
-| `prize.annul`          | Annul an undelivered prize (admin only). |
+| Permission               | Description                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
+| `draw.view`              | View draws.                                                       |
+| `draw.create`            | Create draws.                                                     |
+| `draw.update`            | Edit scheduled draws.                                             |
+| `draw.generate_roster`   | Generate roster.                                                  |
+| `draw.freeze_roster`     | Freeze roster.                                                    |
+| `draw.load_winner`       | Load winning number.                                              |
+| `prize.resolve`          | Resolve award or non-award.                                       |
+| `prize.deliver`          | Record prize delivery.                                            |
+| `prize.annul`            | Annul an undelivered prize (admin only).                          |
+| `prize.reverse_delivery` | Reverse a mistaken delivery with a mandatory reason (admin only). |
 
 ### Reports, audit, and users
 
@@ -157,6 +158,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
 | `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
 | `prize.annul`            |   yes |       no |        no |        no |        no |
+| `prize.reverse_delivery` |   yes |       no |        no |        no |        no |
 | `report.view_financial`  |   yes |       no |       yes |        no |       yes |
 | `audit.view`             |   yes |       no |       yes |        no |        no |
 | `user.manage`            |   yes |       no |        no |        no |        no |
