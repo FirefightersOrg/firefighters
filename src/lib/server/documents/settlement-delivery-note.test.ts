@@ -43,9 +43,9 @@ describe('buildPrintableSettlementDeliveryNote', () =>
 				payments: [
 					{
 						bond: '0068',
-						buyer: 'Buyer',
-						installments: 'Installment 1',
-						method: 'Cash',
+						buyer: 'Comprador',
+						installments: 'Cuota 1',
+						method: 'Efectivo',
 						amount: '100.00'
 					}
 				]
@@ -54,10 +54,10 @@ describe('buildPrintableSettlementDeliveryNote', () =>
 		);
 		expect(doc).toMatchObject({
 			campaign: 'Bono 2027',
-			settlementNumberLabel: 'Settlement 0007',
+			settlementNumberLabel: 'Rendición 0007',
 			preliminary: true,
-			manualAdjustments: '0 — No manual adjustments have been recorded.',
-			collectorSignature: 'Collector signature'
+			manualAdjustments: '0 — No se registraron ajustes manuales.',
+			collectorSignature: 'Firma del cobrador'
 		});
 		expect(doc.totals.amount).toBe('$ 150,00');
 	}));

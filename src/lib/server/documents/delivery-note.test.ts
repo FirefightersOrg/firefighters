@@ -69,12 +69,12 @@ describe('buildPrintableDeliveryNote', () => {
 		expect(doc).toMatchObject({
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
-			deliveryNoteNumber: 'Note 0007',
+			deliveryNoteNumber: 'Remito 0007',
 			collector: 'Ana Pérez',
 			registeredBy: 'Operator One',
 			notes: 'Box 3',
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración',
 			bondCount: 1,
 			unitCount: 1
 		});

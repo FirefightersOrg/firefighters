@@ -53,13 +53,13 @@ export function buildPrintableSettlementDeliveryNote(
 		...source,
 		institutionName,
 		campaign: campaign.name,
-		settlementNumberLabel: `Settlement ${formatPaddedNumber(source.settlementNumber, 4)}`,
+		settlementNumberLabel: `Rendición ${formatPaddedNumber(source.settlementNumber, 4)}`,
 		openingDate: date(source.openedAt),
 		closingDate: date(source.closedAt),
 		preliminary: source.status === 'open',
-		manualAdjustments: '0 — No manual adjustments have been recorded.',
-		collectorSignature: 'Collector signature',
-		administrationSignature: 'Administration signature',
+		manualAdjustments: '0 — No se registraron ajustes manuales.',
+		collectorSignature: 'Firma del cobrador',
+		administrationSignature: 'Firma de la administración',
 		totals: Object.fromEntries(
 			Object.entries(source.totals).map(([key, value]) => [key, money(value)])
 		) as SettlementPrintSource['totals'],
