@@ -17,6 +17,7 @@
 		type BondCommercialStatus,
 		type BondFinancialStatus
 	} from '$lib/domain/bonds';
+	import ExportLinks from '$lib/components/reports/ExportLinks.svelte';
 	import { formatInteger, formatMoney } from '$lib/domain/money';
 	import {
 		formatMonthLabel,
@@ -28,6 +29,15 @@
 	let { data }: PageProps = $props();
 	const campaign = $derived(data.campaign);
 	const filters = $derived(data.filters);
+	const exportParams = $derived({
+		collector: filters.collectorId,
+		kind: filters.kind,
+		status: filters.commercialStatus,
+		financial: filters.financialStatus,
+		month: filters.month,
+		from: filters.from,
+		to: filters.to
+	});
 	const matrix = $derived(data.bondsByStatus);
 	const commercialLabel = (s: string) =>
 		BOND_COMMERCIAL_STATUS_LABELS[s as BondCommercialStatus] ?? s;
@@ -48,6 +58,13 @@
 			class="text-sm text-blue-700 hover:underline">← {campaign.name}</a
 		>
 		<h1 class="mt-2 text-2xl font-bold tracking-tight">Operational reports</h1>
+		{#if data.canViewFinancial}
+			<a
+				href={resolve('/campaigns/[id]/reports/financial', { id: campaign.id })}
+				class="mt-1 inline-block text-sm text-blue-700 hover:underline"
+				>Financial and draw reports →</a
+			>
+		{/if}
 		<p class="mt-1 text-sm text-slate-600">
 			Read-only views of the current data. Financial status is the bond's last recalculated status
 			(updated when a settlement closes). Dates are Buenos Aires dates.
@@ -122,6 +139,14 @@
 		<h2 id="by-status-title" class="mb-3 text-base font-semibold">
 			Bonds by commercial and financial status
 		</h2>
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="bonds-by-status"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		{#if matrix.bondCount === 0}
 			<p class="text-sm text-slate-500">No bonds match the filters.</p>
 		{:else}
@@ -166,6 +191,14 @@
 
 	<section class={cardClass} aria-labelledby="by-collector-title">
 		<h2 id="by-collector-title" class="mb-3 text-base font-semibold">Bonds by collector</h2>
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="bonds-by-collector"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		{#if data.bondsByCollector.rows.length === 0}
 			<p class="text-sm text-slate-500">No bonds match the filters.</p>
 		{:else}
@@ -227,6 +260,14 @@
 		<h2 id="installments-title" class="mb-1 text-base font-semibold">
 			Installments: pending, paid, advance and overdue
 		</h2>
+		<div class="mb-2">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="installments"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		<p class="mb-3 text-xs text-slate-500">
 			Active sales only. Overdue includes pending installments past their due date. Each cell shows
 			count and amount.
@@ -277,6 +318,14 @@
 		<h2 id="monthly-title" class="mb-1 text-base font-semibold">
 			Monthly summary per collector: {formatMonthLabel(filters.month)}
 		</h2>
+		<div class="mb-2">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="collector-monthly"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		<p class="mb-3 text-xs text-slate-500">
 			Assigned bonds are those held today. Sold = sales registered in the month. Installments are
 			those due in the month and still unpaid. Payments exclude drafts and annulled payments.

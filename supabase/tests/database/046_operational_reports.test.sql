@@ -137,9 +137,9 @@ select results_eq($$select count(*)::int from public.report_collector_monthly(pg
 -- Read only: no function writes
 select is((select count(*)::int from public.audit_log where entity_type in ('report', 'reports')), 0, 'reports write no audit rows');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname like 'report\_%' and p.prosecdef and p.provolatile = 's'), 5, 'the five report functions are stable security definer');
+  where n.nspname = 'public' and p.proname like 'report\_%' and p.prosecdef and p.provolatile = 's'), 13, 'the report functions (SAN-86 and SAN-87) are stable security definer');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname like 'report\_%' and p.proconfig::text like '%search_path=%'), 5, 'the report functions pin search_path');
+  where n.nspname = 'public' and p.proname like 'report\_%' and p.proconfig::text like '%search_path=%'), 13, 'the report functions pin search_path');
 
 select * from finish();
 rollback;

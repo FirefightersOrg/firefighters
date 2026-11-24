@@ -20,9 +20,9 @@ join public.roles r on r.id = rp.role_id
 join public.permissions p on p.id = rp.permission_id;
 
 select is((select count(*)::int from _rp where role_name = 'admin'), 47, 'admin has all 47 permissions');
-select is((select count(*)::int from _rp where role_name = 'operator'), 20, 'operator has 20 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
-select is((select count(*)::int from _rp where role_name = 'treasurer'), 18, 'treasurer has 18 permissions (SAN-93 view and matrix decisions)');
-select is((select count(*)::int from _rp where role_name = 'read-only'), 5, 'read-only has 5 permissions (commission.view in SAN-93)');
+select is((select count(*)::int from _rp where role_name = 'operator'), 21, 'operator has 21 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
+select is((select count(*)::int from _rp where role_name = 'treasurer'), 19, 'treasurer has 19 permissions (SAN-93 view and matrix decisions)');
+select is((select count(*)::int from _rp where role_name = 'read-only'), 6, 'read-only has 6 permissions (commission.view in SAN-93)');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'collector'),
   array['campaign.view'], 'collector grants match the matrix'
@@ -33,21 +33,21 @@ select ok(exists (select 1 from _rp where role_name = 'treasurer' and code = 'pa
 select ok(not exists (select 1 from _rp where role_name = 'operator' and code = 'payment.annul'), 'operator lacks payment.annul');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'read-only'),
-  array['bond.view', 'campaign.view', 'commission.view', 'report.view_financial', 'report.view_operational'],
+  array['bond.view', 'campaign.view', 'commission.view', 'report.export', 'report.view_financial', 'report.view_operational'],
   'read-only grants match the matrix'
 );
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'operator'),
   array['bond.assign', 'bond.create', 'bond.import', 'bond.return', 'bond.scan', 'bond.view', 'buyer.manage', 'buyer.view',
         'campaign.view', 'collector.view', 'draw.load_winner', 'draw.view', 'payment.create', 'payment.view',
-        'report.view_operational', 'sale.create', 'sale.view', 'settlement.create', 'settlement.update_open', 'settlement.view'],
+        'report.export', 'report.view_operational', 'sale.create', 'sale.view', 'settlement.create', 'settlement.update_open', 'settlement.view'],
   'operator grants match the matrix (bond.return, not bond.mark_lost)'
 );
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'treasurer'),
   array['audit.view', 'bond.view', 'campaign.view', 'collector.ledger.view', 'commission.adjust',
         'commission.view', 'draw.freeze_roster', 'draw.load_winner', 'draw.view', 'payment.annul',
-        'payment.create', 'payment.view', 'report.view_financial', 'report.view_operational', 'settlement.close', 'settlement.correct',
+        'payment.create', 'payment.view', 'report.export', 'report.view_financial', 'report.view_operational', 'settlement.close', 'settlement.correct',
         'settlement.create', 'settlement.view'],
   'treasurer grants match the matrix'
 );
