@@ -102,7 +102,7 @@ describe('mapImportRpcError (messages of 20261126000000_import_staging.sql)', ()
 			'22023',
 			'row 1: a pata row needs its grupo_pata',
 			'validation',
-			'Row 1: a pata row needs its grupo_pata.'
+			'Fila 1: Una fila de pata necesita su grupo_pata.'
 		],
 		[
 			'22023',
@@ -114,7 +114,7 @@ describe('mapImportRpcError (messages of 20261126000000_import_staging.sql)', ()
 			'55000',
 			'bonds can only be changed while the campaign is draft or active (status: closed)',
 			'conflict',
-			`${IMPORT_MESSAGES.campaignLocked} This campaign is closed.`
+			`${IMPORT_MESSAGES.campaignLocked} La campaña está cerrada.`
 		],
 		[
 			'55000',

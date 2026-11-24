@@ -43,14 +43,14 @@ export class PartyServiceError extends Error {
 }
 
 export const PARTY_MESSAGES = {
-	permission: 'You do not have permission to perform this action.',
-	collectorNotFound: 'Collector not found.',
-	buyerNotFound: 'Buyer not found.',
-	usualCollectorNotFound: 'The usual collector no longer exists.',
-	profileLinked: 'That user is already linked to another collector.',
-	stale: 'Someone else changed this record. Reload it and apply your change again.',
-	invalid: 'Some values are invalid. Please review the form.',
-	internal: 'Something went wrong. Please try again.'
+	permission: 'No hay permiso para realizar esta acción.',
+	collectorNotFound: 'No se encontró el cobrador.',
+	buyerNotFound: 'No se encontró el comprador.',
+	usualCollectorNotFound: 'El cobrador habitual ya no existe.',
+	profileLinked: 'Ese usuario ya está vinculado a otro cobrador.',
+	stale: 'Otra persona modificó este registro. Recargar la página y volver a aplicar el cambio.',
+	invalid: 'Hay valores no válidos. Revisar el formulario.',
+	internal: 'Algo salió mal. Volver a intentar.'
 } as const;
 
 interface PostgrestLikeError {
@@ -75,10 +75,33 @@ const FIELD_BY_MESSAGE: [RegExp, string][] = [
 	[/^notes/, 'notes']
 ];
 
-function sentence(message: string): string {
-	const text = message.replace(/\s[0-9a-f]{8}-[0-9a-f-]{27}/gi, '');
-	const s = text.charAt(0).toUpperCase() + text.slice(1);
-	return /[.!?]$/.test(s) ? s : `${s}.`;
+/** Spanish copy for the validation messages raised by the SQL functions (English, internal). */
+const FIELD_LABELS_ES: Record<string, string> = {
+	displayName: 'El nombre',
+	email: 'El correo electrónico',
+	phone: 'El teléfono',
+	address: 'El domicilio',
+	firstName: 'El nombre',
+	lastName: 'El apellido',
+	businessName: 'La razón social',
+	documentNumber: 'El número de documento',
+	taxId: 'El CUIT',
+	notes: 'Las notas'
+};
+
+function validationMessage(message: string, field: string | undefined): string {
+	if (/^a display name is required/.test(message)) return 'Ingresar el nombre del cobrador.';
+	if (/^email is not valid/.test(message)) return 'Ingresar un correo electrónico válido.';
+	if (/collector status/.test(message)) return 'Elegir un estado válido para el cobrador.';
+	if (/buyer type/.test(message)) return 'Elegir si el comprador es una persona o una empresa.';
+	if (/first or last name/.test(message)) return 'Ingresar el nombre o el apellido.';
+	if (/business name/.test(message) && /needs/.test(message)) return 'Ingresar la razón social.';
+	const max = /must be at most (\d+) characters/.exec(message);
+	if (max) {
+		const label = (field && FIELD_LABELS_ES[field]) || 'El valor';
+		return `${label} debe tener como máximo ${max[1]} caracteres.`;
+	}
+	return PARTY_MESSAGES.invalid;
 }
 
 export function mapPartyRpcError(rpcError: PostgrestLikeError): PartyServiceError {
@@ -90,8 +113,9 @@ export function mapPartyRpcError(rpcError: PostgrestLikeError): PartyServiceErro
 			return err('permission', PARTY_MESSAGES.permission);
 		case '22023': {
 			const field = FIELD_BY_MESSAGE.find(([re]) => re.test(message))?.[1];
-			if (field === 'userProfileId') return err('validation', 'That user does not exist.', field);
-			return err('validation', sentence(message), field);
+			if (field === 'userProfileId')
+				return err('validation', 'El usuario elegido no existe.', field);
+			return err('validation', validationMessage(message, field), field);
 		}
 		case 'P0002':
 			if (message.startsWith('usual collector')) {

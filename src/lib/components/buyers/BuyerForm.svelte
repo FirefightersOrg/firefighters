@@ -1,8 +1,16 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import { inputClass, labelClass, primaryButtonClass } from '$lib/components/campaigns/styles';
-	import { PARTY_LIMITS, type Buyer } from '$lib/domain/parties';
+	import {
+		Alert,
+		Button,
+		Checkbox,
+		Field,
+		FormResult,
+		Select,
+		Textarea,
+		TextInput
+	} from '$lib/components/ui';
+	import { BUYER_TYPE_LABELS, PARTY_LIMITS, type Buyer } from '$lib/domain/parties';
 
 	let {
 		buyer = null,
@@ -10,7 +18,8 @@
 		collectors,
 		usualCollectorNotVisible = false,
 		canViewCollectors = true,
-		form
+		form,
+		cancelHref
 	}: {
 		buyer?: Buyer | null;
 		campaignId: string;
@@ -19,13 +28,29 @@
 		canViewCollectors?: boolean;
 		form:
 			| {
+					success?: boolean;
+					message?: string;
 					values?: Record<string, unknown>;
 					errors?: Record<string, string[]>;
 					duplicates?: { id: string; name: string }[];
 			  }
 			| null
 			| undefined;
+		cancelHref?: string;
 	} = $props();
+
+	const FIELDS = [
+		{ name: 'type', label: 'Tipo' },
+		{ name: 'firstName', label: 'Nombre' },
+		{ name: 'lastName', label: 'Apellido' },
+		{ name: 'documentNumber', label: 'Número de documento' },
+		{ name: 'businessName', label: 'Razón social' },
+		{ name: 'taxId', label: 'CUIT' },
+		{ name: 'phone', label: 'Teléfono' },
+		{ name: 'usualCollectorId', label: 'Cobrador habitual' },
+		{ name: 'address', label: 'Domicilio' },
+		{ name: 'notes', label: 'Notas' }
+	];
 
 	function initialType() {
 		const submitted = form?.values?.type;
@@ -38,183 +63,152 @@
 		const candidate = form?.values?.[name];
 		return typeof candidate === 'string' ? candidate : fallback;
 	};
-	const errors = (name: string) => form?.errors?.[name];
-	const invalid = (name: string) => (errors(name) ? 'true' : undefined);
-	const describedBy = (name: string) => (errors(name) ? `${name}-error` : undefined);
+	const errors = $derived(form?.errors ?? {});
 	const collectorValue = () => {
 		const selected = value('usualCollectorId', buyer?.usualCollectorId ?? '');
 		return usualCollectorNotVisible && selected === buyer?.usualCollectorId ? '__keep__' : selected;
 	};
+	const collectorOptions = $derived([
+		{ value: '', label: 'Ninguno' },
+		...(usualCollectorNotVisible
+			? [{ value: '__keep__', label: 'Cobrador habitual actual (no visible)' }]
+			: []),
+		...collectors.map((collector) => ({ value: collector.id, label: collector.displayName }))
+	]);
 </script>
 
-<form method="POST" action={buyer ? '?/update' : '?/default'} class="space-y-4">
+<form method="POST" action={buyer ? '?/update' : '?/default'} class="flex flex-col gap-5">
+	<FormResult
+		result={form?.message ? { success: !!form.success, message: form.message, errors } : null}
+		fields={FIELDS}
+	/>
 	{#if buyer}<input type="hidden" name="updatedAt" value={buyer.updatedAt} />{/if}
-	<div>
-		<label for="type" class={labelClass}>Type</label>
-		<select
-			id="type"
+	<Field label="Tipo" id="type" error={errors.type?.[0]}>
+		<Select
 			name="type"
 			bind:value={type}
-			class={inputClass}
-			aria-invalid={invalid('type')}
-			aria-describedby={describedBy('type')}
-		>
-			<option value="individual">Individual</option>
-			<option value="business">Business</option>
-		</select>
-		<FieldError id="type-error" errors={errors('type')} />
-	</div>
+			options={[
+				{ value: 'individual', label: BUYER_TYPE_LABELS.individual },
+				{ value: 'business', label: BUYER_TYPE_LABELS.business }
+			]}
+		/>
+	</Field>
 	{#if type === 'individual'}
-		<div class="grid gap-4 sm:grid-cols-2">
-			<div>
-				<label for="firstName" class={labelClass}>First name</label>
-				<input
-					id="firstName"
+		<div class="grid gap-5 sm:grid-cols-2">
+			<Field label="Nombre" id="firstName" error={errors.firstName?.[0]} optional>
+				<TextInput
 					name="firstName"
-					class={inputClass}
+					autocomplete="given-name"
 					maxlength={PARTY_LIMITS.firstName}
 					value={value('firstName', buyer?.firstName ?? '')}
-					aria-invalid={invalid('firstName')}
-					aria-describedby={describedBy('firstName')}
 				/>
-				<FieldError id="firstName-error" errors={errors('firstName')} />
-			</div>
-			<div>
-				<label for="lastName" class={labelClass}>Last name</label>
-				<input
-					id="lastName"
+			</Field>
+			<Field label="Apellido" id="lastName" error={errors.lastName?.[0]} optional>
+				<TextInput
 					name="lastName"
-					class={inputClass}
+					autocomplete="family-name"
 					maxlength={PARTY_LIMITS.lastName}
 					value={value('lastName', buyer?.lastName ?? '')}
-					aria-invalid={invalid('lastName')}
-					aria-describedby={describedBy('lastName')}
 				/>
-				<FieldError id="lastName-error" errors={errors('lastName')} />
-			</div>
+			</Field>
 		</div>
-		<div>
-			<label for="documentNumber" class={labelClass}>Document number</label>
-			<input
-				id="documentNumber"
+		<Field
+			label="Número de documento"
+			id="documentNumber"
+			hint="DNI u otro documento, tal como figura."
+			error={errors.documentNumber?.[0]}
+			optional
+		>
+			<TextInput
 				name="documentNumber"
-				class={inputClass}
+				mono
+				autocomplete="off"
 				maxlength={PARTY_LIMITS.documentNumber}
 				value={value('documentNumber', buyer?.documentNumber ?? '')}
-				aria-invalid={invalid('documentNumber')}
-				aria-describedby={describedBy('documentNumber')}
 			/>
-			<FieldError id="documentNumber-error" errors={errors('documentNumber')} />
-		</div>
+		</Field>
 	{:else}
-		<div>
-			<label for="businessName" class={labelClass}>Business name</label>
-			<input
-				id="businessName"
+		<Field label="Razón social" id="businessName" error={errors.businessName?.[0]} required>
+			<TextInput
 				name="businessName"
-				required
-				class={inputClass}
+				autocomplete="organization"
 				maxlength={PARTY_LIMITS.businessName}
 				value={value('businessName', buyer?.businessName ?? '')}
-				aria-invalid={invalid('businessName')}
-				aria-describedby={describedBy('businessName')}
 			/>
-			<FieldError id="businessName-error" errors={errors('businessName')} />
-		</div>
-		<div>
-			<label for="taxId" class={labelClass}>Tax ID</label>
-			<input
-				id="taxId"
+		</Field>
+		<Field label="CUIT" id="taxId" error={errors.taxId?.[0]} optional>
+			<TextInput
 				name="taxId"
-				class={inputClass}
+				mono
+				autocomplete="off"
 				maxlength={PARTY_LIMITS.taxId}
 				value={value('taxId', buyer?.taxId ?? '')}
-				aria-invalid={invalid('taxId')}
-				aria-describedby={describedBy('taxId')}
 			/>
-			<FieldError id="taxId-error" errors={errors('taxId')} />
-		</div>
+		</Field>
 	{/if}
-	<div class="grid gap-4 sm:grid-cols-2">
-		<div>
-			<label for="phone" class={labelClass}>Phone</label>
-			<input
-				id="phone"
+	<div class="grid gap-5 sm:grid-cols-2">
+		<Field label="Teléfono" id="phone" error={errors.phone?.[0]} optional>
+			<TextInput
 				name="phone"
-				class={inputClass}
+				type="tel"
+				autocomplete="tel"
+				inputmode="tel"
 				maxlength={PARTY_LIMITS.phone}
 				value={value('phone', buyer?.phone ?? '')}
-				aria-invalid={invalid('phone')}
-				aria-describedby={describedBy('phone')}
 			/>
-			<FieldError id="phone-error" errors={errors('phone')} />
-		</div>
-		<div>
-			<label for="usualCollectorId" class={labelClass}>Usual collector</label>
-			<select
-				id="usualCollectorId"
-				name="usualCollectorId"
-				class={inputClass}
-				aria-invalid={invalid('usualCollectorId')}
-				aria-describedby={describedBy('usualCollectorId')}
-				value={collectorValue()}
-			>
-				<option value="">None</option>
-				{#if usualCollectorNotVisible}<option value="__keep__"
-						>Current usual collector (not visible to you)</option
-					>{/if}
-				{#each collectors as collector (collector.id)}<option value={collector.id}
-						>{collector.displayName}</option
-					>{/each}
-			</select>
-			<FieldError id="usualCollectorId-error" errors={errors('usualCollectorId')} />
-			{#if !canViewCollectors && !buyer?.usualCollectorId}<p class="mt-1 text-sm text-slate-500">
-					You cannot see collectors; ask an admin to set it.
-				</p>{/if}
-		</div>
+		</Field>
+		<Field
+			label="Cobrador habitual"
+			id="usualCollectorId"
+			hint={!canViewCollectors && !buyer?.usualCollectorId
+				? 'No se pueden ver los cobradores. Pedir a un administrador que lo asigne.'
+				: undefined}
+			error={errors.usualCollectorId?.[0]}
+			optional
+		>
+			<Select name="usualCollectorId" value={collectorValue()} options={collectorOptions} />
+		</Field>
 	</div>
-	<div>
-		<label for="address" class={labelClass}>Address</label>
-		<input
-			id="address"
+	<Field label="Domicilio" id="address" error={errors.address?.[0]} optional>
+		<TextInput
 			name="address"
-			class={inputClass}
+			autocomplete="street-address"
 			maxlength={PARTY_LIMITS.address}
 			value={value('address', buyer?.address ?? '')}
-			aria-invalid={invalid('address')}
-			aria-describedby={describedBy('address')}
 		/>
-		<FieldError id="address-error" errors={errors('address')} />
-	</div>
-	<div>
-		<label for="notes" class={labelClass}>Notes</label>
-		<textarea
-			id="notes"
+	</Field>
+	<Field label="Notas" id="notes" error={errors.notes?.[0]} optional>
+		<Textarea
 			name="notes"
-			class={inputClass}
 			maxlength={PARTY_LIMITS.notes}
-			aria-invalid={invalid('notes')}
-			aria-describedby={describedBy('notes')}>{value('notes', buyer?.notes ?? '')}</textarea
-		>
-		<FieldError id="notes-error" errors={errors('notes')} />
-	</div>
-	{#if form?.duplicates?.length}<div
-			class="rounded border border-amber-300 bg-amber-50 p-3 text-sm"
-		>
-			<p>Possible duplicate buyers:</p>
-			<ul>
-				{#each form.duplicates as duplicate (duplicate.id)}<li>
+			value={value('notes', buyer?.notes ?? '')}
+		/>
+	</Field>
+	{#if form?.duplicates?.length}
+		<Alert tone="warning" title="Posibles compradores duplicados">
+			<ul class="m-0 list-disc pl-5">
+				{#each form.duplicates as duplicate (duplicate.id)}
+					<li>
 						<a
-							class="text-blue-700 underline"
+							class="rounded-sm text-primary-text underline underline-offset-2"
 							href={resolve('/campaigns/[id]/buyers/[buyerId]', {
 								id: campaignId,
 								buyerId: duplicate.id
 							})}>{duplicate.name}</a
 						>
-					</li>{/each}
+					</li>
+				{/each}
 			</ul>
-			<label class="mt-2 block"><input type="checkbox" name="createAnyway" /> Create anyway</label>
-		</div>{/if}
-	<button type="submit" class={primaryButtonClass}>{buyer ? 'Save changes' : 'Create buyer'}</button
-	>
+			<div class="mt-3">
+				<Checkbox
+					name="createAnyway"
+					label={buyer ? 'Guardar de todos modos' : 'Crear de todos modos'}
+				/>
+			</div>
+		</Alert>
+	{/if}
+	<div class="flex flex-wrap gap-2">
+		<Button type="submit" variant="primary">{buyer ? 'Guardar cambios' : 'Crear comprador'}</Button>
+		{#if cancelHref}<Button href={cancelHref}>Cancelar</Button>{/if}
+	</div>
 </form>

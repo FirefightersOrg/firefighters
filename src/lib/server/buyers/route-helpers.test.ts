@@ -24,22 +24,22 @@ describe('buyer route helpers', () => {
 		expect('failure' in result).toBe(true);
 		if ('failure' in result && result.failure) {
 			expect(result.failure.data).toMatchObject({
-				message: 'Please correct the highlighted fields.',
-				errors: { firstName: ['Enter a first or last name.'] }
+				message: 'Revisar los campos marcados.',
+				errors: { firstName: ['Ingresar el nombre o el apellido.'] }
 			});
 		}
 	});
 
 	it('keeps field service errors associated with their input and a general message', () => {
 		const result = partyFailure(
-			new PartyServiceError('validation', 'A document number is invalid.', {
+			new PartyServiceError('validation', 'El número de documento no es válido.', {
 				field: 'documentNumber'
 			}),
 			{}
 		);
 		expect(result.data).toMatchObject({
-			message: 'Please correct the highlighted fields.',
-			errors: { documentNumber: ['A document number is invalid.'] }
+			message: 'Revisar los campos marcados.',
+			errors: { documentNumber: ['El número de documento no es válido.'] }
 		});
 	});
 });

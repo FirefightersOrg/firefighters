@@ -142,7 +142,7 @@ describe('bond record: correct collector (SAN-73)', () => {
 		vi.mocked(correctBondCollector).mockRejectedValue(
 			new SaleCorrectionServiceError(
 				'validation',
-				'A reason of at most 1000 characters is required.'
+				'Se requiere un motivo de hasta 1000 caracteres.'
 			)
 		);
 		expect(

@@ -20,13 +20,13 @@ const conflict = (number: number, formatted: string, bondId: string) => ({
 describe('bond route helpers', () => {
 	it('words duplicate numbers without bond ids', () => {
 		expect(duplicateNumbersFieldMessage([conflict(68, '0068', A)])).toBe(
-			'Number 0068 is already used by another bond in this campaign.'
+			'El número 0068 ya está en uso en otro bono de esta campaña.'
 		);
 		expect(duplicateNumbersFieldMessage([conflict(68, '0068', A), conflict(4939, '4939', A)])).toBe(
-			'Numbers 0068, 4939 are already used by another bond in this campaign.'
+			'Los números 0068, 4939 ya están en uso en otro bono de esta campaña.'
 		);
 		expect(duplicateNumbersFieldMessage([conflict(68, '0068', A), conflict(5000, '5000', B)])).toBe(
-			'Numbers 0068, 5000 are already used by other bonds in this campaign.'
+			'Los números 0068, 5000 ya están en uso en otros bonos de esta campaña.'
 		);
 	});
 
@@ -44,33 +44,33 @@ describe('bond route helpers', () => {
 	});
 
 	it('explains the campaign status', () => {
-		expect(campaignLockedMessage('annulled')).toMatch(/This campaign is annulled\.$/);
+		expect(campaignLockedMessage('annulled')).toMatch(/La campaña está anulada\.$/);
 	});
 
 	it('maps form-level service errors and rethrows anything else', () => {
 		const result = bondServiceFailure(
 			'create',
-			new BondServiceError('internal', 'Something went wrong. Please try again.')
+			new BondServiceError('internal', 'Algo salió mal. Volver a intentar.')
 		);
 		expect(result.status).toBe(500);
-		expect(result.data).toMatchObject({ message: 'Something went wrong. Please try again.' });
+		expect(result.data).toMatchObject({ message: 'Algo salió mal. Volver a intentar.' });
 		expect(() => bondServiceFailure('create', new Error('boom'))).toThrow('boom');
 	});
 });
 
 describe('withoutBondIds', () => {
 	it('removes bond ids from database messages', () => {
-		expect(withoutBondIds(`Bond 0068 (${A}) is already annulled.`)).toBe(
-			'Bond 0068 is already annulled.'
+		expect(withoutBondIds(`El bono 0068 (${A}) ya está anulado.`)).toBe(
+			'El bono 0068 ya está anulado.'
 		);
-		expect(withoutBondIds(`Bond 0068 (${A}) already belongs to manually grouped pata ${B}.`)).toBe(
-			'Bond 0068 already belongs to a manually grouped pata.'
+		expect(withoutBondIds(`El bono 0068 (${A}) ya pertenece a la pata manual ${B}.`)).toBe(
+			'El bono 0068 ya pertenece a una pata manual.'
 		);
-		expect(withoutBondIds(`Only an available pata can be ungrouped (pata ${B} is sold).`)).toBe(
-			'Only an available pata can be ungrouped (this pata is sold).'
-		);
-		expect(withoutBondIds(`Bond ${A} is listed more than once.`)).toBe(
-			'A bond is listed more than once.'
+		expect(
+			withoutBondIds(`Solo se puede desagrupar una pata disponible (la pata ${B} está vendida).`)
+		).toBe('Solo se puede desagrupar una pata disponible (esta pata está vendida).');
+		expect(withoutBondIds(`El bono ${A} figura más de una vez.`)).toBe(
+			'Un bono figura más de una vez.'
 		);
 		expect(withoutBondIds('Nothing to remove.')).toBe('Nothing to remove.');
 	});

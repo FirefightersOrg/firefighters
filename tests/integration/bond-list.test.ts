@@ -217,7 +217,7 @@ describe('bonds list (local Supabase)', () => {
 		const printed = await list(readOnly, '?associated=4972');
 		expect(printed.bonds.map((b) => b.id)).toEqual([ids.printed]);
 		expect(printed.bonds[0]).toMatchObject({
-			typeLabel: 'Printed pata',
+			typeLabel: 'Pata impresa',
 			baseFormatted: ['0100', '0101'],
 			associatedFormatted: ['4971', '4972'],
 			totalValue: '120000.00'
@@ -248,10 +248,10 @@ describe('bond record audit (local Supabase)', () => {
 		expect(own.audit.allowed).toBe(true);
 		expect(own.audit.entries.map((e) => e.action)).toEqual(['bond.create']);
 		expect(own.audit.entries[0]).toMatchObject({
-			actionLabel: 'Loaded',
-			summary: 'Numbers 0005, 4876'
+			actionLabel: 'Cargado',
+			summary: 'Números 0005, 4876'
 		});
-		expect(own.audit.entries[0].actorLabel).not.toBe('System');
+		expect(own.audit.entries[0].actorLabel).not.toBe('Sistema');
 
 		const hidden = await record(operator, ids.s5);
 		expect(hidden.audit).toEqual({ allowed: false, entries: [], truncated: false });
@@ -277,7 +277,7 @@ describe('bond record audit (local Supabase)', () => {
 		expect(member.audit.entries[0]).toMatchObject({
 			reason: 'Wrong bonds',
 			viaPata: { pataId: ids.manual, label: '0001 + 0002' },
-			summary: 'This bond was freed from pata 0001 + 0002'
+			summary: 'Este bono se liberó de la pata 0001 + 0002'
 		});
 		expect(member.group.memberOf).toBeNull();
 		expect(member.group.pastPatas).toMatchObject([
@@ -304,7 +304,7 @@ describe('bond record audit (local Supabase)', () => {
 		expect(annulled.audit.entries[0]).toMatchObject({
 			action: 'bond.annul',
 			reason: 'Loaded by mistake',
-			summary: 'Released numbers 0003, 4874'
+			summary: 'Números liberados 0003, 4874'
 		});
 	});
 

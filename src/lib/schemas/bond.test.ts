@@ -53,16 +53,16 @@ describe('bondCreateSimpleSchema', () => {
 		).toEqual([95128]);
 		expect(
 			errorsOf(bondCreateSimpleSchema(FOUR).safeParse({ ...base, baseNumber: '00068' })).baseNumber
-		).toEqual(['"00068" is not a valid number (use up to 4 digits)']);
+		).toEqual(['«00068» no es un número válido (usar hasta 4 dígitos)']);
 	});
 
 	it.each([
-		['', 'Base number is required'],
-		['abc', '"abc" is not a valid number (use up to 4 digits)'],
-		['-1', '"-1" is not a valid number (use up to 4 digits)'],
+		['', 'El número base es obligatorio'],
+		['abc', '«abc» no es un número válido (usar hasta 4 dígitos)'],
+		['-1', '«-1» no es un número válido (usar hasta 4 dígitos)'],
 		[
 			'5129',
-			'Base number 5129 overflows: its associated number 10000 exceeds the campaign maximum number 9999 (the highest allowed base number is 5128)'
+			'El número base 5129 desborda: su número asociado 10000 supera el número máximo de la campaña 9999 (el número base más alto permitido es 5128)'
 		]
 	])('rejects base number %j', (baseNumber, message) => {
 		expect(
@@ -74,7 +74,7 @@ describe('bondCreateSimpleSchema', () => {
 		const config = { ...FOUR, maxNumber: 5000, associatedNumberOffset: 100 };
 		expect(
 			errorsOf(bondCreateSimpleSchema(config).safeParse({ ...base, baseNumber: '6000' })).baseNumber
-		).toEqual(['Number 6000 exceeds the campaign maximum number 5000']);
+		).toEqual(['El número 6000 supera el número máximo de la campaña 5000']);
 	});
 
 	it('rejects an unknown campaign id and long codes', () => {
@@ -86,8 +86,8 @@ describe('bondCreateSimpleSchema', () => {
 				barcode: 'x'.repeat(101)
 			})
 		);
-		expect(errors.campaignId).toEqual(['Unknown campaign']);
-		expect(errors.barcode).toEqual(['Barcode must be at most 100 characters']);
+		expect(errors.campaignId).toEqual(['Campaña desconocida']);
+		expect(errors.barcode).toEqual(['El código de barras admite hasta 100 caracteres']);
 	});
 });
 
@@ -107,25 +107,29 @@ describe('bondCreatePataSchema', () => {
 		expect(
 			errorsOf(bondCreatePataSchema(FOUR).safeParse({ ...base, baseNumbers: ['0068', ' '] }))
 				.baseNumbers
-		).toEqual(['A pata needs at least 2 base numbers']);
+		).toEqual(['Una pata necesita al menos 2 números base']);
 	});
 
 	it('rejects numbers repeated inside the pata (base or associated)', () => {
 		expect(
 			errorsOf(bondCreatePataSchema(FOUR).safeParse({ ...base, baseNumbers: '5 5' })).baseNumbers
-		).toEqual(['Number 0005 appears more than once in this bond (2 as base, 0 as associated)']);
+		).toEqual([
+			'El número 0005 aparece más de una vez en este bono (2 como base, 0 como asociado)'
+		]);
 		expect(
 			errorsOf(bondCreatePataSchema(FOUR).safeParse({ ...base, baseNumbers: '10 4881' }))
 				.baseNumbers
-		).toEqual(['Number 4881 appears more than once in this bond (1 as base, 1 as associated)']);
+		).toEqual([
+			'El número 4881 aparece más de una vez en este bono (1 como base, 1 como asociado)'
+		]);
 	});
 
 	it('reports every malformed number', () => {
 		expect(
 			errorsOf(bondCreatePataSchema(FOUR).safeParse({ ...base, baseNumbers: 'x 1 y' })).baseNumbers
 		).toEqual([
-			'"x" is not a valid number (use up to 4 digits)',
-			'"y" is not a valid number (use up to 4 digits)'
+			'«x» no es un número válido (usar hasta 4 dígitos)',
+			'«y» no es un número válido (usar hasta 4 dígitos)'
 		]);
 	});
 });
@@ -144,8 +148,8 @@ describe('bondGroupSchema', () => {
 	});
 
 	it.each([
-		[[BOND_A], 'A pata needs at least 2 simple bonds'],
-		[[BOND_A, BOND_A.toUpperCase()], 'A bond is listed more than once']
+		[[BOND_A], 'Una pata necesita al menos 2 bonos simples'],
+		[[BOND_A, BOND_A.toUpperCase()], 'Un bono figura más de una vez']
 	])('rejects %j', (memberBondIds, message) => {
 		expect(errorsOf(bondGroupSchema.safeParse({ ...base, memberBondIds })).memberBondIds).toEqual([
 			message
@@ -163,9 +167,9 @@ describe('bondUngroupSchema / bondAnnulSchema', () => {
 	it('require a reason', () => {
 		expect(
 			errorsOf(bondUngroupSchema.safeParse({ pataBondId: BOND_A, reason: '  ' })).reason
-		).toEqual(['A reason is required to ungroup a pata']);
+		).toEqual(['Se requiere un motivo para desagrupar una pata']);
 		expect(errorsOf(bondAnnulSchema.safeParse({ bondId: BOND_A, reason: '' })).reason).toEqual([
-			'A reason is required to annul a bond'
+			'Se requiere un motivo para anular un bono'
 		]);
 	});
 
@@ -182,7 +186,7 @@ describe('bondUngroupSchema / bondAnnulSchema', () => {
 
 	it('reject long reasons and unknown ids', () => {
 		const errors = errorsOf(bondAnnulSchema.safeParse({ bondId: 'x', reason: 'r'.repeat(1001) }));
-		expect(errors.bondId).toEqual(['Unknown bond']);
-		expect(errors.reason).toEqual(['Reason must be at most 1000 characters']);
+		expect(errors.bondId).toEqual(['Bono desconocido']);
+		expect(errors.reason).toEqual(['El motivo admite hasta 1000 caracteres']);
 	});
 });

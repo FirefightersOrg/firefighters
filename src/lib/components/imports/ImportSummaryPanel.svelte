@@ -1,43 +1,48 @@
 <script lang="ts">
-	import { formatInteger } from '$lib/domain/money';
+	import { Stat } from '$lib/components/ui';
+	import { formatNumber } from '$lib/format';
 	import type { ImportSessionSummary } from '$lib/server/services/imports';
 
-	/** The seven preview metrics of docs/imports.md, with blocking errors highlighted. */
+	/** The seven preview metrics of docs/imports.md, with blocking errors called out in words. */
 	let { summary }: { summary: ImportSessionSummary } = $props();
 
 	const metrics = $derived([
-		{ label: 'Simple bonds', value: summary.simpleItems, tone: 'neutral' },
-		{ label: 'Patas', value: summary.pataGroups, tone: 'neutral' },
-		{ label: 'Base numbers', value: summary.baseNumbers, tone: 'neutral' },
-		{ label: 'Participating numbers', value: summary.participatingNumbers, tone: 'neutral' },
-		{ label: 'Blocking errors', value: summary.errors, tone: summary.errors > 0 ? 'error' : 'ok' },
-		{ label: 'Warnings', value: summary.warnings, tone: summary.warnings > 0 ? 'warning' : 'ok' },
+		{ label: 'Bonos simples', value: summary.simpleItems },
+		{ label: 'Patas', value: summary.pataGroups },
+		{ label: 'Números base', value: summary.baseNumbers },
+		{ label: 'Números participantes', value: summary.participatingNumbers },
 		{
-			label: 'Duplicates',
+			label: 'Errores bloqueantes',
+			value: summary.errors,
+			detail: summary.errors > 0 ? 'Impiden confirmar' : undefined
+		},
+		{
+			label: 'Observaciones',
+			value: summary.warnings,
+			detail: summary.warnings > 0 ? 'Revisar antes de confirmar' : undefined
+		},
+		{
+			label: 'Duplicados',
 			value: summary.duplicates,
-			tone: summary.duplicates > 0 ? 'error' : 'ok'
+			detail: summary.duplicates > 0 ? 'Repetidos o ya en uso' : undefined
 		}
-	] as const);
-
-	const TONES = {
-		neutral: 'border-slate-200 bg-white text-slate-900',
-		ok: 'border-slate-200 bg-white text-slate-900',
-		warning: 'border-amber-200 bg-amber-50 text-amber-900',
-		error: 'border-red-200 bg-red-50 text-red-800'
-	} as const;
+	]);
 </script>
 
-<dl class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7" aria-label="Import summary">
+<div
+	class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7"
+	role="group"
+	aria-label="Resumen de la importación"
+>
 	{#each metrics as metric (metric.label)}
-		<div class="rounded-lg border p-3 {TONES[metric.tone]}">
-			<dt class="text-xs font-medium opacity-80">{metric.label}</dt>
-			<dd class="mt-1 text-xl font-semibold tabular-nums">{formatInteger(metric.value)}</dd>
-		</div>
+		<Stat label={metric.label} value={formatNumber(metric.value)} detail={metric.detail} />
 	{/each}
-</dl>
+</div>
 {#if summary.pending > 0 || summary.removedItems > 0}
-	<p class="mt-2 text-xs text-slate-500">
-		{#if summary.pending > 0}{formatInteger(summary.pending)} rows pending validation.{/if}
-		{#if summary.removedItems > 0}{formatInteger(summary.removedItems)} rows removed (kept as history).{/if}
+	<p class="m-0 mt-2 text-body-sm text-muted">
+		{#if summary.pending > 0}{formatNumber(summary.pending)}
+			{summary.pending === 1 ? 'fila pendiente' : 'filas pendientes'} de validación.{/if}
+		{#if summary.removedItems > 0}{formatNumber(summary.removedItems)}
+			{summary.removedItems === 1 ? 'fila quitada' : 'filas quitadas'} (se conservan como historial).{/if}
 	</p>
 {/if}

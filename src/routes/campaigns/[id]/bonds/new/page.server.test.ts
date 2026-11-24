@@ -102,7 +102,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const missing = setup({ campaign: { data: null, error: null } });
 			await expect(load(loadEvent(missing.locals))).rejects.toMatchObject({
 				status: 404,
-				body: { message: 'Campaign not found.' }
+				body: { message: 'No se encontró la campaña.' }
 			});
 		});
 
@@ -130,7 +130,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const data = (await load(loadEvent(locals)))!;
 			expect(data.canLoad).toBe(false);
 			expect(data.lockedMessage).toBe(
-				'Bonds can only be loaded or changed while the campaign is a draft or active. This campaign is closed.'
+				'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa. La campaña está cerrada.'
 			);
 		});
 	});
@@ -154,7 +154,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			expect(result.data).toMatchObject({
 				form: 'create',
 				success: false,
-				message: 'You do not have permission to perform this action.'
+				message: 'No hay permiso para realizar esta acción.'
 			});
 			expect(rpc).not.toHaveBeenCalled();
 			expect(from).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const { locals, rpc } = setup({ campaign: { data: null, error: { message: 'boom' } } });
 			const result = (await runAction(locals, entry())) as ActionFailure;
 			expect(result.status).toBe(500);
-			expect(result.data.message).toBe('Something went wrong. Please try again.');
+			expect(result.data.message).toBe('Algo salió mal. Volver a intentar.');
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
@@ -211,7 +211,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			expect(result).toEqual({
 				form: 'create',
 				success: true,
-				message: 'Bond 0068 / 4939 saved.',
+				message: 'Bono 0068 / 4939 guardado.',
 				errors: {},
 				created: { id: BOND_ID, baseFormatted: '0068', associatedFormatted: '4939' }
 			});
@@ -233,7 +233,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			});
 			const result = await runAction(locals, { ...entry({ baseNumber: '68' }), intent: 'another' });
 			expect(result).toMatchObject({
-				message: 'Bond 00068 / 48778 saved.',
+				message: 'Bono 00068 / 48778 guardado.',
 				created: { baseFormatted: '00068', associatedFormatted: '48778' }
 			});
 			expect(rpc).toHaveBeenCalledWith(
@@ -244,13 +244,13 @@ describe('/campaigns/[id]/bonds/new', () => {
 
 		it('rejects a missing number, an overflow or too many digits before calling the database', async () => {
 			const cases: Array<[string, string]> = [
-				['', 'Base number is required'],
+				['', 'El número base es obligatorio'],
 				[
 					'5129',
-					'Base number 5129 overflows: its associated number 10000 exceeds the campaign maximum ' +
-						'number 9999 (the highest allowed base number is 5128)'
+					'El número base 5129 desborda: su número asociado 10000 supera el número máximo de la campaña ' +
+						'9999 (el número base más alto permitido es 5128)'
 				],
-				['12345', '"12345" is not a valid number (use up to 4 digits)']
+				['12345', '«12345» no es un número válido (usar hasta 4 dígitos)']
 			];
 			for (const [baseNumber, message] of cases) {
 				const { locals, rpc } = setup();
@@ -258,7 +258,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 				const result = (await runAction(locals, form)) as ActionFailure;
 				expect(result.status).toBe(400);
 				expect(result.data).toMatchObject({
-					message: 'Please correct the highlighted fields.',
+					message: 'Corregir los campos marcados.',
 					errors: { baseNumber: [message] },
 					values: entry({ baseNumber })
 				});
@@ -273,7 +273,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const result = (await runAction(locals, entry())) as ActionFailure;
 			expect(result.status).toBe(409);
 			expect(result.data.message).toBe(
-				'Bonds can only be loaded or changed while the campaign is a draft or active. This campaign is closing.'
+				'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa. La campaña está en cierre.'
 			);
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -292,9 +292,9 @@ describe('/campaigns/[id]/bonds/new', () => {
 			expect(result.status).toBe(409);
 			expect(result.data).toMatchObject({
 				success: false,
-				message: 'Please correct the highlighted fields.',
+				message: 'Corregir los campos marcados.',
 				errors: {
-					baseNumber: ['Numbers 0068, 4939 are already used by another bond in this campaign.']
+					baseNumber: ['Los números 0068, 4939 ya están en uso en otro bono de esta campaña.']
 				},
 				conflicts: [{ field: 'baseNumber', bondId: OTHER_BOND_ID, numbers: ['0068', '4939'] }],
 				values: entry()
@@ -313,7 +313,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			});
 			const result = (await runAction(locals, entry({ baseNumber: '0129' }))) as ActionFailure;
 			expect(result.data.errors).toEqual({
-				baseNumber: ['Numbers 0129, 5000 are already used by other bonds in this campaign.']
+				baseNumber: ['Los números 0129, 5000 ya están en uso en otros bonos de esta campaña.']
 			});
 			expect(result.data.conflicts).toEqual([
 				{ field: 'baseNumber', bondId: BOND_ID, numbers: ['0129'] },
@@ -335,7 +335,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const result = (await runAction(locals, entry({ internalCode: 'INT-1' }))) as ActionFailure;
 			expect(result.status).toBe(409);
 			expect(result.data.errors).toEqual({
-				internalCode: ['Internal code INT-1 is already used by another bond in this campaign.']
+				internalCode: ['El código interno INT-1 ya está en uso en otro bono de esta campaña.']
 			});
 			expect(result.data.conflicts).toEqual([
 				{ field: 'internalCode', bondId: OTHER_BOND_ID, numbers: [] }
@@ -356,7 +356,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const overflowResult = (await runAction(overflow.locals, entry())) as ActionFailure;
 			expect(overflowResult.status).toBe(400);
 			expect((overflowResult.data.errors as Record<string, string[]>).baseNumber[0]).toMatch(
-				/^Base number 5129 overflows/
+				/^El número base 5129 desborda/
 			);
 
 			// The campaign was closed between the lookup and the insert.
@@ -373,7 +373,7 @@ describe('/campaigns/[id]/bonds/new', () => {
 			const closedResult = (await runAction(closed.locals, entry())) as ActionFailure;
 			expect(closedResult.status).toBe(409);
 			expect(closedResult.data.message).toBe(
-				'Bonds can only be loaded or changed while the campaign is a draft or active. This campaign is closing.'
+				'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa. La campaña está en cierre.'
 			);
 
 			const denied = setup({

@@ -6,7 +6,7 @@ import type {
 	BondRecordPastPata
 } from '$lib/components/bonds/record/types';
 import {
-	BARCODE_MODE_LABELS,
+	BARCODE_MODE_LABELS_ES,
 	campaignNumberingConfig,
 	canLoadBonds,
 	type Campaign
@@ -20,9 +20,9 @@ import { campaignLockedMessage } from './route-helpers';
 /** Builds the bond record page's view model (pure: everything is passed in). */
 
 const TYPE_LABELS = {
-	simple: 'Simple bond',
-	printed: 'Printed pata',
-	manual_grouping: 'Manually grouped pata'
+	simple: 'Bono simple',
+	printed: 'Pata impresa',
+	manual_grouping: 'Pata agrupada manualmente'
 } as const;
 
 export function bondTypeLabel(bond: Pick<BondDetail, 'kind' | 'origin'>): string {
@@ -39,10 +39,10 @@ export function formatPataLabel(baseNumbers: readonly number[], campaign: Campai
 }
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
-	'bond.create': 'Loaded',
-	'bond.group': 'Grouped into a pata',
-	'bond.ungroup': 'Pata ungrouped',
-	'bond.annul': 'Annulled'
+	'bond.create': 'Cargado',
+	'bond.group': 'Agrupado en una pata',
+	'bond.ungroup': 'Pata desagrupada',
+	'bond.annul': 'Anulado'
 };
 
 /** Pata entries shown on a member's record. */
@@ -184,7 +184,7 @@ export function buildBondRecord(input: BondRecordInput): BondRecord {
 		barcode: {
 			barcode: bond.barcode,
 			internalCode: bond.internalCode,
-			modeLabel: BARCODE_MODE_LABELS[campaign.barcodeMode]
+			modeLabel: BARCODE_MODE_LABELS_ES[campaign.barcodeMode]
 		},
 		collector: { id: bond.currentCollectorId },
 		buyer: { id: bond.currentBuyerId },
@@ -231,18 +231,18 @@ export function buildAuditEntries(
 		let summary: string | null = null;
 		if (entry.action === 'bond.create') {
 			const loaded = numbersIn(entry.newValue, 'numbers', format);
-			summary = loaded.length ? `Numbers ${loaded.join(', ')}` : null;
+			summary = loaded.length ? `Números ${loaded.join(', ')}` : null;
 		} else if (entry.action === 'bond.annul') {
 			const released = numbersIn(entry.newValue, 'released_numbers', format);
-			summary = released.length ? `Released numbers ${released.join(', ')}` : null;
+			summary = released.length ? `Números liberados ${released.join(', ')}` : null;
 		} else if (entry.action === 'bond.group') {
 			summary = pata
-				? `This bond was grouped into pata ${pata.label}`
-				: `${idsIn(entry.newValue, 'members').length} bonds grouped`;
+				? `Este bono se agrupó en la pata ${pata.label}`
+				: `${idsIn(entry.newValue, 'members').length} bonos agrupados`;
 		} else if (entry.action === 'bond.ungroup') {
 			summary = pata
-				? `This bond was freed from pata ${pata.label}`
-				: `${idsIn(entry.newValue, 'ungrouped_members').length} bonds freed`;
+				? `Este bono se liberó de la pata ${pata.label}`
+				: `${idsIn(entry.newValue, 'ungrouped_members').length} bonos liberados`;
 		}
 
 		return [
@@ -251,7 +251,7 @@ export function buildAuditEntries(
 				action: entry.action,
 				actionLabel: AUDIT_ACTION_LABELS[entry.action] ?? entry.action,
 				createdAt: entry.createdAt,
-				actorLabel: entry.actorName ?? (entry.actorUserId ? 'A user' : 'System'),
+				actorLabel: entry.actorName ?? (entry.actorUserId ? 'Un usuario' : 'Sistema'),
 				reason: entry.reason,
 				summary,
 				viaPata: pata,
