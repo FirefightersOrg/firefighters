@@ -162,7 +162,7 @@ Possible results:
   and a draft/active campaign (55000 otherwise),
   preserves draw type and only edits scheduled draws; changing the installment takes the campaign
   lock before the draw lock and remains bounded by the campaign's installment count.
-- There is no `draw.annul` permission in `docs/permissions.md`, so annulment uses `draw.update`.
+- Annulment requires the admin-only `draw.annul` permission (SAN-118), not `draw.update`.
   Only `scheduled -> annulled` is allowed, exactly as in `docs/state-machines.md` and SAN-75.
   Generated/frozen draws cannot be annulled; no frozen history is changed or discarded.
   Annulment has its own timestamp, actor and trimmed 1..1000-code-point reason.
@@ -514,8 +514,8 @@ Review resolutions (PR #89):
 ## Implemented in SAN-123: completing a draw
 
 - `draw_complete(p_draw_id, p_request_id)` / `completeDraw` moves a draw from `roster_frozen` to
-  `completed` (the only path to that state). Permission: `draw.update`, like `draw_annul`, until
-  SAN-118 splits the draw permissions.
+  `completed` (the only path to that state). Permission: admin-only `draw.complete` (SAN-118).
+  `draw.update` does not authorize completion or annulment.
 - Preconditions: at least one resolved non-annulled prize (Santi, #93: a draw with no prizes, or
   only annulled ones, cannot complete), and no non-annulled prize of the draw in `pending_validation` (with or without a
   loaded number). `pending_delivery` counts as resolved: deliveries can be recorded after completion.
@@ -524,4 +524,38 @@ Review resolutions (PR #89):
   so concurrent prize writes serialize with the completion.
 - One `draw.complete` audit row with the before/after draw. After completion, prize creation and
   winner loading are refused; void-only prize annulment still works (SAN-81).
-- The draw detail page offers "Complete draw" only on frozen draws to users with `draw.update`.
+- The draw detail page offers "Complete draw" only on frozen draws to users with `draw.complete`.
+
+## SAN-118: independent lifecycle permissions
+
+- Migration `20270103000000_draw_annul_complete_permissions.sql` seeds `draw.annul` and
+  `draw.complete` for admin only, following Santi's Phase 12 decision. Existing `draw.update`
+  grants stay unchanged; there is no implied lifecycle grant for custom roles.
+- RPC signatures, validation, state transitions, locks, audit snapshots and execution grants
+  are unchanged. No lock change was made, so no new dblink test is needed; existing concurrency
+  tests remain part of the full database suite.
+- Service and route guards use the same independent permissions. Phase 2 navigation is
+  unchanged because no navigation flag or seeded non-admin grant changes.
+- Stack integration: this branch is based on SAN-123, not SAN-117. Before merging after
+  SAN-117, rebase the `draw_annul` replacement onto its new body (extraordinary generated-draw
+  annulment and number release), changing only its actor permission to `draw.annul`.
+  The coordinator owns that rebase; this migration deliberately preserves the current base's
+  behavior rather than implementing SAN-117 independently.
+- Known gaps outside this change: **SAN-117** extraordinary-number release on annulment,
+  **SAN-119** idempotent roster freeze, **SAN-81** delivered-prize annulment pending a product
+  decision, and **SAN-77** payment-date rather than confirmation-time cutoff semantics.
+
+### SAN-118 verification
+
+- Full locked reset → database tests → admin seed → integration: **45 pgTAP files /
+  3046 assertions passed** (including 27 new permission assertions); **28 integration files /
+  230 tests passed**. `pnpm check`: zero errors/warnings; `pnpm lint`: passed;
+  `pnpm test`: **146 files / 1777 tests passed**. The three changed draw test files also
+  passed shuffled with seed 118 (59 tests).
+- Initial integration run: 228 passed, two flaky, order-sensitive Phase 3 assertions failed
+  at `tests/integration/phase-3-acceptance.test.ts:1257` and `:1395` (group-history and
+  audit-history ordering). The fresh full locked rerun passed both without changes; per the
+  coordinator's decision those assertions were not modified.
+- An intervening integration-only retry found no seeded admin in the shared database
+  (invalid credentials, 228 skipped); the final successful run reset and seeded under one
+  lock, so it did not rely on another worker's database state.

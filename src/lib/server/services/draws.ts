@@ -45,7 +45,7 @@ async function write<T extends z.ZodType>(
 	client: SupabaseClient,
 	input: z.input<T>,
 	ctx: DrawRequestContext,
-	permission: 'draw.create' | 'draw.update',
+	permission: 'draw.create' | 'draw.update' | 'draw.annul' | 'draw.complete',
 	schema: T,
 	name: string,
 	args: (p: z.output<T>) => Record<string, unknown>
@@ -98,7 +98,7 @@ export function updateDraw(
 	})).then(() => undefined);
 }
 export function annulDraw(client: SupabaseClient, input: AnnulDrawInput, ctx: DrawRequestContext) {
-	return write(client, input, ctx, 'draw.update', annulDrawSchema, 'draw_annul', (p) => ({
+	return write(client, input, ctx, 'draw.annul', annulDrawSchema, 'draw_annul', (p) => ({
 		p_draw_id: p.drawId,
 		p_reason: p.reason
 	})).then(() => undefined);
@@ -110,7 +110,7 @@ export function completeDraw(
 	input: CompleteDrawInput,
 	ctx: DrawRequestContext
 ) {
-	return write(client, input, ctx, 'draw.update', completeDrawSchema, 'draw_complete', (p) => ({
+	return write(client, input, ctx, 'draw.complete', completeDrawSchema, 'draw_complete', (p) => ({
 		p_draw_id: p.drawId
 	})).then(() => undefined);
 }

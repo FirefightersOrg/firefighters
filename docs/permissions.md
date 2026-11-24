@@ -105,6 +105,8 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `draw.view`            | View draws.                              |
 | `draw.create`          | Create draws.                            |
 | `draw.update`          | Edit scheduled draws.                    |
+| `draw.annul`           | Annul scheduled draws (admin only).      |
+| `draw.complete`        | Complete frozen draws (admin only).      |
 | `draw.generate_roster` | Generate roster.                         |
 | `draw.freeze_roster`   | Freeze roster.                           |
 | `draw.load_winner`     | Load winning number.                     |
@@ -154,6 +156,8 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `commission.rule_manage` |   yes |       no |        no |        no |        no |
 | `commission.adjust`      |   yes |       no |       yes |        no |        no |
 | `draw.view`              |   yes |      yes |       yes |        no |        no |
+| `draw.annul`             |   yes |       no |        no |        no |        no |
+| `draw.complete`          |   yes |       no |        no |        no |        no |
 | `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
 | `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
 | `prize.annul`            |   yes |       no |        no |        no |        no |
