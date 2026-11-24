@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import type { BondRecord } from '$lib/components/bonds/record/types';
 import type { Campaign } from '$lib/domain/campaigns';
+import { formatMoney } from '$lib/format';
 import Page from './+page.svelte';
 
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';
@@ -35,7 +36,7 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 			id: BOND_ID,
 			kind: 'simple',
 			origin: 'printed',
-			typeLabel: 'Simple bond',
+			typeLabel: 'Bono simple',
 			commercialStatus: 'available',
 			financialStatus: 'no_payments',
 			unitCount: 1,
@@ -52,7 +53,11 @@ function record(overrides: Partial<BondRecord> = {}): BondRecord {
 			{ formatted: '4939', kind: 'associated', released: false, ownerBondId: BOND_ID }
 		],
 		group: { members: [], memberOf: null, pastPatas: [] },
-		barcode: { barcode: null, internalCode: 'INT-1', modeLabel: 'Barcode is the base number' },
+		barcode: {
+			barcode: null,
+			internalCode: 'INT-1',
+			modeLabel: 'El código de barras es el número base'
+		},
 		collector: { id: null },
 		buyer: { id: null },
 		audit: { allowed: false, entries: [], truncated: false },
@@ -96,10 +101,10 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			]
 		});
-		expect(body).toContain('Draws and rosters');
+		expect(body).toContain('Sorteos y padrones');
 		expect(body).toContain('0007');
-		expect(body).toContain('Extraordinary');
-		expect(body).toContain('not_fully_paid');
+		expect(body).toContain('Extraordinario');
+		expect(body).toContain('Bono sin pago total');
 	});
 
 	it('renders confirmed payment certificates in the Payments section', () => {
@@ -116,7 +121,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			]
 		});
-		expect(body).toContain('Payments');
+		expect(body).toContain('Pagos');
 		expect(body).toContain(
 			'/campaigns/f0000000-0000-0000-0000-000000000001/payments/payment/print'
 		);
@@ -145,35 +150,35 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			]
 		});
-		expect(body).toContain('Prizes won (1)');
-		expect(body).toContain('Annulled — does not count as won');
+		expect(body).toContain('Premios ganados: 1');
+		expect(body).toContain('No cuenta como ganado');
 		expect(body).toContain('December');
-		expect(body).toContain('#1 — Bike');
-		expect(body).toContain('Delivered');
+		expect(body).toContain('N.º 1 — Bike');
+		expect(body).toContain('Entregado');
 		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
 		expect(body).toContain('/draws/draw/winners');
 	});
 	it('shows the general data and the formatted numbers of a simple bond', () => {
 		const body = renderPage(record());
-		expect(body).toContain('Simple bond 0068');
-		expect(body).toContain('General data');
-		expect(body).toContain('$ 60.000,00');
+		expect(body).toContain('Bono simple 0068');
+		expect(body).toContain('Datos generales');
+		expect(body).toContain(formatMoney('60000.00'));
 		expect(body).toContain('INT-1');
 		expect(body).toContain('4939');
 		expect(body).toContain('Disponible');
 		// No actions for this user.
-		expect(body).not.toContain('Annul bond');
-		expect(body).not.toContain('Ungroup pata');
+		expect(body).not.toContain('Anular bono');
+		expect(body).not.toContain('Desagrupar pata');
 	});
 
 	it('offers annulment with a required reason and explains that the numbers are freed', () => {
 		const body = renderPage(
 			record({ actions: { ungroup: false, annul: true, lockedMessage: null } })
 		);
-		expect(body).toContain('Annul bond');
+		expect(body).toContain('Anular bono');
 		expect(body).toContain('action="?/annul"');
 		expect(body).toMatch(/<textarea[^>]*name="reason"[^>]*required/);
-		expect(body).toContain('its numbers are freed');
+		expect(body).toContain('sus números quedan libres');
 	});
 
 	it('shows the reason error and the success message', () => {
@@ -182,11 +187,11 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			{
 				form: 'annul',
 				success: false,
-				message: 'Please correct the highlighted fields.',
-				errors: { reason: ['A reason is required to annul a bond'] }
+				message: 'Corregir los campos marcados.',
+				errors: { reason: ['Se requiere un motivo para anular un bono'] }
 			}
 		);
-		expect(failed).toContain('A reason is required to annul a bond');
+		expect(failed).toContain('Se requiere un motivo para anular un bono');
 		const done = renderPage(
 			record({
 				general: {
@@ -201,15 +206,15 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			{
 				form: 'annul',
 				success: true,
-				message: 'Bond annulled. Its numbers are free and can be entered again.',
+				message: 'Bono anulado. Sus números quedaron libres y se pueden volver a ingresar.',
 				errors: {}
 			}
 		);
-		expect(done).toContain('Bond annulled.');
+		expect(done).toContain('Bono anulado.');
 		expect(done).toContain('Loaded twice');
-		expect(done).toContain('Released');
-		expect(done).toContain('Annulled from');
-		expect(done).toContain('its numbers and codes were freed');
+		expect(done).toContain('Liberado');
+		expect(done).toContain('Anulado desde el estado');
+		expect(done).toContain('sus números y códigos quedaron libres');
 	});
 
 	it('an annulled sale: numbers and codes stay held', () => {
@@ -224,10 +229,10 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			})
 		);
-		expect(body).toContain('Annulled from');
-		expect(body).toContain('its numbers and codes stay held');
-		expect(body).not.toContain('were freed');
-		expect(body).not.toContain('Released');
+		expect(body).toContain('Anulado desde el estado');
+		expect(body).toContain('Sus números y códigos siguen retenidos');
+		expect(body).not.toContain('quedaron libres');
+		expect(body).not.toContain('Liberado');
 	});
 
 	it('a member of a manual pata: links to the pata, no actions', () => {
@@ -240,10 +245,10 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			})
 		);
-		expect(body).toContain('In pata');
+		expect(body).toContain('En la pata');
 		expect(body).toContain('0068 + 0069');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
-		expect(body).not.toContain('Annul bond');
+		expect(body).not.toContain('Anular bono');
 	});
 
 	it('a manual pata: members with links, ungroup action and ungroup history', () => {
@@ -254,7 +259,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 					id: PATA_ID,
 					kind: 'pata',
 					origin: 'manual_grouping',
-					typeLabel: 'Manually grouped pata',
+					typeLabel: 'Pata agrupada manualmente',
 					unitCount: 2,
 					totalValue: '120000.00'
 				},
@@ -289,15 +294,15 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				actions: { ungroup: true, annul: false, lockedMessage: null }
 			})
 		);
-		expect(body).toContain('Manually grouped pata 0068 + 0069');
-		expect(body).toContain('$ 120.000,00');
-		expect(body).toContain('Members');
+		expect(body).toContain('Pata agrupada manualmente 0068 + 0069');
+		expect(body).toContain(formatMoney('120000.00'));
+		expect(body).toContain('Miembros');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${MEMBER_B}"`);
-		expect(body).toContain('Member bond');
-		expect(body).toContain('Ungroup history');
+		expect(body).toContain('Bono miembro');
+		expect(body).toContain('Historial de desagrupaciones');
 		expect(body).toContain('Wrong bonds');
 		expect(body).toContain('action="?/ungroup"');
-		expect(body).toContain('Ungroup pata');
+		expect(body).toContain('Desagrupar pata');
 	});
 
 	it('explains why an available bond cannot be changed in a closed campaign', () => {
@@ -306,30 +311,30 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				actions: {
 					ungroup: false,
 					annul: false,
-					lockedMessage: 'Bonds can only be loaded or changed ... This campaign is closed.'
+					lockedMessage: 'Los bonos solo se pueden cargar o modificar ... La campaña está cerrada.'
 				}
 			})
 		);
-		expect(body).toContain('This campaign is closed.');
+		expect(body).toContain('La campaña está cerrada.');
 		expect(body).not.toContain('action="?/annul"');
 	});
 	it('renders the 14 numbered sections in order, with an index of anchors', () => {
 		const body = renderPage(record());
 		const titles = [
-			'General data',
-			'Participating numbers',
-			'Barcode',
-			'Current collector',
-			'Assignment history',
-			'Current buyer',
-			'Sale',
-			'Installments',
-			'Payments',
-			'Settlements',
-			'Commissions',
-			'Draws and rosters',
-			'Prizes',
-			'Audit'
+			'Datos generales',
+			'Números participantes',
+			'Código de barras',
+			'Cobrador actual',
+			'Historial de asignaciones',
+			'Comprador actual',
+			'Venta',
+			'Cuotas',
+			'Pagos',
+			'Rendiciones',
+			'Comisiones',
+			'Sorteos y padrones',
+			'Premios',
+			'Auditoría'
 		];
 		const ids = [
 			'general',
@@ -365,22 +370,22 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 
 	it('later-phase sections show empty states; collector and buyer are not set', () => {
 		const body = renderPage(record());
-		expect(body).toContain('Not delivered to a collector.');
-		expect(body).toContain('No buyer: the bond is not sold.');
-		expect(body).toContain('This bond has not been sold.');
-		expect(body).toContain('No installment plan.');
-		expect(body).toContain('No payments recorded.');
-		expect(body).toContain('Not included in any settlement.');
-		expect(body).toContain('No commissions generated.');
-		expect(body).toContain('Not included in any draw roster.');
-		expect(body).toContain('No prizes.');
-		expect(body).toContain('Barcode is the base number');
-		expect(body).toContain('No barcode was recorded for this bond.');
-		expect(body).toContain('No payments');
+		expect(body).toContain('No se entregó a un cobrador.');
+		expect(body).toContain('Sin comprador: el bono no se vendió.');
+		expect(body).toContain('Este bono no se vendió.');
+		expect(body).toContain('Sin plan de cuotas.');
+		expect(body).toContain('No hay pagos registrados.');
+		expect(body).toContain('No figura en ninguna rendición.');
+		expect(body).toContain('No se generaron comisiones.');
+		expect(body).toContain('No figura en ningún padrón de sorteo.');
+		expect(body).toContain('Sin premios.');
+		expect(body).toContain('El código de barras es el número base');
+		expect(body).toContain('No se registró un código de barras para este bono.');
+		expect(body).toContain('No hay pagos');
 	});
 
 	it('audit: a note without audit.view; entries with actor, reason and pata link', () => {
-		expect(renderPage(record())).toContain('You do not have permission to view the audit log.');
+		expect(renderPage(record())).toContain('No hay permiso para ver el registro de auditoría.');
 
 		const body = renderPage(
 			record({
@@ -391,11 +396,11 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 						{
 							id: 'a2',
 							action: 'bond.group',
-							actionLabel: 'Grouped into a pata',
+							actionLabel: 'Agrupado en una pata',
 							createdAt: '2026-11-17T13:00:00+00:00',
 							actorLabel: 'Operator One',
 							reason: null,
-							summary: 'This bond was grouped into pata 0068 + 0069',
+							summary: 'Este bono se agrupó en la pata 0068 + 0069',
 							viaPata: { pataId: PATA_ID, label: '0068 + 0069' },
 							oldValue: null,
 							newValue: '{\n  "members": []\n}',
@@ -404,11 +409,11 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 						{
 							id: 'a1',
 							action: 'bond.create',
-							actionLabel: 'Loaded',
+							actionLabel: 'Cargado',
 							createdAt: '2026-11-17T12:00:00+00:00',
-							actorLabel: 'A user',
+							actorLabel: 'Un usuario',
 							reason: 'Batch 3',
-							summary: 'Numbers 0068, 4939',
+							summary: 'Números 0068, 4939',
 							viaPata: null,
 							oldValue: null,
 							newValue: '{}',
@@ -418,17 +423,17 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			})
 		);
-		expect(body).not.toContain('You do not have permission to view the audit log.');
+		expect(body).not.toContain('No hay permiso para ver el registro de auditoría.');
 		expect(body.indexOf('data-audit-action="bond.group"')).toBeLessThan(
 			body.indexOf('data-audit-action="bond.create"')
 		);
 		expect(body).toContain('Operator One');
-		expect(body).toContain('Reason: Batch 3');
-		expect(body).toContain('Numbers 0068, 4939');
+		expect(body).toContain('Motivo: Batch 3');
+		expect(body).toContain('Números 0068, 4939');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 
 		const empty = renderPage(record({ audit: { allowed: true, entries: [], truncated: false } }));
-		expect(empty).toContain('No audit entries for this bond.');
+		expect(empty).toContain('Este bono no tiene entradas de auditoría.');
 	});
 
 	it('a simple bond that was in an ungrouped pata shows it as history', () => {
@@ -449,8 +454,8 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			})
 		);
-		expect(body).toContain('Previous patas');
-		expect(body).toContain('Not in a pata.');
+		expect(body).toContain('Patas anteriores');
+		expect(body).toContain('No está en ninguna pata.');
 		expect(body).toContain('Wrong bonds');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 	});
@@ -486,8 +491,8 @@ describe('bond sale sections', () => {
 		const body = render(Page, {
 			props: { data, form: null, params: { id: CAMPAIGN_ID, bondId: BOND_ID } } as never
 		}).body;
-		expect(body).toContain('Active sale');
+		expect(body).toContain('Venta activa');
 		expect(body).toContain('/sales/a0000000-0000-0000-0000-000000000009');
-		expect(body).toContain('2027-01-01');
+		expect(body).toContain('01/01/2027');
 	});
 });

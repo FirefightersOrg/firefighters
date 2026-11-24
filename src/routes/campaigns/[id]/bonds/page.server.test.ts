@@ -106,7 +106,7 @@ describe('/campaigns/[id]/bonds', () => {
 				id: BOND_ID,
 				kind: 'simple',
 				origin: 'printed',
-				typeLabel: 'Simple bond',
+				typeLabel: 'Bono simple',
 				baseFormatted: ['0068'],
 				associatedFormatted: ['4939'],
 				internalCode: null,
@@ -161,10 +161,10 @@ describe('/campaigns/[id]/bonds', () => {
 		))!;
 		expect(chains.bond_list).toBeUndefined();
 		expect(data.query.errors).toEqual({
-			base: 'Enter a number from 0000 to 9999.',
-			associated: 'Enter a number from 0000 to 9999.',
-			type: 'Choose one of the listed options.',
-			status: 'Choose one of the listed options.'
+			base: 'Ingresar un número entre 0000 y 9999.',
+			associated: 'Ingresar un número entre 0000 y 9999.',
+			type: 'Elegir una de las opciones de la lista.',
+			status: 'Elegir una de las opciones de la lista.'
 		});
 		expect(data.bonds).toEqual([]);
 		expect(data.pagination.page).toBe(1);
@@ -194,7 +194,7 @@ describe('/campaigns/[id]/bonds', () => {
 		expect(chains.bond_list[1].in).toHaveBeenCalledWith('id', [PATA_ID]);
 		expect(data.bonds[0].inPata).toEqual({ pataId: PATA_ID, label: '0068 + 0069' });
 		expect(data.bonds[1]).toMatchObject({
-			typeLabel: 'Manually grouped pata',
+			typeLabel: 'Pata agrupada manualmente',
 			baseFormatted: ['0068', '0069']
 		});
 	});

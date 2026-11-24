@@ -221,8 +221,9 @@
 				</div>
 				<p id="confirm-hint" class="m-0 w-full text-body-sm text-muted">
 					{#if summary.errors > 0}
-						Confirmar está deshabilitado: corregir o quitar las {formatNumber(summary.errors)} filas con
-						errores.
+						Confirmar está deshabilitado: corregir o quitar {summary.errors === 1
+							? 'la fila con error'
+							: `las ${formatNumber(summary.errors)} filas con errores`}.
 					{:else if summary.status !== 'validated'}
 						Validar la importación para habilitar Confirmar.
 					{:else}
