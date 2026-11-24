@@ -871,7 +871,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			);
 			expect(activated).toMatchObject({
 				success: true,
-				message: expect.stringContaining('activated')
+				message: expect.stringContaining('activada')
 			});
 			await expectOneAudit(activateId, {
 				action: 'campaign.transition',
@@ -1620,7 +1620,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			).toMatchObject({
 				form: 'update',
 				success: true,
-				message: 'Rule saved.',
+				message: 'Regla guardada.',
 				ruleId: ruleIds.cash
 			});
 			await expectOneAudit(requestId, {
@@ -1770,7 +1770,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				)
 			).toMatchObject({
 				status: 400,
-				data: { errors: { installmentCount: [expect.stringContaining('installment 10')] } }
+				data: { errors: { installmentCount: [expect.stringContaining('cuota 10')] } }
 			});
 			await expectNoAudit(requestId);
 
@@ -1820,7 +1820,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					}),
 					editId
 				)
-			).toMatchObject({ success: true, message: 'Rule saved.' });
+			).toMatchObject({ success: true, message: 'Regla guardada.' });
 			await expectOneAudit(editId, {
 				action: 'commission_rule.update',
 				entity_id: ruleIds.custom8,
@@ -2062,7 +2062,7 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					{ ruleId, expectedUpdatedAt: loaded.updatedAt, ...ruleFields({ percentage: '11' }) },
 					otherId
 				)
-			).toMatchObject({ success: true, message: 'Rule saved.' });
+			).toMatchObject({ success: true, message: 'Regla guardada.' });
 			await expectOneAudit(otherId, { action: 'commission_rule.update', entity_id: ruleId });
 
 			const staleId = rid('stale-rule-edit');
