@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {
-		BARCODE_MODE_LABELS_ES,
+		BARCODE_MODE_LABELS,
 		BARCODE_MODES,
 		barcodeModeUsesPattern
 	} from '$lib/domain/campaigns';
@@ -45,7 +45,7 @@
 		<Select
 			name="barcodeMode"
 			placeholder="Elegir cómo se leen los códigos de barras…"
-			options={BARCODE_MODES.map((mode) => ({ value: mode, label: BARCODE_MODE_LABELS_ES[mode] }))}
+			options={BARCODE_MODES.map((mode) => ({ value: mode, label: BARCODE_MODE_LABELS[mode] }))}
 			bind:value={values.barcodeMode}
 		/>
 	</Field>

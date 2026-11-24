@@ -43,7 +43,7 @@ export class DeliveryServiceError extends Error {
 
 export const DELIVERY_MESSAGES = {
 	permission: 'No hay permiso para esta acción.',
-	bondNotFound: 'A selected bond no longer exists.',
+	bondNotFound: 'Uno de los bonos elegidos ya no existe.',
 	collectorNotFound: 'Cobrador no encontrado.',
 	campaignLocked:
 		'Los bonos solo se pueden entregar o cambiar mientras la campaña está en borrador o activa.',

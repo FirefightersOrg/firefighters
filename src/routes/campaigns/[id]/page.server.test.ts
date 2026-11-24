@@ -75,7 +75,7 @@ describe('/campaigns/[id]', () => {
 			const { supabase } = mockSupabase({ query: { data: null, error: null } });
 			await expect(load(loadEvent(makeLocals({ supabase })))).rejects.toMatchObject({
 				status: 404,
-				body: { message: 'Campaign not found.' }
+				body: { message: 'Campaña no encontrada.' }
 			});
 		});
 

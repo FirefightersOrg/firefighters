@@ -27,18 +27,8 @@ export const BARCODE_MODES = [
 ] as const;
 export type BarcodeMode = (typeof BARCODE_MODES)[number];
 
+/** Spanish labels (docs/copy.md). */
 export const BARCODE_MODE_LABELS: Record<BarcodeMode, string> = {
-	base_number: 'Barcode is the base number',
-	internal_code: 'Internal code',
-	external_legacy_code: 'External / legacy code',
-	manual_mapping: 'Manual mapping'
-};
-
-/**
- * Spanish labels (docs/copy.md) for the migrated screens. The English map above stays until the
- * remaining screens (bonds) move to Cimiento, then it is replaced by this one.
- */
-export const BARCODE_MODE_LABELS_ES: Record<BarcodeMode, string> = {
 	base_number: 'El código de barras es el número base',
 	internal_code: 'Código interno',
 	external_legacy_code: 'Código externo o heredado',

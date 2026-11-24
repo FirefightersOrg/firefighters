@@ -60,8 +60,8 @@ interface PostgrestLikeError {
 }
 
 export const CAMPAIGN_MESSAGES = {
-	permission: 'You do not have permission to perform this action.',
-	notFound: 'Campaign not found.',
+	permission: 'No hay permiso para esta acción.',
+	notFound: 'Campaña no encontrada.',
 	internal: 'Something went wrong. Please try again.',
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
 	activationNeedsDates: 'Definir las fechas de inicio y de fin antes de activar la campaña.',

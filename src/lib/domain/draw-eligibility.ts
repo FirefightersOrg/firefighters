@@ -39,9 +39,6 @@ export const DRAW_INELIGIBILITY_REASON_LABELS: Record<DrawIneligibilityReason, s
 	missing_required_installment: 'El sorteo no tiene cuota requerida configurada'
 };
 
-/** @deprecated Same as DRAW_INELIGIBILITY_REASON_LABELS (kept for existing imports). */
-export const DRAW_INELIGIBILITY_REASON_LABELS_ES = DRAW_INELIGIBILITY_REASON_LABELS;
-
 export interface DrawEligibilityDrawSnapshot {
 	type: DrawType;
 	/** ISO timestamptz. Its Buenos Aires calendar day is the inclusive payment-date cutoff. */

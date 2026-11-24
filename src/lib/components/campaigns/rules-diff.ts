@@ -1,5 +1,5 @@
 import {
-	BARCODE_MODE_LABELS_ES,
+	BARCODE_MODE_LABELS,
 	OVERFLOW_POLICY_LABELS,
 	barcodeModeUsesPattern,
 	type BarcodeMode,
@@ -31,7 +31,7 @@ function parseWhole(raw: string): number | null {
 }
 
 function barcodeLabel(mode: string): string {
-	return BARCODE_MODE_LABELS_ES[mode as BarcodeMode] ?? (mode.trim() === '' ? EMPTY : mode);
+	return BARCODE_MODE_LABELS[mode as BarcodeMode] ?? (mode.trim() === '' ? EMPTY : mode);
 }
 
 /**

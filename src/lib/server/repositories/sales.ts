@@ -286,13 +286,13 @@ export interface SaleCandidate {
 }
 
 const NOT_SELLABLE: Record<string, string> = {
-	available: 'It has not been delivered to a collector yet: deliver it first.',
-	created: 'It has not been delivered to a collector yet: deliver it first.',
-	returned: 'It was returned and is not with a collector.',
-	sold: 'It is already sold.',
-	lost: 'It was marked lost.',
-	annulled: 'It was annulled.',
-	closed: 'It is closed.'
+	available: 'Todavía no se entregó a un cobrador: primero hay que entregarlo.',
+	created: 'Todavía no se entregó a un cobrador: primero hay que entregarlo.',
+	returned: 'Fue devuelto y no está en poder de un cobrador.',
+	sold: 'Ya está vendido.',
+	lost: 'Se marcó como perdido.',
+	annulled: 'Fue anulado.',
+	closed: 'Está cerrado.'
 };
 
 /**
