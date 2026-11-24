@@ -52,6 +52,7 @@ import {
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
 import { listBondDrawRosterEntries } from '$lib/server/repositories/draws';
+import { listBondPrizes } from '$lib/server/repositories/prizes';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -168,6 +169,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			'draw.load_winner'
 		] as const
 	).some((permission) => hasPermissionIn(locals.permissions, permission));
+	const canViewPrizes = (
+		['draw.view', 'draw.load_winner', 'prize.resolve', 'prize.deliver', 'prize.annul'] as const
+	).some((permission) => hasPermissionIn(locals.permissions, permission));
 	const [historyResult, collectorsResult, activeSaleResult, drawEntriesResult] = await Promise.all([
 		listBondAssignments(locals.supabase, bond.id),
 		can.reassign || can.correctCollector
@@ -187,6 +191,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (installmentsResult.error) fail500(installmentsResult.error);
 	const paymentsResult = await listBondPayments(locals.supabase, bond.id);
 	if (paymentsResult.error) fail500(paymentsResult.error);
+	const prizesResult = canViewPrizes
+		? await listBondPrizes(locals.supabase, campaign.id, bond.id)
+		: { data: [], error: null };
+	if (prizesResult.error) fail500(prizesResult.error);
 
 	return {
 		campaign,
@@ -215,7 +223,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		installments: installmentsResult.data ?? [],
 		payments: paymentsResult.data ?? [],
 		drawRosterEntries: drawEntriesResult.data ?? [],
-		canViewDraws
+		canViewDraws,
+		prizes: prizesResult.data ?? [],
+		canViewPrizes
 	};
 };
 
@@ -408,6 +418,9 @@ async function custodyPreflight(
 	permission: 'bond.return' | 'bond.assign' | 'bond.mark_lost'
 ) {
 	requireActiveUser(locals, url.pathname);
+	if (permissionsUnavailable(locals.permissions)) {
+		return custodyFailure(action, 500, 'Could not load permissions.');
+	}
 	if (!hasPermissionIn(locals.permissions, permission)) {
 		return custodyFailure(action, 403, BOND_MESSAGES.permission);
 	}

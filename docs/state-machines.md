@@ -300,12 +300,19 @@ Transitions:
 ```txt
 pending_validation -> awarded
 pending_validation -> unawarded
+pending_validation -> annulled
 awarded -> pending_delivery
 pending_delivery -> delivered
+pending_delivery -> annulled
 awarded -> annulled
+unawarded -> annulled
 ```
 
 Rules:
 
 - If the bond was not eligible in the frozen roster, the prize remains unawarded.
 - Prize delivery must record date, user, and observations.
+- Audited annulment requires `prize.annul` (admin only), a reason, and preserves
+  original history. It is allowed only from pending validation, awarded, pending
+  delivery, or unawarded. Delivered prizes cannot be annulled pending a product
+  decision (SAN-81 known gap); annulled prizes cannot be annulled again.

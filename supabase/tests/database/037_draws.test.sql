@@ -177,7 +177,7 @@ where campaign_id=pg_temp.id('c') and draw_type='final'$$,'scheduled -> annulled
 select throws_ok($$update public.draws set annul_reason='Overwrite' where campaign_id=pg_temp.id('c') and draw_type='final'$$,'55000',null,'annul reason immutable');
 select throws_ok(format('delete from public.%I where id=pg_temp.id(%L)',t,k),'23001',null,'never delete '||t)
 from (values ('draws','d'),('draw_rosters','r'),('draw_roster_entries','e'))v(t,k);
-select throws_ok('truncate public.draw_roster_entries,public.draw_rosters,public.draws','23001',null,'never truncate');
+select throws_ok('truncate public.draw_roster_entries,public.draw_rosters,public.draws,public.prizes,public.winning_numbers,public.prize_awards','23001',null,'never truncate');
 -- Real two-session races. Setup is committed and explicitly removed below.
 create extension if not exists dblink with schema extensions;
 select extensions.dblink_connect(c,format('host=%s port=%s dbname=%s user=postgres password=postgres',

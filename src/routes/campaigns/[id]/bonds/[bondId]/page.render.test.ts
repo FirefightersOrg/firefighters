@@ -121,6 +121,38 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			'/campaigns/f0000000-0000-0000-0000-000000000001/payments/payment/print'
 		);
 	});
+	it('renders prize history and converts UTC delivery instants to Buenos Aires', () => {
+		const body = renderPage(record(), null, {
+			canViewPrizes: true,
+			prizes: [
+				{
+					id: 'prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Bike',
+					position: 1,
+					status: 'delivered',
+					deliveredAt: '2026-11-20T02:30:00+00:00'
+				},
+				{
+					id: 'annulled-prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Wrong bike',
+					position: 1,
+					status: 'annulled',
+					deliveredAt: null
+				}
+			]
+		});
+		expect(body).toContain('Prizes won (1)');
+		expect(body).toContain('Annulled — does not count as won');
+		expect(body).toContain('December');
+		expect(body).toContain('#1 — Bike');
+		expect(body).toContain('Delivered');
+		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('/draws/draw/winners');
+	});
 	it('shows the general data and the formatted numbers of a simple bond', () => {
 		const body = renderPage(record());
 		expect(body).toContain('Simple bond 0068');

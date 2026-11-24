@@ -811,6 +811,136 @@ Suggested fields:
 - `created_by`
 - `notes`
 
+### SAN-80: implemented prize storage (Phase 12)
+
+Migration `20261225000000_prizes.sql` implements the three preceding tables; pgTAP
+`041_prizes.test.sql` verifies storage, authorization, immutable history and real two-session
+admission races. This is **storage only**: no client write path or new RPC is exposed.
+SAN-81 must supply audited `SECURITY DEFINER` functions with an empty search path, check
+`draw.load_winner`, `prize.resolve` or `prize.deliver` as appropriate, and audit in the same
+transaction. This migration does not change the SAN-77 consolation generation gate.
+
+#### Columns and limits
+
+- All three tables have UUID `id`, `created_at`, required `created_by` (profile FK) and
+  `updated_at`; updates refresh `updated_at`. All FKs restrict deletion and have a full,
+  leading-column index (including indexes supplied by UNIQUE constraints).
+- `prizes`: required `draw_id`, `name` (1..200 code points), optional `description` (1..1000),
+  positive integer `position` unique per draw, and `status` defaulting to `pending_validation`.
+  `excludes_from_consolation` is a required boolean defaulting to **true**.
+- `winning_numbers`: required `draw_id`, `prize_id`, integer `number_value` (0 through the
+  campaign's `max_number`, inclusive), nullable `matched_roster_entry_id`, required
+  `result_status`, `loaded_by` and `loaded_at` (default now), optional `notes` (1..1000).
+  There is intentionally no default result: the future loading RPC must decide explicitly.
+- `prize_awards`: required `prize_id`, `winning_number_id`, `bond_id`, `buyer_id`, `collector_id`,
+  `status` defaulting to `awarded`, `awarded_at` defaulting to now, optional `notes` (1..1000).
+  Delivery adds `delivered_at` and `delivered_by`; both are required **iff** `delivered`.
+  Delivered awards also require observations in `notes`, satisfying the documented date,
+  user and observations requirement.
+- Both prizes and awards have separate `annulled_at`, `annulled_by`, `annul_reason` fields.
+  All three are required iff annulled; reasons are 1..1000 code points. All text is trimmed
+  and nonblank when present; optional text uses SQL NULL, never an empty string.
+  Limits use PostgreSQL `char_length`, matching the TS code-point contract, not UTF-16 length.
+
+#### Lifecycle and historical decisions
+
+- Prizes start only in `pending_validation`. Exact transitions:
+  `pending_validation -> awarded | unawarded`, `awarded -> pending_delivery | annulled`,
+  `pending_delivery -> delivered`. Delivered, unawarded and annulled prizes are immutable,
+  including same-status updates. Identity/ancestry/creation metadata never change.
+  Name, description, position and consolation exclusion can change only before resolution.
+- **Uniqueness decision:** one loaded winning number per prize, with no uniqueness on
+  `(draw_id, number_value)`. The docs do not prohibit one participating number winning
+  different positions. No correction by overwriting/reloading a resolved result is available:
+  future correction requirements need an explicit audited history model, not destructive edits.
+- A winner can be inserted, or a pending review updated, only for a `roster_frozen` or
+  `completed` draw with an actual frozen roster. A closed draw rejects winner writes.
+  Matching is determined by the exact number in that draw's frozen roster, not a caller's
+  guess: `no_match` iff the entry is NULL, and an existing match cannot be hidden as no-match.
+  `eligible_winner` requires `eligible = true`; `not_eligible` requires `eligible = false`.
+  The prize and winning number must refer to the same draw (and therefore campaign).
+- **Review decision:** pending review is allowed only with a matched frozen entry, either
+  eligible or ineligible. It may resolve only to the corresponding eligibility result; it
+  cannot override frozen eligibility. Loaded number, matched entry, parents, loader/time and
+  creation metadata are immutable even during review. Resolved results (including no-match)
+  are fully immutable. The docs list result states but no separate winning-number state graph;
+  this deliberately conservative graph preserves the snapshot.
+- Awards start only in `awarded`; `awarded -> delivered | annulled` are the only transitions.
+  Delivered and annulled awards are immutable. Award source identities, award timestamp and
+  creation metadata never change. Only one non-annulled award per prize is permitted by a
+  partial unique index; annulled history remains when a replacement award is recorded.
+- An award must refer to that prize's **eligible resolved winner**. Bond is the physical
+  `draw_roster_entries.bond_id`, including manual-pata member ownership; buyer and collector
+  use the real frozen snapshot keys `buyer_snapshot.id` / `collector_snapshot.id`.
+  Current buyer/collector values are deliberately not substituted: later sales/custody changes
+  must not rewrite history. Missing snapshot identities cannot receive an award.
+- Prize workflow status and award workflow status are separate storage machines. SAN-81 must
+  resolve/annul/deliver them atomically, including creating an award and advancing its prize.
+  Cross-table existence checks tying every intermediate prize status to an award are not
+  imposed here, since either insertion order would otherwise require deferred write machinery.
+  There is no unaudited API path that can leave such an intermediate state committed.
+- No API role (`anon`, `authenticated`, `service_role`) has INSERT/UPDATE/DELETE/TRUNCATE,
+  and no write RLS policies exist. Even owner DELETE/TRUNCATE is rejected (`23001`).
+  Invalid checks/transitions raise `23514`, immutable identity changes `23001`, wrong lifecycle
+  `55000`, missing FK references `23503`, and duplicate positions/results/active awards `23505`.
+  SAN-81 must map its RPC errors explicitly and use 42501 for permission denial.
+
+#### Consolation contract
+
+The flag belongs to the **prize**, not the entire draw: administrators can configure a
+non-excluding position without implicitly changing every other prize in that draw.
+Default true is conservative; awarded prizes freeze this choice.
+An authoritative previous win is a `prize_awards` row with status `awarded` or `delivered`,
+joined to a non-annulled prize with `excludes_from_consolation = true`; annulled awards/prizes
+do not exclude. Consumers join `prizes -> draws` to restrict campaign and previous draws,
+and identify the winning bond through the frozen roster entry/award. For manual patas,
+SAN-77's existing effective-parent mapping must propagate a physical member win to the
+commercial parent and its participating members, rather than assuming award bond is the parent.
+No derived flag is written on bonds, no winner is inferred from prize status alone, and merely
+loading an eligible winning number does not exclude until an actual award exists.
+Which draws count as “previous” at equal dates remains a future generation/RPC policy;
+consumers must use a documented deterministic draw ordering, never unspecified row order.
+
+#### Locks, authorization and remaining scope
+
+Winner admission reads the campaign id without locking, then locks **campaign FOR SHARE ->
+draw FOR SHARE**, stabilizing both `max_number` and the draw lifecycle. Frozen rosters/entries
+are already immutable. A new campaign guard also rejects lowering `max_number` below any
+historical winning value (including no-match), so the invariant holds in both directions.
+That read-only trigger helper is SECURITY DEFINER with an empty search path: legacy campaign
+writers must be checked against protected winner rows without acquiring SELECT privileges on
+them. It has no API EXECUTE grant and makes no writes of its own.
+Future write RPCs must prelock **campaign -> draw -> prize -> winner -> award**, with ids sorted
+at each level when touching multiple rows. On UPDATE, row triggers run after the target row
+lock; privileged writers must prelock parents, never invert that order. There are no new
+financial writes, settlement/payment/installment locks or ledger advisory locks.
+The real dblink tests cover committed maximum reduction versus admission in both orders,
+and draw closure versus admission in both orders.
+
+Only authenticated gets SELECT. Select-only RLS permits `draw.view` OR `draw.load_winner` OR
+`prize.resolve` OR `prize.deliver`; its SECURITY DEFINER read helper has an empty search path
+and an explicit authenticated EXECUTE grant. Internal trigger functions have no API EXECUTE.
+In the actual seed, admin has every permission; operator and treasurer have `draw.load_winner`,
+while only admin has prize resolution/delivery. Read-only, collector and roleless users see
+no prize rows. These are capability checks, not hard-coded role checks.
+
+TS `src/lib/domain/prizes.ts` mirrors the statuses, English labels, transition graphs and text/
+numeric lower limits; the upper number bound is campaign-specific, not a global constant.
+There are no routes or services in SAN-80. SAN-81 owns permission checks, audited writes,
+coordinated prize/award transitions, correction policy and subsequent consolation enablement.
+
+Validation after a clean local reset: `supabase test db` passed **40 files / 2780 assertions**
+(041 plan: **299**); after local admin/role-fixture seeding, `pnpm test:integration` passed
+**25 files / 202 tests**; `pnpm check` reported **0 errors / 0 warnings**; `pnpm lint` passed;
+`pnpm test` passed **134 files / 1629 tests** (the four new domain tests included).
+The initial full DB run caught two older owner-TRUNCATE tests whose explicit table lists no
+longer covered the new FK dependents; 008 and 037 now include those dependents, preserving the
+same `23001` trigger assertion rather than weakening it to an FK error.
+It also caught the campaign guard's need for definer read access, fixed as described above.
+Integration setup initially refused an unset local environment, then lacked seeded users;
+the successful run explicitly used `APP_ENV=local`, the running local CLI credentials and
+`pnpm seed:admin`, without weakening the integration safety guard.
+
 ### audit_log
 
 General audit.
