@@ -38,12 +38,14 @@ export const updateDrawSchema = z.object({ drawId: z.guid(), ...fields });
 export const annulDrawSchema = z.object({ drawId: z.guid(), reason: text(DRAW_REASON_MAX) });
 export type CreateDrawInput = z.input<typeof createDrawSchema>;
 export type UpdateDrawInput = z.input<typeof updateDrawSchema>;
+export const completeDrawSchema = z.object({ drawId: z.guid() });
 export type AnnulDrawInput = z.input<typeof annulDrawSchema>;
+export type CompleteDrawInput = z.input<typeof completeDrawSchema>;
 async function write<T extends z.ZodType>(
 	client: SupabaseClient,
 	input: z.input<T>,
 	ctx: DrawRequestContext,
-	permission: 'draw.create' | 'draw.update',
+	permission: 'draw.create' | 'draw.update' | 'draw.annul' | 'draw.complete',
 	schema: T,
 	name: string,
 	args: (p: z.output<T>) => Record<string, unknown>
@@ -96,8 +98,19 @@ export function updateDraw(
 	})).then(() => undefined);
 }
 export function annulDraw(client: SupabaseClient, input: AnnulDrawInput, ctx: DrawRequestContext) {
-	return write(client, input, ctx, 'draw.update', annulDrawSchema, 'draw_annul', (p) => ({
+	return write(client, input, ctx, 'draw.annul', annulDrawSchema, 'draw_annul', (p) => ({
 		p_draw_id: p.drawId,
 		p_reason: p.reason
+	})).then(() => undefined);
+}
+
+/** SAN-123: roster_frozen -> completed; every prize must be resolved first (409 otherwise). */
+export function completeDraw(
+	client: SupabaseClient,
+	input: CompleteDrawInput,
+	ctx: DrawRequestContext
+) {
+	return write(client, input, ctx, 'draw.complete', completeDrawSchema, 'draw_complete', (p) => ({
+		p_draw_id: p.drawId
 	})).then(() => undefined);
 }

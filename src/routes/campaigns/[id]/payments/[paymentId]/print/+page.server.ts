@@ -26,8 +26,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(500, { message: 'Could not load the payment.' });
 	}
 	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!found.data || found.data.status !== 'confirmed')
-		error(404, { message: 'Payment certificate is only available for confirmed payments.' });
+	// SAN-111: confirmed payments, and annulled/adjusted ones that were confirmed first (they carry a
+	// legend). A pending payment removed from an open settlement was never valid: no certificate.
+	if (
+		!found.data ||
+		!['confirmed', 'annulled', 'adjusted'].includes(found.data.status) ||
+		(found.data.status !== 'confirmed' && !found.data.payment.legend)
+	)
+		error(404, { message: 'El comprobante no está disponible para este pago.' });
 	const payment = { ...found.data.payment, registeredBy: actor.data ?? '—' };
 	return { document: buildPrintablePaymentCertificate(campaign.data, payment) };
 };
