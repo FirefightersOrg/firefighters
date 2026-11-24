@@ -953,7 +953,8 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 				.from('bond_numbers')
 				.update({ released_at: new Date().toISOString(), released_by: users.admin.profile.id })
 				.eq('bond_id', a.s700);
-			expect(releaseError?.code).toBe('55000');
+			// SAN-141: intermittent 42501 seen here; keep the full error in the failure message.
+			expect(releaseError?.code, JSON.stringify(releaseError)).toBe('55000');
 			expect((await numbersOf(a.s700)).every((n) => n.released_at === null)).toBe(true);
 
 			for (const [label, run] of [
