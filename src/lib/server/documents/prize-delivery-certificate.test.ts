@@ -35,19 +35,19 @@ describe('prize delivery certificate', () => {
 		const doc = buildPrintablePrizeDeliveryCertificate(campaign, source, 'Firefighters');
 		expect({ ...doc, deliveryDate: plainSpaces(doc.deliveryDate) }).toEqual({
 			institutionName: 'Firefighters',
-			draw: 'December & summer (Monthly)',
-			drawDate: '31/12/26',
+			draw: 'December & summer (Mensual)',
+			drawDate: '31/12/2026',
 			prize: '#2 — Bike <Pro>',
 			winningNumber: '00068',
 			associatedBond: 'B&68',
 			buyer: 'Buyer <SA>',
 			collector: 'Collector & Co',
-			rosterStatus: 'Eligible',
-			deliveryDate: '31/12/26, 11:30 p. m.',
+			rosterStatus: 'Habilitado',
+			deliveryDate: '31/12/2026, 23:30',
 			registeredBy: 'Operator <One>',
 			notes: 'Received & signed',
-			recipientSignature: 'Recipient signature',
-			recipientName: 'Name / clarification',
+			recipientSignature: 'Firma de quien recibe',
+			recipientName: 'Aclaración',
 			recipientDocument: 'DNI'
 		});
 	});

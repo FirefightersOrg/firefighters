@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from './+page@.svelte';
 import source from './+page@.svelte?raw';
+
+const printCss = readFileSync('src/lib/styles/print.css', 'utf8');
 
 describe('unawarded prize certificate render', () => {
 	it('renders all ten fields, escapes HTML and includes print styles', () => {
@@ -14,7 +17,7 @@ describe('unawarded prize certificate render', () => {
 			associatedBond: 'B-8',
 			buyer: 'Ada & Bob',
 			reason: 'Winner <declined>',
-			rosterStatus: 'Eligible',
+			rosterStatus: 'Habilitado',
 			registeredBy: 'Resolver',
 			date: '31/12/26, 23:30',
 			notes: 'Original note'
@@ -28,6 +31,7 @@ describe('unawarded prize certificate render', () => {
 		expect(body).toContain('Ada &amp; Bob');
 		expect(body).toContain('Winner &lt;declined>');
 		expect(body).not.toContain('<script>');
-		expect(source).toContain('@media print');
+		expect(source).toContain("import '$lib/styles/print.css'");
+		expect(printCss).toContain('@media print');
 	});
 });
