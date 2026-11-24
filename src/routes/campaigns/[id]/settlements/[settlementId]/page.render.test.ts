@@ -39,11 +39,11 @@ const page = (status = 'open') =>
 describe('settlement workspace render', () => {
 	it('renders seven metrics and open forms', () => {
 		const body = page();
-		expect(body.match(/tabular-nums/g)).toHaveLength(7);
+		expect(body.match(/text-number-lg/g)).toHaveLength(7);
 		expect(body).toContain('?/add');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');
-		expect(body).toContain('Dec 31, 2025');
+		expect(body).toContain('31/12/2025');
 		// Native maxlength counts UTF-16 units, unlike the database's code-point limit.
 		expect(body).not.toContain('maxlength=');
 	});
@@ -95,16 +95,16 @@ describe('settlement workspace corrections (SAN-73)', () => {
 	it('shows payment correction forms with the indicative ledger preview only with permission', () => {
 		const allowed = closed({ correctPayment: true });
 		expect(allowed).toContain('?/annulPayment');
-		expect(allowed).toContain('Indicative preview');
+		expect(allowed).toContain('Vista indicativa:');
 		const denied = closed({ correctPayment: false });
 		expect(denied).not.toContain('?/annulPayment');
-		expect(denied).not.toContain('Indicative preview');
+		expect(denied).not.toContain('Vista indicativa:');
 	});
 
 	it('shows the settlement correction with its ledger preview only with settlement.correct', () => {
 		const allowed = closed({ correctSettlement: true });
-		expect(allowed).toContain('Indicative ledger preview');
+		expect(allowed).toContain('Vista indicativa del libro');
 		expect(allowed).toContain('name="commissionDelta"');
-		expect(closed({ correctSettlement: false })).not.toContain('Indicative ledger preview');
+		expect(closed({ correctSettlement: false })).not.toContain('Vista indicativa del libro');
 	});
 });
