@@ -49,7 +49,7 @@ begin
 end $$;
 
 -- The next draw of the campaign (zero rows when none) with its number of bonds at risk.
-create function public.report_next_draw(p_campaign_id uuid)
+create function public.dashboard_next_draw(p_campaign_id uuid)
 returns table (
   draw_id uuid, draw_name text, draw_type text, draw_date date, payment_cutoff_at timestamptz,
   required_installment_number integer, draw_status text, at_risk_count bigint
@@ -71,7 +71,7 @@ end $$;
 
 -- Bonds at risk for one draw of the campaign, most installments missing first, then by number.
 -- Paged with p_limit/p_offset; total_count is the full count of at-risk bonds.
-create function public.report_at_risk_bonds(
+create function public.dashboard_at_risk_bonds(
   p_campaign_id uuid,
   p_draw_id uuid,
   p_limit integer default 100,
@@ -108,7 +108,7 @@ begin
 end $$;
 
 revoke all on function public.dashboard_at_risk_bonds_internal(uuid) from public, anon, authenticated, service_role;
-revoke all on function public.report_next_draw(uuid) from public, anon, service_role;
-revoke all on function public.report_at_risk_bonds(uuid, uuid, integer, integer) from public, anon, service_role;
-grant execute on function public.report_next_draw(uuid) to authenticated;
-grant execute on function public.report_at_risk_bonds(uuid, uuid, integer, integer) to authenticated;
+revoke all on function public.dashboard_next_draw(uuid) from public, anon, service_role;
+revoke all on function public.dashboard_at_risk_bonds(uuid, uuid, integer, integer) from public, anon, service_role;
+grant execute on function public.dashboard_next_draw(uuid) to authenticated;
+grant execute on function public.dashboard_at_risk_bonds(uuid, uuid, integer, integer) to authenticated;

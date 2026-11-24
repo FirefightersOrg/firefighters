@@ -64,7 +64,7 @@ const RPC_ROWS: Record<string, unknown[]> = {
 			amount: '50.00'
 		}
 	],
-	report_next_draw: [
+	dashboard_next_draw: [
 		{
 			draw_id: 'd1',
 			draw_name: 'Diciembre',
@@ -76,7 +76,7 @@ const RPC_ROWS: Record<string, unknown[]> = {
 			at_risk_count: 1
 		}
 	],
-	report_at_risk_bonds: [
+	dashboard_at_risk_bonds: [
 		{
 			bond_id: BOND_ID,
 			bond_kind: 'simple',
@@ -160,7 +160,7 @@ describe('/campaigns/[id] dashboard load', () => {
 			nextDraw: { id: 'd1', name: 'Diciembre', requiredInstallmentNumber: 2, atRiskCount: 1 },
 			atRisk: [{ bondId: BOND_ID, baseNumber: 7, missingInstallments: 1, totalCount: 1 }]
 		});
-		expect(rpc).toHaveBeenCalledWith('report_at_risk_bonds', {
+		expect(rpc).toHaveBeenCalledWith('dashboard_at_risk_bonds', {
 			p_campaign_id: CAMPAIGN_ID,
 			p_draw_id: 'd1',
 			p_limit: 25,
@@ -184,19 +184,22 @@ describe('/campaigns/[id] dashboard load', () => {
 	it('skips the at-risk list when there is no next draw', async () => {
 		const { supabase, rpc } = supabaseWithReports();
 		rpc.mockImplementation((fn: string) =>
-			Promise.resolve({ data: fn === 'report_next_draw' ? [] : (RPC_ROWS[fn] ?? []), error: null })
+			Promise.resolve({
+				data: fn === 'dashboard_next_draw' ? [] : (RPC_ROWS[fn] ?? []),
+				error: null
+			})
 		);
 		const data = (await load(loadEvent(makeLocals({ supabase, permissions: OPERATIONAL }))))!;
 		expect(data.dashboard.operational?.nextDraw).toBeNull();
 		expect(data.dashboard.operational?.atRisk).toEqual([]);
-		expect(rpc.mock.calls.map(([fn]) => fn)).not.toContain('report_at_risk_bonds');
+		expect(rpc.mock.calls.map(([fn]) => fn)).not.toContain('dashboard_at_risk_bonds');
 	});
 
 	it.each([
 		['report_bonds_by_status', OPERATIONAL],
 		['report_installments', OPERATIONAL],
-		['report_next_draw', OPERATIONAL],
-		['report_at_risk_bonds', OPERATIONAL],
+		['dashboard_next_draw', OPERATIONAL],
+		['dashboard_at_risk_bonds', OPERATIONAL],
 		['report_payments_by_date', FINANCIAL],
 		['report_settlements_by_collector', FINANCIAL],
 		['report_collector_accounts', FINANCIAL]

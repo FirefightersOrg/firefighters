@@ -1,6 +1,6 @@
 /**
  * Campaign dashboard (SAN-85): the next draw and its at-risk bonds, from the read-only
- * `report_next_draw` / `report_at_risk_bonds` SQL functions (permission `report.view_operational`).
+ * `dashboard_next_draw` / `dashboard_at_risk_bonds` SQL functions (permission `report.view_operational`).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AtRiskBond, NextDraw } from '$lib/domain/dashboard';
@@ -14,7 +14,7 @@ export async function getNextDraw(
 	supabase: SupabaseClient,
 	campaignId: string
 ): Promise<RepositoryResult<NextDraw | null>> {
-	const { data, error } = await supabase.rpc('report_next_draw', { p_campaign_id: campaignId });
+	const { data, error } = await supabase.rpc('dashboard_next_draw', { p_campaign_id: campaignId });
 	if (error) return { data: null, error };
 	const r = ((data ?? []) as Raw[])[0];
 	if (!r) return { data: null, error: null };
@@ -39,7 +39,7 @@ export async function getAtRiskBonds(
 	drawId: string,
 	limit: number
 ): Promise<RepositoryResult<AtRiskBond[]>> {
-	const { data, error } = await supabase.rpc('report_at_risk_bonds', {
+	const { data, error } = await supabase.rpc('dashboard_at_risk_bonds', {
 		p_campaign_id: campaignId,
 		p_draw_id: drawId,
 		p_limit: limit,
