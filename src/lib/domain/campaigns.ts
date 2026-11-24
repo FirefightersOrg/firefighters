@@ -11,11 +11,11 @@ export const CAMPAIGN_STATUSES = ['draft', 'active', 'closing', 'closed', 'annul
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
-	draft: 'Draft',
-	active: 'Active',
-	closing: 'Closing',
-	closed: 'Closed',
-	annulled: 'Annulled'
+	draft: 'Borrador',
+	active: 'Activa',
+	closing: 'En cierre',
+	closed: 'Cerrada',
+	annulled: 'Anulada'
 };
 
 /** How a scanned barcode is interpreted (docs/imports.md). Chosen at creation, no default. */

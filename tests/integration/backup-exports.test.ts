@@ -141,6 +141,14 @@ describe('backup export route (local Supabase)', () => {
 		expect(numbers).toHaveLength(4);
 		expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
 		expect(numbers.slice(0, 2)).toEqual([1, 2]);
+		// The number kind tells base numbers from associated ones (and extraordinary extras).
+		expect(get(rows[1]!, 'bond_number_id')).toMatch(/^[0-9a-f-]{36}$/);
+		const kinds = rows.slice(1).map((r) => get(r!, 'number_kind'));
+		expect(kinds.filter((k) => k === 'base')).toHaveLength(2);
+		expect(kinds.filter((k) => k === 'associated')).toHaveLength(2);
+		for (const r of rows.slice(1)) {
+			expect(get(r!, 'source_base_number_id') !== '').toBe(get(r!, 'number_kind') !== 'base');
+		}
 		expect(get(rows[1]!, 'draw_id')).toBe(draw.data);
 		expect(get(rows[1]!, 'draw_name')).toBe(`'=Final ${run}`);
 		expect(get(rows[1]!, 'draw_date')).toBe('2027-12-20');

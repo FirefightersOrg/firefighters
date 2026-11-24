@@ -29,9 +29,9 @@ export const LEDGER_DIRECTION_LABELS: Record<LedgerDirection, string> = {
 export const LEDGER_STATUSES = ['recorded', 'annulled', 'compensated'] as const;
 export type LedgerStatus = (typeof LEDGER_STATUSES)[number];
 export const LEDGER_STATUS_LABELS: Record<LedgerStatus, string> = {
-	recorded: 'Recorded',
-	annulled: 'Annulled',
-	compensated: 'Compensated'
+	recorded: 'Registrado',
+	annulled: 'Anulado',
+	compensated: 'Compensado'
 };
 
 export const LEDGER_REASON_MAX = 1000;

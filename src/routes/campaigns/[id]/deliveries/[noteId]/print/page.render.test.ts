@@ -7,7 +7,7 @@ describe('printable delivery note page', () => {
 		const document = {
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
-			deliveryNoteNumber: 'Note 0007',
+			deliveryNoteNumber: 'Remito 0007',
 			reason: 'delivery' as const,
 			status: 'issued' as const,
 			date: '18/11/26, 12:30',
@@ -25,19 +25,19 @@ describe('printable delivery note page', () => {
 			baseAndAssociatedNumbers: ['0068 / 4939'],
 			barcode: ['0068'],
 			notes: 'Box 3',
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración',
 			bondCount: 1,
 			unitCount: 1
 		};
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 		const body = render(Page, { props: { data: { document }, params: {} } as any }).body;
-		expect(body).toContain('ORIGINAL – Administration');
-		expect(body).toContain('DUPLICATE – Collector');
+		expect(body).toContain('ORIGINAL – Administración');
+		expect(body).toContain('DUPLICADO – Cobrador');
 		for (const text of [
 			'Bomberos Test',
 			'Bono 2027',
-			'Note 0007',
+			'Remito 0007',
 			'18/11/26, 12:30',
 			'Ana Pérez',
 			'Operator One',
@@ -46,15 +46,15 @@ describe('printable delivery note page', () => {
 		]) {
 			expect(body.split(text).length - 1).toBe(2);
 		}
-		expect(body.split('Collector signature').length - 1).toBe(2);
-		expect(body.split('Administration signature').length - 1).toBe(2);
+		expect(body.split('Firma del cobrador').length - 1).toBe(2);
+		expect(body.split('Firma de la administración').length - 1).toBe(2);
 	});
 
 	it('labels reassignment notes and marks annulled copies', () => {
 		const document = {
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
-			deliveryNoteNumber: 'Note 0008',
+			deliveryNoteNumber: 'Remito 0008',
 			reason: 'reassignment' as const,
 			status: 'annulled' as const,
 			date: '18/11/26, 12:30',
@@ -65,22 +65,22 @@ describe('printable delivery note page', () => {
 			baseAndAssociatedNumbers: [],
 			barcode: [],
 			notes: null,
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración',
 			bondCount: 0,
 			unitCount: 0
 		};
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 		const body = render(Page, { props: { data: { document }, params: {} } as any }).body;
-		expect(body.split('Reassignment').length - 1).toBe(2);
-		expect(body.split('ANNULLED').length - 1).toBe(2);
+		expect(body.split('Reasignación de bonos').length - 1).toBe(2);
+		expect(body.split('ANULADO').length - 1).toBe(2);
 	});
 
 	it('labels return notes and has the collector attest to handing bonds back', () => {
 		const document = {
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
-			deliveryNoteNumber: 'Note 0009',
+			deliveryNoteNumber: 'Remito 0009',
 			reason: 'return' as const,
 			status: 'issued' as const,
 			date: '18/11/26, 12:30',
@@ -91,16 +91,16 @@ describe('printable delivery note page', () => {
 			baseAndAssociatedNumbers: [],
 			barcode: [],
 			notes: null,
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración',
 			bondCount: 0,
 			unitCount: 0
 		};
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 		const body = render(Page, { props: { data: { document }, params: {} } as any }).body;
 
-		expect(body.split('Bond return note').length - 1).toBe(2);
-		expect(body.split('I HANDED the bonds back').length - 1).toBe(2);
-		expect(body).not.toContain('Bond delivery note');
+		expect(body.split('Remito de devolución de bonos').length - 1).toBe(2);
+		expect(body.split('DEVOLVIÓ los bonos').length - 1).toBe(2);
+		expect(body).not.toContain('Remito de entrega de bonos');
 	});
 });

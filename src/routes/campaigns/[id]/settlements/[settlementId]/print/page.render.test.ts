@@ -5,7 +5,7 @@ import type { PageProps } from './$types';
 const document = {
 	institutionName: 'Bomberos Test',
 	campaign: 'Bono 2027',
-	settlementNumberLabel: 'Settlement 0007',
+	settlementNumberLabel: 'Rendición 0007',
 	status: 'open' as const,
 	openedAt: '',
 	closedAt: null,
@@ -13,11 +13,11 @@ const document = {
 	closingDate: '—',
 	collector: 'Ana Pérez',
 	closedBy: null,
-	notes: 'Cash box',
+	notes: 'Caja de efectivo',
 	preliminary: true,
-	manualAdjustments: '0 — No manual adjustments have been recorded.',
-	collectorSignature: 'Collector signature',
-	administrationSignature: 'Administration signature',
+	manualAdjustments: '0 — No se registraron ajustes manuales.',
+	collectorSignature: 'Firma del cobrador',
+	administrationSignature: 'Firma de la administración',
 	totals: {
 		cash: '$ 100,00',
 		transfer: '$ 50,00',
@@ -30,9 +30,9 @@ const document = {
 	payments: [
 		{
 			bond: '0068',
-			buyer: 'Buyer',
-			installments: 'Installment 1',
-			method: 'Cash',
+			buyer: 'Comprador',
+			installments: 'Cuota 1',
+			method: 'Efectivo',
 			amount: '$ 100,00'
 		}
 	]
@@ -43,36 +43,36 @@ describe('settlement delivery note print page', () => {
 			props: { data: { document }, params: {} } as unknown as PageProps
 		}).body;
 		for (const text of [
-			'ORIGINAL – Administration',
-			'DUPLICATE – Collector',
+			'ORIGINAL – Administración',
+			'DUPLICADO – Cobrador',
 			'Bomberos Test',
 			'Bono 2027',
-			'Settlement 0007',
+			'Rendición 0007',
 			'18/11/26, 12:30',
 			'Ana Pérez',
 			'0068',
-			'Buyer',
-			'Installment 1',
-			'Cash',
-			'Cash total',
-			'Transfer total',
-			'Grand total',
-			'Generated commission',
-			'Settled commission',
-			'Manual adjustments',
-			'Net for Firefighters',
-			'Resulting collector balance',
-			'Cash box'
+			'Comprador',
+			'Cuota 1',
+			'Efectivo',
+			'Total en efectivo',
+			'Total por transferencia',
+			'Total general',
+			'Comisión generada',
+			'Comisión liquidada',
+			'Ajustes manuales',
+			'Neto para Bomberos',
+			'Saldo resultante del cobrador',
+			'Caja de efectivo'
 		])
 			expect(body).toContain(text);
-		expect(body.split('Collector signature').length - 1).toBe(2);
-		expect(body.split('Administration signature').length - 1).toBe(2);
+		expect(body.split('Firma del cobrador').length - 1).toBe(2);
+		expect(body.split('Firma de la administración').length - 1).toBe(2);
 	});
 	it('shows the preliminary label for an open settlement', () => {
 		const body = render(Page, {
 			props: { data: { document }, params: {} } as unknown as PageProps
 		}).body;
-		expect(body.split('PRELIMINARY / DRAFT — OPEN SETTLEMENT').length - 1).toBe(2);
+		expect(body.split('PRELIMINAR / BORRADOR — RENDICIÓN ABIERTA').length - 1).toBe(2);
 	});
 	it.each([
 		['annulled', 'ANULADA'],
@@ -85,8 +85,8 @@ describe('settlement delivery note print page', () => {
 			} as unknown as PageProps
 		}).body;
 		expect(body.split(label).length - 1).toBe(2);
-		expect(body.split('NOT VALID').length - 1).toBe(2);
-		expect(body).not.toContain('PRELIMINARY / DRAFT');
+		expect(body.split('SIN VALIDEZ').length - 1).toBe(2);
+		expect(body).not.toContain('PRELIMINAR / BORRADOR');
 	});
 	it('does not mark closed settlements as drafts or invalid', () => {
 		const body = render(Page, {
@@ -95,7 +95,7 @@ describe('settlement delivery note print page', () => {
 				params: {}
 			} as unknown as PageProps
 		}).body;
-		expect(body).not.toContain('NOT VALID');
-		expect(body).not.toContain('PRELIMINARY / DRAFT');
+		expect(body).not.toContain('SIN VALIDEZ');
+		expect(body).not.toContain('PRELIMINAR / BORRADOR');
 	});
 });
