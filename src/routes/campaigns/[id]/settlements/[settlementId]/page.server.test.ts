@@ -295,7 +295,7 @@ describe('settlement workspace', () => {
 		vi.mocked(correctPaymentMethod).mockRejectedValueOnce(
 			new SettlementServiceError(
 				'conflict',
-				'This payment was already moved by a correction and cannot be corrected again.'
+				'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
 			)
 		);
 		expect(
@@ -307,7 +307,8 @@ describe('settlement workspace', () => {
 		).toMatchObject({
 			status: 409,
 			data: {
-				message: 'This payment was already moved by a correction and cannot be corrected again.'
+				message:
+					'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
 			}
 		});
 	});
