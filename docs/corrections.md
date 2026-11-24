@@ -31,7 +31,7 @@ System records audit
 
 Rules:
 
-- If the payment was in a closed settlement, the original settlement is not modified.
+- If the payment was in a closed settlement, annulment does not modify the original settlement.
 - A correction linked to the settlement is created.
 
 ## Incorrect payment method
@@ -109,7 +109,8 @@ System updates calculated balances
 Rules:
 
 - Do not reopen the settlement.
-- Do not edit original totals.
+- Monetary adjustments do not edit original totals; payment-method corrections have the narrow
+  SAN-110 exception described below.
 - The adjustment must appear in the current account and reports.
 
 ## Incorrectly calculated commission
@@ -198,8 +199,8 @@ the older removal RPC and duplicating its audit.
   rejected. Original applications remain immutable. Both annulled and adjusted payments are
   excluded from reservation/coverage checks; only confirmed payments count for paid status.
 - **Settlements:** a replacement retains the original settlement link, amount and payment
-  date; closed settlement rows are never updated, not even their status or `updated_at`.
-  Historical cash/transfer totals remain snapshots, not corrected live totals.
+  date. SAN-110 supersedes the frozen method totals for method corrections only; annulment and
+  reassociation retain the closing totals.
 - **Methods:** a replacement keeps sale, buyer, collector, campaign and applications.
   Installments and bond snapshots are untouched because coverage is unchanged.
   Cash → transfer credits back cash-retained commission; transfer → cash debits that commission.
@@ -378,12 +379,6 @@ correction flows, without changing any earlier migration.
   adjustment table, `027` uses the audited closed-to-corrected transition, and `030`
   acknowledges the immutable sale-compensation reference; their plans are unchanged.
 
-Validation on the local database after a fresh reset, with pgTAP **before**
-integration: `supabase test db` passed **34 files / 2102 assertions** (`034` plan:
-**103**, including two-session dblink cases); `pnpm test:integration` passed
-**21 files / 181 tests** after `pnpm seed:admin`; `pnpm check` reported **0 errors /
-0 warnings**; `pnpm lint` passed; `pnpm test` passed **99 files / 1379 tests**.
-
 ## Implemented in SAN-73
 
 - Sale, bond, payment and closed-settlement record pages expose permission-gated, progressively
@@ -406,24 +401,46 @@ integration: `supabase test db` passed **34 files / 2102 assertions** (`034` pla
   and RPC still accept multiple applications; expanding the no-JavaScript UI to add arbitrary
   application rows is a known follow-up.
 
-### Known follow-up (SAN-71 review): cash/transfer totals of a corrected closed settlement
+### Implemented in SAN-110: closed-settlement method totals
 
-When a payment method is corrected (cash ↔ transfer) for a payment of a **closed** settlement, the
-settlement's `total_cash` / `total_transfer` stay as the closing snapshot (closed totals are never
-edited), and `settlement_correct` (SAN-72) only records `commission_delta` / `cash_retained_delta`.
-So those two totals do **not** reflect the corrected method. Reports by payment method must not
-read them as live data: derive cash/transfer from the payments (non-adjusted originals excluded,
-replacements included). A way to record cash/transfer deltas on the settlement correction is a
-follow-up.
+`payment_correct_method` updates the linked closed or corrected settlement atomically with its
+replacement payment, compensating ledger entries and single audit. Cash → transfer subtracts the
+payment amount from `total_cash` and adds it to `total_transfer`; transfer → cash reverses that
+delta. `total_amount` and `commission_amount` do not change. SAN-68 selects commission using the
+sale's **payment mode** (full payment or installments), not the payment's cash/transfer method:
+despite its name, `cash_full_payment` applies to full-payment sales of either method.
+
+Cash-retained commission (`commission_paid_amount`) moves by that payment's commission and
+`net_to_firefighters = total_amount - commission_paid_amount` moves inversely, matching the
+existing SAN-71 retained-commission compensation. Rules are still evaluated at the original
+payment date using current definitions (the SAN-71/SAN-72 applied-rule attribution limitation
+remains). No principal amount is posted to the commission ledger.
+
+This is a narrow exception to closed-row immutability: identity, status, closing metadata,
+`updated_at`, notes, generated commission and gross total stay unchanged. The existing
+settlement → payment → sorted installments → ledger advisory lock order is unchanged; no
+additional lock is acquired by the totals update. Private triggers execute inside the audited
+SECURITY DEFINER correction transaction and validate the exact replacement-linked delta; no
+API role gains DML or helper EXECUTE privileges. Before/after settlement snapshots are included
+in that correction's existing audit (`old_value.settlement`,
+`new_value.previous_value.settlement`, `new_value.new_value.settlement`).
+
+Repeated correction of the adjusted original still fails with 55000 without another delta or
+audit; correcting its confirmed replacement back is a new, reversing correction. Pending
+payments in open settlements remain ineligible for method correction; their existing summary
+path is unchanged. `settlement_correct` retains its commission/retention-only contract and
+immutable linked adjustments, including when method corrections follow it. Annulment and
+reassociation semantics are unchanged, so these totals are not a general live-payment summary.
 
 ### Known limitation (SAN-72 review): payment corrections after a collector move
 
 After `sale_correct_collector` moves a sale, its historical payments still carry the original
 collector. Annulling or correcting one of them would post compensation to the wrong collector, so
-the `moved_payment_correction_guard` trigger refuses it (55000, shown as a 409 conflict with the
-message "This payment's sale was moved to another collector. Correct the sale collector back
-before annulling or correcting this payment."). Making payment corrections collector-aware is a
-follow-up.
+the `moved_payment_correction_guard` trigger refuses it (55000). The service and route show a
+409 conflict: "La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta
+al cobrador original para anular o corregir el pago." Correct the sale collector back, correct
+the payment, then reapply the collector move if needed. This restriction is accepted for now
+(SAN-110); collector-aware payment attribution remains a SAN-72 follow-up.
 
 ### Campaign audit viewer: performance and coverage (SAN-73 review)
 

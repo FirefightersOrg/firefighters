@@ -4,7 +4,18 @@ import { hasPermissionIn } from '$lib/server/auth/permissions';
 import { mapSettlementRpcError, SettlementServiceError } from './settlements';
 
 export { SettlementServiceError as PaymentCorrectionServiceError };
-export const mapPaymentCorrectionRpcError = mapSettlementRpcError;
+export function mapPaymentCorrectionRpcError(error: { code?: string; message?: string }) {
+	if (
+		error.code === '55000' &&
+		error.message ===
+			"This payment's sale was moved to another collector. Correct the sale collector back before annulling or correcting this payment."
+	)
+		return new SettlementServiceError(
+			'conflict',
+			'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+		);
+	return mapSettlementRpcError(error);
+}
 const uuid = z.guid();
 const reason = z
 	.string()
