@@ -77,6 +77,14 @@
 			>
 		</nav>
 		<h1 class="mt-2 text-2xl font-bold">{data.collector.displayName}</h1>
+		{#if data.can.viewReports}
+			<a
+				href="{resolve('/campaigns/[id]/reports', { id: data.campaign.id })}?collector={data
+					.collector.id}#monthly-title"
+				class="mt-1 inline-block text-sm text-blue-700 hover:underline"
+				>Monthly operational summary →</a
+			>
+		{/if}
 		<nav class="mt-3 text-xs">
 			{#each sections as section, i (section)}<a
 					href="#section-{i + 1}"
