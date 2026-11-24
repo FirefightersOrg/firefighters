@@ -16,9 +16,9 @@ export const IMPORT_REASON_MAX_LENGTH = 500;
 export const IMPORT_NOTES_MAX_LENGTH = 2000;
 export const IMPORT_FILE_NAME_MAX_LENGTH = 255;
 
-const campaignIdField = z.guid({ message: 'Unknown campaign' });
-const sessionIdField = z.guid({ message: 'Unknown import session' });
-const itemIdField = z.guid({ message: 'Unknown import item' });
+const campaignIdField = z.guid({ message: 'Campaña desconocida' });
+const sessionIdField = z.guid({ message: 'Sesión de importación desconocida' });
+const itemIdField = z.guid({ message: 'Fila de importación desconocida' });
 
 const optionalText = (label: string, max: number) =>
 	z
@@ -26,7 +26,7 @@ const optionalText = (label: string, max: number) =>
 		.nullish()
 		.transform((value) => normalizeField(value))
 		.refine((value) => value === null || value.length <= max, {
-			message: `${label} must be at most ${max} characters`
+			message: `${label} admite hasta ${max} caracteres`
 		});
 
 const codeField = (label: string) => optionalText(label, BARCODE_MAX_LENGTH);
@@ -39,7 +39,7 @@ const baseNumberField = z
 		const text = typeof value === 'number' ? String(value) : normalizeField(value);
 		if (text === null) return null;
 		if (!/^[0-9]{1,10}$/.test(text) || Number(text) > IMPORT_MAX_BASE_NUMBER) {
-			ctx.addIssue({ code: 'custom', message: 'The base number must be a whole number' });
+			ctx.addIssue({ code: 'custom', message: 'El número base debe ser un número entero' });
 			return z.NEVER;
 		}
 		return Number(text);
@@ -49,17 +49,17 @@ export const importSessionCreateSchema = z
 	.object({
 		campaignId: campaignIdField,
 		sourceType: z.enum(['barcode_scan', 'csv_file', 'excel_file'], {
-			message: 'Choose how the bonds are loaded'
+			message: 'Elegir cómo se cargan los bonos'
 		}),
-		fileName: optionalText('File name', IMPORT_FILE_NAME_MAX_LENGTH),
-		notes: optionalText('Notes', IMPORT_NOTES_MAX_LENGTH)
+		fileName: optionalText('El nombre del archivo', IMPORT_FILE_NAME_MAX_LENGTH),
+		notes: optionalText('Las notas', IMPORT_NOTES_MAX_LENGTH)
 	})
 	.superRefine((value, ctx) => {
 		if (value.sourceType === 'barcode_scan' && value.fileName !== null) {
-			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'A scan session has no file' });
+			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'Una sesión de escaneo no tiene archivo' });
 		}
 		if (value.sourceType !== 'barcode_scan' && value.fileName === null) {
-			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'A file name is required' });
+			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'El nombre del archivo es obligatorio' });
 		}
 	});
 export type ImportSessionCreateInput = z.output<typeof importSessionCreateSchema>;
@@ -73,37 +73,37 @@ export const stagedImportRowSchema = z
 			.nullish()
 			.transform((value) => (value == null ? null : value.slice(0, IMPORT_RAW_MAX_LENGTH))),
 		parsedValue: z.record(z.string(), z.unknown()).nullish(),
-		barcode: codeField('Barcode'),
+		barcode: codeField('El código de barras'),
 		itemType: z.enum(['simple', 'pata']).nullable(),
-		groupKey: codeField('Pata group'),
+		groupKey: codeField('El grupo de pata'),
 		baseNumber: baseNumberField,
 		errorCode: z
 			.string()
-			.regex(/^parse_[a-z0-9_]{1,56}$/, 'Only parser errors (parse_*) can be staged')
+			.regex(/^parse_[a-z0-9_]{1,56}$/, 'Solo se pueden cargar errores del lector (parse_*)')
 			.nullish()
 			.transform((value) => value ?? null),
-		errorMessage: optionalText('Error message', 500)
+		errorMessage: optionalText('El mensaje de error', 500)
 	})
 	.superRefine((row, ctx) => {
 		if (row.itemType === 'pata' && row.groupKey === null) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['groupKey'],
-				message: 'A pata row needs its grupo_pata'
+				message: 'Una fila de pata necesita su grupo_pata'
 			});
 		}
 		if (row.itemType !== 'pata' && row.groupKey !== null) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['groupKey'],
-				message: 'Only pata rows have a grupo_pata'
+				message: 'Solo las filas de pata tienen grupo_pata'
 			});
 		}
 		if ((row.errorCode === null) !== (row.errorMessage === null)) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['errorMessage'],
-				message: 'A parser error needs both its code and its message'
+				message: 'Un error del lector necesita su código y su mensaje'
 			});
 		}
 	});
@@ -114,10 +114,10 @@ export const importAddItemsSchema = z.object({
 	sessionId: sessionIdField,
 	rows: z
 		.array(stagedImportRowSchema)
-		.min(1, 'The file has no rows')
-		.max(IMPORT_MAX_ROWS, `At most ${IMPORT_MAX_ROWS} rows can be imported at once`)
+		.min(1, 'El archivo no tiene filas')
+		.max(IMPORT_MAX_ROWS, `Se pueden importar como máximo ${IMPORT_MAX_ROWS} filas a la vez`)
 		.refine((rows) => new Set(rows.map((r) => r.rowNumber)).size === rows.length, {
-			message: 'Row numbers must be unique'
+			message: 'Los números de fila deben ser únicos'
 		})
 });
 export type ImportAddItemsInput = z.output<typeof importAddItemsSchema>;
@@ -128,24 +128,24 @@ export type ImportAddItemsInput = z.output<typeof importAddItemsSchema>;
  */
 export const importAddScanSchema = z.object({
 	sessionId: sessionIdField,
-	barcode: codeField('Barcode').refine((value) => value !== null, {
-		message: 'Scan or type a barcode'
+	barcode: codeField('El código de barras').refine((value) => value !== null, {
+		message: 'Escanear o ingresar un código de barras'
 	}),
-	groupKey: codeField('Pata group'),
+	groupKey: codeField('El grupo de pata'),
 	baseNumber: baseNumberField,
-	rawValue: optionalText('Raw value', IMPORT_RAW_MAX_LENGTH)
+	rawValue: optionalText('El valor original', IMPORT_RAW_MAX_LENGTH)
 });
 export type ImportAddScanInput = z.output<typeof importAddScanSchema>;
 
 export const importRemoveItemSchema = z.object({
 	itemId: itemIdField,
-	reason: optionalText('Reason', IMPORT_REASON_MAX_LENGTH)
+	reason: optionalText('El motivo', IMPORT_REASON_MAX_LENGTH)
 });
 export type ImportRemoveItemInput = z.output<typeof importRemoveItemSchema>;
 
 export const importCancelSessionSchema = z.object({
 	sessionId: sessionIdField,
-	reason: optionalText('Reason', IMPORT_REASON_MAX_LENGTH)
+	reason: optionalText('El motivo', IMPORT_REASON_MAX_LENGTH)
 });
 export type ImportCancelSessionInput = z.output<typeof importCancelSessionSchema>;
 
@@ -158,26 +158,26 @@ export const importSessionIdSchema = z.object({ sessionId: sessionIdField });
 export const importUpdateItemSchema = z
 	.object({
 		itemId: itemIdField,
-		itemType: z.enum(['simple', 'pata'], { message: 'Choose simple or pata' }),
-		groupKey: codeField('Pata group'),
+		itemType: z.enum(['simple', 'pata'], { message: 'Elegir bono simple o pata' }),
+		groupKey: codeField('El grupo de pata'),
 		baseNumber: baseNumberField.refine((value) => value !== null, {
-			message: 'Type the base number'
+			message: 'Ingresar el número base'
 		}),
-		barcode: codeField('Barcode')
+		barcode: codeField('El código de barras')
 	})
 	.superRefine((row, ctx) => {
 		if (row.itemType === 'pata' && row.groupKey === null) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['groupKey'],
-				message: 'A pata row needs its grupo_pata'
+				message: 'Una fila de pata necesita su grupo_pata'
 			});
 		}
 		if (row.itemType === 'simple' && row.groupKey !== null) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['groupKey'],
-				message: 'Only pata rows have a grupo_pata'
+				message: 'Solo las filas de pata tienen grupo_pata'
 			});
 		}
 	});
@@ -186,8 +186,8 @@ export type ImportUpdateItemInput = z.output<typeof importUpdateItemSchema>;
 /** SAN-47 rollback of a confirmed import: the reason is required. */
 export const importRollbackSchema = z.object({
 	sessionId: sessionIdField,
-	reason: optionalText('Reason', IMPORT_REASON_MAX_LENGTH).refine((value) => value !== null, {
-		message: 'A reason is required'
+	reason: optionalText('El motivo', IMPORT_REASON_MAX_LENGTH).refine((value) => value !== null, {
+		message: 'Se requiere un motivo'
 	})
 });
 export type ImportRollbackInput = z.output<typeof importRollbackSchema>;

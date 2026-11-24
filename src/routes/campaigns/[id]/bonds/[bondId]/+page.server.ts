@@ -42,7 +42,6 @@ import { requireActiveUser } from '$lib/server/auth/guards';
 import { canDeliverBonds, canLoadBonds } from '$lib/domain/campaigns';
 import { fail, redirect } from '@sveltejs/kit';
 import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bonds';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$lib/schemas/bond';
 import { readFormFields } from '$lib/schemas/campaign';
 import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
@@ -73,10 +72,10 @@ const isUuid = (value: string) => z.guid().safeParse(value).success;
  */
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'bond.view');
-	if (!isUuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!isUuid(params.id)) error(404, { message: BOND_MESSAGES.campaignNotFound });
 	if (!isUuid(params.bondId)) error(404, { message: BOND_MESSAGES.bondNotFound });
 
 	const fail500 = (cause: unknown): never => {
@@ -85,7 +84,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			bondId: params.bondId,
 			error: cause
 		});
-		error(500, { message: 'Could not load the bond. Please try again.' });
+		error(500, { message: 'No se pudo cargar el bono. Volver a intentar.' });
 	};
 
 	const [campaignResult, bondResult] = await Promise.all([
@@ -95,7 +94,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (campaignResult.error) fail500(campaignResult.error);
 	if (bondResult.error) fail500(bondResult.error);
 	const campaign = campaignResult.data;
-	if (!campaign) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!campaign) error(404, { message: BOND_MESSAGES.campaignNotFound });
 	const bond = bondResult.data;
 	if (!bond || bond.campaignId !== campaign.id) {
 		error(404, { message: BOND_MESSAGES.bondNotFound });
@@ -252,7 +251,7 @@ async function checkBondInCampaign(
 			bondId: params.bondId,
 			error: loadError
 		});
-		return bondFormFailure(form, 500, 'Could not load the bond. Please try again.');
+		return bondFormFailure(form, 500, 'No se pudo cargar el bono. Volver a intentar.');
 	}
 	if (campaignId !== params.id) return bondFormFailure(form, 404, BOND_MESSAGES.bondNotFound);
 	return null;
@@ -280,7 +279,7 @@ export const actions: Actions = {
 		const result: BondFormResult = {
 			form: 'ungroup',
 			success: true,
-			message: 'Pata ungrouped. It is annulled and its bonds are available on their own again.',
+			message: 'Pata desagrupada. Quedó anulada y sus bonos vuelven a estar disponibles por separado.',
 			errors: {}
 		};
 		return result;
@@ -307,7 +306,7 @@ export const actions: Actions = {
 		const result: BondFormResult = {
 			form: 'annul',
 			success: true,
-			message: 'Bond annulled. Its numbers are free and can be entered again.',
+			message: 'Bono anulado. Sus números quedaron libres y se pueden volver a ingresar.',
 			errors: {}
 		};
 		return result;
@@ -320,7 +319,7 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctCollector',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireActiveUser(locals, url.pathname);
 		const data = await request.formData();
@@ -333,7 +332,7 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctCollector',
 				errors: {},
-				message: 'Could not load the bond.'
+				message: 'No se pudo cargar el bono.'
 			});
 		if (scoped.data !== params.id)
 			return fail(404, {
@@ -351,7 +350,7 @@ export const actions: Actions = {
 			return {
 				form: 'correctCollector',
 				success: true,
-				message: 'Collector corrected.',
+				message: 'Cobrador corregido.',
 				errors: {}
 			};
 		} catch (cause) {
@@ -360,7 +359,7 @@ export const actions: Actions = {
 				form: 'correctCollector',
 				values,
 				errors: {},
-				message: service?.message ?? 'Could not record correction.'
+				message: service?.message ?? 'No se pudo registrar la corrección.'
 			});
 		}
 	}
@@ -419,7 +418,7 @@ async function custodyPreflight(
 ) {
 	requireActiveUser(locals, url.pathname);
 	if (permissionsUnavailable(locals.permissions)) {
-		return custodyFailure(action, 500, 'Could not load permissions.');
+		return custodyFailure(action, 500, 'No se pudieron cargar los permisos.');
 	}
 	if (!hasPermissionIn(locals.permissions, permission)) {
 		return custodyFailure(action, 403, BOND_MESSAGES.permission);
@@ -436,7 +435,7 @@ async function custodyPreflight(
 			requestId: locals.requestId,
 			error: loadError
 		});
-		return custodyFailure(action, 500, 'Could not load the bond. Please try again.');
+		return custodyFailure(action, 500, 'No se pudo cargar el bono. Volver a intentar.');
 	}
 	if (campaignId !== params.id) return custodyFailure(action, 404, BOND_MESSAGES.bondNotFound);
 	return null;
@@ -462,17 +461,17 @@ async function returnAction({ request, locals, params, url }: RequestEvent) {
 		return custodyFailure(
 			'return',
 			400,
-			'The bond custody is out of date. Reload the page and try again.',
+			'La custodia del bono está desactualizada. Recargar la página y volver a intentar.',
 			{
 				errors: {
-					fromCollectorId: ['The bond custody is out of date. Reload the page and try again.']
+					fromCollectorId: ['La custodia del bono está desactualizada. Recargar la página y volver a intentar.']
 				}
 			}
 		);
 	}
 	if (notes.length > 2000) {
-		return custodyFailure('return', 400, 'Notes are limited to 2000 characters.', {
-			errors: { notes: ['Notes are limited to 2000 characters.'] }
+		return custodyFailure('return', 400, 'Las notas admiten hasta 2000 caracteres.', {
+			errors: { notes: ['Las notas admiten hasta 2000 caracteres.'] }
 		});
 	}
 	let noteId: string;
@@ -497,8 +496,8 @@ async function reassignAction({ request, locals, params, url }: RequestEvent) {
 	const notes = field(formData, 'notes');
 	const values = { collectorId, notes };
 	if (!isUuid(collectorId)) {
-		return custodyFailure('reassign', 400, 'Choose the new collector.', {
-			errors: { collectorId: ['Choose the new collector.'] },
+		return custodyFailure('reassign', 400, 'Elegir el cobrador nuevo.', {
+			errors: { collectorId: ['Elegir el cobrador nuevo.'] },
 			values
 		});
 	}
@@ -506,10 +505,10 @@ async function reassignAction({ request, locals, params, url }: RequestEvent) {
 		return custodyFailure(
 			'reassign',
 			400,
-			'The bond custody is out of date. Reload the page and try again.',
+			'La custodia del bono está desactualizada. Recargar la página y volver a intentar.',
 			{
 				errors: {
-					fromCollectorId: ['The bond custody is out of date. Reload the page and try again.']
+					fromCollectorId: ['La custodia del bono está desactualizada. Recargar la página y volver a intentar.']
 				},
 				values
 			}
@@ -544,15 +543,15 @@ async function markLostAction({ request, locals, params, url }: RequestEvent) {
 		reason: field(formData, 'reason')
 	};
 	const errors: Record<string, string[]> = {};
-	if (!values.responsibleParty) errors.responsibleParty = ['Who was responsible is required.'];
+	if (!values.responsibleParty) errors.responsibleParty = ['Indicar quién fue responsable.'];
 	else if (values.responsibleParty.length > 200)
-		errors.responsibleParty = ['At most 200 characters.'];
+		errors.responsibleParty = ['Hasta 200 caracteres.'];
 	if (!z.iso.date().safeParse(values.lostOn).success)
-		errors.lostOn = ['Pick a real calendar date.'];
-	if (!values.reason) errors.reason = ['A reason is required.'];
-	else if (values.reason.length > 2000) errors.reason = ['At most 2000 characters.'];
+		errors.lostOn = ['Elegir una fecha real del calendario.'];
+	if (!values.reason) errors.reason = ['El motivo es obligatorio.'];
+	else if (values.reason.length > 2000) errors.reason = ['Hasta 2000 caracteres.'];
 	if (Object.keys(errors).length) {
-		return custodyFailure('markLost', 400, 'Please correct the highlighted fields.', {
+		return custodyFailure('markLost', 400, 'Corregir los campos marcados.', {
 			errors,
 			values
 		});
@@ -570,7 +569,7 @@ async function markLostAction({ request, locals, params, url }: RequestEvent) {
 		form: 'custody',
 		action: 'markLost',
 		success: true,
-		message: 'Bond marked lost.',
+		message: 'Bono marcado como extraviado.',
 		errors: {}
 	};
 	return result;

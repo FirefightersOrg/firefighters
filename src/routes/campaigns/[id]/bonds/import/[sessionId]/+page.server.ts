@@ -47,7 +47,7 @@ import {
 
 /** Rows shown per page of the preview table. */
 const PAGE_SIZE = 200;
-const FIX_FIELDS = 'Please correct the highlighted fields.';
+const FIX_FIELDS = 'Corregir los campos marcados.';
 
 /**
  * /campaigns/[id]/bonds/import/[sessionId]: the preview of an import (file or scan). Shows the
@@ -120,7 +120,7 @@ function failLoad(locals: App.Locals, sessionId: string, err: unknown): never {
 		sessionId,
 		error: err
 	});
-	error(500, { message: 'Could not load the import. Please try again.' });
+	error(500, { message: 'No se pudo cargar la importación. Volver a intentar.' });
 }
 
 /**
@@ -244,7 +244,7 @@ export const actions: Actions = {
 			const result: ImportFormResult = {
 				form: 'update',
 				success: true,
-				message: 'Row corrected and revalidated.',
+				message: 'Fila corregida y validada de nuevo.',
 				itemId,
 				summary
 			};
@@ -272,7 +272,7 @@ export const actions: Actions = {
 			return importFormFailure(
 				'remove',
 				400,
-				`Reasons are limited to ${IMPORT_REASON_MAX_LENGTH} characters.`,
+				`Los motivos admiten hasta ${IMPORT_REASON_MAX_LENGTH} caracteres.`,
 				{ itemId }
 			);
 		}
@@ -285,7 +285,7 @@ export const actions: Actions = {
 			const result: ImportFormResult = {
 				form: 'remove',
 				success: true,
-				message: 'Row removed from the import.',
+				message: 'Fila quitada de la importación.',
 				itemId,
 				summary
 			};
@@ -309,8 +309,8 @@ export const actions: Actions = {
 				success: summary.status === 'validated',
 				message:
 					summary.status === 'validated'
-						? 'The import is valid and ready to confirm.'
-						: 'Some rows still need attention: correct or remove them and validate again.',
+						? 'La importación es válida y está lista para confirmar.'
+						: 'Algunas filas necesitan atención: corregirlas o quitarlas y volver a validar.',
 				summary
 			};
 			return result;
@@ -350,7 +350,7 @@ export const actions: Actions = {
 			return importFormFailure(
 				'cancel',
 				400,
-				`Reasons are limited to ${IMPORT_REASON_MAX_LENGTH} characters.`
+				`Los motivos admiten hasta ${IMPORT_REASON_MAX_LENGTH} caracteres.`
 			);
 		}
 		try {
@@ -365,7 +365,7 @@ export const actions: Actions = {
 		const result: ImportFormResult = {
 			form: 'cancel',
 			success: true,
-			message: 'The import was cancelled. No bond was created.'
+			message: 'La importación se canceló. No se creó ningún bono.'
 		};
 		return result;
 	},
@@ -399,7 +399,7 @@ export const actions: Actions = {
 		const result: ImportFormResult = {
 			form: 'rollback',
 			success: true,
-			message: 'The import was rolled back: its bonds were annulled and their numbers released.'
+			message: 'La importación se revirtió: sus bonos se anularon y sus números quedaron libres.'
 		};
 		return result;
 	}

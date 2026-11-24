@@ -1,6 +1,9 @@
 import { z } from 'zod';
-import { statusWord } from '$lib/domain/status-word';
-import { bondTotalValueCents, BondError } from '$lib/domain/bonds';
+import {
+	BOND_COMMERCIAL_STATUS_LABELS,
+	bondTotalValueCents,
+	BondError
+} from '$lib/domain/bonds';
 import { centsToDecimalString } from '$lib/domain/money';
 import {
 	calculateAssociatedNumber,
@@ -51,14 +54,14 @@ export interface GroupingMemberView {
 
 /** Why `member` cannot join a manual pata of `campaignId`, or null when it can. */
 export function groupingProblem(member: GroupingMember | undefined, campaignId: string) {
-	if (!member) return 'Bond not found.';
-	if (member.campaignId !== campaignId) return 'It belongs to another campaign.';
-	if (member.kind !== 'simple') return 'It is a pata: only simple bonds can be grouped.';
+	if (!member) return 'No se encontró el bono.';
+	if (member.campaignId !== campaignId) return 'Pertenece a otra campaña.';
+	if (member.kind !== 'simple') return 'Es una pata: solo se pueden agrupar bonos simples.';
 	if (member.commercialStatus !== 'available') {
-		const status = statusWord(member.commercialStatus);
-		return `It is ${status}: only available bonds can be grouped.`;
+		const status = BOND_COMMERCIAL_STATUS_LABELS[member.commercialStatus].toLowerCase();
+		return `Está ${status}: solo se pueden agrupar bonos disponibles.`;
 	}
-	if (member.activeGroupPataId) return 'It already belongs to a pata. Ungroup that pata first.';
+	if (member.activeGroupPataId) return 'Ya pertenece a una pata. Desagrupar esa pata primero.';
 	return null;
 }
 
@@ -90,9 +93,9 @@ export function describeGroupingMembers(
 	});
 }
 
-/** Error line for a picked bond that cannot be grouped: "Bond 0068: It is sold: ...". */
+/** Error line for a picked bond that cannot be grouped: "Bono 0068: Está vendido: ...". */
 export function groupingProblemMessage(view: GroupingMemberView): string {
-	return `${view.baseFormatted ? `Bond ${view.baseFormatted}` : 'A selected bond'}: ${view.problem}`;
+	return `${view.baseFormatted ? `Bono ${view.baseFormatted}` : 'Un bono seleccionado'}: ${view.problem}`;
 }
 
 /** N and `simple_bond_value * N` of the pata the picked bonds would make (null total when N = 0). */

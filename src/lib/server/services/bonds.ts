@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { statusWord } from '$lib/domain/status-word';
-import { BOND_COMMERCIAL_STATUSES, type BondNumberKind } from '$lib/domain/bonds';
+import {
+	BOND_COMMERCIAL_STATUSES,
+	BOND_COMMERCIAL_STATUS_LABELS,
+	type BondCommercialStatus,
+	type BondNumberKind
+} from '$lib/domain/bonds';
+import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import type {
@@ -87,14 +92,14 @@ interface PostgrestLikeError {
 }
 
 export const BOND_MESSAGES = {
-	permission: 'You do not have permission to perform this action.',
-	campaignNotFound: 'Campaign not found.',
-	bondNotFound: 'Bond not found. It may have been removed or you may not have access to it.',
-	internal: 'Something went wrong. Please try again.',
-	invalid: 'Some values are invalid. Please review the form.',
-	campaignLocked: 'Bonds can only be loaded or changed while the campaign is a draft or active.',
-	manualPataAnnul: 'A manually grouped pata cannot be annulled directly. Ungroup it instead.',
-	duplicate: 'A number or code is already used by another bond in this campaign.'
+	permission: 'No hay permiso para realizar esta acción.',
+	campaignNotFound: 'No se encontró la campaña.',
+	bondNotFound: 'No se encontró el bono. Puede que se haya quitado o que no haya acceso a él.',
+	internal: 'Algo salió mal. Volver a intentar.',
+	invalid: 'Hay valores no válidos. Revisar el formulario.',
+	campaignLocked: 'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa.',
+	manualPataAnnul: 'Una pata agrupada manualmente no se puede anular directamente. Desagruparla en su lugar.',
+	duplicate: 'Un número o código ya está en uso en otro bono de esta campaña.'
 } as const;
 
 /** Which form field a duplicate-number error belongs to (simple bond or pata form). */
@@ -102,9 +107,107 @@ export type BondNumberField = 'baseNumber' | 'baseNumbers';
 
 const STATUS_WORD = new RegExp(`\\b(${BOND_COMMERCIAL_STATUSES.join('|')})\\b`, 'g');
 
-/** Database message → sentence for people: status codes as labels, capitalized, final period. */
+/** A bond status code as a lowercase Spanish word (`sold` → `vendido`). */
+function statusLabel(status: string): string {
+	return (BOND_COMMERCIAL_STATUS_LABELS[status as BondCommercialStatus] ?? status).toLowerCase();
+}
+
+/** A campaign status code as a lowercase Spanish word (`closed` → `cerrada`). */
+export function campaignStatusLabel(status: string): string {
+	return (CAMPAIGN_STATUS_LABELS[status as CampaignStatus] ?? status).toLowerCase();
+}
+
+/**
+ * The database raises English messages; these are their Spanish wording (docs/copy.md). The
+ * first matching pattern wins; unknown messages fall back to the original text.
+ */
+const DB_MESSAGES_ES: [RegExp, (m: RegExpExecArray) => string][] = [
+	[/^an active profile is required/, () => 'Se requiere un perfil activo para modificar bonos'],
+	[/^at least one base number is required/, () => 'Se requiere al menos un número base'],
+	[/^base numbers (must be a flat list|cannot be empty)/, () => 'Los números base no son válidos'],
+	[
+		/^base number (\S+) is negative/,
+		(m) => `El número base ${m[1]} no puede ser negativo`
+	],
+	[
+		/^number (\S+) exceeds the campaign maximum number (\S+)/,
+		(m) => `El número ${m[1]} supera el número máximo de la campaña ${m[2]}`
+	],
+	[
+		/^base number (\S+) overflows: its associated number (\S+) exceeds the campaign maximum number (\S+)/,
+		(m) =>
+			`El número base ${m[1]} desborda: su número asociado ${m[2]} supera el número máximo de la campaña ${m[3]}`
+	],
+	[
+		/^number (\S+) appears more than once in this bond \((\d+) as base, (\d+) as associated\)/,
+		(m) =>
+			`El número ${m[1]} aparece más de una vez en este bono (${m[2]} como base, ${m[3]} como asociado)`
+	],
+	[
+		/^number (\S+) is already used by bond (\S+)/,
+		(m) => `El número ${m[1]} ya está en uso en el bono ${m[2]}`
+	],
+	[
+		/^internal code (.+) is already used by bond (\S+)/,
+		(m) => `El código interno ${m[1]} ya está en uso en el bono ${m[2]}`
+	],
+	[
+		/^barcode (.+) is already used by bond (\S+)/,
+		(m) => `El código de barras ${m[1]} ya está en uso en el bono ${m[2]}`
+	],
+	[/^a pata needs at least (\d+) simple bonds/, (m) => `Una pata necesita al menos ${m[1]} bonos simples`],
+	[/^member bond ids cannot be empty/, () => 'Se requiere elegir los bonos que forman la pata'],
+	[/^bond (\S+) is listed more than once/, (m) => `El bono ${m[1]} figura más de una vez`],
+	[/^bond (.+) not found/, () => BOND_MESSAGES_NOT_FOUND],
+	[/^bond (.+) belongs to another campaign/, (m) => `El bono ${m[1]} pertenece a otra campaña`],
+	[
+		/^only simple bonds can be grouped into a pata \(bond (.+) is a (\w+)\)/,
+		(m) => `Solo se pueden agrupar bonos simples en una pata (el bono ${m[1]} es una pata)`
+	],
+	[
+		/^only available bonds can be grouped \(bond (.+) is (\w+)\)/,
+		(m) =>
+			`Solo se pueden agrupar bonos disponibles (el bono ${m[1]} está en estado ${statusLabel(m[2])})`
+	],
+	[
+		/^bond (.+) already belongs to manually grouped pata (\S+)/,
+		(m) => `El bono ${m[1]} ya pertenece a la pata manual ${m[2]}`
+	],
+	[/^a reason is required to ungroup a pata/, () => 'Se requiere un motivo para desagrupar una pata'],
+	[/^a reason is required to annul a bond/, () => 'Se requiere un motivo para anular un bono'],
+	[
+		/^bond (\S+) is not a manually grouped pata/,
+		(m) => `El bono ${m[1]} no es una pata agrupada manualmente`
+	],
+	[
+		/^only an available pata can be ungrouped \(pata (\S+) is (\w+)\)/,
+		(m) =>
+			`Solo se puede desagrupar una pata disponible (la pata ${m[1]} está en estado ${statusLabel(m[2])})`
+	],
+	[/^bond (.+) is already annulled/, (m) => `El bono ${m[1]} ya está anulado`],
+	[
+		/^only available bonds can be annulled \(bond (.+) is (\w+)\)/,
+		(m) =>
+			`Solo se pueden anular bonos disponibles (el bono ${m[1]} está en estado ${statusLabel(m[2])})`
+	],
+	[
+		/^bond (.+) belongs to manually grouped pata (\S+)/,
+		(m) => `El bono ${m[1]} pertenece a la pata manual ${m[2]}`
+	]
+];
+const BOND_MESSAGES_NOT_FOUND = 'No se encontró el bono.';
+
+/** Database message → sentence for people: Spanish, capitalized, final period. */
 function humanize(message: string): string {
-	const text = message.replace(STATUS_WORD, (status) => statusWord(status));
+	let text = message;
+	for (const [pattern, translate] of DB_MESSAGES_ES) {
+		const match = pattern.exec(message);
+		if (match) {
+			text = translate(match);
+			break;
+		}
+	}
+	if (text === message) text = message.replace(STATUS_WORD, (status) => statusLabel(status));
 	const sentence = text.charAt(0).toUpperCase() + text.slice(1);
 	return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
@@ -148,13 +251,13 @@ export function duplicateNumbersMessage(conflicts: readonly BondNumberConflict[]
 	const numbers = conflicts.map((c) => c.formatted).join(', ');
 	const bonds = [...new Set(conflicts.map((c) => c.bondId))];
 	if (conflicts.length === 1) {
-		return `Number ${numbers} is already used by bond ${bonds[0]}.`;
+		return `El número ${numbers} ya está en uso en el bono ${bonds[0]}.`;
 	}
 	if (bonds.length === 1) {
-		return `Numbers ${numbers} are already used by bond ${bonds[0]}.`;
+		return `Los números ${numbers} ya están en uso en el bono ${bonds[0]}.`;
 	}
-	const owners = conflicts.map((c) => `${c.formatted}: bond ${c.bondId}`).join(', ');
-	return `Numbers ${numbers} are already used by other bonds in this campaign (${owners}).`;
+	const owners = conflicts.map((c) => `${c.formatted}: bono ${c.bondId}`).join(', ');
+	return `Los números ${numbers} ya están en uso en otros bonos de esta campaña (${owners}).`;
 }
 
 /** Field of a 22023 / 55000 message, by its wording (see the migration's RAISE messages). */
@@ -222,8 +325,8 @@ export function mapBondRpcError(
 		case '55000': {
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
-				const label = statusWord(window[1]);
-				return err('conflict', `${BOND_MESSAGES.campaignLocked} This campaign is ${label}.`);
+				const label = campaignStatusLabel(window[1]);
+				return err('conflict', `${BOND_MESSAGES.campaignLocked} La campaña está ${label}.`);
 			}
 			if (message.startsWith('a manually grouped pata cannot be annulled directly')) {
 				return err('conflict', BOND_MESSAGES.manualPataAnnul);
@@ -231,7 +334,7 @@ export function mapBondRpcError(
 			const grouped = /belongs to (a )?manually grouped pata/.test(message);
 			return err(
 				'conflict',
-				grouped ? `${humanize(message)} Ungroup the pata first.` : humanize(message),
+				grouped ? `${humanize(message)} Desagrupar la pata primero.` : humanize(message),
 				{ field: fieldFor(message, numberField) }
 			);
 		}

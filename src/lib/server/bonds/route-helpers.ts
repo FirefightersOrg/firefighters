@@ -1,5 +1,4 @@
 import { fail } from '@sveltejs/kit';
-import { statusWord } from '$lib/domain/status-word';
 import type { z } from 'zod';
 import type { CampaignStatus } from '$lib/domain/campaigns';
 import { requireActiveUser } from '$lib/server/auth/guards';
@@ -9,6 +8,7 @@ import { bondFieldErrors, type BondFieldErrors } from '$lib/schemas/bond';
 import {
 	BOND_MESSAGES,
 	BondServiceError,
+	campaignStatusLabel,
 	type BondNumberConflict
 } from '$lib/server/services/bonds';
 
@@ -50,7 +50,7 @@ export interface BondFormResult {
 	values?: Record<string, string>;
 }
 
-export const FIX_FIELDS_MESSAGE = 'Please correct the highlighted fields.';
+export const FIX_FIELDS_MESSAGE = 'Corregir los campos marcados.';
 
 /**
  * Actions: active user (else redirect to login). Returns a 403 `fail()` result when the
@@ -94,9 +94,9 @@ export function bondFormFailure(
 	return fail(status, data);
 }
 
-/** "Bonds can only be loaded or changed while ... This campaign is closed." */
+/** "Los bonos solo se pueden cargar o modificar mientras ... La campaña está cerrada." */
 export function campaignLockedMessage(status: CampaignStatus): string {
-	return `${BOND_MESSAGES.campaignLocked} This campaign is ${statusWord(status)}.`;
+	return `${BOND_MESSAGES.campaignLocked} La campaña está ${campaignStatusLabel(status)}.`;
 }
 
 /** 400 failure for a schema validation error. */
@@ -123,32 +123,32 @@ export function conflictLinks(
 }
 
 /**
- * "Number 0068 is already used by another bond in this campaign." The bond is not named by its id
+ * "El número 0068 ya está en uso en otro bono de esta campaña." The bond is not named by its id
  * (meaningless to people): the form links to it instead.
  */
 export function duplicateNumbersFieldMessage(conflicts: readonly BondNumberConflict[]): string {
 	const numbers = conflicts.map((c) => c.formatted);
 	const owners = new Set(conflicts.map((c) => c.bondId)).size;
 	const subject =
-		numbers.length === 1 ? `Number ${numbers[0]} is` : `Numbers ${numbers.join(', ')} are`;
-	return `${subject} already used by ${owners === 1 ? 'another bond' : 'other bonds'} in this campaign.`;
+		numbers.length === 1 ? `El número ${numbers[0]} ya está` : `Los números ${numbers.join(', ')} ya están`;
+	return `${subject} en uso en ${owners === 1 ? 'otro bono' : 'otros bonos'} de esta campaña.`;
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const BOND_ID_REFERENCE = new RegExp(` by bond ${UUID}`, 'i');
+const BOND_ID_REFERENCE = new RegExp(` en el bono ${UUID}`, 'i');
 
 /**
- * Removes bond ids (meaningless to people) from a database message: `Bond 0068 (<id>) is sold`
- * → `Bond 0068 is sold`; `... manually grouped pata <id>` → `... a manually grouped pata`;
- * `(pata <id> is sold)` → `(this pata is sold)`; `Bond <id> is listed ...` → `A bond is listed ...`.
+ * Removes bond ids (meaningless to people) from a database message: `El bono 0068 (<id>) ...`
+ * → `El bono 0068 ...`; `... la pata manual <id>` → `... una pata manual`;
+ * `(la pata <id> está ...)` → `(esta pata está ...)`; `El bono <id> figura ...` → `Un bono figura ...`.
  */
 export function withoutBondIds(message: string): string {
 	return message
 		.replace(new RegExp(` \\(${UUID}\\)`, 'gi'), '')
-		.replace(new RegExp(`manually grouped pata ${UUID}`, 'gi'), 'a manually grouped pata')
-		.replace(new RegExp(`\\bpata ${UUID}`, 'gi'), 'this pata')
-		.replace(new RegExp(`\\b(b)ond ${UUID}`, 'gi'), (_match, b: string) =>
-			b === 'B' ? 'A bond' : 'a bond'
+		.replace(new RegExp(`la pata manual ${UUID}`, 'gi'), 'una pata manual')
+		.replace(new RegExp(`\\bla pata ${UUID}`, 'gi'), 'esta pata')
+		.replace(new RegExp(`\\b(e)l bono ${UUID}`, 'gi'), (_match, e: string) =>
+			e === 'E' ? 'Un bono' : 'un bono'
 		);
 }
 
@@ -174,7 +174,7 @@ export function bondServiceFailure(
 		const bondId = err.kind === 'conflict' ? err.conflictingBondId : undefined;
 		const message = withoutBondIds(
 			bondId
-				? err.message.replace(BOND_ID_REFERENCE, ' by another bond in this campaign')
+				? err.message.replace(BOND_ID_REFERENCE, ' en otro bono de esta campaña')
 				: err.message
 		);
 		return bondFormFailure(form, err.status, FIX_FIELDS_MESSAGE, {
