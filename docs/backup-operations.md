@@ -129,7 +129,7 @@ Generated on demand as CSV (UTF-8 with BOM, CRLF, formula-safe text cells) at
 Correction links (SAN-114): `payments` includes `replaces_payment_id` (links an `adjusted` payment to
 its replacement), `collector-ledger` includes `corrects_sale_id` (links cross-collector
 compensation to the corrected sale) and `settlement-corrections` carries `commission_delta` and
-`withheld_commission_delta`.
+`cash_retained_delta`.
 
 Rules: `report.export` is required (only the administrator holds it today) together with the view
 permission of the exported data; RLS still applies. Exports are read-only, paginated in 1000-row
