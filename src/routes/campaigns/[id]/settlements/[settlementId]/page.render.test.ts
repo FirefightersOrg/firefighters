@@ -39,11 +39,12 @@ const page = (status = 'open') =>
 describe('settlement workspace render', () => {
 	it('renders seven metrics and open forms', () => {
 		const body = page();
-		expect(body.match(/tabular-nums/g)).toHaveLength(7);
+		// Every Stat value is tabular (acceptance: amounts right-aligned and tabular).
+		expect(body.match(/text-number-lg tabular-nums/g)).toHaveLength(7);
 		expect(body).toContain('?/add');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');
-		expect(body).toContain('Dec 31, 2025');
+		expect(body).toContain('31/12/2025');
 		// Native maxlength counts UTF-16 units, unlike the database's code-point limit.
 		expect(body).not.toContain('maxlength=');
 	});
@@ -95,16 +96,68 @@ describe('settlement workspace corrections (SAN-73)', () => {
 	it('shows payment correction forms with the indicative ledger preview only with permission', () => {
 		const allowed = closed({ correctPayment: true });
 		expect(allowed).toContain('?/annulPayment');
-		expect(allowed).toContain('Indicative preview');
+		expect(allowed).toContain('Vista indicativa:');
 		const denied = closed({ correctPayment: false });
 		expect(denied).not.toContain('?/annulPayment');
-		expect(denied).not.toContain('Indicative preview');
+		expect(denied).not.toContain('Vista indicativa:');
 	});
 
 	it('shows the settlement correction with its ledger preview only with settlement.correct', () => {
 		const allowed = closed({ correctSettlement: true });
-		expect(allowed).toContain('Indicative ledger preview');
+		expect(allowed).toContain('Vista indicativa del libro');
 		expect(allowed).toContain('name="commissionDelta"');
-		expect(closed({ correctSettlement: false })).not.toContain('Indicative ledger preview');
+		expect(closed({ correctSettlement: false })).not.toContain('Vista indicativa del libro');
+	});
+	it('offers one fast-entry option per sale, also for sales with several pending installments', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					settlement,
+					totals,
+					payments: [],
+					candidates: [
+						{
+							id: 'i1',
+							saleId: 'sale-a',
+							bond: '0068',
+							buyer: 'Ana',
+							number: 1,
+							dueDate: '2026-01-10',
+							amount: '100.00',
+							status: 'pending'
+						},
+						{
+							id: 'i2',
+							saleId: 'sale-a',
+							bond: '0068',
+							buyer: 'Ana',
+							number: 2,
+							dueDate: '2026-02-10',
+							amount: '100.00',
+							status: 'pending'
+						},
+						{
+							id: 'i3',
+							saleId: 'sale-b',
+							bond: '0070',
+							buyer: 'Luis',
+							number: 1,
+							dueDate: '2026-01-10',
+							amount: '50.00',
+							status: 'pending'
+						}
+					],
+					reasonMax: 1000,
+					can: { add: true, remove: false, close: false }
+				},
+				form: null,
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+		// Before SAN-135 a sale with more than one candidate installment was hidden from the selector.
+		expect(body.match(/<option value="sale-a"/g)).toHaveLength(1);
+		expect(body.match(/<option value="sale-b"/g)).toHaveLength(1);
+		expect(body).toContain('Bono 0068 — Ana');
 	});
 });

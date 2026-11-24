@@ -18,11 +18,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		'settlement.correct'
 	] as const;
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Permission check failed' });
+		error(500, { message: 'No se pudieron verificar los permisos.' });
 	if (!allowed.some((permission) => hasPermissionIn(locals.permissions, permission)))
-		error(403, { message: 'Permission denied.' });
+		error(403, { message: 'No hay permiso para esta acción.' });
 	if (!uuid(params.id) || !uuid(params.settlementId))
-		error(404, { message: 'Settlement not found.' });
+		error(404, { message: 'Rendición no encontrada.' });
 	const [campaign, settlement, actor] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getSettlementPrint(locals.supabase, params.id, params.settlementId),
@@ -34,10 +34,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			settlementId: params.settlementId,
 			error: campaign.error ?? settlement.error ?? actor.error
 		});
-		error(500, { message: 'Could not load the settlement.' });
+		error(500, { message: 'No se pudo cargar la rendición.' });
 	}
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!settlement.data) error(404, { message: 'Settlement not found.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!settlement.data) error(404, { message: 'Rendición no encontrada.' });
 	return {
 		document: buildPrintableSettlementDeliveryNote(campaign.data, {
 			...settlement.data,

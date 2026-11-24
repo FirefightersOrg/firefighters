@@ -16,7 +16,7 @@ describe('new settlement render', () =>
 		}).body;
 		expect(body).toContain('Ana');
 		expect(body).toContain('name="notes"');
-		expect(body).toContain('Open settlement');
+		expect(body).toContain('Abrir rendición');
 	}));
 it('renders validation feedback', () => {
 	const body = render(Page, {

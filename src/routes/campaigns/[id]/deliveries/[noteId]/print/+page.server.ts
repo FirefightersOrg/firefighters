@@ -11,7 +11,7 @@ import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 
 const getDeliveryNoteActor = (supabase: App.Locals['supabase'], id: string) =>
 	getDocumentActorName(supabase, 'delivery_note', id);
-const NOTE_NOT_FOUND = 'Delivery note not found.';
+const NOTE_NOT_FOUND = 'Remito no encontrado.';
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
 /**
@@ -64,5 +64,5 @@ function fail500(locals: App.Locals, noteId: string, err: unknown): never {
 		noteId,
 		error: err
 	});
-	error(500, { message: 'Could not load the delivery note. Please try again.' });
+	error(500, { message: 'No se pudo cargar el remito. Volver a intentar.' });
 }

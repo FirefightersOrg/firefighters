@@ -26,7 +26,7 @@ describe('payment corrections', () => {
 			status: 409,
 			kind: 'conflict',
 			message:
-				'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+				'La venta de este pago fue reasignada a otro cobrador. Primero hay que devolver la venta al cobrador original para anular o corregir el pago.'
 		});
 	});
 	it.each([null, []])('fails closed before RPC for permissions %s', async (permissions) => {

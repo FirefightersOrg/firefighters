@@ -2,16 +2,20 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
+		Alert,
+		Button,
+		Card,
+		Checkbox,
+		Disclosure,
+		EmptyState,
+		Field,
+		PageHeader,
+		Select,
+		TextInput
+	} from '$lib/components/ui';
 	import { PAYMENT_MODE_LABELS, buildInstallmentSchedule } from '$lib/domain/sales';
-	import { formatMoney } from '$lib/domain/money';
+	import { formatDate, formatMoney } from '$lib/format';
 	import { buyerDisplayName } from '$lib/domain/parties';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import type { PageProps } from './$types';
 	let { data, form }: PageProps = $props();
 	let selectedBond = $state('');
@@ -40,162 +44,202 @@
 				})
 			: []
 	);
+	const saleError = (key: string) => (form?.form === 'sale' ? errors[key]?.[0] : undefined);
+	const buyerOptions = $derived([
+		{ value: '', label: 'Elegir comprador' },
+		...(form?.form === 'buyer' &&
+		form.success &&
+		form.buyerId &&
+		!data.buyers.some((b) => b.id === form.buyerId)
+			? [{ value: form.buyerId as string, label: form.buyerName as string }]
+			: []),
+		...data.buyers.map((buyer) => ({ value: buyer.id, label: buyerDisplayName(buyer) }))
+	]);
+	const modeOptions = Object.entries(PAYMENT_MODE_LABELS).map(([value, label]) => ({
+		value,
+		label
+	}));
+	const typeOptions = [
+		{ value: 'individual', label: 'Persona' },
+		{ value: 'business', label: 'Empresa' }
+	];
 </script>
 
-<svelte:head><title>Register sale - {data.campaign.name}</title></svelte:head>
+<svelte:head><title>Registrar venta - {data.campaign.name}</title></svelte:head>
+
+<PageHeader
+	title="Registrar venta"
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
+		{ label: 'Ventas', href: resolve('/campaigns/[id]/sales', { id: data.campaign.id }) },
+		{ label: 'Registrar venta' }
+	]}
+/>
+
 <div class="space-y-6">
-	<a
-		class="text-sm text-blue-700 hover:underline"
-		href={resolve('/campaigns/[id]/sales', { id: data.campaign.id })}>← Sales</a
-	>
-	<h1 class="text-2xl font-bold">Register sale</h1>
-	<section class="{cardClass} space-y-4">
-		<h2 class="font-semibold">1. Find a delivered bond</h2>
-		<form method="POST" action="?/lookup" use:enhance class="flex gap-2">
-			<input
-				class={inputClass}
-				name="query"
-				placeholder="Base number, associated number or code"
-				aria-invalid={form?.form === 'lookup' && errors.query ? 'true' : undefined}
-				aria-describedby={form?.form === 'lookup' && errors.query ? 'query-error' : undefined}
-			/><button class={primaryButtonClass}>Search</button>
+	<Card title="1. Buscar un bono entregado">
+		<form method="POST" action="?/lookup" use:enhance class="flex items-end gap-2">
+			<Field
+				label="Número base, asociado o código"
+				id="query"
+				error={form?.form === 'lookup' ? errors.query?.[0] : undefined}
+			>
+				<TextInput name="query" mono />
+			</Field>
+			<Button type="submit" variant="primary" icon="search">Buscar</Button>
 		</form>
-		<FieldError id="query-error" errors={form?.form === 'lookup' ? errors.query : undefined} />
-		{#if form?.form === 'lookup'}<div class="space-y-2">
+		{#if form?.form === 'lookup'}
+			<fieldset class="mt-4 space-y-2">
+				<legend class="sr-only">Bonos encontrados</legend>
 				{#each form.found ?? [] as bond (bond.id)}
-					{#if bond.sellable}<label class="block"
-							><input type="radio" bind:group={selectedBond} value={bond.id} /> Bond {bond.baseNumbers.join(
-								', '
-							)}{bond.associatedNumbers.length ? ` / ${bond.associatedNumbers.join(', ')}` : ''} — delivered,
-							can be sold</label
-						>{:else}<p class="text-sm text-slate-600">
-							Bond {bond.baseNumbers.join(', ')} cannot be sold: {bond.reason}
-						</p>{/if}
-				{:else}<p class="text-sm text-slate-500">
-						No delivered bond matches. Available bonds must be delivered first; sold, lost, annulled
-						and grouped member bonds cannot be sold.
-					</p>{/each}
-			</div>{/if}
-	</section>
-	<section class="{cardClass} space-y-5">
-		<h2 class="font-semibold">2. Buyer</h2>
-		<form method="GET" class="flex gap-2">
-			<label class="sr-only" for="buyer-search">Search buyers</label>
-			<input
-				class={inputClass}
-				id="buyer-search"
-				name="buyer"
-				value={data.buyerSearch}
-				placeholder="Search buyers"
-			/>
-			<button class={secondaryButtonClass}>Search</button>
-		</form>
-		{#if data.buyerTotal > data.buyers.length}<p class="text-sm text-slate-500">
-				Showing first {data.buyers.length} of {data.buyerTotal} — refine the search.
-			</p>{/if}
-		<select
-			class={inputClass}
-			bind:value={selectedBuyer}
-			aria-invalid={form?.form === 'sale' && errors.buyerId ? 'true' : undefined}
-			aria-describedby={form?.form === 'sale' && errors.buyerId ? 'buyerId-error' : undefined}
-			><option value="">Choose buyer</option
-			>{#if form?.form === 'buyer' && form.success && form.buyerId && !data.buyers.some((b) => b.id === form.buyerId)}<option
-					value={form.buyerId}>{form.buyerName}</option
-				>{/if}{#each data.buyers as buyer (buyer.id)}<option value={buyer.id}
-					>{buyerDisplayName(buyer)}</option
-				>{/each}</select
-		>
-		<FieldError id="buyerId-error" errors={form?.form === 'sale' ? errors.buyerId : undefined} />
-		{#if data.canCreateBuyer}<details class="rounded border p-3 text-sm">
-				<summary class="cursor-pointer font-medium">Create a buyer</summary>
-				<form
-					method="POST"
-					action="?/createBuyer"
-					use:enhance
-					class="mt-3 grid gap-2 sm:grid-cols-2"
-				>
-					<select class={inputClass} name="type"
-						><option value="individual">Individual</option><option value="business">Business</option
-						></select
-					>
-					<input class={inputClass} name="firstName" placeholder="First name" />
-					<input class={inputClass} name="lastName" placeholder="Last name" />
-					<input class={inputClass} name="businessName" placeholder="Business name" />
-					<input class={inputClass} name="documentNumber" placeholder="Document number" />
-					<input class={inputClass} name="taxId" placeholder="Tax ID" />
-					<input class={inputClass} name="phone" placeholder="Phone" />
-					<input class={inputClass} name="address" placeholder="Address" />
-					<input type="hidden" name="usualCollectorId" value="" />
-					<input type="hidden" name="notes" value="" />
-					{#if form?.form === 'buyer' && form.duplicates}<label class="sm:col-span-2"
-							><input type="checkbox" name="createAnyway" /> {form.message}</label
-						>{/if}
-					<button class={secondaryButtonClass}>Create buyer</button>
-					{#if form?.form === 'buyer' && form.message}<p class="text-red-700">
-							{form.message}
-						</p>{/if}
-				</form>
-			</details>{/if}
-	</section>
-	<form method="POST" action="?/register" use:enhance class="{cardClass} space-y-5">
-		<input type="hidden" name="bondId" value={selectedBond} />
-		<input type="hidden" name="buyerId" value={selectedBuyer} />
-		<FieldError id="bondId-error" errors={form?.form === 'sale' ? errors.bondId : undefined} />
-		<p class="text-sm text-slate-500">
-			{#if selectedCandidate?.collectorName}
-				Collector: {selectedCandidate.collectorName}
-			{:else}
-				Collector: Select a bond to see its holder.
-			{/if}
-		</p>
-		<h2 class="font-semibold">3. Modality</h2>
-		<select
-			class={inputClass}
-			name="paymentMode"
-			bind:value={mode}
-			aria-invalid={form?.form === 'sale' && errors.paymentMode ? 'true' : undefined}
-			aria-describedby={form?.form === 'sale' && errors.paymentMode
-				? 'paymentMode-error'
-				: undefined}
-			>{#each Object.entries(PAYMENT_MODE_LABELS) as [value, label] (value)}<option {value}
-					>{label}</option
-				>{/each}</select
-		>
-		<FieldError
-			id="paymentMode-error"
-			errors={form?.form === 'sale' ? errors.paymentMode : undefined}
-		/>
-		{#if mode === 'installments'}
-			<label class={labelClass} for="firstDueDate">First due date</label><input
-				class={inputClass}
-				id="firstDueDate"
-				name="firstDueDate"
-				type="date"
-				bind:value={due}
-				min={data.firstDueDateBounds.min}
-				max={data.firstDueDateBounds.max}
-				aria-invalid={form?.form === 'sale' && errors.firstDueDate ? 'true' : undefined}
-				aria-describedby={form?.form === 'sale' && errors.firstDueDate
-					? 'firstDueDate-error'
-					: undefined}
-			/>
-			<FieldError
-				id="firstDueDate-error"
-				errors={form?.form === 'sale' ? errors.firstDueDate : undefined}
-			/>
+					{#if bond.sellable}
+						<label class="flex items-center gap-2 text-body">
+							<input
+								type="radio"
+								bind:group={selectedBond}
+								value={bond.id}
+								class="size-5 accent-primary"
+							/>
+							<span
+								>Bono <span class="font-mono"
+									>{bond.baseNumbers.join(', ')}{bond.associatedNumbers.length
+										? ` / ${bond.associatedNumbers.join(', ')}`
+										: ''}</span
+								> — entregado, se puede vender</span
+							>
+						</label>
+					{:else}
+						<p class="text-body-sm text-muted">
+							El bono <span class="font-mono">{bond.baseNumbers.join(', ')}</span> no se puede
+							vender: {bond.reason}
+						</p>
+					{/if}
+				{:else}
+					<EmptyState title="Ningún bono entregado coincide">
+						Los bonos disponibles se tienen que entregar primero; los vendidos, extraviados,
+						anulados y los que integran una pata no se pueden vender.
+					</EmptyState>
+				{/each}
+			</fieldset>
 		{/if}
-		<h2 class="font-semibold">4. Schedule preview</h2>
-		{#if schedule.length}<table class="text-sm">
-				<tbody
-					>{#each schedule as installment (installment.number)}<tr
-							><td class="pr-4">{installment.number}</td><td class="pr-4">{installment.dueDate}</td
-							><td>{formatMoney(installment.amount)}</td></tr
-						>{/each}</tbody
-				>
-			</table>{:else}<p class="text-sm text-slate-500">
-				Select a bond to preview the schedule.
-			</p>{/if}{#if form?.form === 'sale' && form.message}<p class="text-sm text-red-700">
-				{form.message}
-			</p>{/if}<button class={primaryButtonClass}>Confirm sale</button>
-	</form>
+	</Card>
+
+	<Card title="2. Comprador">
+		<form method="GET" class="flex items-end gap-2">
+			<Field label="Buscar compradores" id="buyer-search">
+				<TextInput name="buyer" value={data.buyerSearch} />
+			</Field>
+			<Button type="submit" icon="search">Buscar</Button>
+		</form>
+		{#if data.buyerTotal > data.buyers.length}
+			<p class="mt-2 text-body-sm text-muted">
+				Se muestran los primeros {data.buyers.length} de {data.buyerTotal}; afinar la búsqueda.
+			</p>
+		{/if}
+		<div class="mt-4">
+			<Field label="Comprador" id="buyerId" required error={saleError('buyerId')}>
+				<Select options={buyerOptions} bind:value={selectedBuyer} />
+			</Field>
+		</div>
+		{#if data.canCreateBuyer}
+			<div class="mt-4">
+				<Disclosure summary="Crear un comprador">
+					<form method="POST" action="?/createBuyer" use:enhance class="grid gap-4 sm:grid-cols-2">
+						<Field label="Tipo" id="buyer-type"
+							><Select name="type" options={typeOptions} value="individual" /></Field
+						>
+						<Field label="Nombre" id="buyer-firstName" optional
+							><TextInput name="firstName" /></Field
+						>
+						<Field label="Apellido" id="buyer-lastName" optional
+							><TextInput name="lastName" /></Field
+						>
+						<Field label="Razón social" id="buyer-businessName" optional
+							><TextInput name="businessName" /></Field
+						>
+						<Field label="DNI" id="buyer-documentNumber" optional
+							><TextInput name="documentNumber" /></Field
+						>
+						<Field label="CUIT" id="buyer-taxId" optional><TextInput name="taxId" /></Field>
+						<Field label="Teléfono" id="buyer-phone" optional
+							><TextInput name="phone" type="tel" /></Field
+						>
+						<Field label="Dirección" id="buyer-address" optional><TextInput name="address" /></Field
+						>
+						<input type="hidden" name="usualCollectorId" value="" />
+						<input type="hidden" name="notes" value="" />
+						{#if form?.form === 'buyer' && form.duplicates}
+							<div class="sm:col-span-2">
+								<Checkbox name="createAnyway" label={form.message ?? ''} />
+							</div>
+						{/if}
+						<div><Button type="submit">Crear comprador</Button></div>
+						{#if form?.form === 'buyer' && form.message && !form.duplicates}
+							<div class="sm:col-span-2">
+								<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
+							</div>
+						{/if}
+					</form>
+				</Disclosure>
+			</div>
+		{/if}
+	</Card>
+
+	<Card title="3. Modalidad y plan">
+		<form method="POST" action="?/register" use:enhance class="space-y-4">
+			<input type="hidden" name="bondId" value={selectedBond} />
+			<input type="hidden" name="buyerId" value={selectedBuyer} />
+			{#if saleError('bondId')}<div id="bondId-error">
+					<Alert tone="danger">{saleError('bondId')}</Alert>
+				</div>{/if}
+			<p class="text-body-sm text-muted">
+				Cobrador: {selectedCandidate?.collectorName ?? 'elegir un bono para ver quién lo tiene.'}
+			</p>
+			<Field label="Modalidad" id="paymentMode" error={saleError('paymentMode')}>
+				<Select name="paymentMode" options={modeOptions} bind:value={mode} />
+			</Field>
+			{#if mode === 'installments'}
+				<Field label="Primer vencimiento" id="firstDueDate" error={saleError('firstDueDate')}>
+					<TextInput
+						name="firstDueDate"
+						type="date"
+						bind:value={due}
+						min={data.firstDueDateBounds.min}
+						max={data.firstDueDateBounds.max}
+					/>
+				</Field>
+			{/if}
+			<h3 class="text-heading-3">4. Vista previa del plan</h3>
+			{#if schedule.length}
+				<div class="overflow-x-auto">
+					<table class="w-full max-w-md border-collapse text-body-sm">
+						<caption class="sr-only">Plan de cuotas previsto</caption>
+						<thead>
+							<tr class="border-b border-border text-left text-label text-muted">
+								<th scope="col" class="px-3 py-2 text-right">N.º</th>
+								<th scope="col" class="px-3 py-2">Vencimiento</th>
+								<th scope="col" class="px-3 py-2 text-right">Importe</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each schedule as installment (installment.number)}
+								<tr class="border-b border-border last:border-b-0">
+									<td class="px-3 py-2 text-right tabular-nums">{installment.number}</td>
+									<td class="px-3 py-2">{formatDate(installment.dueDate)}</td>
+									<td class="px-3 py-2 text-right tabular-nums"
+										>{formatMoney(installment.amount, { decimals: 'always' })}</td
+									>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{:else}
+				<p class="text-body-sm text-muted">Elegir un bono para ver el plan.</p>
+			{/if}
+			{#if form?.form === 'sale' && form.message}<Alert tone="danger">{form.message}</Alert>{/if}
+			<Button type="submit" variant="primary">Confirmar venta</Button>
+		</form>
+	</Card>
 </div>
