@@ -1,4 +1,5 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
@@ -13,8 +14,6 @@
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
-	import ImportItemStatusBadge from '$lib/components/imports/ImportItemStatusBadge.svelte';
-	import ImportSessionStatusBadge from '$lib/components/imports/ImportSessionStatusBadge.svelte';
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
 	import {
 		IMPORT_ITEM_FILTERS,
@@ -114,9 +113,9 @@
 			<h1 class="text-2xl font-bold tracking-tight">
 				{isScan ? 'Scan batch' : session.fileName}
 			</h1>
-			<ImportSessionStatusBadge
-				status={session.status}
-				rolledBack={session.rolledBackAt !== null}
+			<StatusBadge
+				kind="importSession"
+				status={session.rolledBackAt !== null ? 'rolled_back' : session.status}
 			/>
 		</div>
 		<p class="text-sm text-slate-500">
@@ -306,7 +305,9 @@
 							{@const failure = editFailure(item)}
 							<tr class={removed ? 'text-slate-400' : ''}>
 								<td class="py-2 pr-3 tabular-nums">{item.rowNumber}</td>
-								<td class="py-2 pr-3"><ImportItemStatusBadge status={item.status} {removed} /></td>
+								<td class="py-2 pr-3"
+									><StatusBadge kind="importItem" status={removed ? 'removed' : item.status} /></td
+								>
 								<td class="py-2 pr-3">{item.itemType ?? '—'}</td>
 								<td class="py-2 pr-3">{item.groupKey ?? '—'}</td>
 								<td class="py-2 pr-3 font-mono tabular-nums">
