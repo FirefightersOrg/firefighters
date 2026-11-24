@@ -132,7 +132,7 @@ describe('settlement workspace', () => {
 			status: 400,
 			data: {
 				errors: {
-					[`amount-${INSTALLMENT}`]: ['The amount cannot exceed the installment balance.']
+					[`amount-${INSTALLMENT}`]: ['El importe no puede superar el saldo de la cuota.']
 				}
 			}
 		});
@@ -240,7 +240,7 @@ describe('settlement workspace', () => {
 		async (action, service, schema, valid) => {
 			vi.mocked(service).mockImplementation(async (_client, input) => {
 				const parsed = schema.safeParse(input);
-				if (!parsed.success) throw new SettlementServiceError('validation', 'Invalid correction.');
+				if (!parsed.success) throw new SettlementServiceError('validation', 'Corrección inválida.');
 				return null;
 			});
 			const permission =
@@ -295,7 +295,7 @@ describe('settlement workspace', () => {
 		vi.mocked(correctPaymentMethod).mockRejectedValueOnce(
 			new SettlementServiceError(
 				'conflict',
-				'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+				'La venta de este pago fue reasignada a otro cobrador. Primero hay que devolver la venta al cobrador original para anular o corregir el pago.'
 			)
 		);
 		expect(
@@ -308,7 +308,7 @@ describe('settlement workspace', () => {
 			status: 409,
 			data: {
 				message:
-					'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+					'La venta de este pago fue reasignada a otro cobrador. Primero hay que devolver la venta al cobrador original para anular o corregir el pago.'
 			}
 		});
 	});

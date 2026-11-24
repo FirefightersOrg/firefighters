@@ -5,7 +5,7 @@ import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { bondOption, isUuid, loadDeliveryCampaign } from '$lib/server/deliveries/route-helpers';
 import { getDeliveryNote, listBondEntriesByIds } from '$lib/server/repositories/deliveries';
 
-const NOTE_NOT_FOUND = 'Delivery note not found.';
+const NOTE_NOT_FOUND = 'Remito no encontrado.';
 
 /**
  * /campaigns/[id]/deliveries/[noteId]: one delivery note with its bonds and a link to the

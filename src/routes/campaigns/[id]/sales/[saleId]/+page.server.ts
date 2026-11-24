@@ -110,7 +110,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'correctBuyer',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const data = await request.formData();
 		const values = { newBuyerId: field(data, 'newBuyerId'), reason: field(data, 'reason') };
@@ -139,7 +139,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'correctCollector',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const data = await request.formData();
 		const values = { newCollectorId: field(data, 'newCollectorId'), reason: field(data, 'reason') };

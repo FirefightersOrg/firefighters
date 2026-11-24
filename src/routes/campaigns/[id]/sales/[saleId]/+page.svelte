@@ -156,7 +156,7 @@
 						<p class="text-body-sm text-muted" data-testid="buyers-truncated">
 							Se muestran los primeros {data.correction.buyers.length} de {data.correction
 								.buyersTotal}
-							compradores. Si falta el correcto, abrí su ficha desde el listado de compradores.
+							compradores. Si falta el correcto, abrir su ficha desde el listado de compradores.
 						</p>
 					{/if}
 					<Field label="Motivo" id="buyer-reason" required hint="Hasta 1000 caracteres.">

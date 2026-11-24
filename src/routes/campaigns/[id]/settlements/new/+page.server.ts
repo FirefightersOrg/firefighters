@@ -43,7 +43,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'create',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const form = await request.formData();
 		const values = {
@@ -77,7 +77,7 @@ export const actions: Actions = {
 				form: 'create',
 				values,
 				errors: {},
-				message: e?.message ?? 'Something went wrong. Please try again.'
+				message: e?.message ?? 'Algo salió mal. Volver a intentar.'
 			});
 		}
 		redirect(303, `/campaigns/${params.id}/settlements/${id}`);

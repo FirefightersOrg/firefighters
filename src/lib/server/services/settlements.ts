@@ -53,24 +53,21 @@ export class SettlementServiceError extends Error {
 type RpcError = { code?: string; message?: string };
 export function mapSettlementRpcError(error: RpcError) {
 	if (error.code === '42501')
-		return new SettlementServiceError(
-			'permission',
-			'You do not have permission to perform this action.'
-		);
+		return new SettlementServiceError('permission', 'No hay permiso para esta acción.');
 	if (error.code === 'P0002')
-		return new SettlementServiceError(
-			'not_found',
-			'The requested settlement resource was not found.'
-		);
+		return new SettlementServiceError('not_found', 'No se encontró el recurso de la rendición.');
 	if (['22023', '23514'].includes(error.code ?? ''))
-		return new SettlementServiceError('validation', error.message || 'Invalid settlement data.');
+		return new SettlementServiceError(
+			'validation',
+			error.message || 'Datos de la rendición inválidos.'
+		);
 	// 23001 restrict_violation (immutable after draft), P0001 generic guard raise.
 	if (['55000', '23505', '23001', 'P0001'].includes(error.code ?? ''))
 		return new SettlementServiceError(
 			'conflict',
-			error.message || 'The settlement can no longer be changed.'
+			error.message || 'La rendición ya no se puede modificar.'
 		);
-	return new SettlementServiceError('internal', 'Something went wrong. Please try again.', {
+	return new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.', {
 		cause: error
 	});
 }
@@ -85,12 +82,9 @@ function requirePermission(
 	permission: PermissionCode
 ) {
 	if (permissions == null)
-		throw new SettlementServiceError('internal', 'Something went wrong. Please try again.');
+		throw new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.');
 	if (!hasPermissionIn(permissions, permission))
-		throw new SettlementServiceError(
-			'permission',
-			'You do not have permission to perform this action.'
-		);
+		throw new SettlementServiceError('permission', 'No hay permiso para esta acción.');
 }
 async function rpc<T>(
 	client: SupabaseClient,
@@ -101,7 +95,7 @@ async function rpc<T>(
 	try {
 		result = await client.rpc(name, args);
 	} catch (cause) {
-		throw new SettlementServiceError('internal', 'Something went wrong. Please try again.', {
+		throw new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.', {
 			cause
 		});
 	}
@@ -115,7 +109,9 @@ export async function openSettlement(
 ) {
 	const p = openSettlementSchema.safeParse(input);
 	if (!p.success)
-		throw new SettlementServiceError('validation', 'Invalid settlement data.', { cause: p.error });
+		throw new SettlementServiceError('validation', 'Datos de la rendición inválidos.', {
+			cause: p.error
+		});
 	requirePermission(ctx.permissions, 'settlement.create');
 	return rpc<string>(client, 'settlement_open', {
 		p_campaign_id: p.data.campaignId,
@@ -131,7 +127,7 @@ export async function addPaymentToSettlement(
 ) {
 	const p = addPaymentToSettlementSchema.safeParse(input);
 	if (!p.success)
-		throw new SettlementServiceError('validation', 'Invalid payment data.', { cause: p.error });
+		throw new SettlementServiceError('validation', 'Datos del pago inválidos.', { cause: p.error });
 	requirePermission(ctx.permissions, 'payment.create');
 	return rpc<string>(client, 'settlement_add_payment', {
 		p_settlement_id: p.data.settlementId,
@@ -153,7 +149,9 @@ export async function removePaymentFromSettlement(
 ) {
 	const p = removePaymentFromSettlementSchema.safeParse(input);
 	if (!p.success)
-		throw new SettlementServiceError('validation', 'Invalid annulment data.', { cause: p.error });
+		throw new SettlementServiceError('validation', 'Datos de la anulación inválidos.', {
+			cause: p.error
+		});
 	requirePermission(ctx.permissions, 'settlement.update_open');
 	return rpc<void>(client, 'settlement_remove_payment', {
 		p_payment_id: p.data.paymentId,
@@ -168,7 +166,9 @@ export async function closeSettlement(
 ) {
 	const p = closeSettlementSchema.safeParse(input);
 	if (!p.success)
-		throw new SettlementServiceError('validation', 'Invalid settlement data.', { cause: p.error });
+		throw new SettlementServiceError('validation', 'Datos de la rendición inválidos.', {
+			cause: p.error
+		});
 	requirePermission(ctx.permissions, 'settlement.close');
 	return rpc<void>(client, 'settlement_close', {
 		p_settlement_id: p.data.settlementId,

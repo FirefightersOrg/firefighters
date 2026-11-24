@@ -86,7 +86,7 @@
 						if (result.type === 'success' && result.data?.found) {
 							add(result.data.found as DeliveryBondOption[]);
 							if (result.data.truncated)
-								lookupMessage = 'Se muestran las primeras 500 coincidencias; acotá el rango.';
+								lookupMessage = 'Se muestran las primeras 500 coincidencias; acotar el rango.';
 						} else if (result.type === 'failure') {
 							lookupMessage = (result.data?.message as string) ?? 'La búsqueda falló.';
 						}
@@ -98,7 +98,7 @@
 					<Field
 						label="Número, código de barras o código"
 						id="query"
-						hint="Un número base o asociado, o escaneá el código de barras (Enter lo agrega)."
+						hint="Un número base o asociado, o escanear el código de barras (Enter lo agrega)."
 					>
 						<TextInput name="query" autocomplete="off" mono />
 					</Field>
@@ -124,7 +124,7 @@
 					required
 					hint={data.canSeeCollectors
 						? undefined
-						: 'No podés ver los cobradores; pedile a un administrador.'}
+						: 'Solo un administrador puede ver los cobradores.'}
 					error={deliverErrors.collectorId?.[0]}
 				>
 					<Select

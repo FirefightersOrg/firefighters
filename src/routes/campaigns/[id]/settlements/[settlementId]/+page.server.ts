@@ -104,7 +104,7 @@ function serviceFailure(err: unknown, form: string, values: Record<string, strin
 		form,
 		values,
 		errors: {},
-		message: e?.message ?? 'Something went wrong. Please try again.'
+		message: e?.message ?? 'Algo salió mal. Volver a intentar.'
 	});
 }
 async function settlementForPaymentCorrection(
@@ -130,7 +130,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'add',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const saleId = field(f, 'saleId');
@@ -172,11 +172,11 @@ export const actions: Actions = {
 			const remaining = available.get(application.installmentId);
 			if (cents === null || cents <= 0)
 				validationErrors[`amount-${application.installmentId}`] = [
-					'Enter an amount greater than zero.'
+					'Ingresar un importe mayor que cero.'
 				];
 			else if (remaining !== undefined && remaining !== null && cents > remaining)
 				validationErrors[`amount-${application.installmentId}`] = [
-					'The amount cannot exceed the installment balance.'
+					'El importe no puede superar el saldo de la cuota.'
 				];
 			else if (remaining === undefined)
 				validationErrors.installmentId = ['Elegir cuotas válidas de la venta elegida.'];
@@ -220,7 +220,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'annulPayment',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const values = { paymentId: field(f, 'paymentId'), reason: field(f, 'reason') };
@@ -253,7 +253,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'correctPaymentMethod',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -296,7 +296,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'reassociateTransfer',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -348,7 +348,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'correctSettlement',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -391,7 +391,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'remove',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		const f = await request.formData();
 		const paymentId = field(f, 'paymentId'),
@@ -429,7 +429,7 @@ export const actions: Actions = {
 			return fail(403, {
 				form: 'close',
 				errors: {},
-				message: 'No tenés permiso para hacer esta acción.'
+				message: 'No hay permiso para esta acción.'
 			});
 		try {
 			await closeSettlement(

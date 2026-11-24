@@ -134,7 +134,7 @@
 		</form>
 		{#if data.buyerTotal > data.buyers.length}
 			<p class="mt-2 text-body-sm text-muted">
-				Se muestran los primeros {data.buyers.length} de {data.buyerTotal}; afiná la búsqueda.
+				Se muestran los primeros {data.buyers.length} de {data.buyerTotal}; afinar la búsqueda.
 			</p>
 		{/if}
 		<div class="mt-4">
