@@ -163,7 +163,7 @@
 	{#if data.canEdit}
 		<RiskyOperationChecklist
 			campaignId={data.campaign.id}
-			operation="confirming a bulk import"
+			operation="confirmar una importación masiva"
 			canExport={data.canExport}
 		/>
 		<section class="{cardClass} flex flex-wrap items-center gap-3" aria-label="Import actions">
