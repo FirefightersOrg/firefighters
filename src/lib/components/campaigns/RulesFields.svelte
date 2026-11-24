@@ -1,14 +1,13 @@
 <script lang="ts">
 	import {
-		BARCODE_MODE_LABELS,
+		BARCODE_MODE_LABELS_ES,
 		BARCODE_MODES,
 		barcodeModeUsesPattern
 	} from '$lib/domain/campaigns';
+	import { Field, Select, TextInput } from '$lib/components/ui';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
-	import FieldError from './FieldError.svelte';
 	import InstallmentFields from './InstallmentFields.svelte';
 	import NumberingFields from './NumberingFields.svelte';
-	import { inputClass, labelClass } from './styles';
 	import type { CampaignRulesValues } from './types';
 
 	/**
@@ -24,9 +23,9 @@
 	} = $props();
 </script>
 
-<div class="space-y-6">
-	<fieldset class="space-y-4">
-		<legend class="text-sm font-semibold text-slate-900">Price and installments</legend>
+<div class="flex flex-col gap-6">
+	<fieldset class="m-0 flex flex-col gap-5 border-0 p-0">
+		<legend class="mb-3 p-0 text-heading-3 text-text">Precio y cuotas</legend>
 		<InstallmentFields
 			bind:simpleBondValue={values.simpleBondValue}
 			bind:installmentCount={values.installmentCount}
@@ -42,47 +41,32 @@
 		{errors}
 	/>
 
-	<div>
-		<label for="barcodeMode" class={labelClass}>Barcode mode</label>
-		<select
-			id="barcodeMode"
+	<Field label="Modo de código de barras" id="barcodeMode" error={errors.barcodeMode?.[0]} required>
+		<Select
 			name="barcodeMode"
-			required
+			placeholder="Elegir cómo se leen los códigos de barras…"
+			options={BARCODE_MODES.map((mode) => ({ value: mode, label: BARCODE_MODE_LABELS_ES[mode] }))}
 			bind:value={values.barcodeMode}
-			aria-invalid={errors.barcodeMode ? 'true' : undefined}
-			aria-describedby={errors.barcodeMode ? 'barcodeMode-error' : undefined}
-			class={inputClass}
-		>
-			<option value="" disabled>Choose how scanned barcodes are read…</option>
-			{#each BARCODE_MODES as mode (mode)}
-				<option value={mode}>{BARCODE_MODE_LABELS[mode]}</option>
-			{/each}
-		</select>
-		<FieldError id="barcodeMode-error" errors={errors.barcodeMode} />
-	</div>
+		/>
+	</Field>
 
 	{#if barcodeModeUsesPattern(values.barcodeMode)}
-		<div>
-			<label for="barcodePattern" class={labelClass}>Barcode pattern (optional)</label>
-			<input
-				id="barcodePattern"
+		<Field
+			label="Patrón del código de barras"
+			id="barcodePattern"
+			hint="Expresión regular cuyo primer grupo entre paréntesis es el número base. Dejarlo vacío para escribir el número base al escanear."
+			error={errors.barcodePattern?.[0]}
+			optional
+		>
+			<TextInput
 				name="barcodePattern"
 				type="text"
 				autocomplete="off"
 				spellcheck="false"
+				mono
 				placeholder="^BC-(\d+)$"
 				bind:value={values.barcodePattern}
-				aria-invalid={errors.barcodePattern ? 'true' : undefined}
-				aria-describedby={errors.barcodePattern
-					? 'barcodePattern-help barcodePattern-error'
-					: 'barcodePattern-help'}
-				class="{inputClass} font-mono"
 			/>
-			<p id="barcodePattern-help" class="mt-1 text-xs text-slate-500">
-				A regular expression whose first group in parentheses is the base number. Leave it empty to
-				type the base number when scanning.
-			</p>
-			<FieldError id="barcodePattern-error" errors={errors.barcodePattern} />
-		</div>
+		</Field>
 	{/if}
 </div>

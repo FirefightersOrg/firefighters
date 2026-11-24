@@ -113,8 +113,8 @@ describe('/campaigns/new', () => {
 			)) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toMatchObject({
-				name: ['Name is required'],
-				barcodeMode: ['Choose how barcodes are read']
+				name: ['El nombre es obligatorio'],
+				barcodeMode: ['Elegir cómo se leen los códigos de barras']
 			});
 			// The pattern field is only rendered for the internal / external code modes.
 			expect(result.data.values).toEqual({ ...form, barcodePattern: '' });
@@ -128,7 +128,7 @@ describe('/campaigns/new', () => {
 			)) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect((result.data.errors as Record<string, string[]>).installmentCount[0]).toMatch(
-				/cannot be split into 7 equal installments/
+				/no se puede dividir en 7 cuotas iguales/
 			);
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -175,8 +175,8 @@ describe('/campaigns/new', () => {
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
 				installmentCount: [
-					'$ 60.000,00 cannot be split into 7 equal installments. ' +
-						'Choose a value and a number of installments that divide exactly (to the cent).'
+					'$ 60.000,00 no se puede dividir en 7 cuotas iguales. ' +
+						'Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).'
 				]
 			});
 			expect(rpc).not.toHaveBeenCalled();
@@ -212,8 +212,8 @@ describe('/campaigns/new', () => {
 			)) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data).toMatchObject({
-				message: 'Please correct the highlighted fields.',
-				errors: { maxNumber: ['Maximum number must fit in the number of digits.'] },
+				message: 'Revisar los campos marcados.',
+				errors: { maxNumber: ['El número máximo debe entrar en la cantidad de dígitos.'] },
 				values: validForm
 			});
 		});

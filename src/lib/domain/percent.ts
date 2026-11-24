@@ -16,7 +16,7 @@ export const MAX_PERCENT_HUNDREDTHS = 10_000;
 
 /** Message for input {@link parsePercentInput} rejects (shared by the schemas and the UI). */
 export const PERCENT_INPUT_FORMAT_MESSAGE =
-	'Enter a percentage like 25 or 12,5 (comma for up to 2 decimals)';
+	'Ingresar un porcentaje como 25 o 12,5 (coma para hasta 2 decimales)';
 
 /** Canonical form (database / SQL): up to 3 integer digits, optionally `.` and 1-2 decimals. */
 const CANONICAL_PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;

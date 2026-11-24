@@ -131,7 +131,10 @@ select is((select to_jsonb(i) from public.installments i where id=pg_temp.id('me
 select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('method_payment')$$,
  $$values ('collector_credit'::text,10::numeric)$$,'cash to transfer restores retained commission');
 select is(pg_temp.balance(),40::numeric,'cash to transfer balance');
-select is((select to_jsonb(s) from public.settlements s where id=pg_temp.id('settlement')),(select value from snapshots where k='closed'),'method correction preserves full closed row');
+select is((select to_jsonb(s) from public.settlements s where id=pg_temp.id('settlement')),
+ (select value||jsonb_build_object('total_cash',200,'total_transfer',500,
+ 'commission_paid_amount',20,'net_to_firefighters',680) from snapshots where k='closed'),
+ 'method correction updates only method totals, retention and net (SAN-110)');
 insert into ids values('reverse_replacement',public.payment_correct_method(pg_temp.id('reverse_payment'),'cash','reverse mistake','reverse-correction'));
 select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('reverse_replacement')$$,
  $$values ('collector_debit'::text,10::numeric)$$,'transfer to cash posts retained commission debit');

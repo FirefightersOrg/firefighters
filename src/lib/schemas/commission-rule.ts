@@ -64,7 +64,7 @@ const reasonField = z
 	.trim()
 	.max(
 		COMMISSION_REASON_MAX_LENGTH,
-		`Reason must be at most ${COMMISSION_REASON_MAX_LENGTH} characters`
+		`El motivo admite hasta ${COMMISSION_REASON_MAX_LENGTH} caracteres`
 	)
 	.transform((value) => (value === '' ? null : value));
 
@@ -73,14 +73,14 @@ const day = (label: string) =>
 		.string()
 		.trim()
 		.refine((value) => value === '' || z.iso.date().safeParse(value).success, {
-			message: `${label} must be a valid date (YYYY-MM-DD)`
+			message: `${label} debe ser una fecha válida (AAAA-MM-DD)`
 		});
 
-const ruleIdField = z.guid({ message: 'Unknown commission rule' });
+const ruleIdField = z.guid({ message: 'Regla de comisión desconocida' });
 
 /** Shown when the hidden version field is missing or malformed (e.g. a form from an old page). */
 export const COMMISSION_RULE_VERSION_INVALID_MESSAGE =
-	'This form is out of date. Reload the page and try again.';
+	'El formulario está desactualizado. Recargar la página y volver a intentar.';
 
 /** The rule version as loaded: ISO 8601 with an offset, exactly as PostgREST returned it. */
 const versionField = z.iso.datetime({
@@ -106,15 +106,15 @@ export interface CommissionRuleInput {
 }
 
 const ruleShape = {
-	ruleType: z.enum(COMMISSION_RULE_TYPES, { message: 'Choose a rule type' }),
+	ruleType: z.enum(COMMISSION_RULE_TYPES, { message: 'Elegir un tipo de regla' }),
 	installmentNumber: z.string().trim(),
 	valueKind: z.enum(COMMISSION_VALUE_KINDS, {
-		message: 'Choose a percentage or a fixed amount'
+		message: 'Elegir un porcentaje o un monto fijo'
 	}),
 	percentage: z.string().trim(),
 	fixedAmount: z.string().trim(),
-	validFrom: day('Valid from'),
-	validTo: day('Valid to'),
+	validFrom: day('La fecha de inicio de vigencia'),
+	validTo: day('La fecha de fin de vigencia'),
 	reason: reasonField
 };
 
@@ -152,17 +152,20 @@ function analyzeRule(
 	let installmentNumber: number | null = null;
 	if (value.ruleType === 'custom') {
 		if (value.installmentNumber === '') {
-			issue('installmentNumber', 'Installment number is required for a specific installment rule');
+			issue(
+				'installmentNumber',
+				'El número de cuota es obligatorio para una regla de cuota específica'
+			);
 		} else if (!/^\d+$/.test(value.installmentNumber)) {
-			issue('installmentNumber', 'Installment number must be a whole number');
+			issue('installmentNumber', 'El número de cuota debe ser un número entero');
 		} else {
 			const n = Number(value.installmentNumber);
 			if (n < 1 || n > installmentCount) {
 				issue(
 					'installmentNumber',
 					installmentCount === 1
-						? 'This campaign has a single installment: use 1'
-						: `Installment number must be between 1 and ${installmentCount}`
+						? 'Esta campaña tiene una sola cuota: usar 1'
+						: `El número de cuota debe estar entre 1 y ${installmentCount}`
 				);
 			} else {
 				installmentNumber = n;
@@ -175,33 +178,33 @@ function analyzeRule(
 	if (value.valueKind === 'percentage') {
 		const hundredths = parsePercentInput(value.percentage);
 		if (value.percentage === '') {
-			issue('percentage', 'Percentage is required');
+			issue('percentage', 'El porcentaje es obligatorio');
 		} else if (hundredths === null) {
 			issue('percentage', PERCENT_INPUT_FORMAT_MESSAGE);
 		} else if (hundredths <= 0 || hundredths > MAX_PERCENT_HUNDREDTHS) {
-			issue('percentage', 'Percentage must be greater than 0 and at most 100');
+			issue('percentage', 'El porcentaje debe ser mayor que 0 y hasta 100');
 		} else {
 			percentage = hundredthsToDecimalString(hundredths);
 		}
 	} else if (value.valueKind === 'fixed_amount') {
 		const cents = parseMoneyInput(value.fixedAmount);
 		if (value.fixedAmount === '') {
-			issue('fixedAmount', 'Fixed amount is required');
+			issue('fixedAmount', 'El monto fijo es obligatorio');
 		} else if (cents === null) {
 			issue('fixedAmount', MONEY_INPUT_FORMAT_MESSAGE);
 		} else if (cents <= 0) {
-			issue('fixedAmount', 'Fixed amount must be greater than 0');
+			issue('fixedAmount', 'El monto fijo debe ser mayor que 0');
 		} else if (cents > MAX_MONEY_CENTS) {
-			issue('fixedAmount', 'Fixed amount is too large');
+			issue('fixedAmount', 'El monto fijo es demasiado grande');
 		} else {
 			fixedAmount = centsToDecimalString(cents);
 		}
 	}
 
-	if (value.validFrom === '') issue('validFrom', 'Valid from is required');
+	if (value.validFrom === '') issue('validFrom', 'La fecha de inicio de vigencia es obligatoria');
 	const validTo = value.validTo === '' ? null : value.validTo;
 	if (isDay(value.validFrom) && validTo && isDay(validTo) && validTo < value.validFrom) {
-		issue('validTo', 'Valid to must be on or after the valid from date');
+		issue('validTo', 'La fecha de fin de vigencia debe ser igual o posterior a la de inicio');
 	}
 
 	return {
@@ -253,10 +256,10 @@ export const commissionRuleAnnulSchema = z.object({
 	reason: z
 		.string()
 		.trim()
-		.min(1, 'A reason is required to annul a commission rule')
+		.min(1, 'Se requiere un motivo para anular una regla de comisión')
 		.max(
 			COMMISSION_REASON_MAX_LENGTH,
-			`Reason must be at most ${COMMISSION_REASON_MAX_LENGTH} characters`
+			`El motivo admite hasta ${COMMISSION_REASON_MAX_LENGTH} caracteres`
 		)
 });
 

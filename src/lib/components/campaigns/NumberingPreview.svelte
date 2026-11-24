@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatInteger } from '$lib/domain/money';
+	import { formatNumber } from '$lib/format';
 	import type { CampaignNumberingInputPreview } from '$lib/schemas/campaign';
 
 	/**
@@ -19,17 +19,19 @@
 <div
 	{id}
 	aria-live="polite"
-	class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+	class="rounded-md border border-border bg-surface-sunken p-4 text-body-sm text-text"
 >
-	<h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Numbering preview</h3>
+	<h3 class="m-0 text-label text-muted">Vista previa de la numeración</h3>
 
 	{#if preview.state === 'incomplete'}
-		<p class="mt-2 text-slate-500">
-			Enter the number of digits, the maximum number and the offset to see examples.
+		<p class="m-0 mt-2 text-muted">
+			Completar la cantidad de dígitos, el número máximo y el desfase para ver ejemplos.
 		</p>
 	{:else if preview.state === 'invalid'}
-		<p class="mt-2 font-medium text-red-700">This numbering configuration is not valid:</p>
-		<ul class="mt-1 list-disc space-y-0.5 pl-5 text-red-700">
+		<p class="m-0 mt-2 text-label text-danger-text">
+			Esta configuración de numeración no es válida:
+		</p>
+		<ul class="m-0 mt-1 list-disc space-y-0.5 pl-5 text-danger-text">
 			{#each preview.issues as issue (issue.field)}
 				<li id="{issue.field}-preview-error">{issue.message}</li>
 			{/each}
@@ -37,11 +39,11 @@
 	{:else}
 		{@const p = preview.preview}
 		<table class="mt-2 text-left">
-			<caption class="sr-only">Example base numbers and their associated numbers</caption>
-			<thead class="text-xs text-slate-500">
+			<caption class="sr-only">Ejemplos de números base y sus números asociados</caption>
+			<thead class="text-caption text-muted">
 				<tr>
-					<th scope="col" class="pr-6 font-medium">Base number</th>
-					<th scope="col" class="font-medium">Associated number</th>
+					<th scope="col" class="pr-6 font-medium">Número base</th>
+					<th scope="col" class="font-medium">Número asociado</th>
 				</tr>
 			</thead>
 			<tbody class="font-mono tabular-nums">
@@ -53,25 +55,25 @@
 				{/each}
 			</tbody>
 		</table>
-		<p class="mt-3">
-			Highest usable base number: <strong class="font-mono tabular-nums"
-				>{p.maxValidBase.baseFormatted}</strong
-			>
-			(associated {p.maxValidBase.associatedFormatted}).
-			<strong class="tabular-nums">{formatInteger(p.usableBaseCount)}</strong>
-			usable base {p.usableBaseCount === 1 ? 'number' : 'numbers'}
+		<p class="m-0 mt-3">
+			Mayor número base utilizable:
+			<strong class="font-mono tabular-nums">{p.maxValidBase.baseFormatted}</strong>
+			(asociado {p.maxValidBase.associatedFormatted}).
+			<strong class="tabular-nums">{formatNumber(p.usableBaseCount)}</strong>
+			{p.usableBaseCount === 1 ? 'número base utilizable' : 'números base utilizables'}
 			({p.examples[0].baseFormatted}–{p.maxValidBase.baseFormatted}).
 		</p>
 		{#if p.overflowExample}
-			<p class="mt-1 text-amber-800">
-				Overflow: base <span class="font-mono tabular-nums">{p.overflowExample.baseFormatted}</span>
-				would give associated number
-				<span class="font-mono tabular-nums">{p.overflowExample.associated}</span>, above the
-				maximum <span class="font-mono tabular-nums">{p.overflowExample.maxNumber}</span>, so it is
-				rejected.
+			<p class="m-0 mt-1 text-warning-text">
+				Desborde: el número base
+				<span class="font-mono tabular-nums">{p.overflowExample.baseFormatted}</span>
+				daría el número asociado
+				<span class="font-mono tabular-nums">{p.overflowExample.associated}</span>, por encima del
+				máximo <span class="font-mono tabular-nums">{p.overflowExample.maxNumber}</span>, por lo que
+				se rechaza.
 			</p>
 		{:else}
-			<p class="mt-1 text-slate-500">No base number overflows (the offset is 0).</p>
+			<p class="m-0 mt-1 text-muted">Ningún número base desborda (el desfase es 0).</p>
 		{/if}
 	{/if}
 </div>

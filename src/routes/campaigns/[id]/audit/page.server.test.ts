@@ -72,4 +72,18 @@ describe('campaign audit viewer', () => {
 			status: 500
 		});
 	});
+	it('returns ordinary creation history as well as corrections without snapshot filtering', async () => {
+		const items = ['sale', 'payment', 'draw', 'prize'].map((entityType) => ({
+			id: entityType,
+			entityType,
+			action: `${entityType}.create`,
+			newValue: { status: 'created' }
+		}));
+		vi.mocked(listCampaignAuditEntries).mockResolvedValueOnce({
+			data: { items, total: 4, page: 1, pageSize: 50 },
+			error: null
+		} as never);
+		const result = await load(event(['campaign.view', 'audit.view']) as never);
+		expect(result?.entries.items).toEqual(items);
+	});
 });

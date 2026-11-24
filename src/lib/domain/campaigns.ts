@@ -35,6 +35,22 @@ export const BARCODE_MODE_LABELS: Record<BarcodeMode, string> = {
 };
 
 /**
+ * Spanish labels (docs/copy.md) for the migrated screens. The English map above stays until the
+ * remaining screens (bonds) move to Cimiento, then it is replaced by this one.
+ */
+export const BARCODE_MODE_LABELS_ES: Record<BarcodeMode, string> = {
+	base_number: 'El código de barras es el número base',
+	internal_code: 'Código interno',
+	external_legacy_code: 'Código externo o heredado',
+	manual_mapping: 'Asignación manual'
+};
+
+/** Spanish labels of the overflow policies. */
+export const OVERFLOW_POLICY_LABELS: Record<OverflowPolicy, string> = {
+	reject: 'Rechazar (bloquea los números cuyo número asociado supera el máximo)'
+};
+
+/**
  * Modes whose barcodes are read with the campaign's `barcodePattern` (a regex whose first capture
  * group is the base number). Without a pattern they behave like `manual_mapping`: the operator
  * types the base number when scanning.

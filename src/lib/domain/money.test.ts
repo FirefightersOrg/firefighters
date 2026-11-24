@@ -150,7 +150,7 @@ describe('parseMoneyInput (Argentine format)', () => {
 
 	it('explains the accepted format', () => {
 		expect(MONEY_INPUT_FORMAT_MESSAGE).toBe(
-			'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)'
+			'Ingresar un monto como 60.000 o 60.000,50 (puntos para los miles, coma para hasta 2 decimales)'
 		);
 	});
 });
@@ -281,21 +281,21 @@ describe('installments', () => {
 		expect(previewInstallmentValue('0', '10')).toEqual({
 			state: 'error',
 			field: 'simpleBondValue',
-			message: 'Enter a simple bond value greater than 0.'
+			message: 'Ingresar un valor del bono simple mayor que 0.'
 		});
 		for (const count of ['0', '2.5', '-1', '99999999999999999999']) {
 			expect(previewInstallmentValue('60000', count)).toEqual({
 				state: 'error',
 				field: 'installmentCount',
-				message: 'Enter a whole number of installments greater than 0.'
+				message: 'Ingresar una cantidad entera de cuotas mayor que 0.'
 			});
 		}
 	});
 
 	it('explains a non-exact split in user terms, with the amount in es-AR format', () => {
 		expect(notExactInstallmentsMessage('60000.00', 7)).toBe(
-			`$${NBSP}60.000,00 cannot be split into 7 equal installments. ` +
-				'Choose a value and a number of installments that divide exactly (to the cent).'
+			`$${NBSP}60.000,00 no se puede dividir en 7 cuotas iguales. ` +
+				'Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).'
 		);
 	});
 });

@@ -11,6 +11,7 @@ import {
 	loadWinningNumber,
 	resolvePrize,
 	deliverPrize,
+	reversePrizeDelivery,
 	annulPrize
 } from '$lib/server/services/prizes';
 import { evaluateDrawEligibility } from '$lib/domain/draw-eligibility';
@@ -168,6 +169,77 @@ async function fixture() {
 }
 
 describe('audited prize services with real users', () => {
+	it('reverses a delivery without losing history and supports redelivery', async () => {
+		const f = await fixture();
+		const prizeId = await f.prize();
+		await loadWinningNumber(admin, { prizeId, numberValue: 100, notes: null }, ctx());
+		await resolvePrize(admin, { prizeId, decision: 'award', notes: 'Approved' }, ctx());
+		await deliverPrize(admin, { prizeId, notes: 'Original receipt' }, ctx());
+		const { data: before, error: beforeError } = await admin
+			.from('prize_awards')
+			.select('*')
+			.eq('prize_id', prizeId)
+			.single();
+		if (beforeError) throw beforeError;
+		const denied = ctx();
+		const deniedPrize = await row('prizes', prizeId);
+		const { error: deniedError } = await readOnly.rpc('prize_reverse_delivery', {
+			p_prize_id: prizeId,
+			p_reason: 'Mistake',
+			p_request_id: denied.requestId
+		});
+		expect(deniedError?.code).toBe('42501');
+		expect(await row('prizes', prizeId)).toEqual(deniedPrize);
+		expect(await row('prize_awards', before.id)).toEqual(before);
+		expect(await audits(denied.requestId)).toEqual([]);
+		const request = ctx();
+		await reversePrizeDelivery(admin, { prizeId, reason: ' Mistake ' }, request);
+		expect((await row('prizes', prizeId)).status).toBe('pending_delivery');
+		expect(await row('prize_awards', before.id)).toMatchObject({
+			status: 'awarded',
+			delivered_at: null,
+			delivered_by: null,
+			notes: 'Approved'
+		});
+		const { data: history, error: historyError } = await admin
+			.from('prize_delivery_reversals')
+			.select('*')
+			.eq('prize_id', prizeId)
+			.order('reversed_at')
+			.order('id');
+		if (historyError) throw historyError;
+		expect(history).toHaveLength(1);
+		expect(history![0]).toMatchObject({
+			award_snapshot: before,
+			delivered_at: before.delivered_at,
+			delivered_by: before.delivered_by,
+			notes: 'Original receipt',
+			reason: 'Mistake'
+		});
+		expect(await audits(request.requestId)).toHaveLength(1);
+		const repeat = ctx();
+		await expect(
+			reversePrizeDelivery(admin, { prizeId, reason: 'Again' }, repeat)
+		).rejects.toMatchObject({ status: 409 });
+		expect(await audits(repeat.requestId)).toEqual([]);
+		const { data: certificate, error: certificateError } = await admin.rpc(
+			'prize_certificate_data',
+			{ p_prize_id: prizeId }
+		);
+		if (certificateError) throw certificateError;
+		expect(certificate).toMatchObject({
+			prize_status: 'pending_delivery',
+			award_status: 'awarded',
+			delivered_at: null
+		});
+		await deliverPrize(admin, { prizeId, notes: 'Second receipt' }, ctx());
+		expect(await row('prize_delivery_reversals', history![0].id)).toEqual(history![0]);
+		expect((await row('prizes', prizeId)).status).toBe('delivered');
+		expect(await row('prize_awards', before.id)).toMatchObject({
+			status: 'delivered',
+			notes: 'Second receipt'
+		});
+	});
 	it('propagates a physical manual-pata member win to every member in a later same-date consolation', async () => {
 		const f = await fixture();
 		const members = [];
@@ -313,7 +385,7 @@ describe('audited prize services with real users', () => {
 			annulPrize(admin, { prizeId, reason: 'Wrong result' }, deliveredAnnul)
 		).rejects.toMatchObject({
 			status: 409,
-			message: 'A delivered prize cannot be annulled; pending product decision.'
+			message: 'A delivered prize cannot be annulled. Reverse the delivery first.'
 		});
 		expect(await row('prizes', prizeId)).toEqual(deliveredBefore);
 		expect(await audits(deliveredAnnul.requestId)).toEqual([]);

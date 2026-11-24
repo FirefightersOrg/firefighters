@@ -235,8 +235,8 @@ describe('/campaigns/[id]/commissions', () => {
 			})) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
-				installmentNumber: ['Installment number must be between 1 and 10'],
-				percentage: [expect.stringContaining('Enter a percentage')]
+				installmentNumber: ['El número de cuota debe estar entre 1 y 10'],
+				percentage: [expect.stringContaining('Ingresar un porcentaje')]
 			});
 			expect(result.data.values).toMatchObject({ installmentNumber: '11' });
 			expect(rpc).not.toHaveBeenCalled();
@@ -297,7 +297,7 @@ describe('/campaigns/[id]/commissions', () => {
 			const data = (await load(loadEvent(makeLocals({ supabase, permissions: MANAGER })))) as {
 				specialRules: { collectorName: string }[];
 			};
-			expect(data.specialRules[0].collectorName).toBe('Collector');
+			expect(data.specialRules[0].collectorName).toBe('Cobrador');
 		});
 
 		it('create: calls commission_rule_create with canonical values', async () => {
@@ -310,7 +310,7 @@ describe('/campaigns/[id]/commissions', () => {
 			expect(result).toEqual({
 				form: 'create',
 				success: true,
-				message: 'Rule added.',
+				message: 'Regla agregada.',
 				errors: {},
 				ruleId: RULE_ID
 			});
@@ -342,7 +342,7 @@ describe('/campaigns/[id]/commissions', () => {
 				ruleForm
 			)) as ActionFailure;
 			expect(result.status).toBe(409);
-			expect(result.data.message).toMatch(/overlaps an existing active rule/);
+			expect(result.data.message).toMatch(/se superpone con una regla activa/);
 		});
 
 		it('update: rejects a rule of another campaign (404, no RPC)', async () => {
@@ -369,7 +369,7 @@ describe('/campaigns/[id]/commissions', () => {
 			});
 			expect(result).toMatchObject({
 				success: true,
-				message: 'No changes to save.',
+				message: 'No hay cambios para guardar.',
 				ruleId: RULE_ID
 			});
 			expect(rpc).toHaveBeenCalledWith(
@@ -400,7 +400,7 @@ describe('/campaigns/[id]/commissions', () => {
 				form: 'update',
 				ruleId: RULE_ID,
 				message:
-					'This commission rule was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.',
+					'Otra persona modificó esta regla de comisión mientras se editaba. Recargar la página para ver los últimos cambios y volver a hacer la edición.',
 				values: { expectedUpdatedAt: VERSION }
 			});
 		});
@@ -414,7 +414,7 @@ describe('/campaigns/[id]/commissions', () => {
 			expect(result.status).toBe(400);
 			expect(result.data).toMatchObject({
 				ruleId: RULE_ID,
-				message: 'This form is out of date. Reload the page and try again.'
+				message: 'El formulario está desactualizado. Recargar la página y volver a intentar.'
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -439,7 +439,7 @@ describe('/campaigns/[id]/commissions', () => {
 			})) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
-				reason: ['A reason is required to annul a commission rule']
+				reason: ['Se requiere un motivo para anular una regla de comisión']
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -451,7 +451,7 @@ describe('/campaigns/[id]/commissions', () => {
 					ruleId: RULE_ID,
 					reason: 'Mistake'
 				})
-			).toMatchObject({ success: true, message: 'Rule annulled.' });
+			).toMatchObject({ success: true, message: 'Regla anulada.' });
 			expect(ok.rpc).toHaveBeenCalledWith('commission_rule_annul', {
 				p_id: RULE_ID,
 				p_reason: 'Mistake',
@@ -470,7 +470,7 @@ describe('/campaigns/[id]/commissions', () => {
 				{ ruleId: RULE_ID, reason: 'Again' }
 			)) as ActionFailure;
 			expect(result.status).toBe(409);
-			expect(result.data.message).toBe('This rule is already annulled.');
+			expect(result.data.message).toBe('Esta regla ya está anulada.');
 		});
 	});
 });

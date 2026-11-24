@@ -8,9 +8,9 @@ import {
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
-import { annulDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
+import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
-import { DRAW_REASON_MAX } from '$lib/domain/draws';
+import { canTransitionDraw, DRAW_REASON_MAX } from '$lib/domain/draws';
 import { field, readDrawFields, uuid, validateDrawFields } from '$lib/server/draws/route-helpers';
 
 const canRead = (permissions: readonly string[] | null | undefined) =>
@@ -82,10 +82,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		reasonMax: DRAW_REASON_MAX,
 		can: {
 			edit: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),
-			annul: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),
+			annul:
+				canTransitionDraw(draw.data.status, 'annulled', draw.data.drawType) &&
+				hasPermissionIn(locals.permissions, 'draw.annul'),
 			generate: scheduled && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			regenerate: generated && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
-			freeze: generated && hasPermissionIn(locals.permissions, 'draw.freeze_roster')
+			freeze: generated && hasPermissionIn(locals.permissions, 'draw.freeze_roster'),
+			complete:
+				draw.data.status === 'roster_frozen' && hasPermissionIn(locals.permissions, 'draw.complete')
 		}
 	};
 };
@@ -118,7 +122,7 @@ export const actions: Actions = {
 		}
 	},
 	annul: async ({ request, locals, params, url }) => {
-		const denied = guard(locals, 'draw.update', 'annul');
+		const denied = guard(locals, 'draw.annul', 'annul');
 		if (denied) return denied;
 		requireCampaignViewer(locals, url);
 		const scoped = await scopedDraw(locals, params, 'annul');
@@ -143,6 +147,26 @@ export const actions: Actions = {
 			return { form: 'annul', success: true, errors: {}, message: 'Draw annulled.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'annul', { reason });
+		}
+	},
+	complete: async ({ locals, params, url }) => {
+		const denied = guard(locals, 'draw.complete', 'complete');
+		if (denied) return denied;
+		requireCampaignViewer(locals, url);
+		const scoped = await scopedDraw(locals, params, 'complete');
+		if ('failure' in scoped) return scoped.failure;
+		try {
+			await completeDraw(
+				locals.supabase,
+				{ drawId: params.drawId },
+				{
+					requestId: locals.requestId ?? null,
+					permissions: locals.permissions ?? null
+				}
+			);
+			return { form: 'complete', success: true, errors: {}, message: 'Draw completed.' };
+		} catch (cause) {
+			return serviceFailure(cause, 'complete');
 		}
 	},
 	generate: async ({ locals, params, url }) => {

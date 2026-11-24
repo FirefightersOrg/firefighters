@@ -63,7 +63,7 @@ describe('campaign draw navigation', () => {
 	it('shows Draws when any draw capability grants read access', () => {
 		const body = renderPage(campaign(), null, { can: { viewDraws: true } });
 		expect(body).toContain('/draws');
-		expect(body).toContain('Draws →');
+		expect(body).toContain('Sorteos');
 	});
 });
 
@@ -87,13 +87,13 @@ describe('campaign page edit forms (values and version come from the same load)'
 		const body = renderPage(campaign(), {
 			form: 'general',
 			success: false,
-			message: 'Please fix the highlighted fields.',
-			errors: { name: ['Name is required'] },
+			message: 'Revisar los campos marcados.',
+			errors: { name: ['El nombre es obligatorio'] },
 			values: { name: '', startsOn: '', endsOn: '', expectedUpdatedAt: V1 }
 		});
 		expect(inputValue(body, 'update', 'name')).toBe('');
 		expect(inputValue(body, 'update', 'expectedUpdatedAt')).toBe(V1);
-		expect(body).toContain('Name is required');
+		expect(body).toContain('El nombre es obligatorio');
 	});
 
 	it('never pairs values submitted at an older version with the newer loaded version', () => {
@@ -101,7 +101,7 @@ describe('campaign page edit forms (values and version come from the same load)'
 		const body = renderPage(reloaded, {
 			form: 'general',
 			success: false,
-			message: 'This campaign was changed by someone else.',
+			message: 'Otra persona modificó esta campaña.',
 			errors: {},
 			values: { name: 'Old name', startsOn: '', endsOn: '', expectedUpdatedAt: V1 }
 		});
@@ -113,8 +113,8 @@ describe('campaign page edit forms (values and version come from the same load)'
 		const rulesFailure = (expectedUpdatedAt: string) => ({
 			form: 'rules',
 			success: false,
-			message: 'Please fix the highlighted fields.',
-			errors: { confirmRulesChange: ['Confirm the rule changes before saving.'] },
+			message: 'Revisar los campos marcados.',
+			errors: { confirmRulesChange: ['Confirmar los cambios en las reglas antes de guardar.'] },
 			values: {
 				simpleBondValue: '70000',
 				installmentCount: '7',
@@ -150,9 +150,9 @@ describe('campaign page edit forms (values and version come from the same load)'
 describe('campaign page: bonds', () => {
 	it('shows the rules of a draft with bonds as frozen, explaining why, without the rules form', () => {
 		const body = renderPage(campaign(), null, { hasBonds: true, can: { editRules: false } });
-		expect(body).toContain('Rules are frozen.');
-		expect(body).toContain('This campaign already has bonds');
-		expect(body).toContain('even though the campaign is still a');
+		expect(body).toContain('Las reglas están congeladas.');
+		expect(body).toContain('Esta campaña ya tiene bonos');
+		expect(body).toContain('aunque la campaña siga siendo un');
 		expect(body).not.toMatch(/action="\?\/rules"/);
 		// General data stays editable.
 		expect(body).toMatch(/action="\?\/update"/);
@@ -163,8 +163,8 @@ describe('campaign page: bonds', () => {
 			hasBonds: true,
 			can: { editRules: false }
 		});
-		expect(body).toContain('This campaign is active');
-		expect(body).not.toContain('This campaign already has bonds');
+		expect(body).toContain('Esta campaña está activa');
+		expect(body).not.toContain('Esta campaña ya tiene bonos');
 	});
 
 	it('links to bond loading only when allowed', () => {

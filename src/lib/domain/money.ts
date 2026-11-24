@@ -49,7 +49,7 @@ const DOT_DECIMAL = /^(\d+)\.(\d{1,2})$/;
 
 /** Message for input {@link parseMoneyInput} rejects (shared by the schemas and live previews). */
 export const MONEY_INPUT_FORMAT_MESSAGE =
-	'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)';
+	'Ingresar un monto como 60.000 o 60.000,50 (puntos para los miles, coma para hasta 2 decimales)';
 
 /**
  * Parses an amount typed by a person into cents, or `null` if it is malformed or does not fit in

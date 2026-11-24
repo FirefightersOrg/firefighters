@@ -27,9 +27,13 @@ const source = {
 	resolutionNotes: 'Winner declined'
 } as unknown as PrizeCertificateSource;
 
+/** ICU emits a regular, no-break or narrow no-break space (U+202F) before `p. m.` depending on version. */
+const plainSpaces = (value: string) => value.replace(/\s/gu, ' ');
+
 describe('unawarded prize certificate', () => {
 	it('builds all fields for a manual unaward and preserves strings for template escaping', () => {
-		expect(buildPrintableUnawardedPrizeCertificate(campaign, source, 'Firefighters')).toEqual({
+		const doc = buildPrintableUnawardedPrizeCertificate(campaign, source, 'Firefighters');
+		expect({ ...doc, date: plainSpaces(doc.date) }).toEqual({
 			institutionName: 'Firefighters',
 			draw: 'Final <draw> (Final)',
 			prize: '#1 — Trip & stay',
