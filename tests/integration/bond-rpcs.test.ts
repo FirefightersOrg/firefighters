@@ -126,7 +126,7 @@ describe('bond services (local Supabase)', () => {
 		expect(err).toMatchObject({
 			kind: 'conflict',
 			field: 'baseNumber',
-			message: `Numbers 0068, 4939 are already used by bond ${owner}.`,
+			message: `Los números 0068, 4939 ya están en uso en el bono ${owner}.`,
 			conflicts: [
 				{ number: 68, formatted: '0068', bondId: owner, numberKind: 'base' },
 				{ number: 4939, formatted: '4939', bondId: owner, numberKind: 'associated' }
@@ -137,7 +137,7 @@ describe('bond services (local Supabase)', () => {
 		// A base number whose associated number belongs to another bond (5000 -> 9871, 129 -> 5000).
 		const other = await createBond(operator.client, simple('5000'));
 		await expect(createBond(operator.client, simple('0129'))).rejects.toMatchObject({
-			message: `Number 5000 is already used by bond ${other}.`,
+			message: `El número 5000 ya está en uso en el bono ${other}.`,
 			conflicts: [{ number: 5000, bondId: other, numberKind: 'base' }]
 		});
 

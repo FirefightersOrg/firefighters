@@ -44,7 +44,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		});
 		error(500, { message: 'Could not generate the export. Please try again.' });
 	}
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 
 	let body: ReadableStream<Uint8Array>;
 	try {

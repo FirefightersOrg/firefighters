@@ -18,7 +18,7 @@ export function validateBuyer(values: ReturnType<typeof buyerValues>) {
 			success: false,
 			values,
 			errors: parsed.error.flatten().fieldErrors,
-			message: 'Please correct the highlighted fields.'
+			message: 'Revisar los campos marcados.'
 		})
 	};
 }
@@ -29,7 +29,7 @@ export function partyFailure(err: unknown, values: Record<string, unknown>) {
 			success: false,
 			values,
 			errors: err.field ? { [err.field]: [err.message] } : {},
-			message: err.field ? 'Please correct the highlighted fields.' : err.message
+			message: err.field ? 'Revisar los campos marcados.' : err.message
 		});
 	}
 	console.error('[buyers] action failed', err);
@@ -37,7 +37,7 @@ export function partyFailure(err: unknown, values: Record<string, unknown>) {
 		success: false,
 		values,
 		errors: {},
-		message: 'Something went wrong. Please try again.'
+		message: 'Algo salió mal. Volver a intentar.'
 	});
 }
 
@@ -48,7 +48,7 @@ export function requireBuyerManage(locals: App.Locals, url: URL) {
 			success: false,
 			values: {},
 			errors: {},
-			message: 'You do not have permission to perform this action.'
+			message: 'No hay permiso para realizar esta acción.'
 		});
 	}
 	return null;
@@ -64,7 +64,7 @@ export function duplicateFailure(
 		errors: {},
 		duplicates,
 		message:
-			'A buyer with this identification already exists. Review the records and confirm to create anyway.'
+			'Ya existe un comprador con esta identificación. Revisar los registros y confirmar para crearlo de todos modos.'
 	});
 }
 

@@ -1,0 +1,896 @@
+{
+	"numTotalTestSuites": 33,
+	"numPassedTestSuites": 9,
+	"numFailedTestSuites": 24,
+	"numPendingTestSuites": 0,
+	"numTotalTests": 62,
+	"numPassedTests": 38,
+	"numFailedTests": 24,
+	"numPendingTests": 0,
+	"numTodoTests": 0,
+	"snapshot": {
+		"added": 0,
+		"failure": false,
+		"filesAdded": 0,
+		"filesRemoved": 0,
+		"filesRemovedList": [],
+		"filesUnmatched": 0,
+		"filesUpdated": 0,
+		"matched": 0,
+		"total": 0,
+		"unchecked": 0,
+		"uncheckedKeysByFile": [],
+		"unmatched": 0,
+		"updated": 0,
+		"didUpdate": false
+	},
+	"startTime": 1795527317866,
+	"success": false,
+	"testResults": [
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buyer route helpers"],
+					"fullName": "buyer route helpers reads empty usual collector as null and returns highlighted validation errors",
+					"status": "passed",
+					"title": "reads empty usual collector as null and returns highlighted validation errors",
+					"duration": 19.95879099999999,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyer route helpers"],
+					"fullName": "buyer route helpers keeps field service errors associated with their input and a general message",
+					"status": "passed",
+					"title": "keeps field service errors associated with their input and a general message",
+					"duration": 0.41241600000000744,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318453,
+			"endTime": 1795527318473.4124,
+			"status": "passed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/lib/server/buyers/route-helpers.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buyers page"],
+					"fullName": "buyers page renders a buyer and its record link",
+					"status": "passed",
+					"title": "renders a buyer and its record link",
+					"duration": 4.101957999999968,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyers page"],
+					"fullName": "buyers page renders the empty state",
+					"status": "failed",
+					"title": "renders the empty state",
+					"duration": 9.359124999999949,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'No buyers match these filters.'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/page.render.test.ts:49:55\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyers page"],
+					"fullName": "buyers page keeps filters in pagination links",
+					"status": "failed",
+					"title": "keeps filters in pagination links",
+					"duration": 8.21570799999995,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain '← Previous'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/page.render.test.ts:63:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318512,
+			"endTime": 1795527318534.2158,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers"],
+					"fullName": "/campaigns/[id]/buyers requires buyer.view or buyer.manage and returns 404 for missing campaigns",
+					"status": "passed",
+					"title": "requires buyer.view or buyer.manage and returns 404 for missing campaigns",
+					"duration": 1.970124999999996,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers"],
+					"fullName": "/campaigns/[id]/buyers lists searched buyers",
+					"status": "passed",
+					"title": "lists searched buyers",
+					"duration": 0.9297090000000026,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318626,
+			"endTime": 1795527318628.9297,
+			"status": "passed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors page"],
+					"fullName": "/campaigns/[id]/collectors page renders search, status filter, and its empty state",
+					"status": "failed",
+					"title": "renders search, status filter, and its empty state",
+					"duration": 16.298374999999993,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'Search'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/page.render.test.ts:25:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors page"],
+					"fullName": "/campaigns/[id]/collectors page shows New collector only to collector managers",
+					"status": "passed",
+					"title": "shows New collector only to collector managers",
+					"duration": 1.0722499999999968,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318514,
+			"endTime": 1795527318532.0723,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors load"],
+					"fullName": "/campaigns/[id]/collectors load requires collector.view or collector.manage",
+					"status": "passed",
+					"title": "requires collector.view or collector.manage",
+					"duration": 2.717375000000004,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors load"],
+					"fullName": "/campaigns/[id]/collectors load returns 404 for a malformed or nonexistent campaign",
+					"status": "passed",
+					"title": "returns 404 for a malformed or nonexistent campaign",
+					"duration": 0.5862079999999992,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors load"],
+					"fullName": "/campaigns/[id]/collectors load applies search and status filters and includes assigned-bond counts",
+					"status": "passed",
+					"title": "applies search and status filters and includes assigned-bond counts",
+					"duration": 0.5846659999999986,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318625,
+			"endTime": 1795527318629.5847,
+			"status": "passed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buyer record page"],
+					"fullName": "buyer record page renders assigned bond numbers with their link",
+					"status": "passed",
+					"title": "renders assigned bond numbers with their link",
+					"duration": 20.10966600000006,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyer record page"],
+					"fullName": "buyer record page renders empty bond states",
+					"status": "failed",
+					"title": "renders empty bond states",
+					"duration": 7.530458999999951,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'No bonds purchased in this campaign.'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.render.test.ts:55:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyer record page"],
+					"fullName": "buyer record page shows all buyer contact details to read-only users",
+					"status": "passed",
+					"title": "shows all buyer contact details to read-only users",
+					"duration": 0.5325839999999289,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyer record page"],
+					"fullName": "buyer record page renders prizes and converts a UTC instant near midnight to Buenos Aires",
+					"status": "failed",
+					"title": "renders prizes and converts a UTC instant near midnight to Buenos Aires",
+					"duration": 5.89387499999998,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'Prizes won (1)'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.render.test.ts:115:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["buyer sale sections"],
+					"fullName": "buyer sale sections links purchased sales and pending installments",
+					"status": "failed",
+					"title": "links purchased sales and pending installments",
+					"duration": 2.740041999999903,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain '2027-01-01'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.render.test.ts:158:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318519,
+			"endTime": 1795527318555.74,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] returns 403/404 for inaccessible records",
+					"status": "passed",
+					"title": "returns 403/404 for inaccessible records",
+					"duration": 3.6618330000000014,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] loads current and historical buyer bonds",
+					"status": "passed",
+					"title": "loads current and historical buyer bonds",
+					"duration": 1.2820839999999976,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] fails closed before load or update database calls when permissions are unavailable",
+					"status": "passed",
+					"title": "fails closed before load or update database calls when permissions are unavailable",
+					"duration": 15.628708999999958,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] loads prizes through the award buyer id",
+					"status": "passed",
+					"title": "loads prizes through the award buyer id",
+					"duration": 2.0036660000000097,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] updates after discarding individual fields, handles stale conflicts and no-ops",
+					"status": "failed",
+					"title": "updates after discarding individual fields, handles stale conflicts and no-ops",
+					"duration": 12.959708000000035,
+					"failureMessages": [
+						"AssertionError: expected { success: true, …(3) } to match object { success: true, …(1) }\n(12 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:2066:10)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:1958:14)\n    at Proxy.methodWrapper (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.server.test.ts:156:18\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] returns field errors for invalid input, versions, and ids",
+					"status": "failed",
+					"title": "returns field errors for invalid input, versions, and ids",
+					"duration": 1.9389589999999544,
+					"failureMessages": [
+						"AssertionError: expected { success: false, …(3) } to match object { …(2) }\n(12 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:2066:10)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:1958:14)\n    at Proxy.methodWrapper (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.server.test.ts:176:24\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/[buyerId]"],
+					"fullName": "/campaigns/[id]/buyers/[buyerId] keeps a hidden usual collector only for buyers that already have one",
+					"status": "passed",
+					"title": "keeps a hidden usual collector only for buyers that already have one",
+					"duration": 1.3732080000000337,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318217,
+			"endTime": 1795527318256.3733,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/[buyerId]/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new page"],
+					"fullName": "/campaigns/[id]/collectors/new page renders the collector form and optional linked-user empty state",
+					"status": "failed",
+					"title": "renders the collector form and optional linked-user empty state",
+					"duration": 13.674417000000005,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'New collector'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/new/page.render.test.ts:18:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318512,
+			"endTime": 1795527318525.6743,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/new/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new action"],
+					"fullName": "/campaigns/[id]/collectors/new action redirects to the created collector after the RPC succeeds",
+					"status": "passed",
+					"title": "redirects to the created collector after the RPC succeeds",
+					"duration": 18.695583,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new action"],
+					"fullName": "/campaigns/[id]/collectors/new action validates an empty name and invalid email before calling the RPC",
+					"status": "passed",
+					"title": "validates an empty name and invalid email before calling the RPC",
+					"duration": 1.3819579999999974,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new action"],
+					"fullName": "/campaigns/[id]/collectors/new action returns 403 without collector.manage",
+					"status": "passed",
+					"title": "returns 403 without collector.manage",
+					"duration": 0.40787500000004684,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new action"],
+					"fullName": "/campaigns/[id]/collectors/new action maps an already-linked profile to its field conflict",
+					"status": "failed",
+					"title": "maps an already-linked profile to its field conflict",
+					"duration": 5.811500000000024,
+					"failureMessages": [
+						"AssertionError: expected ActionFailure{ status: 409, …(1) } to match object { status: 409, …(1) }\n(8 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:2066:10)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:1958:14)\n    at Proxy.methodWrapper (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/new/page.server.test.ts:76:18\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/new action"],
+					"fullName": "/campaigns/[id]/collectors/new action returns 404 for an invalid campaign id without calling the RPC",
+					"status": "passed",
+					"title": "returns 404 for an invalid campaign id without calling the RPC",
+					"duration": 1.1610829999999623,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318211,
+			"endTime": 1795527318238.1611,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/new/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["new buyer page"],
+					"fullName": "new buyer page renders the buyer form",
+					"status": "failed",
+					"title": "renders the buyer form",
+					"duration": 19.13708399999996,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'New buyer'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/new/page.render.test.ts:18:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318512,
+			"endTime": 1795527318531.137,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/new/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/new"],
+					"fullName": "/campaigns/[id]/buyers/new requires buyer.manage and returns 404 for an invalid campaign",
+					"status": "passed",
+					"title": "requires buyer.manage and returns 404 for an invalid campaign",
+					"duration": 18.444041999999996,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/new"],
+					"fullName": "/campaigns/[id]/buyers/new loads only for managers and creates an individual, discarding business fields",
+					"status": "passed",
+					"title": "loads only for managers and creates an individual, discarding business fields",
+					"duration": 4.427792000000011,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/buyers/new"],
+					"fullName": "/campaigns/[id]/buyers/new validates the type and requires confirmation for duplicates",
+					"status": "passed",
+					"title": "validates the type and requires confirmation for duplicates",
+					"duration": 2.920792000000006,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318438,
+			"endTime": 1795527318463.921,
+			"status": "passed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/buyers/new/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId] page"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] page renders the settlement record section",
+					"status": "failed",
+					"title": "renders the settlement record section",
+					"duration": 28.95900000000006,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'Dec 31, 2025'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:58:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId] page"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] page renders the eight sections with their empty states",
+					"status": "failed",
+					"title": "renders the eight sections with their empty states",
+					"duration": 3.4712919999999485,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'General data'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:73:17\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId] page"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] page renders editing only for collector managers",
+					"status": "failed",
+					"title": "renders editing only for collector managers",
+					"duration": 5.161334000000011,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'Save changes'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:83:22\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId] page"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] page lists held bonds with their note and offers bulk return / reassign",
+					"status": "passed",
+					"title": "lists held bonds with their note and offers bulk return / reassign",
+					"duration": 1.4635829999999714,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector sale sections"],
+					"fullName": "collector sale sections renders pending installments for collector sales",
+					"status": "failed",
+					"title": "renders pending installments for collector sales",
+					"duration": 1.2086249999999836,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain '2027-01-01'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:142:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector sale sections"],
+					"fullName": "collector sale sections shows the current account balance, its link and the special rules (SAN-69)",
+					"status": "failed",
+					"title": "shows the current account balance, its link and the special rules (SAN-69)",
+					"duration": 1.2291249999999536,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to match /data-testid=\"collector-balance\"[^>]*>…/\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:164:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector sale sections"],
+					"fullName": "collector sale sections hides the current account without ledger permissions",
+					"status": "failed",
+					"title": "hides the current account without ledger permissions",
+					"duration": 2.4957090000000335,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'You do not have permission to view th…'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts:172:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318532,
+			"endTime": 1795527318576.4956,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] requires collector.view or collector.manage and 404s missing records",
+					"status": "passed",
+					"title": "requires collector.view or collector.manage and 404s missing records",
+					"duration": 3.0494580000000155,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] only queries and returns audit data with audit.view",
+					"status": "passed",
+					"title": "only queries and returns audit data with audit.view",
+					"duration": 2.3562499999999886,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] updates, accepts no-op RPC results, and deactivates a collector",
+					"status": "failed",
+					"title": "updates, accepts no-op RPC results, and deactivates a collector",
+					"duration": 22.95083299999999,
+					"failureMessages": [
+						"AssertionError: expected { success: true, …(2) } to match object { success: true, …(1) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:2066:10)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:1958:14)\n    at Proxy.methodWrapper (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.server.test.ts:123:19\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] maps PT409 to a 409 conflict",
+					"status": "failed",
+					"title": "maps PT409 to a 409 conflict",
+					"duration": 1.990083000000027,
+					"failureMessages": [
+						"AssertionError: expected ActionFailure{ status: 409, …(1) } to match object { status: 409, data: { …(1) } }\n(9 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:2066:10)\n    at Proxy.<anonymous> (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/index.aTZaPVhf.js:1958:14)\n    at Proxy.methodWrapper (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/chai@6.3.0/node_modules/chai/index.js:1737:25)\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.server.test.ts:136:18\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] lists assigned bonds by number with the exact total",
+					"status": "passed",
+					"title": "lists assigned bonds by number with the exact total",
+					"duration": 1.0177909999999883,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] names the linked user when the profile can be read, else a generic label",
+					"status": "failed",
+					"title": "names the linked user when the profile can be read, else a generic label",
+					"duration": 7.029375000000016,
+					"failureMessages": [
+						"AssertionError: expected 'Usuario vinculado actual' to be 'Current linked user' // Object.is equality\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.server.test.ts:193:72\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] rejects a malformed updatedAt with 400 before calling the RPC",
+					"status": "passed",
+					"title": "rejects a malformed updatedAt with 400 before calling the RPC",
+					"duration": 1.1168749999999932,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId] returns 404 for malformed action ids without calling the RPC",
+					"status": "passed",
+					"title": "returns 404 for malformed action ids without calling the RPC",
+					"duration": 0.6186249999999518,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318237,
+			"endTime": 1795527318277.6187,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/page.server.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["collector current account page"],
+					"fullName": "collector current account page renders every required column, the running balance and the total",
+					"status": "failed",
+					"title": "renders every required column, the running balance and the total",
+					"duration": 24.06925000000001,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain '>Date</th>'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.render.test.ts:80:17\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector current account page"],
+					"fullName": "collector current account page shows annulled adjustments struck through with both original and annulment reasons",
+					"status": "failed",
+					"title": "shows annulled adjustments struck through with both original and annulment reasons",
+					"duration": 3.2891250000000127,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'Annulled'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.render.test.ts:91:16\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector current account page"],
+					"fullName": "collector current account page hides adjustment forms and annul actions without permissions",
+					"status": "passed",
+					"title": "hides adjustment forms and annul actions without permissions",
+					"duration": 1.5611670000000686,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector current account page"],
+					"fullName": "collector current account page shows forms and annul only for recorded entries without a settlement",
+					"status": "passed",
+					"title": "shows forms and annul only for recorded entries without a settlement",
+					"duration": 2.959875000000011,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["collector current account page"],
+					"fullName": "collector current account page renders an empty state",
+					"status": "failed",
+					"title": "renders an empty state",
+					"duration": 1.6544999999999845,
+					"failureMessages": [
+						"AssertionError: expected '<!--[--><header class=\"mb-6 flex flex…' to contain 'No entries yet.'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.render.test.ts:114:31\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:1632:35\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:26\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3338:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3333:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3318:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3276:10)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:3904:64"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318520,
+			"endTime": 1795527318553.6545,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.render.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger load"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger load requires collector.ledger.view or collector.ledger.adjust",
+					"status": "passed",
+					"title": "requires collector.ledger.view or collector.ledger.adjust",
+					"duration": 4.001874999999984,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger load"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger load 404s invalid ids and returns entries with the reconstructed balance",
+					"status": "passed",
+					"title": "404s invalid ids and returns entries with the reconstructed balance",
+					"duration": 1.013750000000016,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger load"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger load returns annulled adjustments with both reasons and excludes their amount from the balance",
+					"status": "passed",
+					"title": "returns annulled adjustments with both reasons and excludes their amount from the balance",
+					"duration": 0.3686670000000163,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger load"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger load maps a database permission refusal to 403 and other errors to 500",
+					"status": "passed",
+					"title": "maps a database permission refusal to 403 and other errors to 500",
+					"duration": 1.6439579999999978,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger actions"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger actions denies each action without its permission",
+					"status": "passed",
+					"title": "denies each action without its permission",
+					"duration": 13.186832999999979,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger actions"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger actions validates amount, reason and direction before calling the database",
+					"status": "passed",
+					"title": "validates amount, reason and direction before calling the database",
+					"duration": 2.3957920000000286,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger actions"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger actions records commission and ledger adjustments and annulments",
+					"status": "passed",
+					"title": "records commission and ledger adjustments and annulments",
+					"duration": 6.276999999999987,
+					"failureMessages": [],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				},
+				{
+					"ancestorTitles": ["/campaigns/[id]/collectors/[collectorId]/ledger actions"],
+					"fullName": "/campaigns/[id]/collectors/[collectorId]/ledger actions maps service errors to their status",
+					"status": "failed",
+					"title": "maps service errors to their status",
+					"duration": 4.075167000000022,
+					"failureMessages": [
+						"AssertionError: expected 'Los movimientos de una rendición cerr…' to contain 'closed-settlement'\n    at /Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.server.test.ts:204:31\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/node_modules/.pnpm/vitest@5.0.5_@types+node@24.13.3_vite@8.1.5_@types+node@24.13.3_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.15_yaml@2.9.0_/node_modules/vitest/dist/chunks/run.BPv-BBRv.js:2801:20"
+					],
+					"meta": {},
+					"tags": [],
+					"benchmarks": []
+				}
+			],
+			"startTime": 1795527318211,
+			"endTime": 1795527318244.0752,
+			"status": "failed",
+			"message": "",
+			"name": "/Users/santiagomusso/Proyectos/firefighters/.claude/worktrees/agent-acf2ac83f871de5a0/src/routes/campaigns/[id]/collectors/[collectorId]/ledger/page.server.test.ts"
+		}
+	]
+}

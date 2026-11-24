@@ -1,6 +1,5 @@
 <script lang="ts">
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
-	import { cardClass } from '$lib/components/campaigns/styles';
+	import { Alert, Card } from '$lib/components/ui';
 	import BondReasonAction from './BondReasonAction.svelte';
 	import type { BondRecordActions } from './types';
 
@@ -18,32 +17,33 @@
 </script>
 
 {#if actions.ungroup || actions.annul || actions.lockedMessage}
-	<section class={cardClass} aria-labelledby="actions-title">
-		<h2 id="actions-title" class="mb-4 text-base font-semibold">Actions</h2>
-		{#if actions.lockedMessage}
-			<FormAlert kind="warning" message={actions.lockedMessage} />
-		{/if}
-		<div class="flex flex-wrap gap-4">
-			{#if actions.ungroup}
-				<BondReasonAction
-					action="ungroup"
-					label="Ungroup pata"
-					title="Ungroup this pata?"
-					body="The pata is annulled and its simple bonds are available on their own again. The grouping is kept in the history. This cannot be undone."
-					confirm="Ungroup pata"
-					errors={errors.ungroup}
-				/>
+	<Card title="Acciones" id="actions">
+		<div class="flex flex-col gap-4">
+			{#if actions.lockedMessage}
+				<Alert tone="warning">{actions.lockedMessage}</Alert>
 			{/if}
-			{#if actions.annul}
-				<BondReasonAction
-					action="annul"
-					label={isPata ? 'Annul pata' : 'Annul bond'}
-					title={isPata ? 'Annul this pata?' : 'Annul this bond?'}
-					body="Use this for a bond loaded by mistake. It is kept as annulled and its numbers are freed, so they can be entered again in another bond. This cannot be undone."
-					confirm={isPata ? 'Annul pata' : 'Annul bond'}
-					errors={errors.annul}
-				/>
-			{/if}
+			<div class="flex flex-wrap gap-4">
+				{#if actions.ungroup}
+					<BondReasonAction
+						action="ungroup"
+						label="Desagrupar pata"
+						title="¿Desagrupar esta pata?"
+						body="La pata se anula y sus bonos simples vuelven a estar disponibles por separado. La agrupación se conserva en el historial. No se puede deshacer."
+						confirm="Desagrupar pata"
+						errors={errors.ungroup}
+					/>
+				{/if}
+				{#if actions.annul}
+					<BondReasonAction
+						action="annul"
+						label={isPata ? 'Anular pata' : 'Anular bono'}
+						title={isPata ? '¿Anular esta pata?' : '¿Anular este bono?'}
+						body="Usar esta acción para un bono cargado por error. Se conserva como anulado y sus números quedan libres, de modo que se pueden ingresar de nuevo en otro bono. No se puede deshacer."
+						confirm={isPata ? 'Anular pata' : 'Anular bono'}
+						errors={errors.annul}
+					/>
+				{/if}
+			</div>
 		</div>
-	</section>
+	</Card>
 {/if}

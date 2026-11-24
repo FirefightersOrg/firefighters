@@ -32,7 +32,7 @@ export const createDrawSchema = z
 	})
 	.refine((p) => p.drawType !== 'monthly' || p.requiredInstallmentNumber !== null, {
 		path: ['requiredInstallmentNumber'],
-		message: 'Monthly draws require an installment.'
+		message: 'Los sorteos mensuales requieren una cuota.'
 	});
 export const updateDrawSchema = z.object({ drawId: z.guid(), ...fields });
 export const annulDrawSchema = z.object({ drawId: z.guid(), reason: text(DRAW_REASON_MAX) });
@@ -51,12 +51,14 @@ async function write<T extends z.ZodType>(
 	args: (p: z.output<T>) => Record<string, unknown>
 ) {
 	if (ctx?.permissions == null)
-		throw new DrawRosterServiceError('internal', 'Could not load draw permissions.');
+		throw new DrawRosterServiceError('internal', 'No se pudieron cargar los permisos de sorteos.');
 	if (!hasPermissionIn(ctx.permissions, permission))
-		throw new DrawRosterServiceError('permission', 'Draw permission is required.');
+		throw new DrawRosterServiceError('permission', 'Hace falta el permiso de sorteos.');
 	const parsed = schema.safeParse(input);
 	if (!parsed.success)
-		throw new DrawRosterServiceError('validation', 'Invalid draw data.', { cause: parsed.error });
+		throw new DrawRosterServiceError('validation', 'Datos del sorteo inválidos.', {
+			cause: parsed.error
+		});
 	try {
 		const { data, error } = await client.rpc(name, {
 			...args(parsed.data),
@@ -66,7 +68,7 @@ async function write<T extends z.ZodType>(
 		return data as string;
 	} catch (cause) {
 		if (cause instanceof DrawRosterServiceError) throw cause;
-		throw new DrawRosterServiceError('internal', 'Could not change draw.', { cause });
+		throw new DrawRosterServiceError('internal', 'No se pudo modificar el sorteo.', { cause });
 	}
 }
 const ruleArgs = (p: z.output<typeof updateDrawSchema> | z.output<typeof createDrawSchema>) => ({

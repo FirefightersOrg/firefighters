@@ -196,18 +196,33 @@ describe('/campaigns/[id] dashboard load', () => {
 	});
 
 	it.each([
-		['report_bonds_by_status', OPERATIONAL],
-		['report_installments', OPERATIONAL],
-		['dashboard_next_draw', OPERATIONAL],
-		['dashboard_at_risk_bonds', OPERATIONAL],
-		['report_payments_by_date', FINANCIAL],
-		['report_settlements_by_collector', FINANCIAL],
-		['report_collector_accounts', FINANCIAL]
-	])('returns 500 when %s fails', async (failing, permissions) => {
-		const { supabase } = supabaseWithReports(failing);
-		await expect(load(loadEvent(makeLocals({ supabase, permissions })))).rejects.toMatchObject({
-			status: 500
-		});
+		['report_bonds_by_status', OPERATIONAL, 'operational', 'financial'],
+		['report_installments', OPERATIONAL, 'operational', 'financial'],
+		['dashboard_next_draw', OPERATIONAL, 'operational', 'financial'],
+		['dashboard_at_risk_bonds', OPERATIONAL, 'operational', 'financial'],
+		['report_payments_by_date', FINANCIAL, 'financial', 'operational'],
+		['report_settlements_by_collector', FINANCIAL, 'financial', 'operational'],
+		['report_collector_accounts', FINANCIAL, 'financial', 'operational']
+	] as const)(
+		'keeps the page and flags only that group when %s fails',
+		async (failing, permissions, failed, other) => {
+			const { supabase } = supabaseWithReports(failing);
+			const data = (await load(
+				loadEvent(makeLocals({ supabase, permissions: [...permissions] }))
+			))!;
+			expect(data.campaign).toBeDefined();
+			expect(data.dashboard[failed]).toEqual({ error: true });
+			expect(data.dashboard[other]).toBeNull();
+		}
+	);
+
+	it('flags only the failing group when both are visible', async () => {
+		const { supabase } = supabaseWithReports('report_payments_by_date');
+		const data = (await load(
+			loadEvent(makeLocals({ supabase, permissions: [...OPERATIONAL, 'report.view_financial'] }))
+		))!;
+		expect(data.dashboard.financial).toEqual({ error: true });
+		expect(data.dashboard.operational).toMatchObject({ bonds: { total: 10 } });
 	});
 
 	it('returns 500 when the permissions could not be loaded', async () => {

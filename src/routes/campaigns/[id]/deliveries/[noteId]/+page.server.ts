@@ -5,7 +5,7 @@ import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { bondOption, isUuid, loadDeliveryCampaign } from '$lib/server/deliveries/route-helpers';
 import { getDeliveryNote, listBondEntriesByIds } from '$lib/server/repositories/deliveries';
 
-const NOTE_NOT_FOUND = 'Delivery note not found.';
+const NOTE_NOT_FOUND = 'Remito no encontrado.';
 
 /**
  * /campaigns/[id]/deliveries/[noteId]: one delivery note with its bonds and a link to the
@@ -35,5 +35,5 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 function fail500(locals: App.Locals, err: unknown): never {
 	console.error('[deliveries] note load failed', { requestId: locals.requestId, error: err });
-	error(500, { message: 'Could not load the delivery note. Please try again.' });
+	error(500, { message: 'No se pudo cargar el remito. Volver a intentar.' });
 }

@@ -8,8 +8,11 @@
 --
 -- Next draw: the earliest non-annulled, non-completed draw whose draw date is today or later
 -- (Buenos Aires). At risk = a sold bond with an active sale whose required installments are not
--- fully covered by confirmed payments dated on or before the cutoff day (the same rule as
--- draw_generate_roster, via draw_payment_before_cutoff). Monthly: installments 1..N. Consolation:
+-- fully covered by confirmed payments dated on or before the cutoff day (the same payment test as
+-- draw_generate_roster, via draw_payment_before_cutoff). It is an estimate, not the roster: it does
+-- not apply the roster's other exclusions (bonds that already won an excluding prize), it lists
+-- nothing for a consolation draw without a required installment, and a sold bond without an
+-- active payment plan is not listed. Monthly: installments 1..N. Consolation:
 -- 1..N from draw_consolation_required. Final and extraordinary: every installment of the plan.
 --
 -- Errors: 42501 insufficient_privilege, P0002 no_data_found (campaign).

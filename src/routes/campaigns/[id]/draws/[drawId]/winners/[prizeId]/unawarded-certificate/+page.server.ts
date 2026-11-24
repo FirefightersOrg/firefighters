@@ -22,24 +22,24 @@ const uuid = (value: string) => z.guid().safeParse(value).success;
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!READ_PERMISSIONS.some((permission) => hasPermissionIn(locals.permissions, permission)))
 		error(403, { message: 'You do not have permission to view this certificate.' });
 	if (!uuid(params.id) || !uuid(params.drawId) || !uuid(params.prizeId))
-		error(404, { message: 'Prize not found.' });
+		error(404, { message: 'Premio no encontrado.' });
 	const [campaign, found] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getPrizeCertificateData(locals.supabase, params.prizeId)
 	]);
 	if (campaign.error || found.error) {
 		if ((found.error as { code?: string } | null)?.code === 'P0002')
-			error(404, { message: 'Prize not found.' });
+			error(404, { message: 'Premio no encontrado.' });
 		error(500, { message: 'Could not load the prize certificate.' });
 	}
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	if (!found.data || found.data.campaignId !== params.id || found.data.drawId !== params.drawId)
-		error(404, { message: 'Prize not found.' });
+		error(404, { message: 'Premio no encontrado.' });
 	if (found.data.prizeStatus !== 'unawarded')
 		error(404, { message: 'Certificate is only available for unawarded prizes.' });
 	return { document: buildPrintableUnawardedPrizeCertificate(campaign.data, found.data) };

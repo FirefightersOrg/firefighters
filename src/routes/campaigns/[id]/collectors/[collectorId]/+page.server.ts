@@ -34,7 +34,7 @@ import {
 	returnBondsFromCollector
 } from '$lib/server/services/deliveries';
 const uuid = (value: string) => z.guid().safeParse(value).success;
-const notFound = 'Collector not found.';
+const notFound = 'No se encontró el cobrador.';
 /** Usual buyers listed on the record; the rest are counted ("and N more"). */
 const BUYERS_SHOWN = 100;
 const isTimestamp = (value: string) => z.iso.datetime({ offset: true }).safeParse(value).success;
@@ -49,7 +49,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		getCollector(locals.supabase, params.collectorId)
 	]);
 	if (campaignResult.error || collectorResult.error)
-		error(500, { message: 'Could not load the collector. Please try again.' });
+		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collectorResult.data) error(404, { message: notFound });
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
@@ -73,7 +73,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		installments.error ||
 		settlements.error
 	)
-		error(500, { message: 'Could not load the collector. Please try again.' });
+		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 	const collector = collectorResult.data;
 	const assigned = bonds.data?.items ?? [];
 
@@ -96,7 +96,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			: Promise.resolve({ data: [], error: null })
 	]);
 	if (notes.error || targets.error)
-		error(500, { message: 'Could not load the collector. Please try again.' });
+		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 
 	// Current account and special commission rules (SAN-69).
 	const ledgerAllowed =
@@ -115,7 +115,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			: Promise.resolve({ data: [], error: null })
 	]);
 	if (specialRules.error)
-		error(500, { message: 'Could not load the collector. Please try again.' });
+		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 
 	const profileOptions = profiles.data ?? [];
 	if (collector.userProfileId) {
@@ -123,7 +123,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		const linked = await getProfileName(locals.supabase, collector.userProfileId);
 		profileOptions.unshift({
 			id: collector.userProfileId,
-			fullName: linked.data ?? 'Current linked user',
+			fullName: linked.data ?? 'Usuario vinculado actual',
 			email: ''
 		});
 	}
@@ -171,27 +171,27 @@ export const actions: Actions = {
 			return fail(400, {
 				values,
 				errors: {},
-				message: 'The form is out of date. Reload the page and try again.'
+				message: 'El formulario está desactualizado. Recargar la página y volver a intentar.'
 			});
 		const parsed = collectorSchema.safeParse(values);
 		if (!parsed.success)
 			return fail(400, {
 				values,
 				errors: parsed.error.flatten().fieldErrors,
-				message: 'Please review the form.'
+				message: 'Revisar el formulario.'
 			});
 		try {
 			await updateCollector(locals.supabase, params.collectorId, parsed.data, values.updatedAt, {
 				requestId: locals.requestId,
 				permissions: locals.permissions
 			});
-			return { success: true, message: 'Collector updated.', errors: {} };
+			return { success: true, message: 'Cobrador actualizado.', errors: {} };
 		} catch (err) {
 			const party = err instanceof PartyServiceError ? err : null;
 			return fail(party?.status ?? 500, {
 				values,
 				errors: party?.field ? { [party.field]: [party.message] } : {},
-				message: party?.message ?? 'Something went wrong. Please try again.'
+				message: party?.message ?? 'Algo salió mal. Volver a intentar.'
 			});
 		}
 	},
@@ -221,8 +221,8 @@ export const actions: Actions = {
 		if ('failure' in checked) return checked.failure;
 		const target = checked.formData.get('targetCollectorId');
 		if (typeof target !== 'string' || !uuid(target) || target === params.collectorId) {
-			return custodyFailure(400, 'Choose the collector that receives the bonds.', {
-				targetCollectorId: ['Choose the collector that receives the bonds.']
+			return custodyFailure(400, 'Elegir el cobrador que recibe los bonos.', {
+				targetCollectorId: ['Elegir el cobrador que recibe los bonos.']
 			});
 		}
 		let noteId: string;
@@ -267,7 +267,7 @@ async function custodyRequest(
 > {
 	requireActiveUser(locals, url.pathname);
 	if (!hasPermissionIn(locals.permissions, permission)) {
-		return { failure: custodyFailure(403, 'You do not have permission to do this.') };
+		return { failure: custodyFailure(403, 'No hay permiso para realizar esta acción.') };
 	}
 	if (!uuid(params.id)) return { failure: custodyFailure(404, CAMPAIGN_MESSAGES.notFound) };
 	if (!uuid(params.collectorId)) return { failure: custodyFailure(404, notFound) };
@@ -277,15 +277,15 @@ async function custodyRequest(
 	];
 	if (bondIds.length === 0) {
 		return {
-			failure: custodyFailure(400, 'Select at least one bond.', {
-				bondIds: ['Select at least one bond.']
+			failure: custodyFailure(400, 'Seleccionar al menos un bono.', {
+				bondIds: ['Seleccionar al menos un bono.']
 			})
 		};
 	}
 	if (bondIds.length > DELIVERY_MAX_BONDS || !bondIds.every(uuid)) {
 		return {
-			failure: custodyFailure(400, `Select at most ${DELIVERY_MAX_BONDS} bonds.`, {
-				bondIds: [`Select at most ${DELIVERY_MAX_BONDS} bonds.`]
+			failure: custodyFailure(400, `Seleccionar como máximo ${DELIVERY_MAX_BONDS} bonos.`, {
+				bondIds: [`Seleccionar como máximo ${DELIVERY_MAX_BONDS} bonos.`]
 			})
 		};
 	}

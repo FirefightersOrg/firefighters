@@ -274,7 +274,7 @@ describe('pata entry, ungroup and annul (local Supabase)', () => {
 		expect(duplicate.status).toBe(409);
 		expect(duplicate.data).toMatchObject({
 			errors: {
-				baseNumbers: ['Numbers 0070, 4941 are already used by another bond in this campaign.']
+				baseNumbers: ['Los números 0070, 4941 ya están en uso en otro bono de esta campaña.']
 			},
 			conflicts: [{ field: 'baseNumbers', bondId: printedId, numbers: ['0070', '4941'] }]
 		});
@@ -334,7 +334,7 @@ describe('pata entry, ungroup and annul (local Supabase)', () => {
 		expect(again.status).toBe(409);
 		expect(again.data).toMatchObject({
 			errors: {
-				memberBondIds: ['Bond 0200: It already belongs to a pata. Ungroup that pata first.']
+				memberBondIds: ['Bono 0200: Ya pertenece a una pata. Desagrupar esa pata primero.']
 			},
 			conflicts: [{ field: 'memberBondIds', bondId: pataId, numbers: ['0200'] }]
 		});
@@ -400,7 +400,7 @@ describe('pata entry, ungroup and annul (local Supabase)', () => {
 		const again = await recordAction(admin, 'annul', printedId, 'twice');
 		expect(again.status).toBe(409);
 		// Its numbers are released, so the database names it by id: the id is not shown.
-		expect(again.data?.message).toBe('A bond is already annulled.');
+		expect(again.data?.message).toBe('Un bono ya está anulado.');
 
 		// The freed numbers can be entered again.
 		const reentry = await printed(operator, '68 69 70');

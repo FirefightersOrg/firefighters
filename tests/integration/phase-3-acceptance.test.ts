@@ -23,7 +23,7 @@ import {
 } from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.server';
 import RecordPage from '../../src/routes/campaigns/[id]/bonds/[bondId]/+page.svelte';
 import { BOND_RECORD_SECTIONS, type BondRecord } from '$lib/components/bonds/record/types';
-import type { Campaign } from '$lib/domain/campaigns';
+import { CAMPAIGN_STATUS_LABELS, type Campaign, type CampaignStatus } from '$lib/domain/campaigns';
 import { loadPermissions } from './permissions';
 import type { BondFormResult } from '$lib/server/bonds/route-helpers';
 import type { BondListItem } from '$lib/server/bonds/list';
@@ -574,7 +574,7 @@ function simpleViaRpc(caller: SignedInUser, campaignId: string, base: number) {
 function expectDuplicate(outcome: Outcome, field: string, bondId: string, numbers: string[]) {
 	expect(outcome.status, JSON.stringify(outcome.data)).toBe(409);
 	expect(outcome.data?.success).toBe(false);
-	expect(outcome.data?.errors[field]?.[0]).toMatch(/already used by/);
+	expect(outcome.data?.errors[field]?.[0]).toMatch(/ya están? en uso en/);
 	const link = outcome.data?.conflicts?.find((c) => c.bondId === bondId);
 	expect(link, `conflict link to ${bondId}`).toBeDefined();
 	expect(link!.numbers).toEqual(numbers);
@@ -741,7 +741,7 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 				const reqId = rid(`printed-repeat-${typed}`);
 				const outcome = await enterPrinted(users.operator, A, typed, reqId);
 				expect(outcome.status).toBe(400);
-				expect(outcome.data?.errors.baseNumbers?.[0]).toMatch(/more than once|repeated|appears/i);
+				expect(outcome.data?.errors.baseNumbers?.[0]).toMatch(/más de una vez|repetid|aparece/i);
 				await expectNoAudit(reqId);
 			}
 			await rpcRejected(
@@ -1102,9 +1102,9 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 				});
 			}
 			const invalid = await list(users.operator, C, '?base=123456');
-			expect(invalid.query.errors.base).toBe('Enter a number from 00000 to 99999.');
+			expect(invalid.query.errors.base).toBe('Ingresar un número entre 00000 y 99999.');
 			const invalidA = await list(users.operator, A, '?base=12345');
-			expect(invalidA.query.errors.base).toBe('Enter a number from 0000 to 9999.');
+			expect(invalidA.query.errors.base).toBe('Ingresar un número entre 0000 y 9999.');
 		});
 	});
 
@@ -1183,7 +1183,9 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			const noReason = rid('ungroup-no-reason');
 			const missing = await recordAction(users.operator, 'ungroup', A, a.m1, '   ', noReason);
 			expect(missing.status).toBe(400);
-			expect(missing.data?.errors.reason?.[0]).toBe('A reason is required to ungroup a pata');
+			expect(missing.data?.errors.reason?.[0]).toBe(
+				'Se requiere un motivo para desagrupar una pata'
+			);
 			await expectNoAudit(noReason);
 			await rpcRejected(
 				users.operator,
@@ -1339,7 +1341,7 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			expect(beyond.pagination.total).toBe(total);
 
 			const html = renderList(first);
-			expect(html).toContain(`Page 1 of ${first.pagination.pageCount}`);
+			expect(html).toContain(`Página 1 de ${first.pagination.pageCount}`);
 			for (const row of first.bonds) expect(html).toContain(`data-bond-id="${row.id}"`);
 			expect(html).toContain('page=2');
 		});
@@ -1403,7 +1405,7 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 					expect(html).toContain('Wrong bonds');
 				} else {
 					expect(loaded.record.audit.entries).toEqual([]);
-					expect(html).toContain('You do not have permission to view the audit log.');
+					expect(html).toContain('No hay permiso para ver el registro de auditoría.');
 					expect(html).not.toContain('data-audit-action');
 				}
 			}
@@ -1734,7 +1736,9 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 				)) as { canLoad: boolean; lockedMessage: string };
 				expect(page.canLoad).toBe(false);
 				expect(page.lockedMessage).toContain(BOND_MESSAGES.campaignLocked);
-				expect(page.lockedMessage).toContain(`This campaign is ${status}`);
+				expect(page.lockedMessage).toContain(
+					`La campaña está ${CAMPAIGN_STATUS_LABELS[status as CampaignStatus].toLowerCase()}`
+				);
 				const attempts = [
 					['create', (r: string) => enterSimple(users.operator, campaignId, '9', r)],
 					['printed', (r: string) => enterPrinted(users.operator, campaignId, '10 11', r)]

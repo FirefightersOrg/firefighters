@@ -20,9 +20,9 @@ export const DELIVERY_NOTE_REASONS = ['delivery', 'reassignment', 'return'] as c
 export type DeliveryNoteReason = (typeof DELIVERY_NOTE_REASONS)[number];
 
 export const DELIVERY_NOTE_REASON_LABELS: Record<DeliveryNoteReason, string> = {
-	delivery: 'Delivery',
-	reassignment: 'Reassignment',
-	return: 'Return'
+	delivery: 'Entrega',
+	reassignment: 'Reasignación',
+	return: 'Devolución'
 };
 
 /** At most this many bonds per delivery, reassignment or return (database limit). */
@@ -62,7 +62,7 @@ export interface BondAssignment {
 	lostOn: string | null;
 }
 
-/** "Note 0007" style label (at least 4 digits). */
+/** "Remito 0007" style label (at least 4 digits), like the printed delivery note. */
 export function deliveryNoteLabel(noteNumber: number): string {
-	return `Note ${String(noteNumber).padStart(4, '0')}`;
+	return `Remito ${String(noteNumber).padStart(4, '0')}`;
 }

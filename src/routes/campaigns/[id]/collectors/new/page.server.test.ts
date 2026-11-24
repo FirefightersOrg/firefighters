@@ -75,7 +75,7 @@ describe('/campaigns/[id]/collectors/new action', () => {
 		});
 		expect(result).toMatchObject({
 			status: 409,
-			data: { errors: { userProfileId: ['That user is already linked to another collector.'] } }
+			data: { errors: { userProfileId: ['Ese usuario ya está vinculado a otro cobrador.'] } }
 		});
 	});
 

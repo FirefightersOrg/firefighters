@@ -9,10 +9,10 @@ export const DRAW_TYPES = [
 ] as const;
 export type DrawType = (typeof DRAW_TYPES)[number];
 export const DRAW_TYPE_LABELS: Record<DrawType, string> = {
-	monthly: 'Monthly',
-	extraordinary_full_payment: 'Extraordinary full payment',
+	monthly: 'Mensual',
+	extraordinary_full_payment: 'Extraordinario por pago total',
 	final: 'Final',
-	consolation: 'Consolation'
+	consolation: 'Consuelo'
 };
 export const DRAW_STATUSES = [
 	'scheduled',

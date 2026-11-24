@@ -10,8 +10,8 @@ describe('new draw render', () => {
 				form: null
 			} as any
 		}).body;
-		expect(body).toContain('Extraordinary full payment');
-		expect(body).toContain('Consolation');
+		expect(body).toContain('Extraordinario por pago total');
+		expect(body).toContain('Consuelo');
 		expect(body).toContain('UTC−03');
 	});
 });

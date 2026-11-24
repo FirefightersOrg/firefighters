@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { canLoadBonds } from '$lib/domain/campaigns';
 import { barcodeNeedsManualNumber } from '$lib/domain/barcodes';
+import { translateImportMessage } from '$lib/domain/import-messages';
 import { isImportSessionOpen } from '$lib/domain/import-preview';
 import { requirePermissionIn } from '$lib/server/auth/permissions';
 import { campaignLockedMessage } from '$lib/server/bonds/route-helpers';
@@ -23,7 +24,6 @@ import {
 	listImportSessions
 } from '$lib/server/repositories/imports';
 import { importAddScanSchema } from '$lib/schemas/import';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	IMPORT_MESSAGES,
 	addScanItem,
@@ -100,7 +100,7 @@ function failLoad(locals: App.Locals, campaignId: string, err: unknown): never {
 		campaignId,
 		error: err
 	});
-	error(500, { message: 'Could not load the scanner. Please try again.' });
+	error(500, { message: 'No se pudo cargar el escáner. Volver a intentar.' });
 }
 
 export const actions: Actions = {
@@ -108,11 +108,12 @@ export const actions: Actions = {
 	start: async ({ request, locals, params, url }) => {
 		const denied = checkImportActionPermission(locals, url, 'start', 'bond.scan');
 		if (denied) return denied;
-		if (!isUuid(params.id)) return importFormFailure('start', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!isUuid(params.id))
+			return importFormFailure('start', 404, IMPORT_MESSAGES.campaignNotFound);
 		const formData = await request.formData();
 		const notes = textField(formData, 'notes');
 		if (notes && notes.length > 2000) {
-			return importFormFailure('start', 400, 'Notes are limited to 2000 characters.');
+			return importFormFailure('start', 400, 'Las notas admiten hasta 2000 caracteres.');
 		}
 		let sessionId: string;
 		try {
@@ -150,7 +151,7 @@ export const actions: Actions = {
 			for (const issue of parsed.error.issues) {
 				(errors[String(issue.path[0])] ??= []).push(`${issue.message}.`);
 			}
-			const first = Object.values(errors)[0]?.[0] ?? 'Scan or type a barcode.';
+			const first = Object.values(errors)[0]?.[0] ?? 'Escanear o ingresar un código de barras.';
 			return importFormFailure('scan', 400, first, { errors, values });
 		}
 		const barcode = parsed.data.barcode as string;
@@ -169,7 +170,8 @@ export const actions: Actions = {
 			});
 			return importFormFailure('scan', 500, IMPORT_MESSAGES.internal, { values });
 		}
-		if (!campaignResult.data) return importFormFailure('scan', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!campaignResult.data)
+			return importFormFailure('scan', 404, IMPORT_MESSAGES.campaignNotFound);
 		if (!canLoadBonds(campaignResult.data.status)) {
 			return importFormFailure('scan', 409, campaignLockedMessage(campaignResult.data.status), {
 				values
@@ -210,7 +212,9 @@ export const actions: Actions = {
 		const result: ImportFormResult = {
 			form: 'scan',
 			success: scanned?.status !== 'error',
-			message: scanned?.errorMessage ?? `Code ${barcode} staged.`,
+			message:
+				(scanned?.errorMessage ? translateImportMessage(scanned.errorMessage) : null) ??
+				`Código ${barcode} cargado.`,
 			summary,
 			scanned,
 			values

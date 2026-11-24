@@ -671,14 +671,14 @@ describe('Phase 5: collectors and buyers', () => {
 		);
 		const collectorHtml = render(CollectorPage, { props: { data: collectorData } as never }).body;
 		for (const title of [
-			'1. General data',
-			'2. Assigned bonds',
-			'3. Associated buyers',
-			'4. Pending installments',
-			'5. Settlements',
-			'6. Current account',
-			'7. Monthly report',
-			'8. Audit'
+			'Datos generales',
+			'Bonos asignados',
+			'Compradores asociados',
+			'Cuotas pendientes',
+			'Rendiciones',
+			'Cuenta corriente',
+			'Informe mensual',
+			'Auditoría'
 		])
 			expect(collectorHtml).toContain(title);
 		expect(collectorHtml).toContain('collector.create');
@@ -689,12 +689,12 @@ describe('Phase 5: collectors and buyers', () => {
 		);
 		const buyerHtml = render(BuyerPage, { props: { data: buyerData } as never }).body;
 		for (const title of [
-			'General data',
-			'Purchased bonds in this campaign',
-			'Installments and debt',
-			'Prizes',
-			'Historical numbers',
-			'Audit'
+			'Datos generales',
+			'Bonos comprados en esta campaña',
+			'Cuotas y deuda',
+			'Premios ganados',
+			'Números históricos',
+			'Auditoría'
 		])
 			expect(buyerHtml).toContain(title);
 		expect(buyerHtml).toContain('buyer.create');
@@ -705,7 +705,7 @@ describe('Phase 5: collectors and buyers', () => {
 			})
 		);
 		expect(render(BuyerPage, { props: { data: operatorBuyerData } as never }).body).toContain(
-			'You do not have permission to view audit history.'
+			'No hay permiso para ver el historial de auditoría.'
 		);
 	});
 

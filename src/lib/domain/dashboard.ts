@@ -5,6 +5,7 @@
  * the dashboard shows. Amounts are canonical decimal strings summed in cents, never as floats.
  */
 import type { BondsByStatusRow, InstallmentBucket } from './reports';
+import { parseMoneyToCents } from './money';
 import { sumAmounts, todayInBuenosAires } from './reports';
 import type {
 	CollectorAccountRow,
@@ -49,7 +50,13 @@ export interface RevenueSummary {
 	collectedPercent: number;
 }
 
-const toCents = (value: string) => Math.round(Number(value) * 100);
+/** Integer cents of a canonical amount (negatives allowed), parsed from the string, not a float. */
+const toCents = (value: string) => {
+	const negative = value.startsWith('-');
+	const cents = parseMoneyToCents(negative ? value.slice(1) : value);
+	if (cents === null) throw new RangeError(`Invalid amount: ${value}`);
+	return negative ? -cents : cents;
+};
 
 /** Installments of active sales by bucket (summed over collectors). */
 export function summarizeRevenue(
@@ -190,14 +197,6 @@ export interface AtRiskBond {
 
 /** Rows of the at-risk list shown on the dashboard. */
 export const AT_RISK_LIMIT = 25;
-
-/** Spanish names of the draw types for the dashboard (docs/copy.md). */
-export const DRAW_TYPE_LABELS_ES: Record<string, string> = {
-	monthly: 'Sorteo mensual',
-	extraordinary_full_payment: 'Sorteo extraordinario por pago total',
-	final: 'Sorteo final',
-	consolation: 'Sorteo de consuelo'
-};
 
 /** What the dashboard says about the cutoff of the next draw. */
 export function countdownLabel(countdown: Countdown): string {

@@ -55,7 +55,8 @@ import {
 	readFormFields
 } from '$lib/schemas/campaign';
 
-const NO_REPORT_FILTERS: ReportFilters = {
+/** Built per call: `month` is not used by the dashboard, but must not go stale in a long-lived server. */
+const noReportFilters = (): ReportFilters => ({
 	collectorId: null,
 	kind: null,
 	commercialStatus: null,
@@ -63,7 +64,7 @@ const NO_REPORT_FILTERS: ReportFilters = {
 	month: todayInBuenosAires().slice(0, 7),
 	from: null,
 	to: null
-};
+});
 
 const NO_FINANCIAL_FILTERS: FinancialFilters = {
 	collectorId: null,
@@ -182,7 +183,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
  * needs `report.view_operational`; the financial group (cash, commissions, balances) needs
  * `report.view_financial`. A group the person may not see is null. The SQL functions check both
  * permissions again and aggregate server-side, so no row cap hides data.
+ *
+ * A failing group never takes the campaign page down (transitions, edits and links must keep
+ * working): it is reported as `{ error: true }` and the page shows an alert in its place.
  */
+type DashboardGroup<T> = T | { error: true } | null;
+
 async function loadDashboard(locals: App.Locals, campaignId: string) {
 	const permissions = locals.permissions ?? [];
 	const supabase = locals.supabase;
@@ -193,53 +199,68 @@ async function loadDashboard(locals: App.Locals, campaignId: string) {
 			what,
 			error: cause
 		});
-		error(500, { message: 'No se pudo cargar el tablero. Intentar nuevamente.' });
+		throw new DashboardGroupError();
+	};
+	const group = async <T>(allowed: boolean, load: () => Promise<T>): Promise<DashboardGroup<T>> => {
+		if (!allowed) return null;
+		try {
+			return await load();
+		} catch (err) {
+			if (!(err instanceof DashboardGroupError)) {
+				console.error('[campaigns] dashboard load failed', {
+					requestId: locals.requestId,
+					campaignId,
+					error: err
+				});
+			}
+			return { error: true };
+		}
 	};
 
-	const operational = hasPermissionIn(permissions, 'report.view_operational')
-		? await (async () => {
-				const [bonds, installments, nextDraw] = await Promise.all([
-					getBondsByStatus(supabase, campaignId, NO_REPORT_FILTERS),
-					getInstallmentsReport(supabase, campaignId, NO_REPORT_FILTERS),
-					getNextDraw(supabase, campaignId)
-				]);
-				if (bonds.error) fail('bonds', bonds.error);
-				if (installments.error) fail('installments', installments.error);
-				if (nextDraw.error) fail('next draw', nextDraw.error);
-				const draw = nextDraw.data ?? null;
-				const atRisk = draw
-					? await getAtRiskBonds(supabase, campaignId, draw.id, AT_RISK_LIMIT)
-					: null;
-				if (atRisk?.error) fail('at-risk bonds', atRisk.error);
-				return {
-					bonds: summarizeBonds(bonds.data ?? []),
-					revenue: summarizeRevenue(installments.data ?? []),
-					nextDraw: draw,
-					atRisk: atRisk?.data ?? []
-				};
-			})()
-		: null;
-
-	const financial = hasPermissionIn(permissions, 'report.view_financial')
-		? await (async () => {
-				const [payments, settlements, accounts] = await Promise.all([
-					getPaymentsByDate(supabase, campaignId, NO_FINANCIAL_FILTERS),
-					getSettlementsByCollector(supabase, campaignId, NO_FINANCIAL_FILTERS),
-					getCollectorAccounts(supabase, campaignId, NO_FINANCIAL_FILTERS)
-				]);
-				if (payments.error) fail('payments', payments.error);
-				if (settlements.error) fail('settlements', settlements.error);
-				if (accounts.error) fail('collector accounts', accounts.error);
-				return {
-					cash: summarizeCash(payments.data ?? []),
-					commissions: summarizeCommissions(settlements.data ?? []),
-					balances: summarizeBalances(accounts.data ?? [])
-				};
-			})()
-		: null;
+	const [operational, financial] = await Promise.all([
+		group(hasPermissionIn(permissions, 'report.view_operational'), async () => {
+			const filters = noReportFilters();
+			const [bonds, installments, nextDraw] = await Promise.all([
+				getBondsByStatus(supabase, campaignId, filters),
+				getInstallmentsReport(supabase, campaignId, filters),
+				getNextDraw(supabase, campaignId)
+			]);
+			if (bonds.error) fail('bonds', bonds.error);
+			if (installments.error) fail('installments', installments.error);
+			if (nextDraw.error) fail('next draw', nextDraw.error);
+			const draw = nextDraw.data ?? null;
+			const atRisk = draw
+				? await getAtRiskBonds(supabase, campaignId, draw.id, AT_RISK_LIMIT)
+				: null;
+			if (atRisk?.error) fail('at-risk bonds', atRisk.error);
+			return {
+				bonds: summarizeBonds(bonds.data ?? []),
+				revenue: summarizeRevenue(installments.data ?? []),
+				nextDraw: draw,
+				atRisk: atRisk?.data ?? []
+			};
+		}),
+		group(hasPermissionIn(permissions, 'report.view_financial'), async () => {
+			const [payments, settlements, accounts] = await Promise.all([
+				getPaymentsByDate(supabase, campaignId, NO_FINANCIAL_FILTERS),
+				getSettlementsByCollector(supabase, campaignId, NO_FINANCIAL_FILTERS),
+				getCollectorAccounts(supabase, campaignId, NO_FINANCIAL_FILTERS)
+			]);
+			if (payments.error) fail('payments', payments.error);
+			if (settlements.error) fail('settlements', settlements.error);
+			if (accounts.error) fail('collector accounts', accounts.error);
+			return {
+				cash: summarizeCash(payments.data ?? []),
+				commissions: summarizeCommissions(settlements.data ?? []),
+				balances: summarizeBalances(accounts.data ?? [])
+			};
+		})
+	]);
 
 	return { operational, financial };
 }
+
+class DashboardGroupError extends Error {}
 
 export const actions: Actions = {
 	update: async ({ request, locals, params, url }) => {

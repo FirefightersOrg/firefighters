@@ -11,7 +11,7 @@ const reason = z
 	.string()
 	.trim()
 	.min(1)
-	.refine((value) => [...value].length <= 1000, 'Reason exceeds 1000 code points.');
+	.refine((value) => [...value].length <= 1000, 'El motivo supera los 1000 caracteres.');
 const delta = z.coerce.number().min(-9_999_999_999.99).max(9_999_999_999.99).multipleOf(0.01);
 export const correctSaleBuyerSchema = z.object({ saleId: uuid, newBuyerId: uuid, reason });
 export const correctSaleCollectorSchema = z.object({ saleId: uuid, newCollectorId: uuid, reason });
@@ -45,12 +45,15 @@ async function correct<T extends z.ZodType>(
 	args: (value: z.output<T>) => Record<string, unknown>
 ) {
 	if (ctx?.permissions == null)
-		throw new SettlementServiceError('internal', 'Could not load correction permissions.');
+		throw new SettlementServiceError(
+			'internal',
+			'No se pudieron cargar los permisos de corrección.'
+		);
 	if (!hasPermissionIn(ctx.permissions, permission))
-		throw new SettlementServiceError('permission', 'Correction permission is required.');
+		throw new SettlementServiceError('permission', 'Hace falta el permiso de corrección.');
 	const parsed = schema.safeParse(input);
 	if (!parsed.success)
-		throw new SettlementServiceError('validation', 'Invalid correction.', { cause: parsed.error });
+		throw new SettlementServiceError('validation', 'Corrección inválida.', { cause: parsed.error });
 	try {
 		const { data, error } = await client.rpc(name, {
 			...args(parsed.data),
@@ -60,7 +63,7 @@ async function correct<T extends z.ZodType>(
 		return data as string | null;
 	} catch (cause) {
 		if (cause instanceof SettlementServiceError) throw cause;
-		throw new SettlementServiceError('internal', 'Correction failed.', { cause });
+		throw new SettlementServiceError('internal', 'No se pudo registrar la corrección.', { cause });
 	}
 }
 export function correctSaleBuyer(

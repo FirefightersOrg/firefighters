@@ -15,12 +15,8 @@
 		statusMeta,
 		type TableColumn
 	} from '$lib/components/ui';
-	import {
-		countdownLabel,
-		cutoffCountdown,
-		DRAW_TYPE_LABELS_ES,
-		type AtRiskBond
-	} from '$lib/domain/dashboard';
+	import { countdownLabel, cutoffCountdown, type AtRiskBond } from '$lib/domain/dashboard';
+	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
 	import { formatSignedMoney } from '$lib/domain/financial-reports';
 	import {
 		BARCODE_MODE_LABELS_ES,
@@ -53,10 +49,20 @@
 	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
 	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
 
-	const operational = $derived(data.dashboard.operational);
-	const financial = $derived(data.dashboard.financial);
+	const operationalGroup = $derived(data.dashboard.operational);
+	const financialGroup = $derived(data.dashboard.financial);
+	const operationalFailed = $derived(operationalGroup !== null && 'error' in operationalGroup);
+	const financialFailed = $derived(financialGroup !== null && 'error' in financialGroup);
+	const operational = $derived(
+		operationalGroup && !('error' in operationalGroup) ? operationalGroup : null
+	);
+	const financial = $derived(
+		financialGroup && !('error' in financialGroup) ? financialGroup : null
+	);
 	const nextDraw = $derived(operational?.nextDraw ?? null);
 	const countdown = $derived(nextDraw ? cutoffCountdown(nextDraw.paymentCutoffAt) : null);
+	// Once the roster is frozen the cutoff has usually passed: the bonds left are not enabled.
+	const rosterFrozen = $derived(nextDraw?.status === 'roster_frozen');
 	const atRiskColumns: TableColumn<AtRiskBond & Record<string, unknown>>[] = [
 		{ key: 'bond', header: 'Bono' },
 		{ key: 'collector', header: 'Cobrador' },
@@ -153,9 +159,22 @@
 		<Alert tone={transitionResult.success ? 'success' : 'danger'}>{transitionMessage}</Alert>
 	{/if}
 
-	{#if operational || financial}
+	{#if operational || financial || operationalFailed || financialFailed}
 		<section aria-labelledby="dashboard-title" class="flex flex-col gap-6">
 			<h2 id="dashboard-title" class="m-0 text-heading-2">Tablero</h2>
+
+			{#if operationalFailed}
+				<Alert tone="danger"
+					>No se pudo cargar el tablero operativo (bonos, recaudación y próximo sorteo). Volver a
+					intentar.</Alert
+				>
+			{/if}
+			{#if financialFailed}
+				<Alert tone="danger"
+					>No se pudo cargar el tablero financiero (efectivo, comisiones y saldos). Volver a
+					intentar.</Alert
+				>
+			{/if}
 
 			{#if operational}
 				<Card title="Bonos" id="dash-bonds">
@@ -243,7 +262,7 @@
 					{#if nextDraw && countdown}
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 							<Stat
-								label={DRAW_TYPE_LABELS_ES[nextDraw.type] ?? nextDraw.name}
+								label={DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name}
 								value={formatDate(nextDraw.drawDate)}
 								detail={nextDraw.name}
 							/>
@@ -253,7 +272,7 @@
 								detail={countdownLabel(countdown)}
 							/>
 							<Stat
-								label="Bonos en riesgo"
+								label={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
 								value={formatNumber(nextDraw.atRiskCount)}
 								detail={nextDraw.requiredInstallmentNumber
 									? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
@@ -267,9 +286,11 @@
 
 				{#if nextDraw}
 					<Card
-						title="Bonos en riesgo"
+						title={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
 						id="dash-at-risk"
-						description="Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte."
+						description={rosterFrozen
+							? 'Bonos vendidos que no cubrieron las cuotas requeridas antes de la fecha de corte.'
+							: 'Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte.'}
 					>
 						{#if operational.atRisk.length}
 							<Table
@@ -404,7 +425,7 @@
 				<div class="mb-4">
 					<RiskyOperationChecklist
 						campaignId={campaign.id}
-						operation="closing the campaign"
+						operation="cerrar la campaña"
 						canExport={data.can.exportBackups}
 					/>
 				</div>
@@ -437,7 +458,7 @@
 		{#if data.can.editRules}
 			<RiskyOperationChecklist
 				campaignId={campaign.id}
-				operation="changing the campaign rules"
+				operation="cambiar las reglas de la campaña"
 				canExport={data.can.exportBackups}
 			/>
 			<CampaignRulesForm {campaign} result={rulesResult} />
