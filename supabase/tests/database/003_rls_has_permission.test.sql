@@ -292,7 +292,7 @@ select ok(not public.has_permission('anything'), 'no-role user: has_permission(a
 select ok(not public.has_permission('user.manage'), 'no-role user: lacks user.manage');
 select is(
   public.my_permissions(),
-  array['bond.view', 'campaign.view', 'commission.view', 'report.view_financial'],
+  array['bond.view', 'campaign.view', 'commission.view', 'report.view_financial', 'report.view_operational'],
   'no-role user: my_permissions reflects only the role granted earlier in this test (read-only)'
 );
 reset role;
