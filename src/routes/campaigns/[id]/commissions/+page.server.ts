@@ -64,7 +64,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			error:
 				campaignResult.error ?? rulesResult.error ?? specialResult.error ?? collectorsResult.error
 		});
-		error(500, { message: 'Could not load the commission rules. Please try again.' });
+		error(500, { message: 'No se pudieron cargar las reglas de comisión. Volver a intentar.' });
 	}
 	if (!campaignResult.data) {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
@@ -92,7 +92,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		rules,
 		specialRules: (specialResult.data ?? []).map((rule) => ({
 			...rule,
-			collectorName: collectorNames.get(rule.appliesToCollectorId ?? '') ?? 'Collector'
+			collectorName: collectorNames.get(rule.appliesToCollectorId ?? '') ?? 'Cobrador'
 		})),
 		collectors: canManage ? collectors : [],
 		today: todayInArgentina(),
@@ -159,9 +159,9 @@ export const actions: Actions = {
 		const collectorField = formData.get('appliesToCollectorId');
 		const appliesToCollectorId = typeof collectorField === 'string' ? collectorField.trim() : '';
 		if (appliesToCollectorId && !isUuid(appliesToCollectorId)) {
-			return commissionRuleFormFailure('create', 400, 'Choose a valid collector.', {
+			return commissionRuleFormFailure('create', 400, 'Elegir un cobrador válido.', {
 				values: { ...values, appliesToCollectorId },
-				errors: { appliesToCollectorId: ['Choose a valid collector.'] }
+				errors: { appliesToCollectorId: ['Elegir un cobrador válido.'] }
 			});
 		}
 		const parsed = commissionRuleSchema(prepared.campaign.installmentCount).safeParse(values);
@@ -175,7 +175,7 @@ export const actions: Actions = {
 				{ requestId: event.locals.requestId },
 				appliesToCollectorId || null
 			);
-			return commissionRuleFormSuccess('create', 'Rule added.', id);
+			return commissionRuleFormSuccess('create', 'Regla agregada.', id);
 		} catch (err) {
 			return commissionRuleServiceFailure('create', err, values);
 		}
@@ -201,7 +201,7 @@ export const actions: Actions = {
 			});
 			return commissionRuleFormSuccess(
 				'update',
-				changed ? 'Rule saved.' : 'No changes to save.',
+				changed ? 'Regla guardada.' : 'No hay cambios para guardar.',
 				parsed.data.ruleId
 			);
 		} catch (err) {
@@ -227,7 +227,7 @@ export const actions: Actions = {
 			await annulCommissionRule(event.locals.supabase, parsed.data, {
 				requestId: event.locals.requestId
 			});
-			return commissionRuleFormSuccess('annul', 'Rule annulled.', parsed.data.ruleId);
+			return commissionRuleFormSuccess('annul', 'Regla anulada.', parsed.data.ruleId);
 		} catch (err) {
 			return commissionRuleServiceFailure('annul', err, values, parsed.data.ruleId);
 		}

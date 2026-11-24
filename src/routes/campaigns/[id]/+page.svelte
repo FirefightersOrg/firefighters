@@ -1,22 +1,19 @@
 <script lang="ts">
-	import { statusWord } from '$lib/domain/status-word';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import CampaignGeneralForm from '$lib/components/campaigns/CampaignGeneralForm.svelte';
 	import CampaignRulesForm from '$lib/components/campaigns/CampaignRulesForm.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
-	import { cardClass } from '$lib/components/campaigns/styles';
 	import { campaignEditFormKey } from '$lib/components/campaigns/types';
+	import { Alert, Card, PageHeader, StatusBadge, statusMeta } from '$lib/components/ui';
 	import {
-		BARCODE_MODE_LABELS,
+		BARCODE_MODE_LABELS_ES,
 		campaignNumberingConfig,
 		canEditCampaignRules,
-		formatCampaignDate
+		OVERFLOW_POLICY_LABELS
 	} from '$lib/domain/campaigns';
-	import { formatInteger, formatMoney } from '$lib/domain/money';
 	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
+	import { formatDate, formatMoney, formatNumber } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -32,160 +29,154 @@
 	const frozenByStatus = $derived(!canEditCampaignRules(campaign.status));
 	const rulesFrozen = $derived(frozenByStatus || data.hasBonds);
 	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
+	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
+
+	/** Links to the campaign's other sections, shown only when the person may open them. */
+	const sections = $derived(
+		[
+			[data.can.viewBonds, 'Bonos', resolve('/campaigns/[id]/bonds', { id: campaign.id })],
+			[
+				data.can.loadBonds,
+				'Cargar bonos',
+				resolve('/campaigns/[id]/bonds/new', { id: campaign.id })
+			],
+			[
+				data.can.loadBonds,
+				'Cargar una pata',
+				resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })
+			],
+			[
+				data.can.viewCollectors,
+				'Cobradores',
+				resolve('/campaigns/[id]/collectors', { id: campaign.id })
+			],
+			[data.can.viewBuyers, 'Compradores', resolve('/campaigns/[id]/buyers', { id: campaign.id })],
+			[
+				data.can.viewDeliveries,
+				'Entregas',
+				resolve('/campaigns/[id]/deliveries', { id: campaign.id })
+			],
+			[data.can.viewSales, 'Ventas', resolve('/campaigns/[id]/sales', { id: campaign.id })],
+			[
+				data.can.viewSettlements,
+				'Rendiciones',
+				resolve('/campaigns/[id]/settlements', { id: campaign.id })
+			],
+			[data.can.viewDraws, 'Sorteos', resolve('/campaigns/[id]/draws', { id: campaign.id })],
+			[data.can.viewReports, 'Reportes', resolve('/campaigns/[id]/reports', { id: campaign.id })],
+			[
+				data.can.exportBackups,
+				'Copias de seguridad',
+				resolve('/campaigns/[id]/backups', { id: campaign.id })
+			],
+			[
+				data.can.viewCommissions,
+				'Reglas de comisión',
+				resolve('/campaigns/[id]/commissions', { id: campaign.id })
+			],
+			[
+				data.can.viewAudit,
+				'Registro de auditoría',
+				resolve('/campaigns/[id]/audit', { id: campaign.id })
+			]
+		]
+			.filter(([allowed]) => allowed)
+			.map(([, label, href]) => ({ label: label as string, href: href as string }))
+	);
 </script>
 
 <svelte:head>
-	<title>{campaign.name} - Campaigns - Firefighters</title>
+	<title>{campaign.name} - Campañas - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a href={resolve('/campaigns')} class="text-sm text-blue-700 hover:underline">← Campaigns</a>
-		<div class="mt-2 flex flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
-			<StatusBadge kind="campaign" status={campaign.status} />
-		</div>
-		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements || data.can.viewDraws || data.can.exportBackups || data.can.viewReports}
-			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-				{#if data.can.viewBonds}
-					<a
-						href={resolve('/campaigns/[id]/bonds', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Bonds →</a
-					>
-				{/if}
-				{#if data.can.loadBonds}
-					<a
-						href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Load bonds →</a
-					>
-					<a
-						href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Load a pata →</a
-					>
-				{/if}
-				{#if data.can.viewCollectors}
-					<a
-						href={resolve('/campaigns/[id]/collectors', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Collectors →</a
-					>
-				{/if}
-				{#if data.can.viewBuyers}
-					<a
-						href={resolve('/campaigns/[id]/buyers', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Buyers →</a
-					>
-				{/if}
-				{#if data.can.viewDeliveries}
-					<a
-						href={resolve('/campaigns/[id]/deliveries', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Deliveries →</a
-					>
-				{/if}
-				{#if data.can.viewSales}
-					<a
-						href={resolve('/campaigns/[id]/sales', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Sales →</a
-					>
-				{/if}
-				{#if data.can.viewSettlements}
-					<a
-						href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Settlements →</a
-					>
-				{/if}
-				{#if data.can.viewDraws}
-					<a
-						href={resolve('/campaigns/[id]/draws', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Draws →</a
-					>
-				{/if}
-				{#if data.can.viewReports}
-					<a
-						href={resolve('/campaigns/[id]/reports', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Reports →</a
-					>
-				{/if}
-				{#if data.can.exportBackups}
-					<a
-						href={resolve('/campaigns/[id]/backups', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Backup exports →</a
-					>
-				{/if}
-				{#if data.can.viewCommissions}
-					<a
-						href={resolve('/campaigns/[id]/commissions', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Commission rules →</a
-					>
-				{/if}
-				{#if data.can.viewAudit}
-					<a
-						href={resolve('/campaigns/[id]/audit', { id: campaign.id })}
-						class="font-medium text-blue-700 hover:underline">Audit log →</a
-					>
-				{/if}
-			</nav>
-		{/if}
-	</div>
+<PageHeader
+	title={campaign.name}
+	breadcrumbs={[{ label: 'Campañas', href: resolve('/campaigns') }, { label: campaign.name }]}
+>
+	{#snippet actions()}
+		<StatusBadge kind="campaign" status={campaign.status} />
+	{/snippet}
+</PageHeader>
 
-	{#if transitionResult}
-		<FormAlert kind={transitionResult.success ? 'success' : 'error'} message={transitionMessage} />
+<div class="flex flex-col gap-6">
+	{#if sections.length}
+		<nav aria-label="Secciones de la campaña">
+			<ul class="m-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0 text-label">
+				{#each sections as section (section.href)}
+					<li>
+						<!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs are resolved above -->
+						<a
+							href={section.href}
+							class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+							>{section.label}</a
+						>
+						<!-- eslint-enable svelte/no-navigation-without-resolve -->
+					</li>
+				{/each}
+			</ul>
+		</nav>
 	{/if}
 
-	<section class={cardClass} aria-labelledby="summary-title">
-		<h2 id="summary-title" class="mb-4 text-base font-semibold">Summary</h2>
-		<dl class="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
+	{#if transitionResult}
+		<Alert tone={transitionResult.success ? 'success' : 'danger'}>{transitionMessage}</Alert>
+	{/if}
+
+	<Card title="Resumen" id="summary">
+		<dl class="m-0 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Start date</dt>
-				<dd class="mt-0.5">{formatCampaignDate(campaign.startsAt)}</dd>
+				<dt class="text-caption text-muted">Fecha de inicio</dt>
+				<dd class="m-0 mt-0.5">{formatDate(campaign.startsAt)}</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">End date</dt>
-				<dd class="mt-0.5">{formatCampaignDate(campaign.endsAt)}</dd>
+				<dt class="text-caption text-muted">Fecha de fin</dt>
+				<dd class="m-0 mt-0.5">{formatDate(campaign.endsAt)}</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Barcode mode</dt>
-				<dd class="mt-0.5">{BARCODE_MODE_LABELS[campaign.barcodeMode]}</dd>
+				<dt class="text-caption text-muted">Modo de código de barras</dt>
+				<dd class="m-0 mt-0.5">{BARCODE_MODE_LABELS_ES[campaign.barcodeMode]}</dd>
 			</div>
 			{#if campaign.barcodePattern}
 				<div>
-					<dt class="text-xs font-medium text-slate-500">Barcode pattern</dt>
-					<dd class="mt-0.5 font-mono break-all">{campaign.barcodePattern}</dd>
+					<dt class="text-caption text-muted">Patrón del código de barras</dt>
+					<dd class="m-0 mt-0.5 font-mono break-all">{campaign.barcodePattern}</dd>
 				</div>
 			{/if}
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Simple bond value</dt>
-				<dd class="mt-0.5 tabular-nums">{formatMoney(campaign.simpleBondValue)}</dd>
+				<dt class="text-caption text-muted">Valor del bono simple</dt>
+				<dd class="m-0 mt-0.5 tabular-nums">{formatMoney(campaign.simpleBondValue)}</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Installments</dt>
-				<dd class="mt-0.5 tabular-nums">
+				<dt class="text-caption text-muted">Cuotas</dt>
+				<dd class="m-0 mt-0.5 tabular-nums">
 					{campaign.installmentCount} × {formatMoney(campaign.installmentValue)}
 				</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Overflow policy</dt>
-				<dd class="mt-0.5">{campaign.overflowPolicy}</dd>
+				<dt class="text-caption text-muted">Política de desborde</dt>
+				<dd class="m-0 mt-0.5">
+					{OVERFLOW_POLICY_LABELS[campaign.overflowPolicy] ?? campaign.overflowPolicy}
+				</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Number of digits</dt>
-				<dd class="mt-0.5 tabular-nums">{campaign.numberDigits}</dd>
+				<dt class="text-caption text-muted">Cantidad de dígitos</dt>
+				<dd class="m-0 mt-0.5 tabular-nums">{campaign.numberDigits}</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Maximum number</dt>
-				<dd class="mt-0.5 tabular-nums">{campaign.maxNumber}</dd>
+				<dt class="text-caption text-muted">Número máximo</dt>
+				<dd class="m-0 mt-0.5 tabular-nums">{campaign.maxNumber}</dd>
 			</div>
 			<div>
-				<dt class="text-xs font-medium text-slate-500">Associated number offset</dt>
-				<dd class="mt-0.5 tabular-nums">+{campaign.associatedNumberOffset}</dd>
+				<dt class="text-caption text-muted">Desfase del número asociado</dt>
+				<dd class="m-0 mt-0.5 tabular-nums">+{campaign.associatedNumberOffset}</dd>
 			</div>
 			{#if numbering.ok}
 				<div class="sm:col-span-2">
-					<dt class="text-xs font-medium text-slate-500">Usable base numbers</dt>
-					<dd class="mt-0.5 tabular-nums">
+					<dt class="text-caption text-muted">Números base utilizables</dt>
+					<dd class="m-0 mt-0.5 tabular-nums">
 						<span class="font-mono"
 							>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
 						>
-						({formatInteger(numbering.usableBaseCount)}); the highest gives associated number
+						({formatNumber(numbering.usableBaseCount)}); el mayor da el número asociado
 						<span class="font-mono">{numbering.maxValidBase.associatedFormatted}</span>
 					</dd>
 				</div>
@@ -193,33 +184,29 @@
 		</dl>
 		{#if rulesFrozen}
 			<div class="mt-4">
-				<FormAlert kind="warning">
+				<Alert tone="warning">
 					{#if frozenByStatus}
-						<p>
-							<strong>Rules are frozen.</strong> This campaign is {statusWord(campaign.status)}, and
-							rules (price, installments, numbering, overflow policy and barcode mode) can only be
-							changed while a campaign is a draft. They are shown read-only above.
-						</p>
+						<strong>Las reglas están congeladas.</strong> Esta campaña está {statusLabel} y las reglas
+						(precio, cuotas, numeración, política de desborde y modo de código de barras) solo se pueden
+						cambiar mientras la campaña es un borrador. Se muestran arriba en solo lectura.
 					{:else}
-						<p>
-							<strong>Rules are frozen.</strong> This campaign already has bonds, and their numbers and
-							values depend on the rules (price, installments, numbering, overflow policy and barcode
-							mode), so they can no longer be changed, even though the campaign is still a draft. They
-							are shown read-only above.
-						</p>
+						<strong>Las reglas están congeladas.</strong> Esta campaña ya tiene bonos y sus números y
+						valores dependen de las reglas (precio, cuotas, numeración, política de desborde y modo de
+						código de barras), por lo que ya no se pueden cambiar, aunque la campaña siga siendo un borrador.
+						Se muestran arriba en solo lectura.
 					{/if}
-				</FormAlert>
+				</Alert>
 			</div>
 		{:else if !data.can.editRules}
-			<p class="mt-4 text-xs text-slate-500">
-				Rules can be changed while the campaign is a draft, by users allowed to change rules.
+			<p class="m-0 mt-4 text-body-sm text-muted">
+				Las reglas se pueden cambiar mientras la campaña es un borrador, por quienes tienen permiso
+				para modificarlas.
 			</p>
 		{/if}
-	</section>
+	</Card>
 
 	{#if data.can.transitions.length > 0}
-		<section class={cardClass} aria-labelledby="status-title">
-			<h2 id="status-title" class="mb-4 text-base font-semibold">Status</h2>
+		<Card title="Estado" id="status">
 			{#if data.can.transitions.includes('closing') || data.can.transitions.includes('closed')}
 				<div class="mb-4">
 					<RiskyOperationChecklist
@@ -234,12 +221,12 @@
 					<TransitionAction
 						{toStatus}
 						blockedReason={toStatus === 'active' && missingDates
-							? 'Set the start and end dates before activating.'
+							? 'Definir las fechas de inicio y de fin antes de activar.'
 							: undefined}
 					/>
 				{/each}
 			</div>
-		</section>
+		</Card>
 	{/if}
 
 	<!-- The forms keep their own input state, taken with the version it belongs to: re-mount them

@@ -152,8 +152,24 @@
 			>
 		</p>
 	</section>
+	{#if data.can.complete}<section class={cardClass}>
+			<h2 class="font-semibold">Complete draw</h2>
+			<p class="mt-1 text-sm text-slate-600">
+				Every prize must be resolved (awarded or unawarded) first. Pending deliveries can still be
+				recorded after completion.
+			</p>
+			<form method="POST" action="?/complete" class="mt-3">
+				<button class={secondaryButtonClass}>Complete draw</button>
+			</form>
+		</section>{/if}
 	{#if data.can.annul}<details class="{cardClass} border-red-200">
 			<summary class="cursor-pointer font-semibold text-red-700">Annul draw</summary>
+			{#if data.draw.drawType === 'extraordinary_full_payment' && data.draw.status === 'roster_generated'}
+				<p class="mt-2 text-sm text-red-700">
+					Annulling this draw releases its reserved extra numbers that no other active draw uses, so
+					a later draw can assign them again. The generated roster is kept as history.
+				</p>
+			{/if}
 			<form method="POST" action="?/annul" class="mt-3">
 				<label class={labelClass} for="reason"
 					>Reason (max. {data.reasonMax} Unicode characters)</label

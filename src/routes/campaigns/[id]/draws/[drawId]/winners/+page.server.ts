@@ -25,6 +25,8 @@ import {
 	PrizeServiceError,
 	resolvePrize,
 	resolvePrizeSchema,
+	reversePrizeDelivery,
+	reversePrizeDeliverySchema,
 	updatePrize,
 	updatePrizeSchema
 } from '$lib/server/services/prizes';
@@ -46,7 +48,8 @@ const READ_PERMISSIONS = [
 	'prize.deliver',
 	'prize.annul'
 ] as const;
-type FormName = 'create' | 'update' | 'loadWinner' | 'resolve' | 'deliver' | 'annul';
+type FormName =
+	'create' | 'update' | 'loadWinner' | 'resolve' | 'deliver' | 'annul' | 'reverseDelivery';
 
 const field = (data: FormData, name: string) => {
 	const value = data.get(name);
@@ -174,12 +177,35 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				hasPermissionIn(locals.permissions, 'draw.load_winner'),
 			resolve: hasPermissionIn(locals.permissions, 'prize.resolve'),
 			deliver: hasPermissionIn(locals.permissions, 'prize.deliver'),
+			reverseDelivery: hasPermissionIn(locals.permissions, 'prize.reverse_delivery'),
 			annul: hasPermissionIn(locals.permissions, 'prize.annul')
 		}
 	};
 };
 
 export const actions: Actions = {
+	reverseDelivery: async ({ request, locals, params, url }) => {
+		const denied = guard(locals, 'prize.reverse_delivery', 'reverseDelivery');
+		if (denied) return denied;
+		requireCampaignViewer(locals, url);
+		const data = await request.formData();
+		const values = { prizeId: field(data, 'prizeId'), reason: field(data, 'reason') };
+		const scoped = await scopedPrize(locals, params, values.prizeId, 'reverseDelivery');
+		if ('failure' in scoped) return scoped.failure;
+		if (!reversePrizeDeliverySchema.safeParse(values).success)
+			return invalid('reverseDelivery', values);
+		try {
+			await reversePrizeDelivery(locals.supabase, values, ctx(locals));
+			return {
+				form: 'reverseDelivery',
+				success: true,
+				errors: {},
+				message: 'Prize delivery reversed.'
+			};
+		} catch (cause) {
+			return failure(cause, 'reverseDelivery', values);
+		}
+	},
 	create: async ({ request, locals, params, url }) => {
 		const denied = guard(locals, 'draw.update', 'create');
 		if (denied) return denied;

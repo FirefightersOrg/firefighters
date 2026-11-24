@@ -12,6 +12,23 @@ const id = '00000000-0000-4000-8000-000000000001';
 const ctx = { requestId: 'san71', permissions: ['payment.annul'] };
 const input = { paymentId: id, reason: ' mistake ' };
 describe('payment corrections', () => {
+	it('translates the moved-sale guard into a readable Spanish 409', async () => {
+		const rpc = vi.fn().mockResolvedValue({
+			error: {
+				code: '55000',
+				message:
+					"This payment's sale was moved to another collector. Correct the sale collector back before annulling or correcting this payment."
+			}
+		});
+		await expect(
+			correctPaymentMethod({ rpc } as never, { ...input, newMethod: 'transfer' }, ctx)
+		).rejects.toMatchObject({
+			status: 409,
+			kind: 'conflict',
+			message:
+				'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+		});
+	});
 	it.each([null, []])('fails closed before RPC for permissions %s', async (permissions) => {
 		const rpc = vi.fn();
 		await expect(

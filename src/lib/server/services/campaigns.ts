@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { statusWord } from '$lib/domain/status-word';
+import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
 import type {
 	CampaignCreateInput,
 	CampaignFormField,
@@ -63,78 +63,91 @@ export const CAMPAIGN_MESSAGES = {
 	permission: 'You do not have permission to perform this action.',
 	notFound: 'Campaign not found.',
 	internal: 'Something went wrong. Please try again.',
-	invalid: 'Some values are invalid. Please review the form.',
-	activationNeedsDates: 'Set both the start and end dates before activating the campaign.',
+	invalid: 'Hay valores no válidos. Revisar el formulario.',
+	activationNeedsDates: 'Definir las fechas de inicio y de fin antes de activar la campaña.',
 	datesCannotBeCleared:
-		'Start and end dates cannot be removed once the campaign has been activated.',
+		'Las fechas de inicio y de fin no se pueden quitar una vez activada la campaña.',
 	rulesFrozen:
-		'Rules can only be changed while the campaign is a draft. They were frozen when the campaign was activated.',
+		'Las reglas solo se pueden cambiar mientras la campaña es un borrador. Se congelaron al activar la campaña.',
 	rulesFrozenByBonds:
-		'Rules can no longer be changed: this campaign already has bonds, and their numbers and values depend on the rules.',
+		'Las reglas ya no se pueden cambiar: esta campaña ya tiene bonos y sus números y valores dependen de las reglas.',
 	staleVersion:
-		'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.',
-	datesFrozen: 'Dates can only be changed while the campaign is a draft or active.',
-	nameFrozen: 'The name of a closed or annulled campaign cannot be changed.',
-	reasonRequired: 'A reason is required to annul a campaign.'
+		'Otra persona modificó esta campaña mientras se editaba. Recargar la página para ver los últimos cambios y volver a hacer la edición.',
+	datesFrozen:
+		'Las fechas solo se pueden cambiar mientras la campaña es un borrador o está activa.',
+	nameFrozen: 'El nombre de una campaña cerrada o anulada no se puede cambiar.',
+	reasonRequired: 'Se requiere un motivo para anular una campaña.'
 } as const;
 
 /** Friendly messages for the table CHECK constraints (SAN-16), by constraint name. */
 const CONSTRAINT_MESSAGES: Record<string, { field: CampaignFormField; message: string }> = {
-	campaigns_name_not_blank: { field: 'name', message: 'Name is required.' },
+	campaigns_name_not_blank: { field: 'name', message: 'El nombre es obligatorio.' },
 	campaigns_name_max_length: {
 		field: 'name',
-		message: `Name must be at most ${CAMPAIGN_NAME_MAX_LENGTH} characters.`
+		message: `El nombre admite hasta ${CAMPAIGN_NAME_MAX_LENGTH} caracteres.`
 	},
-	campaigns_dates_order: { field: 'endsOn', message: 'End date must be after the start date.' },
+	campaigns_dates_order: {
+		field: 'endsOn',
+		message: 'La fecha de fin debe ser posterior a la fecha de inicio.'
+	},
 	campaigns_simple_bond_value_positive: {
 		field: 'simpleBondValue',
-		message: 'Simple bond value must be greater than 0.'
+		message: 'El valor del bono simple debe ser mayor que 0.'
 	},
 	campaigns_installment_count_positive: {
 		field: 'installmentCount',
-		message: 'Number of installments must be greater than 0.'
+		message: 'La cantidad de cuotas debe ser mayor que 0.'
 	},
 	campaigns_installment_value_positive: {
 		field: 'installmentCount',
-		message: 'Each installment must be greater than 0.'
+		message: 'Cada cuota debe ser mayor que 0.'
 	},
 	campaigns_installment_value_exact: {
 		field: 'installmentCount',
-		message: 'The simple bond value must divide exactly into the installments.'
+		message: 'El valor del bono simple debe dividirse exactamente en las cuotas.'
 	},
 	campaigns_number_digits_range: {
 		field: 'numberDigits',
-		message: 'Number of digits must be between 1 and 10.'
+		message: 'La cantidad de dígitos debe estar entre 1 y 10.'
 	},
 	campaigns_max_number_positive: {
 		field: 'maxNumber',
-		message: 'Maximum number must be greater than 0.'
+		message: 'El número máximo debe ser mayor que 0.'
 	},
 	campaigns_max_number_fits_digits: {
 		field: 'maxNumber',
-		message: 'Maximum number must fit in the number of digits.'
+		message: 'El número máximo debe entrar en la cantidad de dígitos.'
 	},
 	campaigns_associated_number_offset_nonnegative: {
 		field: 'associatedNumberOffset',
-		message: 'Associated number offset cannot be negative.'
+		message: 'El desfase del número asociado no puede ser negativo.'
 	},
 	campaigns_associated_number_offset_within_max: {
 		field: 'associatedNumberOffset',
-		message: 'Associated number offset must not exceed the maximum number.'
+		message: 'El desfase del número asociado no puede superar el número máximo.'
 	},
-	campaigns_overflow_policy_check: { field: 'overflowPolicy', message: 'Unknown overflow policy.' },
-	campaigns_barcode_mode_check: { field: 'barcodeMode', message: 'Unknown barcode mode.' },
+	campaigns_overflow_policy_check: {
+		field: 'overflowPolicy',
+		message: 'Política de desborde desconocida.'
+	},
+	campaigns_barcode_mode_check: {
+		field: 'barcodeMode',
+		message: 'Modo de código de barras desconocido.'
+	},
 	campaigns_barcode_pattern_format: {
 		field: 'barcodePattern',
-		message: 'Barcode pattern must be at most 200 characters, without surrounding spaces.'
+		message:
+			'El patrón del código de barras admite hasta 200 caracteres, sin espacios en los extremos.'
 	},
 	campaigns_barcode_pattern_mode: {
 		field: 'barcodePattern',
-		message: 'A barcode pattern is only used with the internal or external/legacy code modes.'
+		message:
+			'El patrón del código de barras solo se usa con los modos de código interno o externo o heredado.'
 	},
 	campaigns_barcode_pattern_valid: {
 		field: 'barcodePattern',
-		message: 'Barcode pattern must be a valid regular expression with a capture group.'
+		message:
+			'El patrón del código de barras debe ser una expresión regular válida con un grupo de captura.'
 	}
 };
 
@@ -151,7 +164,7 @@ const COLUMN_FIELDS: Record<string, CampaignFormField> = {
 };
 
 function statusLabel(status: string): string {
-	return statusWord(status);
+	return (CAMPAIGN_STATUS_LABELS[status as CampaignStatus] ?? status).toLowerCase();
 }
 
 /** Maps a PostgREST/Postgres error from a `campaign_*` function to a `CampaignServiceError`. */
@@ -177,28 +190,28 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			if (split) {
 				return err(
 					'validation',
-					`The simple bond value cannot be split into ${split[1]} equal installments. ` +
-						'Choose a value and a number of installments that divide exactly (to the cent).',
+					`El valor del bono simple no se puede dividir en ${split[1]} cuotas iguales. ` +
+						'Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).',
 					'installmentCount'
 				);
 			}
 			if (message.startsWith('simple bond value')) {
-				return err('validation', `${capitalize(message)}.`, 'simpleBondValue');
+				return err('validation', 'El valor del bono simple no es válido.', 'simpleBondValue');
 			}
 			if (message.startsWith('barcode pattern')) {
-				return err('validation', `${capitalize(message)}.`, 'barcodePattern');
+				return err('validation', 'El patrón del código de barras no es válido.', 'barcodePattern');
 			}
 			if (message.startsWith('installment count')) {
-				return err('validation', `${capitalize(message)}.`, 'installmentCount');
+				return err('validation', 'La cantidad de cuotas no es válida.', 'installmentCount');
 			}
 			if (message === 'campaign name is required') {
-				return err('validation', 'Name is required.', 'name');
+				return err('validation', 'El nombre es obligatorio.', 'name');
 			}
 			if (message === 'a reason is required to annul a campaign') {
 				return err('validation', CAMPAIGN_MESSAGES.reasonRequired, 'reason');
 			}
 			if (message.startsWith('invalid target status')) {
-				return err('validation', 'Unknown status change.', 'toStatus');
+				return err('validation', 'Cambio de estado desconocido.', 'toStatus');
 			}
 			return err('validation', CAMPAIGN_MESSAGES.invalid);
 		}
@@ -224,9 +237,9 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 				return err(
 					'conflict',
 					from === to
-						? `The campaign is already ${statusLabel(to)}.`
-						: `This campaign is ${statusLabel(from)} and cannot be moved to ${statusLabel(to)}. ` +
-								'Reload the page to see its current status.'
+						? `La campaña ya está ${statusLabel(to)}.`
+						: `Esta campaña está ${statusLabel(from)} y no se puede pasar a ${statusLabel(to)}. ` +
+								'Recargar la página para ver su estado actual.'
 				);
 			}
 			return err('internal', CAMPAIGN_MESSAGES.internal);
@@ -239,8 +252,8 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			if (belowRule) {
 				return err(
 					'validation',
-					`A commission rule applies to installment ${belowRule[1]}. Use at least ${belowRule[1]} ` +
-						'installments, or edit or annul that commission rule first.',
+					`Una regla de comisión se aplica a la cuota ${belowRule[1]}. Usar al menos ${belowRule[1]} ` +
+						'cuotas, o editar o anular antes esa regla de comisión.',
 					'installmentCount'
 				);
 			}
@@ -258,17 +271,17 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 			if (message.includes('name cannot be changed')) {
 				return err('conflict', CAMPAIGN_MESSAGES.nameFrozen);
 			}
-			return err('conflict', 'This change is not allowed in the current campaign status.');
+			return err('conflict', 'Este cambio no está permitido en el estado actual de la campaña.');
 		}
 
 		case '23502': {
 			const column = /null value in column "([^"]+)"/.exec(message)?.[1];
 			const field = column ? COLUMN_FIELDS[column] : undefined;
-			return err('validation', 'A required value is missing.', field);
+			return err('validation', 'Falta un valor obligatorio.', field);
 		}
 
 		case '22003':
-			return err('validation', 'A value is too large.');
+			return err('validation', 'Un valor es demasiado grande.');
 
 		case '22P02':
 		case '22007':
@@ -278,10 +291,6 @@ export function mapCampaignRpcError(rpcError: PostgrestLikeError): CampaignServi
 		default:
 			return err('internal', CAMPAIGN_MESSAGES.internal);
 	}
-}
-
-function capitalize(text: string): string {
-	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export interface CampaignRequestContext {

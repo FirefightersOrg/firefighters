@@ -19,13 +19,39 @@ const data = (status: string, type = 'monthly') => ({
 	reasonMax: 1000,
 	can: {
 		edit: status === 'scheduled',
-		annul: status === 'scheduled',
+		annul:
+			status === 'scheduled' ||
+			(status === 'roster_generated' && type === 'extraordinary_full_payment'),
 		generate: status === 'scheduled',
 		regenerate: status === 'roster_generated',
-		freeze: status === 'roster_generated'
+		freeze: status === 'roster_generated',
+		complete: status === 'roster_frozen'
 	}
 });
 describe('draw detail render', () => {
+	it.each(['scheduled', 'roster_frozen'])(
+		'hides lifecycle controls without permission on %s',
+		(status) => {
+			const value = data(status);
+			value.can.annul = false;
+			value.can.complete = false;
+			const body = render(Page, { props: { data: value, form: null } as any }).body;
+			expect(body).not.toContain('action="?/annul"');
+			expect(body).not.toContain('action="?/complete"');
+			if (status === 'scheduled') expect(body).toContain('Edit scheduled draw');
+		}
+	);
+	it('offers generated extraordinary annulment but not ordinary or frozen annulment', () => {
+		for (const [status, type, allowed] of [
+			['roster_generated', 'extraordinary_full_payment', true],
+			['roster_generated', 'monthly', false],
+			['roster_frozen', 'extraordinary_full_payment', false]
+		] as const) {
+			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
+			expect(body.includes('Annul draw')).toBe(allowed);
+			expect(body.includes('releases its reserved extra numbers')).toBe(allowed);
+		}
+	});
 	it('renders scheduled actions', () => {
 		const body = render(Page, { props: { data: data('scheduled'), form: null } as any }).body;
 		expect(body).toContain('Edit scheduled draw');
@@ -46,6 +72,17 @@ describe('draw detail render', () => {
 		expect(
 			render(Page, { props: { data: data('scheduled', 'consolation'), form: null } as any }).body
 		).toContain('unavailable until draw results exist');
+	});
+	it('offers completion only on a frozen draw (SAN-123)', () => {
+		const frozen = render(Page, { props: { data: data('roster_frozen'), form: null } as any }).body;
+		expect(frozen).toContain('action="?/complete"');
+		expect(frozen).toContain('Every prize must be resolved');
+		expect(
+			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
+		).not.toContain('action="?/complete"');
+		expect(
+			render(Page, { props: { data: data('completed'), form: null } as any }).body
+		).not.toContain('action="?/complete"');
 	});
 	it('hides actions in a terminal state', () =>
 		expect(render(Page, { props: { data: data('closed'), form: null } as any }).body).not.toContain(

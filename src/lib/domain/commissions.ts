@@ -3,6 +3,7 @@
  * (migration `20261118000000_commission_rules.sql`, docs/commissions.md).
  */
 import type { CampaignStatus } from './campaigns';
+import { formatDate, formatMoney as formatMoneyEs } from '../format';
 import { formatMoney } from './money';
 import { formatPercent } from './percent';
 
@@ -206,4 +207,51 @@ export function calculateApplicationCommission(
 			? (application.amountApplied * Number(rule.percentage)) / 100
 			: (application.amountApplied * Number(rule.fixedAmount)) / application.installmentAmount;
 	return Math.round((raw + Number.EPSILON) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Spanish display (docs/copy.md) for the migrated screens. The English helpers above stay until
+// the remaining screens (collector detail) move to Cimiento, then they are replaced by these.
+// ---------------------------------------------------------------------------
+
+export const COMMISSION_RULE_TYPE_LABELS_ES: Record<CommissionRuleType, string> = {
+	cash_full_payment: 'Pago al contado',
+	installment_first: 'Primera cuota',
+	installment_middle: 'Cuotas intermedias',
+	installment_last: 'Última cuota',
+	custom: 'Cuota específica'
+};
+
+export const COMMISSION_RULE_TYPE_HINTS_ES: Record<CommissionRuleType, string> = {
+	cash_full_payment: 'El bono se paga completo en un solo pago.',
+	installment_first: 'Pago de la primera cuota.',
+	installment_middle: 'Pagos de todas las cuotas entre la primera y la última.',
+	installment_last: 'Pago de la última cuota.',
+	custom: 'Pago de un número de cuota específico.'
+};
+
+/** `"12,5 %"` or `"$ 1.500"`; an em dash when the rule has neither. */
+export function describeCommissionValue(
+	rule: Pick<CommissionRule, 'percentage' | 'fixedAmount'>
+): string {
+	if (rule.percentage !== null) return formatPercent(rule.percentage);
+	if (rule.fixedAmount !== null) return formatMoneyEs(rule.fixedAmount);
+	return '—';
+}
+
+/** Type label, with the installment for `custom` rules (`"Cuota específica: #4"`). */
+export function describeCommissionRuleType(
+	rule: Pick<CommissionRule, 'ruleType' | 'installmentNumber'>
+): string {
+	const label = COMMISSION_RULE_TYPE_LABELS_ES[rule.ruleType];
+	return rule.ruleType === 'custom' && rule.installmentNumber !== null
+		? `${label}: #${rule.installmentNumber}`
+		: label;
+}
+
+/** `"01/03/2026 – 31/03/2026"` or `"Desde el 01/03/2026"` (open-ended). */
+export function describeValidity(rule: Pick<CommissionRule, 'validFrom' | 'validTo'>): string {
+	const from = formatDate(rule.validFrom, { fallback: rule.validFrom });
+	if (!rule.validTo) return `Desde el ${from}`;
+	return `${from} – ${formatDate(rule.validTo, { fallback: rule.validTo })}`;
 }

@@ -42,6 +42,9 @@ const event = (permissions: string[] | null = ['campaign.view', 'draw.view']) =>
 		url: new URL('http://localhost/certificate')
 	}) as never;
 
+/** ICU emits a regular, no-break or narrow no-break space (U+202F) before `p. m.` depending on version. */
+const plainSpaces = (value: string) => value.replace(/\s/gu, ' ');
+
 describe('delivery prize certificate load', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -64,7 +67,10 @@ describe('delivery prize certificate load', () => {
 	});
 	it('returns a printable document for a scoped delivered prize', async () => {
 		const result = (await load(event()))!;
-		expect(result.document).toMatchObject({
+		expect({
+			...result.document,
+			deliveryDate: plainSpaces(result.document.deliveryDate)
+		}).toMatchObject({
 			prize: '#1 — Bike',
 			winningNumber: '0007',
 			deliveryDate: '31/12/26, 11:30 p. m.',
@@ -76,6 +82,7 @@ describe('delivery prize certificate load', () => {
 			{ campaignId: 'other' },
 			{ drawId: 'other' },
 			{ prizeStatus: 'unawarded' },
+			{ prizeStatus: 'pending_delivery', awardStatus: 'awarded', deliveredAt: null },
 			{ awardStatus: 'annulled' }
 		]) {
 			vi.mocked(getPrizeCertificateData).mockResolvedValue({

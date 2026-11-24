@@ -72,8 +72,9 @@ Must include:
   closing totals. Payments annulled after closing can therefore make the printed
   row sum differ from the snapshot, especially on annulled/corrected notes.
   These are not historical reconciliation reports.
-- The resulting collector balance for non-open notes is currently `0.00`, not a
-  reconstructed historical balance: no historical balance snapshot is stored.
+- New settlement closes store the resulting collector balance atomically and non-open notes
+  show that immutable closing snapshot, never the later live ledger balance. Historical
+  settlements without a snapshot show `—` and identify that the balance was not recorded.
 - The payment query is not paginated and inherits PostgREST's default 1000-row
   cap. Notes above that size may omit rows even though snapshot totals are intact.
 
@@ -97,6 +98,12 @@ Must include:
 - Registration date.
 - User who registered.
 - Internal receipt number.
+
+Confirmed replacement certificates are printable and identify the original payment. Adjusted
+original certificates remain printable as historical documents and identify their replacement.
+Annulled certificates remain printable with a prominent invalid legend containing the Buenos
+Aires annulment date/time, actor and reason. Corrected certificates show the correction actor,
+date, reason and related payment reference.
 
 ## Prize delivery certificate
 

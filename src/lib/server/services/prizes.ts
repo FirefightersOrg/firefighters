@@ -40,7 +40,7 @@ export function mapPrizeRpcError(error: { code?: string; message?: string }) {
 						'this prize already has a loaded winning number':
 							'This prize already has a loaded winning number.',
 						'a delivered prize cannot be annulled; pending product decision':
-							'A delivered prize cannot be annulled; pending product decision.',
+							'A delivered prize cannot be annulled. Reverse the delivery first.',
 						'completed draws cannot configure prizes': 'Completed draws cannot configure prizes.',
 						'previous draws of the campaign have unresolved prizes that exclude from consolation':
 							'Previous draws of the campaign have unresolved prizes that exclude from consolation.'
@@ -99,6 +99,8 @@ export const annulPrizeSchema = z.object({
 	prizeId: z.guid(),
 	reason: text(PRIZE_REASON_MAX)
 });
+export const reversePrizeDeliverySchema = annulPrizeSchema;
+export type ReversePrizeDeliveryInput = z.input<typeof reversePrizeDeliverySchema>;
 export type CreatePrizeInput = z.input<typeof createPrizeSchema>;
 export type UpdatePrizeInput = z.input<typeof updatePrizeSchema>;
 export type LoadWinningNumberInput = z.input<typeof loadWinningNumberSchema>;
@@ -209,4 +211,19 @@ export function annulPrize(
 		p_prize_id: p.prizeId,
 		p_reason: p.reason
 	})).then(() => undefined);
+}
+export function reversePrizeDelivery(
+	client: SupabaseClient,
+	input: ReversePrizeDeliveryInput,
+	ctx: PrizeRequestContext
+) {
+	return write(
+		client,
+		input,
+		ctx,
+		'prize.reverse_delivery',
+		reversePrizeDeliverySchema,
+		'prize_reverse_delivery',
+		(p) => ({ p_prize_id: p.prizeId, p_reason: p.reason })
+	).then(() => undefined);
 }

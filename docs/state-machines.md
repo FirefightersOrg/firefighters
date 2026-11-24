@@ -275,6 +275,7 @@ roster_generated -> roster_frozen
 roster_frozen -> completed
 completed -> closed
 scheduled -> annulled
+roster_generated -> annulled (extraordinary_full_payment only, before freeze; SAN-117)
 ```
 
 Rules:
@@ -303,6 +304,7 @@ pending_validation -> unawarded
 pending_validation -> annulled
 awarded -> pending_delivery
 pending_delivery -> delivered
+delivered -> pending_delivery (audited delivery reversal, SAN-125)
 pending_delivery -> annulled
 awarded -> annulled
 unawarded -> annulled
@@ -314,5 +316,12 @@ Rules:
 - Prize delivery must record date, user, and observations.
 - Audited annulment requires `prize.annul` (admin only), a reason, and preserves
   original history. It is allowed only from pending validation, awarded, pending
-  delivery, or unawarded. Delivered prizes cannot be annulled pending a product
-  decision (SAN-81 known gap); annulled prizes cannot be annulled again.
+  delivery, or unawarded. Delivered prizes cannot be annulled (decided in SAN-125);
+  annulled prizes cannot be annulled again.
+- Delivery reversal requires `prize.reverse_delivery` (seeded only for admin) and
+  a trimmed 1–1000-code-point reason. It returns the prize to `pending_delivery`
+  and the award from `delivered` to `awarded`, retaining its identity and original
+  resolution notes. Each former delivery is archived in immutable
+  `prize_delivery_reversals` with its original timestamp, actor, notes and full
+  award snapshot, plus reversal timestamp/actor/reason. Redelivery starts a new
+  current delivery without overwriting history; repeated reversal fails with 55000.
