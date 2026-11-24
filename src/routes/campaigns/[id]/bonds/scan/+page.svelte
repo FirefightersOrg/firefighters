@@ -1,9 +1,9 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
@@ -14,7 +14,6 @@
 		primaryButtonClass,
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
-	import ImportItemStatusBadge from '$lib/components/imports/ImportItemStatusBadge.svelte';
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
 	import { BARCODE_MODE_LABELS } from '$lib/domain/campaigns';
 	import { formatImportNumber } from '$lib/domain/import-preview';
@@ -97,7 +96,7 @@
 		<a href={campaignHref} class="text-sm text-blue-700 hover:underline">← {campaign.name}</a>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">Scan bonds</h1>
-			<CampaignStatusBadge status={campaign.status} />
+			<StatusBadge kind="campaign" status={campaign.status} />
 		</div>
 		<p class="text-sm text-slate-500">
 			Barcode mode: {BARCODE_MODE_LABELS[campaign.barcodeMode]}. Scans are checked at once and only
@@ -310,7 +309,7 @@
 								<td class="py-2 pr-3 font-mono tabular-nums">{number(item.baseNumber)}</td>
 								<td class="py-2 pr-3">{item.groupKey ?? '—'}</td>
 								<td class="py-2 pr-3">
-									<ImportItemStatusBadge status={item.status} />
+									<StatusBadge kind="importItem" status={item.status} />
 									{#if item.errorMessage}<span class="ml-2 text-xs text-slate-600"
 											>{item.errorMessage}</span
 										>{/if}

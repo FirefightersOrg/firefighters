@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
+import { statusWord } from '$lib/domain/status-word';
 import type { z } from 'zod';
-import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
+import type { CampaignStatus } from '$lib/domain/campaigns';
 import { requireActiveUser } from '$lib/server/auth/guards';
 import { hasPermissionIn, permissionsUnavailable } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
@@ -95,7 +96,7 @@ export function bondFormFailure(
 
 /** "Bonds can only be loaded or changed while ... This campaign is closed." */
 export function campaignLockedMessage(status: CampaignStatus): string {
-	return `${BOND_MESSAGES.campaignLocked} This campaign is ${CAMPAIGN_STATUS_LABELS[status].toLowerCase()}.`;
+	return `${BOND_MESSAGES.campaignLocked} This campaign is ${statusWord(status)}.`;
 }
 
 /** 400 failure for a schema validation error. */
