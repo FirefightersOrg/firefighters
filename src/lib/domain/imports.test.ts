@@ -484,7 +484,7 @@ describe('rowsFromTable', () => {
 				])
 			)
 		).toThrow(
-			'Missing columns: grupo_pata, numero_base (the header row must be tipo_bono,grupo_pata,numero_base,barcode)'
+			'Faltan las columnas: grupo_pata, numero_base (la fila de encabezado debe ser tipo_bono,grupo_pata,numero_base,barcode)'
 		);
 	});
 
@@ -494,9 +494,9 @@ describe('rowsFromTable', () => {
 			header,
 			...Array.from({ length: IMPORT_MAX_ROWS + 1 }, () => ['simple', '', '', '1'])
 		];
-		expect(() => rowsFromTable(t(many))).toThrow(/at most 5000/);
+		expect(() => rowsFromTable(t(many))).toThrow(/como máximo 5000/);
 		expect(() => rowsFromTable(t([header, ['simple', '', '', 'x'.repeat(501)]]))).toThrow(
-			'Row 2: barcode is longer than 500 characters'
+			'Fila 2: barcode tiene más de 500 caracteres'
 		);
 	});
 });

@@ -1,19 +1,21 @@
 <script lang="ts">
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
-		cardClass,
-		hintClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
-	import { IMPORT_MAX_FILE_BYTES } from '$lib/domain/imports';
+		Alert,
+		Button,
+		Card,
+		EmptyState,
+		Field,
+		PageHeader,
+		StatusBadge,
+		Table,
+		TextInput,
+		type TableColumn
+	} from '$lib/components/ui';
 	import { IMPORT_SOURCE_LABELS } from '$lib/domain/import-preview';
+	import { IMPORT_MAX_FILE_BYTES, IMPORT_MAX_ROWS } from '$lib/domain/imports';
+	import { formatDateTime, formatNumber } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	/**
@@ -28,163 +30,154 @@
 		resolve('/campaigns/[id]/bonds/import/[sessionId]', { id: campaign.id, sessionId });
 	let uploading = $state(false);
 
-	const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 	const fileErrors = $derived(form?.errors?.file);
 	const notesErrors = $derived(form?.errors?.notes);
+
+	type SessionRow = (typeof data.sessions)[number] & Record<string, unknown>;
+	const columns: TableColumn<SessionRow>[] = [
+		{ key: 'file', header: 'Archivo' },
+		{ key: 'type', header: 'Tipo' },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'uploaded', header: 'Subido' },
+		{ key: 'open', header: 'Acción', align: 'right' }
+	];
+	const rows = $derived(data.sessions as SessionRow[]);
 </script>
 
 <svelte:head>
-	<title>Import bonds - {campaign.name} - Firefighters</title>
+	<title>Importar bonos - {campaign.name} - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a href={campaignHref} class="text-sm text-blue-700 hover:underline">← {campaign.name}</a>
-		<div class="mt-2 flex flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">Import bonds from a file</h1>
-			<StatusBadge kind="campaign" status={campaign.status} />
-		</div>
-		<p class="text-sm text-slate-500">
-			Upload a CSV or Excel file, review the rows and confirm. Nothing is created until you confirm.
-			<a
-				href={resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}
-				class="text-blue-700 hover:underline">Use the barcode scanner →</a
-			>
-		</p>
-	</div>
+<PageHeader
+	title="Importar bonos desde un archivo"
+	description="Subir un archivo CSV o de Excel, revisar las filas y confirmar. No se crea nada hasta confirmar."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: campaign.name, href: campaignHref },
+		{ label: 'Bonos', href: resolve('/campaigns/[id]/bonds', { id: campaign.id }) },
+		{ label: 'Importar archivo' }
+	]}
+>
+	{#snippet actions()}
+		<StatusBadge kind="campaign" status={campaign.status} />
+	{/snippet}
+</PageHeader>
+
+<div class="flex flex-col gap-6">
+	<p class="m-0 text-body-sm">
+		<a
+			href={resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}
+			class="text-primary-text underline-offset-2 hover:underline"
+			>Usar el lector de códigos de barras →</a
+		>
+	</p>
 
 	{#if !data.canLoad}
-		<FormAlert kind="warning">
-			<p><strong>Bonds cannot be imported.</strong> {data.lockedMessage}</p>
-		</FormAlert>
+		<Alert tone="warning" title="No se pueden importar bonos">{data.lockedMessage}</Alert>
 	{:else}
-		{#if form?.message && !form.success}
-			<FormAlert message={form.message} />
+		{#if form?.message && !form.success && !fileErrors?.length && !notesErrors?.length}
+			<Alert tone="danger">{form.message}</Alert>
 		{/if}
 
-		<section class="{cardClass} space-y-4" aria-labelledby="upload-title">
-			<h2 id="upload-title" class="text-base font-semibold">Upload a file</h2>
-			<div class="text-sm text-slate-600">
-				<p>
-					The first row must hold the column names
-					<code class="rounded bg-slate-100 px-1">tipo_bono,grupo_pata,numero_base,barcode</code>.
-					Rows sharing a <code class="rounded bg-slate-100 px-1">grupo_pata</code> form one pata (every
-					pata row needs its barcode).
-				</p>
-				<pre
-					class="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs">tipo_bono,grupo_pata,numero_base,barcode
+		<Card title="Subir un archivo" id="upload">
+			<div class="flex flex-col gap-5">
+				<div class="text-body-sm text-muted">
+					<p class="m-0">
+						La primera fila debe tener los nombres de las columnas
+						<code class="rounded-sm bg-surface-sunken px-1 font-mono"
+							>tipo_bono,grupo_pata,numero_base,barcode</code
+						>. Las filas que comparten un
+						<code class="rounded-sm bg-surface-sunken px-1 font-mono">grupo_pata</code> forman una pata
+						(cada fila de una pata necesita su código de barras).
+					</p>
+					<pre
+						class="m-0 mt-2 overflow-x-auto rounded-lg bg-surface-sunken p-3 font-mono text-caption">tipo_bono,grupo_pata,numero_base,barcode
 simple,,1658,1658
 pata,PATA1200,1200,PATA1200-1200
 pata,PATA1200,1315,PATA1200-1315</pre>
-			</div>
-			{#if campaign.status === 'draft'}
-				<FormAlert kind="warning">
-					<p>
-						This campaign is a draft. <strong>Confirming the first import freezes its rules</strong>
-						(price, installments, numbering, overflow policy and barcode mode).
-					</p>
-				</FormAlert>
-			{/if}
+				</div>
+				{#if campaign.status === 'draft'}
+					<Alert tone="warning">
+						Esta campaña es un borrador. <strong
+							>Confirmar la primera importación congela sus reglas</strong
+						>
+						(precio, cuotas, numeración, política de desborde y modo de código de barras).
+					</Alert>
+				{/if}
 
-			<form
-				method="POST"
-				action="?/upload"
-				enctype="multipart/form-data"
-				class="space-y-4"
-				use:enhance={() => {
-					uploading = true;
-					return async ({ update }) => {
-						await update();
-						uploading = false;
-					};
-				}}
-			>
-				<div>
-					<label for="file" class={labelClass}>File (.csv or .xlsx)</label>
-					<input
+				<form
+					method="POST"
+					action="?/upload"
+					enctype="multipart/form-data"
+					class="flex flex-col gap-5"
+					use:enhance={() => {
+						uploading = true;
+						return async ({ update }) => {
+							await update();
+							uploading = false;
+						};
+					}}
+				>
+					<Field
+						label="Archivo (.csv o .xlsx)"
 						id="file"
-						name="file"
-						type="file"
-						accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 						required
-						aria-invalid={fileErrors?.length ? 'true' : undefined}
-						aria-describedby={fileErrors?.length ? 'file-hint file-error' : 'file-hint'}
-						class="{inputClass} file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1"
-					/>
-					<p id="file-hint" class={hintClass}>
-						Up to {Math.round(IMPORT_MAX_FILE_BYTES / 1024 / 1024)} MB and 5,000 rows. Excel: the first
-						sheet is read.
-					</p>
-					<FieldError id="file-error" errors={fileErrors} />
-				</div>
-				<div>
-					<label for="notes" class={labelClass}>Notes (optional)</label>
-					<input
-						id="notes"
-						name="notes"
-						type="text"
-						maxlength="2000"
-						value={form?.values?.notes ?? ''}
-						aria-invalid={notesErrors?.length ? 'true' : undefined}
-						class={inputClass}
-						placeholder="For example: March printing batch"
-					/>
-					<FieldError id="notes-error" errors={notesErrors} />
-				</div>
-				<button type="submit" class={primaryButtonClass} disabled={uploading}>
-					{uploading ? 'Reading the file…' : 'Upload and review'}
-				</button>
-			</form>
-		</section>
+						hint={`Hasta ${Math.round(IMPORT_MAX_FILE_BYTES / 1024 / 1024)} MB y ${formatNumber(IMPORT_MAX_ROWS)} filas. En Excel se lee la primera hoja.`}
+						error={fileErrors?.[0]}
+					>
+						<TextInput
+							name="file"
+							type="file"
+							accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+						/>
+					</Field>
+					<Field label="Notas" id="notes" optional error={notesErrors?.[0]}>
+						<TextInput
+							name="notes"
+							type="text"
+							maxlength={2000}
+							value={form?.values?.notes ?? ''}
+							placeholder="Por ejemplo: lote de impresión de marzo"
+						/>
+					</Field>
+					<div>
+						<Button type="submit" variant="primary" loading={uploading}>
+							{uploading ? 'Leyendo el archivo…' : 'Subir y revisar'}
+						</Button>
+					</div>
+				</form>
+			</div>
+		</Card>
 	{/if}
 
-	<section class="{cardClass} space-y-3" aria-labelledby="history-title">
-		<h2 id="history-title" class="text-base font-semibold">File imports</h2>
+	<section aria-labelledby="history-title" class="flex flex-col gap-3">
+		<h2 id="history-title" class="m-0 text-heading-3">Importaciones de archivos</h2>
 		{#if data.sessions.length === 0}
-			<p class="text-sm text-slate-500">No file has been imported in this campaign yet.</p>
+			<EmptyState title="Todavía no hay importaciones">
+				Subir un archivo CSV o XLSX para cargar bonos en lote.
+			</EmptyState>
 		{:else}
-			<div class="overflow-x-auto">
-				<table class="min-w-full text-sm">
-					<thead class="text-left text-xs text-slate-500 uppercase">
-						<tr>
-							<th class="py-2 pr-4 font-medium">File</th>
-							<th class="py-2 pr-4 font-medium">Type</th>
-							<th class="py-2 pr-4 font-medium">Status</th>
-							<th class="py-2 pr-4 font-medium">Uploaded</th>
-							<th class="py-2 font-medium"><span class="sr-only">Open</span></th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100">
-						{#each data.sessions as session (session.id)}
-							<tr>
-								<td class="py-2 pr-4">
-									<span class="font-medium">{session.fileName}</span>
-									{#if session.notes}<span class="block text-xs text-slate-500"
-											>{session.notes}</span
-										>{/if}
-								</td>
-								<td class="py-2 pr-4 text-slate-600">{IMPORT_SOURCE_LABELS[session.sourceType]}</td>
-								<td class="py-2 pr-4">
-									<StatusBadge
-										kind="importSession"
-										status={session.rolledBackAt !== null ? 'rolled_back' : session.status}
-									/>
-								</td>
-								<td class="py-2 pr-4 text-slate-600 tabular-nums"
-									>{dateTime.format(new Date(session.createdAt))}</td
-								>
-								<td class="py-2 text-right">
-									<a href={sessionHref(session.id)} class={secondaryButtonClass}>
-										{session.status === 'draft' || session.status === 'validated'
-											? 'Review'
-											: 'View'}
-									</a>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+			<Table {columns} {rows} caption="Importaciones de archivos">
+				{#snippet cell({ row, column })}
+					{#if column.key === 'file'}
+						<span class="font-medium">{row.fileName}</span>
+						{#if row.notes}<span class="block text-caption text-muted">{row.notes}</span>{/if}
+					{:else if column.key === 'type'}
+						{IMPORT_SOURCE_LABELS[row.sourceType]}
+					{:else if column.key === 'status'}
+						<StatusBadge
+							kind="importSession"
+							status={row.rolledBackAt !== null ? 'rolled_back' : row.status}
+						/>
+					{:else if column.key === 'uploaded'}
+						<span class="tabular-nums">{formatDateTime(row.createdAt)}</span>
+					{:else if column.key === 'open'}
+						<Button href={sessionHref(row.id)} size="sm">
+							{row.status === 'draft' || row.status === 'validated' ? 'Revisar' : 'Ver'}
+						</Button>
+					{/if}
+				{/snippet}
+			</Table>
 		{/if}
 	</section>
 </div>

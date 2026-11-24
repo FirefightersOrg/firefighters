@@ -295,10 +295,10 @@ export function exportFileName(kind: BackupExportKind, campaignId: string, today
 
 /** Procedure before risky operations (docs/backup-operations.md). */
 export const RISKY_OPERATION_STEPS = [
-	'Export critical data (backup exports).',
-	'Record the reason for the operation.',
-	'Execute in a test environment if possible.',
-	'Execute in production.',
-	'Validate the main reports.',
-	'Record the result.'
+	'Exportar los datos críticos (exportaciones de respaldo).',
+	'Registrar el motivo de la operación.',
+	'Ejecutarla en un entorno de prueba, si es posible.',
+	'Ejecutarla en producción.',
+	'Validar los reportes principales.',
+	'Registrar el resultado.'
 ] as const;

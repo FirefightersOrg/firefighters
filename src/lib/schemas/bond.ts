@@ -86,28 +86,28 @@ export function bondFieldErrors(error: z.ZodError): BondFieldErrors {
 	return z.flattenError(error).fieldErrors as BondFieldErrors;
 }
 
-const campaignIdField = z.guid({ message: 'Unknown campaign' });
-const bondIdField = z.guid({ message: 'Unknown bond' });
+const campaignIdField = z.guid({ message: 'Campaña desconocida' });
+const bondIdField = z.guid({ message: 'Bono desconocido' });
 
 const codeField = (label: string) =>
 	z
 		.string()
 		.trim()
-		.max(BOND_CODE_MAX_LENGTH, `${label} must be at most ${BOND_CODE_MAX_LENGTH} characters`)
+		.max(BOND_CODE_MAX_LENGTH, `${label} admite hasta ${BOND_CODE_MAX_LENGTH} caracteres`)
 		.transform((value) => (value === '' ? null : value));
 
 const optionalReasonField = z
 	.string()
 	.trim()
-	.max(BOND_REASON_MAX_LENGTH, `Reason must be at most ${BOND_REASON_MAX_LENGTH} characters`)
+	.max(BOND_REASON_MAX_LENGTH, `El motivo admite hasta ${BOND_REASON_MAX_LENGTH} caracteres`)
 	.transform((value) => (value === '' ? null : value));
 
 const requiredReasonField = (action: string) =>
 	z
 		.string()
 		.trim()
-		.min(1, `A reason is required to ${action}`)
-		.max(BOND_REASON_MAX_LENGTH, `Reason must be at most ${BOND_REASON_MAX_LENGTH} characters`);
+		.min(1, `Se requiere un motivo para ${action}`)
+		.max(BOND_REASON_MAX_LENGTH, `El motivo admite hasta ${BOND_REASON_MAX_LENGTH} caracteres`);
 
 /** Several form values, or one text with values separated by commas, semicolons or whitespace. */
 const listField = z.union([z.string(), z.array(z.string())]).transform((value) =>
@@ -149,8 +149,8 @@ function parseBaseNumbers(
 				path: [field],
 				message:
 					err.code === 'out_of_range'
-						? `Number ${input.trim()} exceeds the campaign maximum number ${String(config.maxNumber).padStart(config.numberDigits, '0')}`
-						: `"${input.trim()}" is not a valid number (use up to ${config.numberDigits} digits)`
+						? `El número ${input.trim()} supera el número máximo de la campaña ${String(config.maxNumber).padStart(config.numberDigits, '0')}`
+						: `«${input.trim()}» no es un número válido (usar hasta ${config.numberDigits} dígitos)`
 			});
 		}
 	}
@@ -170,9 +170,9 @@ export function bondCreateSimpleSchema(config: CampaignNumberingConfig) {
 	return z
 		.object({
 			campaignId: campaignIdField,
-			baseNumber: z.string().trim().min(1, 'Base number is required'),
-			internalCode: codeField('Internal code'),
-			barcode: codeField('Barcode'),
+			baseNumber: z.string().trim().min(1, 'El número base es obligatorio'),
+			internalCode: codeField('El código interno'),
+			barcode: codeField('El código de barras'),
 			reason: optionalReasonField
 		})
 		.transform(({ baseNumber, ...rest }, ctx): BondCreateInput => {
@@ -187,8 +187,8 @@ export function bondCreatePataSchema(config: CampaignNumberingConfig) {
 		.object({
 			campaignId: campaignIdField,
 			baseNumbers: listField,
-			internalCode: codeField('Internal code'),
-			barcode: codeField('Barcode'),
+			internalCode: codeField('El código interno'),
+			barcode: codeField('El código de barras'),
 			reason: optionalReasonField
 		})
 		.transform((value, ctx): BondCreateInput => {
@@ -196,7 +196,7 @@ export function bondCreatePataSchema(config: CampaignNumberingConfig) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['baseNumbers'],
-					message: `A pata needs at least ${MIN_PATA_SIZE} base numbers`
+					message: `Una pata necesita al menos ${MIN_PATA_SIZE} números base`
 				});
 				return { ...value, baseNumbers: [] };
 			}
@@ -211,13 +211,13 @@ export const bondGroupSchema = z.object({
 	memberBondIds: listField.pipe(
 		z
 			.array(bondIdField)
-			.min(MIN_PATA_SIZE, `A pata needs at least ${MIN_PATA_SIZE} simple bonds`)
+			.min(MIN_PATA_SIZE, `Una pata necesita al menos ${MIN_PATA_SIZE} bonos simples`)
 			.refine((ids) => new Set(ids.map((id) => id.toLowerCase())).size === ids.length, {
-				message: 'A bond is listed more than once'
+				message: 'Un bono figura más de una vez'
 			})
 	),
-	internalCode: codeField('Internal code'),
-	barcode: codeField('Barcode'),
+	internalCode: codeField('El código interno'),
+	barcode: codeField('El código de barras'),
 	reason: optionalReasonField
 });
 
@@ -226,7 +226,7 @@ export type BondGroupInput = z.output<typeof bondGroupSchema>;
 /** Ungroup an available manual pata: the pata id and a mandatory reason. */
 export const bondUngroupSchema = z.object({
 	pataBondId: bondIdField,
-	reason: requiredReasonField('ungroup a pata')
+	reason: requiredReasonField('desagrupar una pata')
 });
 
 export type BondUngroupInput = z.output<typeof bondUngroupSchema>;
@@ -234,7 +234,7 @@ export type BondUngroupInput = z.output<typeof bondUngroupSchema>;
 /** Annul an available bond loaded by mistake: the bond id and a mandatory reason. */
 export const bondAnnulSchema = z.object({
 	bondId: bondIdField,
-	reason: requiredReasonField('annul a bond')
+	reason: requiredReasonField('anular un bono')
 });
 
 export type BondAnnulInput = z.output<typeof bondAnnulSchema>;

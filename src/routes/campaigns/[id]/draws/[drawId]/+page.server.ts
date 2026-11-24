@@ -37,10 +37,11 @@ async function scopedDraw(
 	form: string
 ) {
 	if (!uuid.safeParse(params.id).success || !uuid.safeParse(params.drawId).success)
-		return { failure: fail(404, { form, errors: {}, message: 'Draw not found.' }) };
+		return { failure: fail(404, { form, errors: {}, message: 'Sorteo no encontrado.' }) };
 	const result = await getDraw(locals.supabase, params.id, params.drawId);
 	if (result.error) return { failure: serviceFailure(result.error, form) };
-	if (!result.data) return { failure: fail(404, { form, errors: {}, message: 'Draw not found.' }) };
+	if (!result.data)
+		return { failure: fail(404, { form, errors: {}, message: 'Sorteo no encontrado.' }) };
 	return { draw: result.data };
 }
 function guard(
@@ -49,30 +50,30 @@ function guard(
 	form: string
 ) {
 	if (permissionsUnavailable(locals.permissions))
-		return fail(500, { form, errors: {}, message: 'Could not load permissions.' });
+		return fail(500, { form, errors: {}, message: 'No se pudieron cargar los permisos.' });
 	if (!hasPermissionIn(locals.permissions, permission))
 		return fail(403, {
 			form,
 			errors: {},
-			message: 'You do not have permission to perform this action.'
+			message: 'No hay permiso para esta acción.'
 		});
 	return null;
 }
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!canRead(locals.permissions)) requirePermissionIn(locals.permissions, 'draw.view');
-	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Draw not found.' });
+	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Sorteo no encontrado.' });
 	const [campaign, draw] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getDraw(locals.supabase, params.id, params.drawId)
 	]);
-	if (campaign.error || draw.error) error(500, { message: 'Could not load draw.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!draw.data) error(404, { message: 'Draw not found.' });
+	if (campaign.error || draw.error) error(500, { message: 'No se pudo cargar el sorteo.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!draw.data) error(404, { message: 'Sorteo no encontrado.' });
 	const roster = await getCurrentDrawRoster(locals.supabase, draw.data.id);
-	if (roster.error) error(500, { message: 'Could not load draw roster.' });
+	if (roster.error) error(500, { message: 'No se pudo cargar el padrón del sorteo.' });
 	const scheduled = draw.data.status === 'scheduled';
 	const generated = draw.data.status === 'roster_generated';
 	return {
@@ -103,7 +104,7 @@ export const actions: Actions = {
 		const campaign = await getCampaignById(locals.supabase, params.id);
 		if (campaign.error) return serviceFailure(campaign.error, 'update');
 		if (!campaign.data)
-			return fail(404, { form: 'update', errors: {}, message: 'Campaign not found.' });
+			return fail(404, { form: 'update', errors: {}, message: 'Campaña no encontrada.' });
 		const values = readDrawFields(await request.formData());
 		const parsed = validateDrawFields(values, scoped.draw.drawType, campaign.data.installmentCount);
 		if ('failure' in parsed) return parsed.failure;
@@ -116,7 +117,7 @@ export const actions: Actions = {
 					permissions: locals.permissions ?? null
 				}
 			);
-			return { form: 'update', success: true, errors: {}, message: 'Draw updated.' };
+			return { form: 'update', success: true, errors: {}, message: 'Sorteo actualizado.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'update', values);
 		}
@@ -133,7 +134,7 @@ export const actions: Actions = {
 				form: 'annul',
 				values: { reason },
 				errors: { reason: [`Use between 1 and ${DRAW_REASON_MAX} characters.`] },
-				message: 'Please correct the highlighted fields.'
+				message: 'Revisar los campos marcados.'
 			});
 		try {
 			await annulDraw(
@@ -144,7 +145,7 @@ export const actions: Actions = {
 					permissions: locals.permissions ?? null
 				}
 			);
-			return { form: 'annul', success: true, errors: {}, message: 'Draw annulled.' };
+			return { form: 'annul', success: true, errors: {}, message: 'Sorteo anulado.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'annul', { reason });
 		}
@@ -164,7 +165,7 @@ export const actions: Actions = {
 					permissions: locals.permissions ?? null
 				}
 			);
-			return { form: 'complete', success: true, errors: {}, message: 'Draw completed.' };
+			return { form: 'complete', success: true, errors: {}, message: 'Sorteo completado.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'complete');
 		}
@@ -184,7 +185,7 @@ export const actions: Actions = {
 					permissions: locals.permissions ?? null
 				}
 			);
-			return { form: 'generate', success: true, errors: {}, message: 'Roster generated.' };
+			return { form: 'generate', success: true, errors: {}, message: 'Padrón generado.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'generate');
 		}
@@ -198,8 +199,8 @@ export const actions: Actions = {
 		if (field(await request.formData(), 'confirm') !== 'yes')
 			return fail(400, {
 				form: 'freeze',
-				errors: { confirm: ['Confirm that this historical roster must be frozen.'] },
-				message: 'Confirmation is required.'
+				errors: { confirm: ['Confirmar que este padrón debe quedar congelado.'] },
+				message: 'Hace falta confirmar.'
 			});
 		try {
 			await freezeDrawRoster(
@@ -210,7 +211,7 @@ export const actions: Actions = {
 					permissions: locals.permissions ?? null
 				}
 			);
-			return { form: 'freeze', success: true, errors: {}, message: 'Roster frozen.' };
+			return { form: 'freeze', success: true, errors: {}, message: 'Padrón congelado.' };
 		} catch (cause) {
 			return serviceFailure(cause, 'freeze');
 		}

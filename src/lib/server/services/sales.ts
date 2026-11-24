@@ -30,15 +30,15 @@ interface RpcError {
 export function mapSaleRpcError(error: RpcError): SaleServiceError {
 	const message = error.message ?? '';
 	if (error.code === '42501')
-		return new SaleServiceError('permission', 'You do not have permission to perform this action.');
+		return new SaleServiceError('permission', 'No hay permiso para esta acción.');
 	if (error.code === 'P0002')
 		return new SaleServiceError(
 			'not_found',
 			/^buyer/.test(message)
-				? 'Buyer not found.'
+				? 'Comprador no encontrado.'
 				: /^bond/.test(message)
-					? 'Bond not found.'
-					: 'Campaign not found.',
+					? 'Bono no encontrado.'
+					: 'Campaña no encontrada.',
 			{
 				field: /^buyer/.test(message) ? 'buyerId' : /^bond/.test(message) ? 'bondId' : 'campaignId'
 			}
@@ -63,7 +63,7 @@ export function mapSaleRpcError(error: RpcError): SaleServiceError {
 				field: /campaign/.test(message) ? 'campaignId' : 'bondId'
 			}
 		);
-	return new SaleServiceError('internal', 'Something went wrong. Please try again.', {
+	return new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.', {
 		cause: error
 	});
 }
@@ -74,13 +74,15 @@ export async function registerSale(
 ): Promise<string> {
 	const parsed = saleRegisterSchema.safeParse(input);
 	if (!parsed.success) {
-		throw new SaleServiceError('validation', 'Invalid sale data.', { cause: parsed.error });
+		throw new SaleServiceError('validation', 'Datos de la venta inválidos.', {
+			cause: parsed.error
+		});
 	}
 	if (ctx.permissions === null) {
-		throw new SaleServiceError('internal', 'Something went wrong. Please try again.');
+		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.');
 	}
 	if (ctx.permissions != null && !hasPermissionIn(ctx.permissions, 'sale.create')) {
-		throw new SaleServiceError('permission', 'You do not have permission to perform this action.');
+		throw new SaleServiceError('permission', 'No hay permiso para esta acción.');
 	}
 	let result: { data: unknown; error: RpcError | null };
 	try {
@@ -93,11 +95,11 @@ export async function registerSale(
 			p_request_id: ctx.requestId ?? null
 		});
 	} catch (cause) {
-		throw new SaleServiceError('internal', 'Something went wrong. Please try again.', { cause });
+		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.', { cause });
 	}
 	if (result.error) throw mapSaleRpcError(result.error);
 	if (typeof result.data !== 'string' || result.data === '') {
-		throw new SaleServiceError('internal', 'Something went wrong. Please try again.');
+		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.');
 	}
 	return result.data;
 }

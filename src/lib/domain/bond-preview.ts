@@ -46,12 +46,12 @@ export function previewBaseNumber(
 			? {
 					state: 'invalid',
 					problem: 'out_of_range',
-					message: `Number ${typed} exceeds the campaign maximum number ${formatCampaignNumber(config.maxNumber, config)}`
+					message: `El número ${typed} supera el número máximo de la campaña ${formatCampaignNumber(config.maxNumber, config)}`
 				}
 			: {
 					state: 'invalid',
 					problem: 'invalid_format',
-					message: `"${typed}" is not a valid number (use up to ${config.numberDigits} digits)`
+					message: `«${typed}» no es un número válido (usar hasta ${config.numberDigits} dígitos)`
 				};
 	}
 

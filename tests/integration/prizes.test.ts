@@ -385,7 +385,7 @@ describe('audited prize services with real users', () => {
 			annulPrize(admin, { prizeId, reason: 'Wrong result' }, deliveredAnnul)
 		).rejects.toMatchObject({
 			status: 409,
-			message: 'A delivered prize cannot be annulled. Reverse the delivery first.'
+			message: 'Un premio entregado no se puede anular. Primero hay que revertir la entrega.'
 		});
 		expect(await row('prizes', prizeId)).toEqual(deliveredBefore);
 		expect(await audits(deliveredAnnul.requestId)).toEqual([]);

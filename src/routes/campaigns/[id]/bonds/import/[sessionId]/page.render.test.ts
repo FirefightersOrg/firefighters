@@ -113,17 +113,26 @@ function renderPage(
 	return render(Page, { props }).body;
 }
 
+/** Opening tag of the submit button whose label contains `label`. */
+const submitTag = (body: string, label: string) =>
+	[...body.matchAll(/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<\/button>/g)]
+		.map((m) => m[0])
+		.find((button) => button.includes('type="submit"') && button.includes(label))
+		?.match(/^<button[^>]*>/)?.[0] ?? '';
+/** The `disabled` attribute itself, not the `disabled:` Tailwind variants in `class`. */
+const isDisabled = (tag: string) => /\sdisabled=""/.test(tag);
+
 describe('/campaigns/[id]/bonds/import/[sessionId] page', () => {
 	it('shows the seven summary metrics', () => {
 		const body = renderPage();
 		for (const label of [
-			'Simple bonds',
+			'Bonos simples',
 			'Patas',
-			'Base numbers',
-			'Participating numbers',
-			'Blocking errors',
-			'Warnings',
-			'Duplicates'
+			'Números base',
+			'Números participantes',
+			'Errores bloqueantes',
+			'Observaciones',
+			'Duplicados'
 		]) {
 			expect(body).toContain(label);
 		}
@@ -136,32 +145,30 @@ describe('/campaigns/[id]/bonds/import/[sessionId] page', () => {
 					baseNumber: 5500,
 					status: 'error',
 					errorCode: 'number_out_of_range',
-					errorMessage: 'Number 5500 does not fit the campaign (maximum 9999).'
+					errorMessage: 'El número 5500 no entra en la campaña (máximo 9999).'
 				})
 			]
 		});
 		expect(body).toContain('5500 / 10371');
-		expect(body).toContain('Number 5500 does not fit the campaign (maximum 9999).');
+		expect(body).toContain('El número 5500 no entra en la campaña (máximo 9999).');
 	});
 
 	it('disables Confirm while there are blocking errors and explains why', () => {
 		const body = renderPage();
-		expect(body).toMatch(
-			/<button type="submit"[^>]*disabled=""[^>]*>\s*Confirm and create 2 bonds/
-		);
-		expect(body).toContain('Confirm is disabled: correct or remove the 1 rows with errors.');
+		expect(isDisabled(submitTag(body, 'Confirmar y crear 2 bonos'))).toBe(true);
+		expect(body).toContain('Confirmar está deshabilitado: corregir o quitar la fila con error.');
 	});
 
 	it('enables Confirm on a clean validated session', () => {
 		const body = renderPage({ summary: { status: 'validated', errors: 0, valid: true } });
-		expect(body).not.toMatch(/<button type="submit"[^>]*disabled=""[^>]*>\s*Confirm and create/);
-		expect(body).toContain('Confirm and create 2 bonds');
+		expect(isDisabled(submitTag(body, 'Confirmar y crear'))).toBe(false);
+		expect(body).toContain('Confirmar y crear 2 bonos');
 	});
 
 	it('offers no edit, remove or confirm once the session is closed', () => {
 		const body = renderPage({ canEdit: false });
-		expect(body).not.toContain('Confirm and create');
-		expect(body).not.toContain('>Remove<');
-		expect(body).not.toMatch(/>\s*Edit\s*</);
+		expect(body).not.toContain('Confirmar y crear');
+		expect(body).not.toContain('Quitar la fila');
+		expect(body).not.toContain('Editar la fila');
 	});
 });

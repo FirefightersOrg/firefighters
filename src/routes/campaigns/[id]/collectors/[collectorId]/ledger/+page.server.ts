@@ -22,7 +22,7 @@ import { LEDGER_REASON_MAX } from '$lib/domain/ledger';
  * `collector.ledger.adjust`. The SQL functions check the same permissions again.
  */
 const isUuid = (value: string) => z.guid().safeParse(value).success;
-const notFound = 'Collector not found.';
+const notFound = 'No se encontró el cobrador.';
 type FormName = 'commission' | 'ledger' | 'annul';
 
 function failure(
@@ -50,9 +50,9 @@ function readAdjustment(data: FormData) {
 	const reason = readText(data, 'reason');
 	const errors: Record<string, string[]> = {};
 	if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0)
-		errors.amount = ['Enter a positive amount with at most 2 decimals.'];
+		errors.amount = ['Ingresar un monto positivo con hasta 2 decimales.'];
 	if (!reason || reason.length > LEDGER_REASON_MAX)
-		errors.reason = [`Enter a reason of at most ${LEDGER_REASON_MAX} characters.`];
+		errors.reason = [`Ingresar un motivo de hasta ${LEDGER_REASON_MAX} caracteres.`];
 	return { amount, reason, errors };
 }
 
@@ -67,7 +67,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		getCollector(locals.supabase, params.collectorId)
 	]);
 	if (campaign.error || collector.error)
-		error(500, { message: 'Could not load the current account. Please try again.' });
+		error(500, { message: 'No se pudo cargar la cuenta corriente. Volver a intentar.' });
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collector.data) error(404, { message: notFound });
 	let entries;
@@ -79,7 +79,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	} catch (err) {
 		if (err instanceof CommissionLedgerServiceError && err.kind === 'permission')
 			error(403, { message: err.message });
-		error(500, { message: 'Could not load the current account. Please try again.' });
+		error(500, { message: 'No se pudo cargar la cuenta corriente. Volver a intentar.' });
 	}
 	return {
 		campaign: campaign.data,
@@ -98,16 +98,15 @@ export const actions: Actions = {
 	adjustCommission: async ({ request, locals, params, url }) => {
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'commission.adjust'))
-			return failure('commission', 403, 'You do not have permission to adjust commissions.');
+			return failure('commission', 403, 'No hay permiso para ajustar comisiones.');
 		if (!isUuid(params.id) || !isUuid(params.collectorId))
 			return failure('commission', 404, notFound);
 		const data = await request.formData();
 		const { amount, reason, errors } = readAdjustment(data);
 		const direction = readText(data, 'direction');
 		if (direction !== 'in_favor_of_collector' && direction !== 'in_favor_of_firefighters')
-			errors.direction = ['Choose who the adjustment favors.'];
-		if (Object.keys(errors).length)
-			return failure('commission', 400, 'Please review the adjustment.', errors);
+			errors.direction = ['Elegir a favor de quién es el ajuste.'];
+		if (Object.keys(errors).length) return failure('commission', 400, 'Revisar el ajuste.', errors);
 		try {
 			await adjustCommission(
 				locals.supabase,
@@ -123,7 +122,7 @@ export const actions: Actions = {
 			return {
 				form: 'commission' as const,
 				success: true,
-				message: 'Commission adjusted.',
+				message: 'Comisión ajustada.',
 				errors: {}
 			};
 		} catch (err) {
@@ -134,15 +133,14 @@ export const actions: Actions = {
 	adjustLedger: async ({ request, locals, params, url }) => {
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'collector.ledger.adjust'))
-			return failure('ledger', 403, 'You do not have permission to adjust the current account.');
+			return failure('ledger', 403, 'No hay permiso para ajustar la cuenta corriente.');
 		if (!isUuid(params.id) || !isUuid(params.collectorId)) return failure('ledger', 404, notFound);
 		const data = await request.formData();
 		const { amount, reason, errors } = readAdjustment(data);
 		const direction = readText(data, 'direction');
 		if (direction !== 'collector_credit' && direction !== 'collector_debit')
-			errors.direction = ['Choose credit or debit.'];
-		if (Object.keys(errors).length)
-			return failure('ledger', 400, 'Please review the adjustment.', errors);
+			errors.direction = ['Elegir crédito o débito.'];
+		if (Object.keys(errors).length) return failure('ledger', 400, 'Revisar el ajuste.', errors);
 		try {
 			await adjustCollectorLedger(
 				locals.supabase,
@@ -158,7 +156,7 @@ export const actions: Actions = {
 			return {
 				form: 'ledger' as const,
 				success: true,
-				message: 'Current account adjusted.',
+				message: 'Cuenta corriente ajustada.',
 				errors: {}
 			};
 		} catch (err) {
@@ -169,14 +167,14 @@ export const actions: Actions = {
 	annul: async ({ request, locals, url }) => {
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'collector.ledger.adjust'))
-			return failure('annul', 403, 'You do not have permission to annul entries.');
+			return failure('annul', 403, 'No hay permiso para anular movimientos.');
 		const data = await request.formData();
 		const entryId = readText(data, 'entryId');
 		const reason = readText(data, 'reason');
-		if (!isUuid(entryId)) return failure('annul', 400, 'Choose an entry to annul.');
+		if (!isUuid(entryId)) return failure('annul', 400, 'Elegir el movimiento a anular.');
 		if (!reason || reason.length > LEDGER_REASON_MAX)
-			return failure('annul', 400, 'Please review the annulment.', {
-				reason: [`Enter a reason of at most ${LEDGER_REASON_MAX} characters.`]
+			return failure('annul', 400, 'Revisar la anulación.', {
+				reason: [`Ingresar un motivo de hasta ${LEDGER_REASON_MAX} caracteres.`]
 			});
 		try {
 			await annulCollectorLedgerEntry(
@@ -184,7 +182,7 @@ export const actions: Actions = {
 				{ entryId, reason },
 				{ requestId: locals.requestId }
 			);
-			return { form: 'annul' as const, success: true, message: 'Entry annulled.', errors: {} };
+			return { form: 'annul' as const, success: true, message: 'Movimiento anulado.', errors: {} };
 		} catch (err) {
 			return serviceFailure('annul', err);
 		}

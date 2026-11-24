@@ -11,8 +11,8 @@ export const PAYMENT_MODES = ['full_payment', 'installments'] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
-	full_payment: 'Full payment',
-	installments: 'Installments'
+	full_payment: 'Pago total',
+	installments: 'En cuotas'
 };
 
 /** `corrected`: replaced by a new active sale (Phase 10). At most one active sale per bond. */

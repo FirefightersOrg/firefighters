@@ -18,20 +18,20 @@
 	function label(numbers: string[]) {
 		if (kind === 'pata') {
 			return numbers.length > 0
-				? `View the pata that bond ${numbers.join(', ')} belongs to →`
-				: 'View the pata →';
+				? `Ver la pata a la que pertenece el bono ${numbers.join(', ')} →`
+				: 'Ver la pata →';
 		}
 		return numbers.length > 0
-			? `View the bond that uses ${numbers.join(', ')} →`
-			: 'View the bond that uses it →';
+			? `Ver el bono que usa ${numbers.join(', ')} →`
+			: 'Ver el bono que lo usa →';
 	}
 </script>
 
 {#each conflicts as conflict (conflict.bondId)}
-	<p class="mt-1 text-xs">
+	<p class="m-0 mt-1 text-caption">
 		<a
 			href={resolve('/campaigns/[id]/bonds/[bondId]', { id: campaignId, bondId: conflict.bondId })}
-			class="font-medium text-blue-700 hover:underline"
+			class="font-medium text-primary-text underline-offset-2 hover:underline"
 		>
 			{label(conflict.numbers)}
 		</a>

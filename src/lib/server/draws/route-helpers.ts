@@ -34,7 +34,7 @@ export const drawFieldsSchema = z
 			ctx.addIssue({
 				code: 'custom',
 				path: ['paymentCutoffLocal'],
-				message: 'Enter a valid cutoff date and time.'
+				message: 'Ingresar una fecha y hora de corte válidas.'
 			});
 			return z.NEVER;
 		}
@@ -51,7 +51,7 @@ export const drawFieldsSchema = z
 			ctx.addIssue({
 				code: 'custom',
 				path: ['requiredInstallmentNumber'],
-				message: 'Choose a valid installment.'
+				message: 'Elegir una cuota válida.'
 			});
 			return z.NEVER;
 		}
@@ -82,7 +82,7 @@ export function validateDrawFields(
 				form: 'draw',
 				values,
 				errors: parsed.error.flatten().fieldErrors,
-				message: 'Please correct the highlighted fields.'
+				message: 'Revisar los campos marcados.'
 			})
 		};
 	if (type === 'monthly' && parsed.data.requiredInstallmentNumber === null)
@@ -90,8 +90,8 @@ export function validateDrawFields(
 			failure: fail(400, {
 				form: 'draw',
 				values,
-				errors: { requiredInstallmentNumber: ['Monthly draws require an installment.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: { requiredInstallmentNumber: ['Los sorteos mensuales requieren una cuota.'] },
+				message: 'Revisar los campos marcados.'
 			})
 		};
 	if (
@@ -102,8 +102,8 @@ export function validateDrawFields(
 			failure: fail(400, {
 				form: 'draw',
 				values,
-				errors: { requiredInstallmentNumber: ['The installment exceeds the campaign plan.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: { requiredInstallmentNumber: ['La cuota supera el plan de la campaña.'] },
+				message: 'Revisar los campos marcados.'
 			})
 		};
 	return {

@@ -24,19 +24,22 @@ export class DrawRosterServiceError extends Error {
 export function mapDrawRosterRpcError(error: { code?: string; message?: string }) {
 	switch (error.code) {
 		case '42501':
-			return new DrawRosterServiceError('permission', 'Draw roster permission is required.');
+			return new DrawRosterServiceError('permission', 'Hace falta el permiso de padrones.');
 		case '55000':
 			return new DrawRosterServiceError(
 				'conflict',
-				error.message || 'Draw state does not allow this action.'
+				error.message || 'El estado del sorteo no permite esta acción.'
 			);
 		case '22023':
 		case '23514':
-			return new DrawRosterServiceError('validation', error.message || 'Invalid draw roster data.');
+			return new DrawRosterServiceError(
+				'validation',
+				error.message || 'Datos del padrón inválidos.'
+			);
 		case 'P0002':
-			return new DrawRosterServiceError('not_found', 'Draw not found.');
+			return new DrawRosterServiceError('not_found', 'Sorteo no encontrado.');
 		default:
-			return new DrawRosterServiceError('internal', 'Could not change draw roster.', {
+			return new DrawRosterServiceError('internal', 'No se pudo modificar el padrón.', {
 				cause: error
 			});
 	}
@@ -49,12 +52,12 @@ async function changeRoster(
 	action: 'generate' | 'freeze'
 ) {
 	if (ctx?.permissions == null)
-		throw new DrawRosterServiceError('internal', 'Could not load draw permissions.');
+		throw new DrawRosterServiceError('internal', 'No se pudieron cargar los permisos de sorteos.');
 	if (!hasPermissionIn(ctx.permissions, `draw.${action}_roster`))
-		throw new DrawRosterServiceError('permission', 'Draw roster permission is required.');
+		throw new DrawRosterServiceError('permission', 'Hace falta el permiso de padrones.');
 	const parsed = drawRosterSchema.safeParse(input);
 	if (!parsed.success)
-		throw new DrawRosterServiceError('validation', 'Invalid draw roster data.', {
+		throw new DrawRosterServiceError('validation', 'Datos del padrón inválidos.', {
 			cause: parsed.error
 		});
 	try {
@@ -66,7 +69,7 @@ async function changeRoster(
 		return data as string;
 	} catch (cause) {
 		if (cause instanceof DrawRosterServiceError) throw cause;
-		throw new DrawRosterServiceError('internal', 'Could not change draw roster.', { cause });
+		throw new DrawRosterServiceError('internal', 'No se pudo modificar el padrón.', { cause });
 	}
 }
 export function generateDrawRoster(

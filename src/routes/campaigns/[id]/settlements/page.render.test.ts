@@ -24,8 +24,8 @@ describe('settlements list render', () => {
 	it('renders rows and filters', () => {
 		const body = render(Page, { props: { data: data(true), params: { id } } as any }).body;
 		expect(body).toContain('Ana');
-		expect(body).toContain('Dec 31, 2025');
-		expect(body).toContain('Settlement');
+		expect(body).toContain('31/12/2025');
+		expect(body).toContain('Rendiciones');
 		expect(body).toContain('name="status"');
 		expect(body).toContain('/settlements/new');
 	});

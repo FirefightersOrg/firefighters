@@ -191,7 +191,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 		const result = await enter(operator, campaignId, '68', 'another', { internalCode: 'E-1' });
 		expect(result).toMatchObject({
 			success: true,
-			message: 'Bond 0068 / 4939 saved.',
+			message: 'Bono 0068 / 4939 guardado.',
 			created: { baseFormatted: '0068', associatedFormatted: '4939' }
 		});
 		firstBondId = (result.created as { id: string }).id;
@@ -227,7 +227,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 		expect(same.status).toBe(409);
 		expect(same.data).toMatchObject({
 			errors: {
-				baseNumber: ['Numbers 0068, 4939 are already used by another bond in this campaign.']
+				baseNumber: ['Los números 0068, 4939 ya están en uso en otro bono de esta campaña.']
 			},
 			conflicts: [{ field: 'baseNumber', bondId: firstBondId, numbers: ['0068', '4939'] }]
 		});
@@ -238,7 +238,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 		const crossing = await enter(operator, campaignId, '0129');
 		expect(crossing.status).toBe(409);
 		expect(crossing.data).toMatchObject({
-			errors: { baseNumber: ['Number 5000 is already used by another bond in this campaign.'] },
+			errors: { baseNumber: ['El número 5000 ya está en uso en otro bono de esta campaña.'] },
 			conflicts: [{ field: 'baseNumber', bondId: ownerId, numbers: ['5000'] }]
 		});
 
@@ -246,7 +246,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 		expect(code.status).toBe(409);
 		expect(code.data).toMatchObject({
 			errors: {
-				internalCode: ['Internal code E-1 is already used by another bond in this campaign.']
+				internalCode: ['El código interno E-1 ya está en uso en otro bono de esta campaña.']
 			},
 			conflicts: [{ field: 'internalCode', bondId: firstBondId, numbers: [] }]
 		});
@@ -256,7 +256,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 		const result = await enter(operator, campaignId, '5129');
 		expect(result.status).toBe(400);
 		expect((result.data?.errors as Record<string, string[]>).baseNumber[0]).toContain(
-			'the highest allowed base number is 5128'
+			'el número base más alto permitido es 5128'
 		);
 	});
 
@@ -315,7 +315,7 @@ describe('manual simple bond entry (local Supabase)', () => {
 			lockedMessage: string;
 		};
 		expect(entry.canLoad).toBe(false);
-		expect(entry.lockedMessage).toMatch(/This campaign is annulled\.$/);
+		expect(entry.lockedMessage).toMatch(/La campaña está anulada\.$/);
 
 		const result = await enter(operator, annulled, '0068');
 		expect(result.status).toBe(409);
