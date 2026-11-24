@@ -158,7 +158,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const missing = setup({ bond: { data: null, error: null } });
 			await expect(load(loadEvent(missing.locals))).rejects.toMatchObject({
 				status: 404,
-				body: { message: expect.stringContaining('Bond not found') }
+				body: { message: expect.stringContaining('No se encontró el bono') }
 			});
 			const foreign = setup({
 				bond: {
@@ -178,7 +178,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const { locals } = setup();
 			const data = (await load(loadEvent(locals)))!;
 			expect(data.record.general).toMatchObject({
-				typeLabel: 'Simple bond',
+				typeLabel: 'Bono simple',
 				commercialStatus: 'available',
 				unitCount: 1,
 				totalValue: '60000.00'
@@ -258,7 +258,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			});
 			const { actions: can } = (await load(loadEvent(locals)))!.record;
 			expect(can.annul).toBe(false);
-			expect(can.lockedMessage).toMatch(/This campaign is closed\.$/);
+			expect(can.lockedMessage).toMatch(/La campaña está cerrada\.$/);
 		});
 
 		it('a member of a manual pata: shows the pata and no individual actions', async () => {
@@ -306,7 +306,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			});
 			const data = (await load(loadEvent(locals, PATA_ID)))!;
 			expect(data.record.general).toMatchObject({
-				typeLabel: 'Manually grouped pata',
+				typeLabel: 'Pata agrupada manualmente',
 				unitCount: 2,
 				totalValue: '120000.00'
 			});
@@ -409,17 +409,17 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const entries = data.record.audit.entries;
 			expect(entries.map((e: { id: string }) => e.id)).toEqual(['a3', 'a2', 'a1']);
 			expect(entries[0]).toMatchObject({
-				actionLabel: 'Pata ungrouped',
-				actorLabel: 'A user',
+				actionLabel: 'Pata desagrupada',
+				actorLabel: 'Un usuario',
 				reason: 'Wrong bonds',
-				summary: 'This bond was freed from pata 0068 + 0069',
+				summary: 'Este bono se liberó de la pata 0068 + 0069',
 				viaPata: { pataId: PATA_ID, label: '0068 + 0069' }
 			});
 			expect(entries[1].actorLabel).toBe('Admin');
 			expect(entries[2]).toMatchObject({
-				actionLabel: 'Loaded',
-				actorLabel: 'System',
-				summary: 'Numbers 0068',
+				actionLabel: 'Cargado',
+				actorLabel: 'Sistema',
+				summary: 'Números 0068',
 				viaPata: null
 			});
 			expect(data.record.group.pastPatas).toEqual([
@@ -441,7 +441,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			expect(record.barcode).toEqual({
 				barcode: 'BC-1',
 				internalCode: 'INT-1',
-				modeLabel: 'Barcode is the base number'
+				modeLabel: 'El código de barras es el número base'
 			});
 			expect(record.collector).toEqual({ id: null });
 			expect(record.buyer).toEqual({ id: null });
@@ -467,7 +467,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				expect(result.data).toMatchObject({
 					form: action,
 					success: false,
-					message: expect.stringContaining('Bond not found')
+					message: expect.stringContaining('No se encontró el bono')
 				});
 				expect(from).toHaveBeenCalledWith('bonds');
 				expect(rpc).not.toHaveBeenCalled();
@@ -477,7 +477,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				const { locals, rpc } = setup({ bond: { data: null, error: null } });
 				const result = await run(action, locals, { reason: 'x' });
 				expect(result.status).toBe(404);
-				expect(result.data.message).toEqual(expect.stringContaining('Bond not found'));
+				expect(result.data.message).toEqual(expect.stringContaining('No se encontró el bono'));
 				expect(rpc).not.toHaveBeenCalled();
 			});
 
@@ -536,7 +536,9 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const { locals, rpc } = setup({ permissions: OPERATOR });
 			const result = await run('ungroup', locals, { reason: '   ' }, PATA_ID);
 			expect(result.status).toBe(400);
-			expect(result.data.errors).toEqual({ reason: ['A reason is required to ungroup a pata'] });
+			expect(result.data.errors).toEqual({
+				reason: ['Se requiere un motivo para desagrupar una pata']
+			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
@@ -564,7 +566,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const result = await run('ungroup', locals, { reason: 'x' }, PATA_ID);
 			expect(result.status).toBe(409);
 			expect(result.data.message).toBe(
-				'Only an available pata can be ungrouped (this pata is sold).'
+				'Solo se puede desagrupar una pata disponible (esta pata está en estado vendido).'
 			);
 		});
 	});
@@ -583,7 +585,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const { locals, rpc } = setup();
 			const result = await run('annul', locals, { reason: '' });
 			expect(result.status).toBe(400);
-			expect(result.data.errors).toEqual({ reason: ['A reason is required to annul a bond'] });
+			expect(result.data.errors).toEqual({ reason: ['Se requiere un motivo para anular un bono'] });
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
@@ -593,7 +595,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			expect(result).toEqual({
 				form: 'annul',
 				success: true,
-				message: 'Bond annulled. Its numbers are free and can be entered again.',
+				message: 'Bono anulado. Sus números quedaron libres y se pueden volver a ingresar.',
 				errors: {}
 			});
 			expect(rpc).toHaveBeenCalledWith('bond_annul', {
@@ -616,7 +618,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			const result = await run('annul', member.locals, { reason: 'x' });
 			expect(result.status).toBe(409);
 			expect(result.data.message).toBe(
-				'Bond 0068 belongs to a manually grouped pata. Ungroup the pata first.'
+				'El bono 0068 pertenece a una pata manual. Desagrupar la pata primero.'
 			);
 
 			const closed = setup({
@@ -630,7 +632,7 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				}
 			});
 			const locked = await run('annul', closed.locals, { reason: 'x' });
-			expect(locked.data.message).toMatch(/This campaign is closed\.$/);
+			expect(locked.data.message).toMatch(/La campaña está cerrada\.$/);
 		});
 	});
 });

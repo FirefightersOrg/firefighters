@@ -3,27 +3,32 @@
 	import type { BondRecordParty } from './types';
 
 	/**
-	 * Bond record, 4. "Current collector" / 5. "Current buyer". Collectors and buyers get their
+	 * Bond record, 4. "Cobrador actual" / 6. "Comprador actual". Collectors and buyers get their
 	 * own records in Phase 5 (delivery to collectors in Phase 6, sales in Phase 7); until then the
 	 * bond can only show whether one is set.
 	 */
 	let { role, party }: { role: 'collector' | 'buyer'; party: BondRecordParty } = $props();
 
 	const PHASE_NOTE = {
-		collector: 'Collectors arrive in Phase 5 and bonds are delivered to them in Phase 6.',
-		buyer: 'Buyers arrive in Phase 5 and are set when the bond is sold (Phase 7).'
+		collector: 'Los cobradores llegan en la fase 5 y los bonos se les entregan en la fase 6.',
+		buyer: 'Los compradores llegan en la fase 5 y se asignan al vender el bono (fase 7).'
 	};
 </script>
 
 <RecordSection id={role}>
 	{#if party.id}
-		<p class="text-sm">
-			A {role} is recorded for this bond; their details are shown once {role} records exist.
+		<p class="m-0 text-body-sm">
+			Hay {role === 'collector' ? 'un cobrador registrado' : 'un comprador registrado'} para este bono;
+			sus datos se muestran cuando existan las fichas de {role === 'collector'
+				? 'cobradores'
+				: 'compradores'}.
 		</p>
 	{:else}
-		<p class="text-sm text-slate-500">
-			{role === 'collector' ? 'Not delivered to a collector.' : 'No buyer: the bond is not sold.'}
+		<p class="m-0 text-body-sm text-muted">
+			{role === 'collector'
+				? 'No se entregó a un cobrador.'
+				: 'Sin comprador: el bono no se vendió.'}
 		</p>
 	{/if}
-	<p class="mt-2 text-xs text-slate-500">{PHASE_NOTE[role]}</p>
+	<p class="m-0 mt-2 text-caption text-muted">{PHASE_NOTE[role]}</p>
 </RecordSection>

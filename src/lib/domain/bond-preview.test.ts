@@ -48,8 +48,8 @@ describe('previewBaseNumber', () => {
 			state: 'invalid',
 			problem: 'overflow',
 			message:
-				'Base number 5129 overflows: its associated number 10000 exceeds the campaign maximum ' +
-				'number 9999 (the highest allowed base number is 5128)'
+				'El número base 5129 desborda: su número asociado 10000 supera el número máximo de la campaña ' +
+				'9999 (el número base más alto permitido es 5128)'
 		});
 	});
 
@@ -61,7 +61,7 @@ describe('previewBaseNumber', () => {
 			});
 		}
 		expect(previewBaseNumber('12345', FOUR)).toMatchObject({
-			message: '"12345" is not a valid number (use up to 4 digits)'
+			message: '«12345» no es un número válido (usar hasta 4 dígitos)'
 		});
 	});
 
@@ -70,7 +70,7 @@ describe('previewBaseNumber', () => {
 		expect(previewBaseNumber('7000', config)).toEqual({
 			state: 'invalid',
 			problem: 'out_of_range',
-			message: 'Number 7000 exceeds the campaign maximum number 6000'
+			message: 'El número 7000 supera el número máximo de la campaña 6000'
 		});
 	});
 

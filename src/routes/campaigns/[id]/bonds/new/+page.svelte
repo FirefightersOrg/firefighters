@@ -1,29 +1,29 @@
 <script lang="ts">
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import BaseNumberPreview from '$lib/components/bonds/BaseNumberPreview.svelte';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import BondConflictLinks from '$lib/components/bonds/BondConflictLinks.svelte';
 	import {
-		cardClass,
-		hintClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
+		Alert,
+		Button,
+		Card,
+		Field,
+		FormResult,
+		PageHeader,
+		StatusBadge,
+		TextInput
+	} from '$lib/components/ui';
 	import { previewBaseNumber } from '$lib/domain/bond-preview';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
-	import { formatInteger } from '$lib/domain/money';
 	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
+	import { formatNumber } from '$lib/format';
 	import { BOND_CODE_MAX_LENGTH, BOND_ENTRY_INTENT_FIELD } from '$lib/schemas/bond';
 	import type { PageProps } from './$types';
 
 	/**
-	 * Manual entry of simple bonds. "Save & add another" (also what Enter does: it is the first
+	 * Manual entry of simple bonds. "Guardar y cargar otro" (also what Enter does: it is the first
 	 * submit button) keeps the operator on the form with the number cleared and focused, and
-	 * confirms the bond just saved; "Save" opens the new bond's record.
+	 * confirms the bond just saved; "Guardar" opens the new bond's record.
 	 */
 	let { data, form }: PageProps = $props();
 
@@ -44,7 +44,6 @@
 	}
 	const values = $state(initialValues());
 	let submitting = $state(false);
-	let baseNumberInput = $state<HTMLInputElement>();
 	// Bonds saved from this page (newest first), for the operator's own check while loading.
 	function initialSaved() {
 		return form?.success && form.created ? [form.created] : [];
@@ -65,210 +64,221 @@
 	const baseNumberErrors = $derived(fieldErrors('baseNumber'));
 	const internalCodeErrors = $derived(fieldErrors('internalCode'));
 	const barcodeErrors = $derived(fieldErrors('barcode'));
-	const showServerErrors = $derived(!!baseNumberErrors?.length);
-	const baseNumberDescribedBy = $derived(
-		showServerErrors ? 'baseNumber-preview baseNumber-error' : 'baseNumber-preview'
-	);
+	// The summary only lists the errors that still describe what is typed.
+	const summaryErrors = $derived({
+		baseNumber: baseNumberErrors,
+		internalCode: internalCodeErrors,
+		barcode: barcodeErrors
+	});
+	const SUMMARY_FIELDS = [
+		{ name: 'baseNumber', label: 'Número base' },
+		{ name: 'internalCode', label: 'Código interno' },
+		{ name: 'barcode', label: 'Código de barras' }
+	];
+
+	function focusBaseNumber() {
+		document.getElementById('baseNumber')?.focus();
+	}
 </script>
 
 <svelte:head>
-	<title>Load bonds - {campaign.name} - Firefighters</title>
+	<title>Cargar bonos - {campaign.name} - Firefighters</title>
 </svelte:head>
 
-{#snippet conflictLinks(field: string)}
-	{#each fieldConflicts(field) as conflict (conflict.bondId)}
-		<p class="mt-1 text-xs">
-			<a href={bondHref(conflict.bondId)} class="font-medium text-blue-700 hover:underline">
-				{conflict.numbers.length > 0
-					? `View the bond that uses ${conflict.numbers.join(', ')} →`
-					: 'View the bond that uses it →'}
-			</a>
-		</p>
-	{/each}
-{/snippet}
+<PageHeader
+	title="Cargar bonos"
+	description="Bonos simples, un número base por vez. Los bonos nuevos quedan disponibles para la venta."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: campaign.name, href: campaignHref },
+		{ label: 'Bonos', href: resolve('/campaigns/[id]/bonds', { id: campaign.id }) },
+		{ label: 'Cargar bonos' }
+	]}
+>
+	{#snippet actions()}
+		<StatusBadge kind="campaign" status={campaign.status} />
+	{/snippet}
+</PageHeader>
 
-<div class="space-y-6">
-	<div>
-		<a href={campaignHref} class="text-sm text-blue-700 hover:underline">← {campaign.name}</a>
-		<div class="mt-2 flex flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">Load bonds</h1>
-			<StatusBadge kind="campaign" status={campaign.status} />
-		</div>
-		<p class="text-sm text-slate-500">
-			Simple bonds, one base number at a time. New bonds are available for sale.
-			<a
-				href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
-				class="text-blue-700 hover:underline">Load a pata →</a
-			>
-		</p>
-	</div>
+<div class="flex flex-col gap-6">
+	<p class="m-0 text-body-sm">
+		<a
+			href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
+			class="text-primary-text underline-offset-2 hover:underline">Cargar una pata →</a
+		>
+	</p>
 
 	{#if !data.canLoad}
-		<FormAlert kind="warning">
-			<p><strong>Bonds cannot be loaded.</strong> {data.lockedMessage}</p>
-		</FormAlert>
-		<a href={campaignHref} class={secondaryButtonClass}>Back to the campaign</a>
+		<Alert tone="warning" title="No se pueden cargar bonos">{data.lockedMessage}</Alert>
+		<div><Button href={campaignHref}>Volver a la campaña</Button></div>
 	{:else}
 		{#if form?.success && form.created}
-			<FormAlert kind="success">
-				<p>
-					{form.message}
-					<a href={bondHref(form.created.id)} class="font-medium underline">View bond</a>
-				</p>
-			</FormAlert>
-		{:else if form?.message && !form.success}
-			<FormAlert message={form.message} />
+			<Alert tone="success">
+				{form.message}
+				<a href={bondHref(form.created.id)} class="font-medium underline">Ver bono</a>
+			</Alert>
+		{:else if form}
+			<FormResult
+				result={{ success: false, message: form.message, errors: summaryErrors }}
+				fields={SUMMARY_FIELDS}
+			/>
 		{/if}
 
-		<section class="{cardClass} space-y-4" aria-labelledby="entry-title">
-			<h2 id="entry-title" class="text-base font-semibold">Simple bond</h2>
-			<p class="text-sm text-slate-600">
-				{campaign.numberDigits}-digit numbers up to
-				<span class="font-mono tabular-nums">{campaign.maxNumber}</span>; associated number = base +
-				<span class="tabular-nums">{campaign.associatedNumberOffset}</span>.
-				{#if numbering.ok}
-					Usable base numbers:
-					<span class="font-mono tabular-nums"
-						>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
-					>
-					({formatInteger(numbering.usableBaseCount)}).
+		<Card title="Bono simple" id="entry">
+			<div class="flex flex-col gap-5">
+				<p class="m-0 text-body-sm text-muted">
+					Números de {campaign.numberDigits} dígitos hasta
+					<span class="font-mono tabular-nums">{campaign.maxNumber}</span>; número asociado = base +
+					<span class="tabular-nums">{campaign.associatedNumberOffset}</span>.
+					{#if numbering.ok}
+						Números base utilizables:
+						<span class="font-mono tabular-nums"
+							>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
+						>
+						({formatNumber(numbering.usableBaseCount)}).
+					{/if}
+				</p>
+				{#if campaign.status === 'draft'}
+					<Alert tone="warning">
+						Esta campaña es un borrador. <strong>Guardar el primer bono congela sus reglas</strong>
+						(precio, cuotas, numeración, política de desborde y modo de código de barras).
+					</Alert>
 				{/if}
-			</p>
-			{#if campaign.status === 'draft'}
-				<FormAlert kind="warning">
-					<p>
-						This campaign is a draft. <strong>Saving the first bond freezes its rules</strong> (price,
-						installments, numbering, overflow policy and barcode mode).
-					</p>
-				</FormAlert>
-			{/if}
 
-			<form
-				method="POST"
-				class="space-y-4"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ update, result }) => {
-						try {
-							await update({ reset: false });
-							if (result.type === 'success' && result.data?.created) {
-								saved = [result.data.created as (typeof saved)[number], ...saved].slice(0, 20);
-								values.baseNumber = '';
-								values.internalCode = '';
-								values.barcode = '';
+				<form
+					method="POST"
+					class="flex flex-col gap-5"
+					use:enhance={() => {
+						submitting = true;
+						return async ({ update, result }) => {
+							try {
+								await update({ reset: false });
+								if (result.type === 'success' && result.data?.created) {
+									saved = [result.data.created as (typeof saved)[number], ...saved].slice(0, 20);
+									values.baseNumber = '';
+									values.internalCode = '';
+									values.barcode = '';
+								}
+							} finally {
+								submitting = false;
+								focusBaseNumber();
 							}
-						} finally {
-							submitting = false;
-							baseNumberInput?.focus();
-						}
-					};
-				}}
-			>
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
-						<label for="baseNumber" class={labelClass}>Base number</label>
-						<!-- svelte-ignore a11y_autofocus -->
-						<input
-							bind:this={baseNumberInput}
-							id="baseNumber"
-							name="baseNumber"
-							type="text"
-							inputmode="numeric"
-							autocomplete="off"
-							required
-							autofocus
-							placeholder={'0'.repeat(campaign.numberDigits)}
-							bind:value={values.baseNumber}
-							aria-invalid={preview.state === 'invalid' || showServerErrors ? 'true' : undefined}
-							aria-describedby={baseNumberDescribedBy}
-							class="{inputClass} font-mono text-lg tabular-nums"
-						/>
-						<p class={hintClass}>With or without leading zeros (68 or 0068).</p>
-						<FieldError id="baseNumber-error" errors={baseNumberErrors} />
-						{@render conflictLinks('baseNumber')}
+						};
+					}}
+				>
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<Field
+								label="Número base"
+								id="baseNumber"
+								required
+								hint="Con o sin ceros a la izquierda (68 o 0068)."
+								error={baseNumberErrors?.[0]}
+							>
+								<TextInput
+									name="baseNumber"
+									type="text"
+									inputmode="numeric"
+									autocomplete="off"
+									autofocus
+									mono
+									placeholder={'0'.repeat(campaign.numberDigits)}
+									bind:value={values.baseNumber}
+									aria-describedby="baseNumber-preview"
+								/>
+							</Field>
+							<BondConflictLinks
+								campaignId={campaign.id}
+								conflicts={fieldConflicts('baseNumber')}
+							/>
+						</div>
+						<div class="sm:pt-6">
+							<BaseNumberPreview {preview} />
+						</div>
 					</div>
-					<div class="sm:pt-6">
-						<BaseNumberPreview {preview} />
-					</div>
-				</div>
 
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
-						<label for="internalCode" class={labelClass}>Internal code (optional)</label>
-						<input
-							id="internalCode"
-							name="internalCode"
-							type="text"
-							autocomplete="off"
-							maxlength={BOND_CODE_MAX_LENGTH}
-							bind:value={values.internalCode}
-							aria-invalid={internalCodeErrors?.length ? 'true' : undefined}
-							aria-describedby={internalCodeErrors?.length ? 'internalCode-error' : undefined}
-							class={inputClass}
-						/>
-						<FieldError id="internalCode-error" errors={internalCodeErrors} />
-						{@render conflictLinks('internalCode')}
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<Field
+								label="Código interno"
+								id="internalCode"
+								optional
+								error={internalCodeErrors?.[0]}
+							>
+								<TextInput
+									name="internalCode"
+									type="text"
+									autocomplete="off"
+									mono
+									maxlength={BOND_CODE_MAX_LENGTH}
+									bind:value={values.internalCode}
+								/>
+							</Field>
+							<BondConflictLinks
+								campaignId={campaign.id}
+								conflicts={fieldConflicts('internalCode')}
+							/>
+						</div>
+						<div>
+							<Field label="Código de barras" id="barcode" optional error={barcodeErrors?.[0]}>
+								<TextInput
+									name="barcode"
+									type="text"
+									autocomplete="off"
+									mono
+									maxlength={BOND_CODE_MAX_LENGTH}
+									bind:value={values.barcode}
+								/>
+							</Field>
+							<BondConflictLinks campaignId={campaign.id} conflicts={fieldConflicts('barcode')} />
+						</div>
 					</div>
-					<div>
-						<label for="barcode" class={labelClass}>Barcode (optional)</label>
-						<input
-							id="barcode"
-							name="barcode"
-							type="text"
-							autocomplete="off"
-							maxlength={BOND_CODE_MAX_LENGTH}
-							bind:value={values.barcode}
-							aria-invalid={barcodeErrors?.length ? 'true' : undefined}
-							aria-describedby={barcodeErrors?.length ? 'barcode-error' : undefined}
-							class={inputClass}
-						/>
-						<FieldError id="barcode-error" errors={barcodeErrors} />
-						{@render conflictLinks('barcode')}
-					</div>
-				</div>
 
-				<!-- "Save & add another" comes first in the DOM, so Enter uses it; shown last. -->
-				<div class="flex flex-row-reverse flex-wrap justify-start gap-2">
-					<button
-						type="submit"
-						name={BOND_ENTRY_INTENT_FIELD}
-						value="another"
-						disabled={submitting || preview.state === 'invalid'}
-						class={primaryButtonClass}
-					>
-						{submitting ? 'Saving…' : 'Save & add another'}
-					</button>
-					<button
-						type="submit"
-						name={BOND_ENTRY_INTENT_FIELD}
-						value="save"
-						disabled={submitting || preview.state === 'invalid'}
-						class={secondaryButtonClass}
-					>
-						Save
-					</button>
-					<a href={campaignHref} class={secondaryButtonClass}>Done</a>
-				</div>
-			</form>
-		</section>
+					<!-- "Guardar y cargar otro" is the first submit button, so Enter uses it. -->
+					<div class="flex flex-wrap gap-2">
+						<Button
+							type="submit"
+							variant="primary"
+							name={BOND_ENTRY_INTENT_FIELD}
+							value="another"
+							loading={submitting}
+							disabled={preview.state === 'invalid'}
+						>
+							{submitting ? 'Guardando…' : 'Guardar y cargar otro'}
+						</Button>
+						<Button
+							type="submit"
+							name={BOND_ENTRY_INTENT_FIELD}
+							value="save"
+							disabled={submitting || preview.state === 'invalid'}
+						>
+							Guardar
+						</Button>
+						<Button href={campaignHref} variant="ghost">Listo</Button>
+					</div>
+				</form>
+			</div>
+		</Card>
 
 		{#if saved.length > 0}
-			<section class={cardClass} aria-labelledby="saved-title">
-				<h2 id="saved-title" class="mb-3 text-base font-semibold">Saved from this page</h2>
-				<ul class="divide-y divide-slate-100 text-sm">
+			<Card title="Guardados desde esta página" id="saved">
+				<ul class="m-0 list-none divide-y divide-border p-0 text-body-sm">
 					{#each saved as bond (bond.id)}
 						<li class="flex items-center justify-between py-2">
 							<span class="font-mono tabular-nums"
 								>{bond.baseFormatted} <span aria-hidden="true">→</span><span class="sr-only"
-									>associated</span
+									>asociado</span
 								>
 								{bond.associatedFormatted}</span
 							>
-							<a href={bondHref(bond.id)} class="text-blue-700 hover:underline">View</a>
+							<a
+								href={bondHref(bond.id)}
+								class="text-primary-text underline-offset-2 hover:underline">Ver</a
+							>
 						</li>
 					{/each}
 				</ul>
-			</section>
+			</Card>
 		{/if}
 	{/if}
 </div>

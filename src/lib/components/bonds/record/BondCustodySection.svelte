@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
-		dangerButtonClass,
-		inputClass,
-		labelClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
-	import {
-		ASSIGNMENT_TYPE_LABELS,
-		deliveryNoteLabel,
-		type BondAssignment
-	} from '$lib/domain/deliveries';
+		Alert,
+		Button,
+		Dialog,
+		Field,
+		Select,
+		StatusBadge,
+		Table,
+		TextInput,
+		type TableColumn
+	} from '$lib/components/ui';
+	import type { AssignmentType, BondAssignment } from '$lib/domain/deliveries';
+	import { formatDate, formatDateTime } from '$lib/format';
 	import RecordSection from './RecordSection.svelte';
 
 	/**
@@ -43,7 +43,12 @@
 		} | null;
 	} = $props();
 
-	const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+	const EVENT_LABELS: Record<AssignmentType, string> = {
+		delivery: 'Entrega',
+		return: 'Devolución',
+		reassignment: 'Reasignación',
+		lost: 'Extravío'
+	};
 	const custody = $derived(form?.form === 'custody' ? form : null);
 	const errorsOf = (action: string) =>
 		custody?.action === action && !custody.success ? (custody.errors ?? {}) : {};
@@ -52,146 +57,156 @@
 	const today = new Date().toISOString().slice(0, 10);
 	const noteHref = (noteId: string) =>
 		resolve('/campaigns/[id]/deliveries/[noteId]', { id: campaignId, noteId });
+
+	// A failed submit (no JavaScript, or a server error) reopens the dialog with its errors.
+	let lostOpen = $state(Object.keys(errorsOf('markLost')).length > 0);
+	let lostSubmitting = $state(false);
+
+	type HistoryRow = BondAssignment & Record<string, unknown>;
+	const columns: TableColumn<HistoryRow>[] = [
+		{ key: 'event', header: 'Evento' },
+		{ key: 'collector', header: 'Cobrador' },
+		{ key: 'date', header: 'Fecha' },
+		{ key: 'note', header: 'Remito' },
+		{ key: 'details', header: 'Detalle' }
+	];
+	const rows = $derived(history as HistoryRow[]);
+	const collectorOptions = $derived([
+		{ value: '', label: 'Elegir…' },
+		...collectors.map((c) => ({ value: c.id, label: c.displayName }))
+	]);
 </script>
 
 <RecordSection id="custody">
-	{#if custody?.message}
-		<FormAlert kind={custody.success ? 'success' : 'error'} message={custody.message} />
-	{/if}
+	<div class="flex flex-col gap-4">
+		{#if custody?.message}
+			<Alert tone={custody.success ? 'success' : 'danger'}>{custody.message}</Alert>
+		{/if}
 
-	{#if history.length === 0}
-		<p class="text-sm text-slate-500">This bond has not been delivered to a collector.</p>
-	{:else}
-		<table class="min-w-full text-sm">
-			<thead class="text-left text-xs text-slate-500 uppercase">
-				<tr>
-					<th class="py-2 pr-3 font-medium">Event</th>
-					<th class="py-2 pr-3 font-medium">Collector</th>
-					<th class="py-2 pr-3 font-medium">Date</th>
-					<th class="py-2 pr-3 font-medium">Note</th>
-					<th class="py-2 font-medium">Details</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-slate-100">
-				{#each history as a (a.id)}
-					<tr>
-						<td class="py-2 pr-3">
-							{ASSIGNMENT_TYPE_LABELS[a.assignmentType]}
-							{#if a.status === 'active'}<span
-									class="ml-1 rounded bg-green-100 px-1 text-xs text-green-800">current</span
-								>{/if}
-						</td>
-						<td class="py-2 pr-3">{a.collectorName ?? (a.collectorId ? '—' : 'Not delivered')}</td>
-						<td class="py-2 pr-3 tabular-nums">{dateTime.format(new Date(a.assignedAt))}</td>
-						<td class="py-2 pr-3">
-							{#if a.deliveryNoteId && a.noteNumber}
-								<a href={noteHref(a.deliveryNoteId)} class="text-blue-700 hover:underline"
-									>{deliveryNoteLabel(a.noteNumber)}</a
-								>
-							{:else}—{/if}
-						</td>
-						<td class="py-2 text-xs text-slate-600">
-							{#if a.assignmentType === 'lost'}
-								Responsible: {a.responsibleParty} · lost on {a.lostOn} · {a.notes}
-							{:else if a.notes}{a.notes}{/if}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	{/if}
+		{#if history.length === 0}
+			<p class="m-0 text-body-sm text-muted">Este bono no se entregó a ningún cobrador.</p>
+		{:else}
+			<Table {columns} {rows} caption="Historial de asignaciones" density="compact">
+				{#snippet cell({ row, column })}
+					{#if column.key === 'event'}
+						{EVENT_LABELS[row.assignmentType]}
+						{#if row.status === 'active'}<span class="ml-1"
+								><StatusBadge kind="assignment" status="active" /></span
+							>{/if}
+					{:else if column.key === 'collector'}
+						{row.collectorName ?? (row.collectorId ? '—' : 'Sin entregar')}
+					{:else if column.key === 'date'}
+						<span class="tabular-nums">{formatDateTime(row.assignedAt)}</span>
+					{:else if column.key === 'note'}
+						{#if row.deliveryNoteId && row.noteNumber}
+							<a
+								href={noteHref(row.deliveryNoteId)}
+								class="font-mono text-primary-text underline-offset-2 hover:underline"
+								>Remito {String(row.noteNumber).padStart(4, '0')}</a
+							>
+						{:else}—{/if}
+					{:else if column.key === 'details'}
+						<span class="text-caption text-muted">
+							{#if row.assignmentType === 'lost'}
+								Responsable: {row.responsibleParty} · extraviado el {formatDate(row.lostOn)} · {row.notes}
+							{:else if row.notes}{row.notes}{/if}
+						</span>
+					{/if}
+				{/snippet}
+			</Table>
+		{/if}
 
-	{#if can.returnBond}
-		<form method="POST" action="?/return" class="mt-4 flex flex-wrap items-end gap-3" use:enhance>
-			<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
-			<div class="min-w-64 flex-1">
-				<label for="return-notes" class={labelClass}>Return to stock (notes, optional)</label>
-				<input
-					id="return-notes"
-					name="notes"
-					maxlength="2000"
-					class={inputClass}
-					value={valueOf('return', 'notes')}
-				/>
-				<FieldError id="return-notes-error" errors={errorsOf('return').notes} />
-			</div>
-			<button type="submit" class={secondaryButtonClass}>Return</button>
-		</form>
-	{/if}
+		{#if can.returnBond}
+			<form method="POST" action="?/return" class="flex flex-wrap items-end gap-3" use:enhance>
+				<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
+				<div class="min-w-64 flex-1">
+					<Field
+						label="Devolver al stock (notas)"
+						id="return-notes"
+						optional
+						error={errorsOf('return').notes?.[0]}
+					>
+						<TextInput name="notes" maxlength={2000} value={valueOf('return', 'notes')} />
+					</Field>
+				</div>
+				<Button type="submit">Devolver</Button>
+			</form>
+		{/if}
 
-	{#if can.reassign}
-		<form method="POST" action="?/reassign" class="mt-4 flex flex-wrap items-end gap-3" use:enhance>
-			<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
-			<div class="min-w-64 flex-1">
-				<label for="reassign-collector" class={labelClass}>Reassign to</label>
-				<select
-					id="reassign-collector"
-					name="collectorId"
-					required
-					class={inputClass}
-					aria-invalid={errorsOf('reassign').collectorId ? 'true' : undefined}
-					value={valueOf('reassign', 'collectorId')}
-				>
-					<option value="">Choose…</option>
-					{#each collectors as c (c.id)}<option value={c.id}>{c.displayName}</option>{/each}
-				</select>
-				{#if collectors.length === 0}<p class="text-xs text-slate-500">
-						No other collector you can see; ask an admin.
-					</p>{/if}
-				<FieldError id="reassign-collector-error" errors={errorsOf('reassign').collectorId} />
-			</div>
-			<button type="submit" class={secondaryButtonClass}>Reassign</button>
-		</form>
-	{/if}
+		{#if can.reassign}
+			<form method="POST" action="?/reassign" class="flex flex-wrap items-end gap-3" use:enhance>
+				<input type="hidden" name="fromCollectorId" value={fromCollectorId ?? ''} />
+				<div class="min-w-64 flex-1">
+					<Field
+						label="Reasignar a"
+						id="reassign-collector"
+						required
+						hint={collectors.length === 0
+							? 'No hay otro cobrador visible para esta cuenta; consultar a un administrador.'
+							: undefined}
+						error={errorsOf('reassign').collectorId?.[0]}
+					>
+						<Select
+							name="collectorId"
+							options={collectorOptions}
+							value={valueOf('reassign', 'collectorId')}
+						/>
+					</Field>
+				</div>
+				<Button type="submit">Reasignar</Button>
+			</form>
+		{/if}
 
-	{#if can.markLost}
-		<form
-			method="POST"
-			action="?/markLost"
-			class="mt-4 grid gap-3 sm:grid-cols-4 sm:items-end"
-			use:enhance
-		>
+		{#if can.markLost}
 			<div>
-				<label for="lost-responsible" class={labelClass}>Responsible party</label>
-				<input
-					id="lost-responsible"
-					name="responsibleParty"
-					maxlength="200"
-					required
-					class={inputClass}
-					value={valueOf('markLost', 'responsibleParty')}
-					aria-invalid={errorsOf('markLost').responsibleParty ? 'true' : undefined}
-				/>
-				<FieldError id="lost-responsible-error" errors={errorsOf('markLost').responsibleParty} />
+				<Button variant="danger" aria-haspopup="dialog" onclick={() => (lostOpen = true)}>
+					Marcar como extraviado
+				</Button>
 			</div>
-			<div>
-				<label for="lost-on" class={labelClass}>Lost on</label>
-				<input
-					id="lost-on"
-					name="lostOn"
-					type="date"
-					max={today}
-					required
-					class={inputClass}
-					value={valueOf('markLost', 'lostOn')}
-					aria-invalid={errorsOf('markLost').lostOn ? 'true' : undefined}
-				/>
-				<FieldError id="lost-on-error" errors={errorsOf('markLost').lostOn} />
-			</div>
-			<div>
-				<label for="lost-reason" class={labelClass}>Reason</label>
-				<input
-					id="lost-reason"
-					name="reason"
-					maxlength="2000"
-					required
-					class={inputClass}
-					value={valueOf('markLost', 'reason')}
-					aria-invalid={errorsOf('markLost').reason ? 'true' : undefined}
-				/>
-				<FieldError id="lost-reason-error" errors={errorsOf('markLost').reason} />
-			</div>
-			<button type="submit" class={dangerButtonClass}>Mark lost</button>
-		</form>
-	{/if}
+		{/if}
+	</div>
 </RecordSection>
+
+{#if can.markLost}
+	<Dialog
+		open={lostOpen}
+		onClose={() => (lostOpen = false)}
+		title="¿Marcar este bono como extraviado?"
+		description="El bono queda registrado como extraviado a cargo de la persona responsable. No se puede deshacer."
+		confirmLabel="Marcar como extraviado"
+		tone="danger"
+		loading={lostSubmitting}
+		action="?/markLost"
+		enhance={(f) =>
+			enhance(f, () => {
+				lostSubmitting = true;
+				return async ({ update }) => {
+					try {
+						lostOpen = false;
+						await update();
+					} finally {
+						lostSubmitting = false;
+					}
+				};
+			})}
+	>
+		<Field
+			label="Responsable"
+			id="lost-responsible"
+			required
+			error={errorsOf('markLost').responsibleParty?.[0]}
+		>
+			<TextInput
+				name="responsibleParty"
+				maxlength={200}
+				value={valueOf('markLost', 'responsibleParty')}
+			/>
+		</Field>
+		<Field label="Extraviado el" id="lost-on" required error={errorsOf('markLost').lostOn?.[0]}>
+			<TextInput name="lostOn" type="date" max={today} value={valueOf('markLost', 'lostOn')} />
+		</Field>
+		<Field label="Motivo" id="lost-reason" required error={errorsOf('markLost').reason?.[0]}>
+			<TextInput name="reason" maxlength={2000} value={valueOf('markLost', 'reason')} />
+		</Field>
+	</Dialog>
+{/if}

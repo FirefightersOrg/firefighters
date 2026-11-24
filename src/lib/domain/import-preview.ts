@@ -11,9 +11,9 @@ import {
 import { padNumber } from './barcodes';
 
 export const IMPORT_SOURCE_LABELS: Record<ImportSourceType, string> = {
-	barcode_scan: 'Barcode scan',
-	csv_file: 'CSV file',
-	excel_file: 'Excel file'
+	barcode_scan: 'Escaneo de códigos de barras',
+	csv_file: 'Archivo CSV',
+	excel_file: 'Archivo de Excel'
 };
 
 export const IMPORT_SESSION_STATUS_LABELS: Record<ImportSessionStatus, string> = {

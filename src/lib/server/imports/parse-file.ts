@@ -36,7 +36,7 @@ export function importSourceTypeFor(
 	if (lower.endsWith('.xlsx')) return 'excel_file';
 	throw new ImportFileError(
 		'unsupported_file',
-		'Unsupported file type: upload a .csv or .xlsx file (Excel 97-2003 .xls is not supported)'
+		'Tipo de archivo no admitido: subir un archivo .csv o .xlsx (el formato .xls de Excel 97-2003 no se admite)'
 	);
 }
 
@@ -98,15 +98,15 @@ async function xlsxTable(bytes: Uint8Array): Promise<TableRow[]> {
 		// exceljs' typings predate the generic Buffer; any ArrayBuffer view works at runtime.
 		await workbook.xlsx.load(bytes as unknown as ArrayBuffer);
 	} catch {
-		throw new ImportFileError('invalid_file', 'The file is not a valid .xlsx workbook');
+		throw new ImportFileError('invalid_file', 'El archivo no es un libro .xlsx válido');
 	}
 	const sheet = workbook.worksheets[0];
-	if (!sheet) throw new ImportFileError('empty_file', 'The workbook has no worksheets');
+	if (!sheet) throw new ImportFileError('empty_file', 'El libro no tiene hojas');
 	// Header + IMPORT_MAX_ROWS data rows (+ slack for blank rows, which are skipped later).
 	if (sheet.actualRowCount > IMPORT_MAX_ROWS + 1 + 100) {
 		throw new ImportFileError(
 			'too_many_rows',
-			`The file has about ${sheet.actualRowCount - 1} rows; at most ${IMPORT_MAX_ROWS} can be imported at once`
+			`El archivo tiene unas ${sheet.actualRowCount - 1} filas; se pueden importar como máximo ${IMPORT_MAX_ROWS} a la vez`
 		);
 	}
 	const table: TableRow[] = [];
@@ -133,10 +133,10 @@ export async function parseImportFile(file: {
 	if (file.bytes.byteLength > IMPORT_MAX_FILE_BYTES) {
 		throw new ImportFileError(
 			'file_too_large',
-			`The file is too large (at most ${IMPORT_MAX_FILE_BYTES / (1024 * 1024)} MB)`
+			`El archivo es demasiado grande (máximo ${IMPORT_MAX_FILE_BYTES / (1024 * 1024)} MB)`
 		);
 	}
-	if (file.bytes.byteLength === 0) throw new ImportFileError('empty_file', 'The file is empty');
+	if (file.bytes.byteLength === 0) throw new ImportFileError('empty_file', 'El archivo está vacío');
 
 	if (sourceType === 'csv_file') {
 		const { table, joiner } = csvTable(file.bytes);

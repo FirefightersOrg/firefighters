@@ -46,6 +46,8 @@ describe('parseCsv', () => {
 
 	it('reports an unterminated quote with its line', () => {
 		expect(() => parseCsv('a,b\n1,"oops\n')).toThrow(CsvError);
-		expect(() => parseCsv('a,b\n1,"oops\n')).toThrow('Line 2: a quoted value is never closed');
+		expect(() => parseCsv('a,b\n1,"oops\n')).toThrow(
+			'Línea 2: un valor entre comillas no se cierra'
+		);
 	});
 });

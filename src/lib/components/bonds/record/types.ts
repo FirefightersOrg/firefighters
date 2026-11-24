@@ -11,13 +11,13 @@ import type {
 	BondNumberKind,
 	BondOrigin
 } from '$lib/domain/bonds';
-import { CAMPAIGN_TIME_ZONE } from '$lib/domain/campaigns';
+import { formatDateTime } from '$lib/format';
 
 export interface BondRecordGeneral {
 	id: string;
 	kind: BondKind;
 	origin: BondOrigin;
-	/** "Simple bond", "Printed pata" or "Manually grouped pata". */
+	/** "Bono simple", "Pata impresa" or "Pata agrupada manualmente". */
 	typeLabel: string;
 	commercialStatus: BondCommercialStatus;
 	financialStatus: BondFinancialStatus;
@@ -97,7 +97,7 @@ export interface BondRecordAuditEntry {
 	/** "Loaded", "Grouped into a pata", "Annulled", ... */
 	actionLabel: string;
 	createdAt: string;
-	/** The actor's name, "System" without an actor, "A user" when their profile is not visible. */
+	/** The actor's name, "Sistema" without an actor, "Un usuario" when their profile is not visible. */
 	actorLabel: string;
 	reason: string | null;
 	/** One line about what changed (numbers loaded or released, members grouped or freed). */
@@ -140,32 +140,25 @@ export interface BondRecord {
 
 /** The 14 sections of docs/screens.md "Bond record", in order (anchor id and title). */
 export const BOND_RECORD_SECTIONS = [
-	{ id: 'general', title: 'General data' },
-	{ id: 'numbers', title: 'Participating numbers' },
-	{ id: 'barcode', title: 'Barcode' },
-	{ id: 'collector', title: 'Current collector' },
-	{ id: 'custody', title: 'Assignment history' },
-	{ id: 'buyer', title: 'Current buyer' },
-	{ id: 'sale', title: 'Sale' },
-	{ id: 'installments', title: 'Installments' },
-	{ id: 'payments', title: 'Payments' },
-	{ id: 'settlements', title: 'Settlements' },
-	{ id: 'commissions', title: 'Commissions' },
-	{ id: 'draws', title: 'Draws and rosters' },
-	{ id: 'prizes', title: 'Prizes' },
-	{ id: 'audit', title: 'Audit' }
+	{ id: 'general', title: 'Datos generales' },
+	{ id: 'numbers', title: 'Números participantes' },
+	{ id: 'barcode', title: 'Código de barras' },
+	{ id: 'collector', title: 'Cobrador actual' },
+	{ id: 'custody', title: 'Historial de asignaciones' },
+	{ id: 'buyer', title: 'Comprador actual' },
+	{ id: 'sale', title: 'Venta' },
+	{ id: 'installments', title: 'Cuotas' },
+	{ id: 'payments', title: 'Pagos' },
+	{ id: 'settlements', title: 'Rendiciones' },
+	{ id: 'commissions', title: 'Comisiones' },
+	{ id: 'draws', title: 'Sorteos y padrones' },
+	{ id: 'prizes', title: 'Premios' },
+	{ id: 'audit', title: 'Auditoría' }
 ] as const;
 
 export type BondRecordSectionId = (typeof BOND_RECORD_SECTIONS)[number]['id'];
 
-/** "Nov 17, 2026, 10:30 AM" in the campaign time zone; "—" when missing. */
+/** "17/11/2026, 10:30" in Buenos Aires time (es-AR); "—" when missing. */
 export function formatBondTimestamp(timestamp: string | null): string {
-	if (!timestamp) return '—';
-	const ms = Date.parse(timestamp);
-	if (Number.isNaN(ms)) return '—';
-	return new Intl.DateTimeFormat('en-US', {
-		dateStyle: 'medium',
-		timeStyle: 'short',
-		timeZone: CAMPAIGN_TIME_ZONE
-	}).format(ms);
+	return formatDateTime(timestamp);
 }
