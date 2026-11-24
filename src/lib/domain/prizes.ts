@@ -70,3 +70,11 @@ export const PRIZE_AWARD_TRANSITIONS: Record<PrizeAwardStatus, readonly PrizeAwa
 };
 export const canTransitionPrizeAward = (from: PrizeAwardStatus, to: PrizeAwardStatus) =>
 	PRIZE_AWARD_TRANSITIONS[from].includes(to);
+
+/**
+ * Santi's decision (SAN-82 review): annulled prizes stay visible on bond/buyer records, labelled
+ * "Annulled", but never count as won.
+ */
+export function wonPrizeCount(prizes: ReadonlyArray<{ status: string }> | null | undefined) {
+	return (prizes ?? []).filter((prize) => prize.status !== 'annulled').length;
+}
