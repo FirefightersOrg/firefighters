@@ -7,7 +7,7 @@
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { formatCents, formatMoney, parseMoneyToCents } from '$lib/domain/money';
 	import type { PageProps } from './$types';
-	import { PRIZE_STATUS_LABELS } from '$lib/domain/prizes';
+	import { PRIZE_STATUS_LABELS, wonPrizeCount as wonCount } from '$lib/domain/prizes';
 	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 	let { data, form }: PageProps = $props();
 	const baseNumbers = (bond: { baseNumbers: number[]; campaignNumberDigits: number }) =>
@@ -147,7 +147,7 @@
 		</ul>
 	</section>
 	<section class={cardClass}>
-		<h2 class="text-lg font-semibold">Prizes</h2>
+		<h2 class="text-lg font-semibold">Prizes won ({wonCount(data.prizes)})</h2>
 		{#if data.canViewPrizes === false}<p class="mt-2 text-sm text-slate-500">
 				You do not have permission to view prizes.
 			</p>
@@ -159,7 +159,10 @@
 				>
 				<tbody>
 					{#each data.prizes as prize (prize.id)}
-						<tr class="border-t border-slate-100">
+						<tr
+							class="border-t border-slate-100"
+							class:text-slate-400={prize.status === 'annulled'}
+						>
 							<td class="py-2">
 								<a
 									class="text-blue-700 underline"
@@ -170,7 +173,12 @@
 								>
 							</td>
 							<td>#{prize.position} — {prize.name}</td>
-							<td>{PRIZE_STATUS_LABELS[prize.status]}</td>
+							<td>
+								{#if prize.status === 'annulled'}<span
+										class="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700"
+										>Annulled — does not count as won</span
+									>{:else}{PRIZE_STATUS_LABELS[prize.status]}{/if}
+							</td>
 							<td>{deliveredAt(prize.deliveredAt)}</td>
 						</tr>
 					{/each}
