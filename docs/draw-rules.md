@@ -536,26 +536,3 @@ Review resolutions (PR #89):
   tests remain part of the full database suite.
 - Service and route guards use the same independent permissions. Phase 2 navigation is
   unchanged because no navigation flag or seeded non-admin grant changes.
-- Stack integration: this branch is based on SAN-123, not SAN-117. Before merging after
-  SAN-117, rebase the `draw_annul` replacement onto its new body (extraordinary generated-draw
-  annulment and number release), changing only its actor permission to `draw.annul`.
-  The coordinator owns that rebase; this migration deliberately preserves the current base's
-  behavior rather than implementing SAN-117 independently.
-- Known gaps outside this change: **SAN-117** extraordinary-number release on annulment,
-  **SAN-119** idempotent roster freeze, **SAN-81** delivered-prize annulment pending a product
-  decision, and **SAN-77** payment-date rather than confirmation-time cutoff semantics.
-
-### SAN-118 verification
-
-- Full locked reset → database tests → admin seed → integration: **45 pgTAP files /
-  3046 assertions passed** (including 27 new permission assertions); **28 integration files /
-  230 tests passed**. `pnpm check`: zero errors/warnings; `pnpm lint`: passed;
-  `pnpm test`: **146 files / 1777 tests passed**. The three changed draw test files also
-  passed shuffled with seed 118 (59 tests).
-- Initial integration run: 228 passed, two flaky, order-sensitive Phase 3 assertions failed
-  at `tests/integration/phase-3-acceptance.test.ts:1257` and `:1395` (group-history and
-  audit-history ordering). The fresh full locked rerun passed both without changes; per the
-  coordinator's decision those assertions were not modified.
-- An intervening integration-only retry found no seeded admin in the shared database
-  (invalid credentials, 228 skipped); the final successful run reset and seeded under one
-  lock, so it did not rely on another worker's database state.
