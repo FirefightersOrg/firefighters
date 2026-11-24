@@ -139,6 +139,19 @@
 				><button class="{primaryButtonClass} mt-3">Freeze roster</button>
 			</form>{/if}
 	</section>
+	<section class={cardClass}>
+		<h2 class="font-semibold">Winners and prizes</h2>
+		<p class="mt-2 text-sm">
+			Configure prizes, load winning numbers and record delivery.
+			<a
+				class="text-blue-700 underline"
+				href={resolve('/campaigns/[id]/draws/[drawId]/winners', {
+					id: data.campaign.id,
+					drawId: data.draw.id
+				})}>Manage winners and prizes</a
+			>
+		</p>
+	</section>
 	{#if data.can.annul}<details class="{cardClass} border-red-200">
 			<summary class="cursor-pointer font-semibold text-red-700">Annul draw</summary>
 			<form method="POST" action="?/annul" class="mt-3">
