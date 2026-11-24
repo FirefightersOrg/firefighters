@@ -49,10 +49,10 @@ describe('winners and prizes render', () => {
 				const body = render(Page, {
 					props: { data: data([prize(status)], { reverseDelivery }), form: null } as any
 				}).body;
-				expect(body.includes('Reverse delivery')).toBe(status === 'delivered' && reverseDelivery);
-				expect(body.includes('Print delivery certificate')).toBe(status === 'delivered');
+				expect(body.includes('Revertir entrega')).toBe(status === 'delivered' && reverseDelivery);
+				expect(body.includes('Imprimir constancia de entrega')).toBe(status === 'delivered');
 				if (status === 'delivered' && reverseDelivery) {
-					expect(body).toContain('name="reason" required');
+					expect(body).toMatch(/name="reason"[^>]*required/);
 					expect(body).not.toContain('maxlength');
 				}
 			}
@@ -89,15 +89,15 @@ describe('winners and prizes render', () => {
 				form: null
 			} as any
 		}).body;
-		expect(body).toContain('Configure a prize');
-		expect(body).toContain('Validate against frozen roster');
-		expect(body).toContain('Record resolution');
-		expect(body).toContain('Record delivery');
-		expect(body).toContain('Delivered prizes cannot be annulled.');
-		expect(body).toContain('Print delivery certificate');
-		expect(body).toContain('Print unawarded certificate');
+		expect(body).toContain('Configurar un premio');
+		expect(body).toContain('Validar contra el padrón congelado');
+		expect(body).toContain('Registrar resolución');
+		expect(body).toContain('Registrar entrega');
+		expect(body).toContain('Un premio entregado no se puede anular.');
+		expect(body).toContain('Imprimir constancia de entrega');
+		expect(body).toContain('Imprimir constancia de premio no adjudicado');
 		expect(body).toContain('target="_blank"');
-		expect(body).toContain('Create replacement at position 1');
+		expect(body).toContain('Crear el reemplazo en la posición 1');
 	});
 
 	it('hides actions without capabilities', () => {
@@ -114,11 +114,11 @@ describe('winners and prizes render', () => {
 				form: null
 			} as any
 		}).body;
-		expect(body).not.toContain('Configure a prize');
-		expect(body).not.toContain('Validate against frozen roster');
-		expect(body).not.toContain('Annul prize');
-		expect(body).not.toContain('Print delivery certificate');
-		expect(body).not.toContain('Print unawarded certificate');
+		expect(body).not.toContain('Configurar un premio');
+		expect(body).not.toContain('Validar contra el padrón congelado');
+		expect(body).not.toContain('Anular premio');
+		expect(body).not.toContain('Imprimir constancia de entrega');
+		expect(body).not.toContain('Imprimir constancia de premio no adjudicado');
 	});
 
 	it('renders the immediate real-shaped validation result and exact plain-language reason', () => {
@@ -139,12 +139,12 @@ describe('winners and prizes render', () => {
 				}
 			} as any
 		}).body;
-		expect(body).toContain('Validation result for 0007');
+		expect(body).toContain('Resultado de la validación del 0007');
 		expect(body).toContain('B-7');
 		expect(body).toContain('Fire Supplies SA');
 		expect(body).toContain('Central station');
 		expect(body).toContain('Bond not fully paid');
-		expect(body).toContain('The prize is unawarded.');
+		expect(body).toContain('El premio queda no adjudicado.');
 	});
 
 	it('explains an unmatched number without invented snapshot data', () => {
@@ -158,13 +158,13 @@ describe('winners and prizes render', () => {
 						bondLabel: null,
 						buyerLabel: null,
 						collectorLabel: null,
-						reasonLabel: 'Number not in the roster'
+						reasonLabel: 'el número no está en el padrón'
 					})
 				]),
 				form: null
 			} as any
 		}).body;
-		expect(body).toContain('Number not in the roster');
-		expect(body).toContain('The prize is unawarded.');
+		expect(body).toContain('el número no está en el padrón');
+		expect(body).toContain('El premio queda no adjudicado.');
 	});
 });
