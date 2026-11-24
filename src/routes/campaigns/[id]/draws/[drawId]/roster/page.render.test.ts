@@ -27,9 +27,9 @@ describe('roster render', () => {
 				}
 			} as any
 		}).body;
-		expect(body).toContain('Frozen roster');
-		expect(body).toContain('extraordinary');
+		expect(body).toContain('Padrón congelado');
+		expect(body).toContain('Extra');
 		expect(body).toContain('Bond not fully paid');
-		expect(body).toContain('Next');
+		expect(body).toContain('Siguiente');
 	});
 });

@@ -38,11 +38,14 @@
 		{ key: 'date', header: 'Fecha' },
 		{ key: 'status', header: 'Estado' }
 	];
-	const typeOptions = DRAW_TYPES.map((type) => ({ value: type, label: DRAW_TYPE_LABELS[type] }));
-	const statusOptions = DRAW_STATUSES.map((status) => ({
-		value: status,
-		label: DRAW_STATUS_LABELS[status]
-	}));
+	const typeOptions = [
+		{ value: '', label: 'Todos' },
+		...DRAW_TYPES.map((type) => ({ value: type, label: DRAW_TYPE_LABELS[type] }))
+	];
+	const statusOptions = [
+		{ value: '', label: 'Todos' },
+		...DRAW_STATUSES.map((status) => ({ value: status, label: DRAW_STATUS_LABELS[status] }))
+	];
 	const filtered = $derived(Boolean(data.filters.type || data.filters.status));
 </script>
 
@@ -72,20 +75,10 @@
 	<Card>
 		<form method="GET" class="grid gap-4 sm:grid-cols-3 sm:items-end">
 			<Field label="Tipo">
-				<Select
-					name="type"
-					placeholder="Todos"
-					options={typeOptions}
-					value={data.filters.type ?? ''}
-				/>
+				<Select name="type" options={typeOptions} value={data.filters.type ?? ''} />
 			</Field>
 			<Field label="Estado">
-				<Select
-					name="status"
-					placeholder="Todos"
-					options={statusOptions}
-					value={data.filters.status ?? ''}
-				/>
+				<Select name="status" options={statusOptions} value={data.filters.status ?? ''} />
 			</Field>
 			<div class="flex gap-2">
 				<Button type="submit" variant="primary">Filtrar</Button>
