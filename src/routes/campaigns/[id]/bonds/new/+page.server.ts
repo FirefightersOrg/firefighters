@@ -15,7 +15,6 @@ import {
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { BOND_MESSAGES, createBond } from '$lib/server/services/bonds';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	BOND_ENTRY_FIELDS,
 	BOND_ENTRY_INTENT_FIELD,
@@ -37,7 +36,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'bond.create');
 	if (!isUuid(params.id)) {
-		error(404, { message: CAMPAIGN_MESSAGES.notFound });
+		error(404, { message: BOND_MESSAGES.campaignNotFound });
 	}
 
 	const result = await getCampaignById(locals.supabase, params.id);
@@ -47,10 +46,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: params.id,
 			error: result.error
 		});
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	}
 	if (!result.data) {
-		error(404, { message: CAMPAIGN_MESSAGES.notFound });
+		error(404, { message: BOND_MESSAGES.campaignNotFound });
 	}
 
 	const campaign = result.data;
@@ -65,7 +64,7 @@ export const actions: Actions = {
 	default: async ({ request, locals, params, url }) => {
 		const denied = checkBondActionPermission(locals, url, 'create', 'bond.create');
 		if (denied) return denied;
-		if (!isUuid(params.id)) return bondFormFailure('create', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!isUuid(params.id)) return bondFormFailure('create', 404, BOND_MESSAGES.campaignNotFound);
 
 		const formData = await request.formData();
 		const values = readFormFields(formData, BOND_ENTRY_FIELDS);
@@ -83,7 +82,7 @@ export const actions: Actions = {
 			return bondFormFailure('create', 500, BOND_MESSAGES.internal, { values });
 		}
 		const campaign = campaignResult.data;
-		if (!campaign) return bondFormFailure('create', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!campaign) return bondFormFailure('create', 404, BOND_MESSAGES.campaignNotFound);
 		if (!canLoadBonds(campaign.status)) {
 			return bondFormFailure('create', 409, campaignLockedMessage(campaign.status), { values });
 		}
@@ -119,7 +118,7 @@ export const actions: Actions = {
 		const result: BondFormResult = {
 			form: 'create',
 			success: true,
-			message: `Bond ${baseFormatted} / ${associatedFormatted} saved.`,
+			message: `Bono ${baseFormatted} / ${associatedFormatted} guardado.`,
 			errors: {},
 			created: { id, baseFormatted, associatedFormatted }
 		};

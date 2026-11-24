@@ -221,7 +221,7 @@ describe('bond imports (local Supabase)', () => {
 	it('a file with a broken header is refused without opening a session', async () => {
 		const result = await upload(operator, 'bad.csv', 'type,number\nsimple,1\n');
 		expect(result).toMatchObject({ status: 400 });
-		expect(String(result.data?.message)).toMatch(/missing columns/i);
+		expect(String(result.data?.message)).toMatch(/faltan las columnas/i);
 		const page = (await importLoad(event(operator, { id: campaignId }, '/bonds/import'))) as {
 			sessions: unknown[];
 		};

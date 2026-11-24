@@ -92,28 +92,32 @@ describe('mapBondRpcError', () => {
 	it.each([
 		[
 			'base number 5129 overflows: its associated number 10000 exceeds the campaign maximum number 9999',
-			'Base number 5129 overflows: its associated number 10000 exceeds the campaign maximum number 9999.',
+			'El número base 5129 desborda: su número asociado 10000 supera el número máximo de la campaña 9999.',
 			'baseNumbers'
 		],
 		[
 			'number 0005 appears more than once in this bond (2 as base, 0 as associated)',
-			'Number 0005 appears more than once in this bond (2 as base, 0 as associated).',
+			'El número 0005 aparece más de una vez en este bono (2 como base, 0 como asociado).',
 			'baseNumbers'
 		],
 		[
 			'a pata needs at least 2 simple bonds',
-			'A pata needs at least 2 simple bonds.',
+			'Una pata necesita al menos 2 bonos simples.',
 			'memberBondIds'
 		],
 		[
 			`bond ${BOND_A} belongs to another campaign`,
-			`Bond ${BOND_A} belongs to another campaign.`,
+			`El bono ${BOND_A} pertenece a otra campaña.`,
 			'memberBondIds'
 		],
-		['a reason is required to annul a bond', 'A reason is required to annul a bond.', 'reason'],
+		[
+			'a reason is required to annul a bond',
+			'Se requiere un motivo para anular un bono.',
+			'reason'
+		],
 		[
 			`bond ${BOND_A} is not a manually grouped pata`,
-			`Bond ${BOND_A} is not a manually grouped pata.`,
+			`El bono ${BOND_A} no es una pata agrupada manualmente.`,
 			'pataBondId'
 		]
 	])('maps 22023 %j to a validation error on its field', (message, text, field) => {
@@ -137,7 +141,7 @@ describe('mapBondRpcError', () => {
 		expect(err.kind).toBe('conflict');
 		expect(err.status).toBe(409);
 		expect(err.field).toBe('baseNumber');
-		expect(err.message).toBe(`Numbers 0068, 4939 are already used by bond ${BOND_A}.`);
+		expect(err.message).toBe(`Los números 0068, 4939 ya están en uso en el bono ${BOND_A}.`);
 		const several = mapBondRpcError({
 			code: '23505',
 			message: 'x',
@@ -149,7 +153,7 @@ describe('mapBondRpcError', () => {
 			})
 		});
 		expect(several.message).toBe(
-			`Numbers 0068, 5000 are already used by other bonds in this campaign (0068: bond ${BOND_A}, 5000: bond ${BOND_B}).`
+			`Los números 0068, 5000 ya están en uso en otros bonos de esta campaña (0068: bono ${BOND_A}, 5000: bono ${BOND_B}).`
 		);
 		expect(err.conflicts).toEqual([
 			{ number: 68, formatted: '0068', bondId: BOND_A, numberKind: 'base' },
@@ -164,7 +168,7 @@ describe('mapBondRpcError', () => {
 				conflicts: [{ number: 68, formatted: '00068', bond_id: BOND_B, number_kind: 'base' }]
 			})
 		});
-		expect(single.message).toBe(`Number 00068 is already used by bond ${BOND_B}.`);
+		expect(single.message).toBe(`El número 00068 ya está en uso en el bono ${BOND_B}.`);
 		expect(single.field).toBe('baseNumbers');
 	});
 
@@ -179,7 +183,7 @@ describe('mapBondRpcError', () => {
 			field: 'internalCode',
 			conflictingBondId: BOND_A
 		});
-		expect(internal.message).toBe(`Internal code INT-1 is already used by bond ${BOND_A}.`);
+		expect(internal.message).toBe(`El código interno INT-1 ya está en uso en el bono ${BOND_A}.`);
 
 		const barcode = mapBondRpcError({
 			code: '23505',
@@ -195,20 +199,20 @@ describe('mapBondRpcError', () => {
 	it.each([
 		[
 			'bonds can only be changed while the campaign is draft or active (status: closing)',
-			`${BOND_MESSAGES.campaignLocked} This campaign is closing.`
+			`${BOND_MESSAGES.campaignLocked} La campaña está en cierre.`
 		],
 		['a manually grouped pata cannot be annulled directly', BOND_MESSAGES.manualPataAnnul],
 		[
 			`only available bonds can be grouped (bond 1004 (${BOND_A}) is delivered_to_collector)`,
-			`Only available bonds can be grouped (bond 1004 (${BOND_A}) is delivered to collector).`
+			`Solo se pueden agrupar bonos disponibles (el bono 1004 (${BOND_A}) está en estado entregado al cobrador).`
 		],
 		[
 			`bond 1000 (${BOND_A}) belongs to manually grouped pata ${BOND_B}`,
-			`Bond 1000 (${BOND_A}) belongs to manually grouped pata ${BOND_B}. Ungroup the pata first.`
+			`El bono 1000 (${BOND_A}) pertenece a la pata manual ${BOND_B}. Desagrupar la pata primero.`
 		],
 		[
 			`only an available pata can be ungrouped (pata ${BOND_A} is sold)`,
-			`Only an available pata can be ungrouped (pata ${BOND_A} is sold).`
+			`Solo se puede desagrupar una pata disponible (la pata ${BOND_A} está en estado vendido).`
 		]
 	])('maps 55000 %j to a readable conflict', (message, text) => {
 		const err = mapBondRpcError({ code: '55000', message });

@@ -30,7 +30,7 @@ describe('previewPata', () => {
 
 	it('needs at least 2 base numbers', () => {
 		expect(previewPata('68', config, '60000.00').problems).toEqual([
-			'A pata needs at least 2 base numbers'
+			'Una pata necesita al menos 2 números base'
 		]);
 		expect(previewPata('', config, '60000.00')).toMatchObject({
 			ok: false,
@@ -42,14 +42,14 @@ describe('previewPata', () => {
 	it('reports overflow, range and format problems per number', () => {
 		const preview = previewPata('68 5129 12345', config, '60000.00');
 		expect(preview.ok).toBe(false);
-		expect(preview.problems[0]).toContain('the highest allowed base number is 5128');
-		expect(preview.problems[1]).toContain('is not a valid number');
+		expect(preview.problems[0]).toContain('el número base más alto permitido es 5128');
+		expect(preview.problems[1]).toContain('no es un número válido');
 	});
 
 	it('reports numbers repeated inside the pata', () => {
 		expect(previewPata('68 68', config, '60000.00').problems).toEqual([
-			'Number 0068 appears more than once in this pata (2 as base, 0 as associated)',
-			'Number 4939 appears more than once in this pata (0 as base, 2 as associated)'
+			'El número 0068 aparece más de una vez en esta pata (2 como base, 0 como asociado)',
+			'El número 4939 aparece más de una vez en esta pata (0 como base, 2 como asociado)'
 		]);
 		expect(previewPata('68 4939', config, '60000.00').collisions.map((c) => c.formatted)).toEqual([
 			'4939'

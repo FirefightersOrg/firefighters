@@ -6,7 +6,6 @@ import { requireActiveUser } from '$lib/server/auth/guards';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	IMPORT_MESSAGES,
 	ImportServiceError,
@@ -83,7 +82,7 @@ export function importServiceFailure(
 
 /** Loads the campaign of the route (404 for a malformed or unknown id, 500 on failure). */
 export async function loadImportCampaign(locals: App.Locals, id: string): Promise<Campaign> {
-	if (!isUuid(id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!isUuid(id)) error(404, { message: IMPORT_MESSAGES.campaignNotFound });
 	const result = await getCampaignById(locals.supabase, id);
 	if (result.error) {
 		console.error('[imports] campaign load failed', {
@@ -91,9 +90,9 @@ export async function loadImportCampaign(locals: App.Locals, id: string): Promis
 			campaignId: id,
 			error: result.error
 		});
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	}
-	if (!result.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!result.data) error(404, { message: IMPORT_MESSAGES.campaignNotFound });
 	return result.data;
 }
 

@@ -58,7 +58,7 @@ export function parseBondListQuery(params: URLSearchParams, campaign: Campaign):
 			return parseCampaignNumber(values[field], config);
 		} catch {
 			errors[field] =
-				`Enter a number from ${formatCampaignNumber(0, config)} to ` +
+				`Ingresar un número entre ${formatCampaignNumber(0, config)} y ` +
 				`${formatCampaignNumber(config.maxNumber, config)}.`;
 			return null;
 		}
@@ -66,7 +66,7 @@ export function parseBondListQuery(params: URLSearchParams, campaign: Campaign):
 	const choice = <T extends string>(field: BondListQueryField, allowed: readonly T[]) => {
 		if (!values[field]) return null;
 		const parsed = oneOfOrNull(allowed, values[field]);
-		if (!parsed) errors[field] = 'Choose one of the listed options.';
+		if (!parsed) errors[field] = 'Elegir una de las opciones de la lista.';
 		return parsed;
 	};
 
@@ -79,7 +79,7 @@ export function parseBondListQuery(params: URLSearchParams, campaign: Campaign):
 		financialStatus: choice<BondFinancialStatus>('financial', BOND_FINANCIAL_STATUSES)
 	};
 	if (values.code.length > MAX_CODE_SEARCH_LENGTH) {
-		errors.code = `Enter at most ${MAX_CODE_SEARCH_LENGTH} characters.`;
+		errors.code = `Ingresar hasta ${MAX_CODE_SEARCH_LENGTH} caracteres.`;
 	}
 
 	const rawPage = params.get('page') ?? '';
