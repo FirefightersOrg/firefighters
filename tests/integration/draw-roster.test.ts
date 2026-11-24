@@ -186,6 +186,191 @@ beforeAll(async () => {
 	}
 });
 
+it('SAN-117 releases, audits and reallocates extras without changing shared frozen history', async () => {
+	// Dedicated mutable fixture: no dependence on other tests' draws, payments or reservations.
+	const scope = randomUUID();
+	const context = { permissions, requestId: `it-117-${scope}` };
+	const campaign = await rpc<string>('campaign_create', {
+		p_name: `SAN117 ${scope}`,
+		p_simple_bond_value: 100,
+		p_installment_count: 1,
+		p_number_digits: 4,
+		p_max_number: 9999,
+		p_associated_number_offset: 4871,
+		p_overflow_policy: 'reject',
+		p_barcode_mode: 'base_number',
+		p_starts_at: `${today}T00:00:00-03:00`,
+		p_ends_at: `${today}T23:59:59-03:00`,
+		p_request_id: context.requestId
+	});
+	await rpc('campaign_transition', {
+		p_id: campaign,
+		p_to_status: 'active',
+		p_request_id: context.requestId
+	});
+	const bond = await rpc<string>('bond_create', {
+		p_campaign_id: campaign,
+		p_base_numbers: [200],
+		p_request_id: context.requestId
+	});
+	await rpc('bond_deliver', {
+		p_campaign_id: campaign,
+		p_collector_id: collectorId,
+		p_bond_ids: [bond],
+		p_notes: null,
+		p_request_id: context.requestId
+	});
+	const sale = await rpc<string>('sale_register', {
+		p_campaign_id: campaign,
+		p_bond_id: bond,
+		p_buyer_id: buyerId,
+		p_payment_mode: 'full_payment',
+		p_first_due_date: today,
+		p_request_id: context.requestId
+	});
+	const installment = await admin
+		.from('installments')
+		.select('id,payment_plans!inner(sale_id)')
+		.eq('payment_plans.sale_id', sale)
+		.single();
+	expect(installment.error).toBeNull();
+	const settlement = await rpc<string>('settlement_open', {
+		p_campaign_id: campaign,
+		p_collector_id: collectorId,
+		p_request_id: context.requestId
+	});
+	await rpc('settlement_add_payment', {
+		p_settlement_id: settlement,
+		p_sale_id: sale,
+		p_amount: 100,
+		p_payment_method: 'cash',
+		p_payment_date: today,
+		p_applications: [{ installment_id: installment.data!.id, amount_applied: 100 }],
+		p_request_id: context.requestId
+	});
+	await rpc('settlement_close', {
+		p_settlement_id: settlement,
+		p_request_id: context.requestId
+	});
+	const newDraw = (name: string) =>
+		createDraw(
+			admin,
+			{
+				campaignId: campaign,
+				drawType: 'extraordinary_full_payment',
+				name,
+				drawDate: today,
+				paymentCutoffAt: `${today}T23:59:59-03:00`,
+				requiredInstallmentNumber: null,
+				eligibilityRule: {}
+			},
+			context
+		);
+	const first = await newDraw('First');
+	const firstRoster = await generateDrawRoster(admin, { drawId: first }, context);
+	const before = await entries(firstRoster);
+	const oldExtra = await admin
+		.from('bond_numbers')
+		.select('*')
+		.eq('bond_id', bond)
+		.eq('number_kind', 'extraordinary')
+		.single();
+	expect(oldExtra.error).toBeNull();
+	const deniedRequest = `${context.requestId}-denied`;
+	const denied = await readOnly.rpc('draw_annul', {
+		p_draw_id: first,
+		p_reason: 'Denied',
+		p_request_id: deniedRequest
+	});
+	expect(denied.error?.code).toBe('42501');
+	const deniedAudit = await admin.from('audit_log').select('id').eq('request_id', deniedRequest);
+	expect(deniedAudit.error).toBeNull();
+	expect(deniedAudit.data).toEqual([]);
+	const unchanged = await admin.from('draws').select('status').eq('id', first).single();
+	expect(unchanged.error).toBeNull();
+	expect(unchanged.data?.status).toBe('roster_generated');
+	const deniedExtra = await admin
+		.from('bond_numbers')
+		.select('*')
+		.eq('id', oldExtra.data!.id)
+		.single();
+	expect(deniedExtra.error).toBeNull();
+	expect(deniedExtra.data).toEqual(oldExtra.data);
+	const releaseRequest = `${context.requestId}-release`;
+	await annulDraw(
+		admin,
+		{ drawId: first, reason: 'Cancel extraordinary' },
+		{
+			...context,
+			requestId: releaseRequest
+		}
+	);
+	const released = await admin
+		.from('bond_numbers')
+		.select('*')
+		.eq('id', oldExtra.data!.id)
+		.single();
+	expect(released.error).toBeNull();
+	expect(released.data?.released_at).toBeTruthy();
+	expect(released.data?.released_by).toBeTruthy();
+	const audit = await admin
+		.from('audit_log')
+		.select('new_value,old_value,reason')
+		.eq('request_id', releaseRequest)
+		.single();
+	expect(audit.error).toBeNull();
+	expect(audit.data?.new_value).toMatchObject({
+		status: 'annulled',
+		released_number_ids: [oldExtra.data!.id]
+	});
+	expect(audit.data?.old_value).toMatchObject({ status: 'roster_generated' });
+	expect(await entries(firstRoster)).toEqual(before);
+	const second = await newDraw('Later');
+	await generateDrawRoster(admin, { drawId: second }, context);
+	const current = await admin
+		.from('bond_numbers')
+		.select('*')
+		.eq('bond_id', bond)
+		.eq('number_kind', 'extraordinary')
+		.is('released_at', null)
+		.single();
+	expect(current.error).toBeNull();
+	expect(current.data!.id).not.toBe(oldExtra.data!.id);
+	expect(current.data!.number_value).toBe(oldExtra.data!.number_value);
+	expect(current.data!.source_base_number_id).toBe(oldExtra.data!.source_base_number_id);
+	const third = await newDraw('Shared frozen');
+	const thirdRoster = await generateDrawRoster(admin, { drawId: third }, context);
+	await freezeDrawRoster(admin, { drawId: third }, context);
+	const frozen = await entries(thirdRoster);
+	const keepRequest = `${context.requestId}-keep`;
+	await annulDraw(
+		admin,
+		{ drawId: second, reason: 'Keep shared extra' },
+		{ ...context, requestId: keepRequest }
+	);
+	const kept = await admin.from('bond_numbers').select('*').eq('id', current.data!.id).single();
+	expect(kept.error).toBeNull();
+	expect(kept.data).toEqual(current.data);
+	const keptAudit = await admin
+		.from('audit_log')
+		.select('new_value')
+		.eq('request_id', keepRequest)
+		.single();
+	expect(keptAudit.error).toBeNull();
+	expect(keptAudit.data?.new_value).toMatchObject({ released_number_ids: [] });
+	const frozenRequest = `${context.requestId}-frozen`;
+	const refused = await admin.rpc('draw_annul', {
+		p_draw_id: third,
+		p_reason: 'Frozen',
+		p_request_id: frozenRequest
+	});
+	expect(refused.error?.code).toBe('55000');
+	const frozenAudit = await admin.from('audit_log').select('id').eq('request_id', frozenRequest);
+	expect(frozenAudit.error).toBeNull();
+	expect(frozenAudit.data).toEqual([]);
+	expect(await entries(thirdRoster)).toEqual(frozen);
+});
+
 describe('transactional draw roster services with real users', () => {
 	it('creates, edits and annuls an audited scheduled configuration', async () => {
 		const drawId = await createDraw(

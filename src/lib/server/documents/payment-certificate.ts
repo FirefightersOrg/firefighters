@@ -15,12 +15,25 @@ export interface PaymentCertificateSource {
 	createdAt: string;
 	registeredBy: string;
 	settlementNumber: number | null;
+	legend: {
+		kind: 'annulled' | 'corrected';
+		eventAt: string;
+		actor: string;
+		reason: string;
+		relatedPaymentId: string | null;
+		correctionType: string;
+	} | null;
 }
-export interface PrintablePaymentCertificate extends PaymentCertificateSource {
+export interface PrintablePaymentCertificate extends Omit<PaymentCertificateSource, 'legend'> {
 	institutionName: string;
 	campaign: string;
 	amount: string;
 	receiptNumber: string;
+	legend: {
+		label: 'ANULADO — COMPROBANTE SIN VALIDEZ' | 'CORREGIDO — VER REFERENCIA';
+		detail: string;
+		reference: string | null;
+	} | null;
 }
 /** Receipt numbers are stable: settlement number plus the first eight UUID characters, or PAYMENT-<id> when not settled. */
 export function buildPrintablePaymentCertificate(
@@ -37,6 +50,22 @@ export function buildPrintablePaymentCertificate(
 				: number
 		)
 		.join(', ');
+	const legend =
+		source.legend === null
+			? null
+			: source.legend.kind === 'annulled'
+				? {
+						label: 'ANULADO — COMPROBANTE SIN VALIDEZ' as const,
+						detail: `${formatDateTime(source.legend.eventAt)} — ${source.legend.actor}. Motivo: ${source.legend.reason}`,
+						reference: null
+					}
+				: {
+						label: 'CORREGIDO — VER REFERENCIA' as const,
+						detail: `${formatDateTime(source.legend.eventAt)} — ${source.legend.actor}. Motivo: ${source.legend.reason}`,
+						reference: source.legend.relatedPaymentId
+							? `Comprobante relacionado: PAY-${source.legend.relatedPaymentId.slice(0, 8).toUpperCase()}`
+							: null
+					};
 	return {
 		...source,
 		institutionName,
@@ -46,6 +75,7 @@ export function buildPrintablePaymentCertificate(
 		// SQL date is a calendar day: formatDate does not shift zones or invent a time.
 		paymentDate: formatDate(source.paymentDate),
 		createdAt: formatDateTime(source.createdAt),
+		legend,
 		receiptNumber: source.settlementNumber
 			? `SET-${formatPaddedNumber(source.settlementNumber, 4)}-${shortId}`
 			: `PAY-${shortId}`
