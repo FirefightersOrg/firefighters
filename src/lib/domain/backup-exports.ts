@@ -250,7 +250,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			nested('settlement_number', 'settlements', 'settlement_number', false),
 			nested('collector_id', 'settlements', 'collector_id', false),
 			col('commission_delta', 'commission_delta'),
-			col('withheld_commission_delta', 'cash_retained_delta'),
+			col('cash_retained_delta', 'cash_retained_delta'),
 			col('reason', 'reason', true),
 			col('created_by', 'created_by'),
 			col('created_at', 'created_at')

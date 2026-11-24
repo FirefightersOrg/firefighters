@@ -65,7 +65,7 @@ from public.settlement_corrections sc
 join public.settlements s on s.id = sc.settlement_id
 group by s.campaign_id
 union all
-select s.campaign_id, 'withheld_commission_delta', coalesce(sum(sc.cash_retained_delta), 0)::text
+select s.campaign_id, 'cash_retained_delta', coalesce(sum(sc.cash_retained_delta), 0)::text
 from public.settlement_corrections sc
 join public.settlements s on s.id = sc.settlement_id
 group by s.campaign_id

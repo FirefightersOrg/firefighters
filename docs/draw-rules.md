@@ -208,13 +208,15 @@ Possible results:
   calendar day of the cutoff, inclusively, and checks status at generation time. A confirmed
   payment on that day counts even if its confirmation occurred later. The product question about
   confirmation-timestamp semantics remains open; payments currently have no such timestamp.
-- Generation locks campaign FOR SHARE, draw FOR UPDATE, then existing rosters in UUID order.
+- Generation locks campaign FOR SHARE (except SAN-81 consolation, documented below),
+  draw FOR UPDATE, then existing rosters in UUID order.
   Generation also requires the locked campaign to be draft/active (55000 for closing, closed
   or annulled), before any extraordinary reservation or roster write. The existing campaign
   lock stabilizes the status check; this review does not change lock acquisition order.
   Regeneration is allowed only before freeze, supersedes previous generated rosters and preserves
-  all their entries. Freeze locks draw then the current generated roster; it never takes a
-  campaign lock after the draw lock. It sets freeze actor/time and `roster_frozen` atomically.
+  all their entries. Freeze locks campaign first (see SAN-81), then draw and the
+  current generated roster; it never takes a campaign lock after the draw lock.
+  It sets freeze actor/time and `roster_frozen` atomically.
   A repeated freeze of an already frozen roster is an idempotent no-op success (Santiago's
   decision on #79): nothing changes and no audit row is written.
   **Freeze decision (review 4642358561):** freezing an already generated roster remains allowed
@@ -282,3 +284,229 @@ Possible results:
   38 database files / 2475 assertions passed (038 plan: 152); `pnpm test:integration`:
   23 files / 192 tests passed; `pnpm check`: 0 errors / 0 warnings; `pnpm lint`: passed;
   `pnpm test`: 121 files / 1577 tests passed.
+
+## Implemented in SAN-81
+
+### RPC and authorization contract
+
+- Migration `20261226000000_prize_services.sql` adds `prize_create` (UUID),
+  `prize_update` (void), `draw_load_winning_number` (winning-number UUID),
+  `prize_resolve`, `prize_deliver`, and `prize_annul` (all void). SAN-80 and
+  merged migrations are unchanged. All six are audited SECURITY DEFINER RPCs
+  with empty search paths, explicit authenticated EXECUTE, and no public,
+  anon or service-role EXECUTE. Private helpers have no API EXECUTE.
+- Configuration uses **`draw.update`**, since the catalog has no prize-create
+  permission. Loading uses `draw.load_winner`, resolution uses `prize.resolve`,
+  correction uses the new **`prize.annul`** (seeded for admin only), and delivery
+  uses `prize.deliver`. Checks use active-profile
+  capabilities, never role names. No write RLS policies
+  are introduced; no API role has direct prize/winner/award DML.
+- TS `src/lib/server/services/prizes.ts` requires `{ requestId, permissions }`;
+  unavailable permissions fail closed with 500 and missing permission with
+  403 before any DB call. Zod mirrors SQL's trimmed, nullable optional text
+  and Unicode-code-point limits (name 200, description/notes/reason 1000),
+  positive int32 positions and nonnegative int32 numbers. Campaign-specific
+  number bounds are authoritative in SQL. `42501`, `55000`, `22023`, `23514`,
+  `P0002`, and `23505` map to 403/409/400/400/404/409 respectively.
+  Context request IDs correlate calls; they are not idempotency keys.
+
+### Loading, resolution and delivery
+
+- Create always starts pending validation; update requires pending validation.
+  All operations reject closed or annulled draws. Configuration can be created
+  before generation and after freeze, allowing a corrected result to have a
+  replacement prize. Configuration creation and editing reject completed draws
+  with 55000. Completed-but-not-closed draws permit resolution, delivery,
+  and undelivered correction; **loading requires exactly `roster_frozen`**.
+  Consequently, annulment after completion is void-only: a replacement cannot
+  be loaded on a completed draw (55000), and this task introduces no reopen
+  transition. The replacement-and-reload workflow runs before completion.
+  No campaign-status gate is added to prize workflows: an already frozen
+  snapshot remains actionable after campaign closure, as with SAN-77 freezing.
+- Loading searches only the draw's immutable **frozen** roster, including
+  extraordinary entries. Eligible matches produce `eligible_winner`, leaving
+  the prize pending validation. Ineligible matches produce `not_eligible` and
+  make the prize unawarded; their original reason remains accessible through
+  `matched_roster_entry_id`. Missing numbers produce `no_match` and unawarded.
+  There is no manual override of frozen eligibility or new `pending_review`
+  write path. SAN-80's one-winning-number-per-prize rule is retained. Duplicate
+  loading checks under the prize lock and returns readable 55000, not raw 23505.
+- Resolution requires an eligible loaded result and pending prize. `award`
+  transitions through `awarded`, inserts the award and reaches `pending_delivery`
+  in one transaction; `unaward` reaches terminal unawarded without an award.
+  A missing loaded result or missing frozen party identity fails with 55000.
+  The physical entry bond and actual snapshot keys `buyer_snapshot.id` and
+  `collector_snapshot.id` determine ownership, never current parties or their
+  active status. Resolved prizes freeze `excludes_from_consolation`.
+- Delivery requires pending delivery and an awarded award. Both statuses advance
+  atomically; server time, authenticated actor and required nonblank observations
+  are recorded. Resolution notes are retained on the award and audit; unaward
+  notes are retained in the audit reason. Delivery notes replace award notes,
+  while the original resolution audit retains the original observations.
+  Repeated resolve/deliver/annul calls fail state checks without duplicate
+  awards or audit rows.
+
+### Correction and immutable history
+
+- **Replacement model:** annul the incorrect prize, then create a new prize at
+  the same position and load the correct number on that new UUID. The active
+  position index replaces SAN-80's unconditional uniqueness; a full draw-FK
+  index remains. Multiple annulled historical positions are allowed, but only
+  one live prize per `(draw_id, position)` exists. Same-row reloading is never
+  allowed, and no loaded number, entry match or original result classification
+  is overwritten or deleted.
+- A winning-number result is **void by its parent prize's `annulled` status**,
+  not by rewriting SAN-80's immutable `result_status`. Consumers must include
+  the parent status when interpreting historical results. This deliberately
+  preserves the original eligibility classification and frozen match.
+- The general SAN-80 lifecycle guards remain unchanged for ordinary writes.
+  The domain and documented state machine include audited correction from
+  **pending_validation, awarded, pending_delivery, or unawarded only**, including
+  an incorrect unloaded, unmatched or ineligible result. A delivered prize
+  returns 55000: `a delivered prize cannot be annulled; pending product decision`.
+  Correction requires `prize.annul`, not `prize.resolve`.
+  A transaction-local marker selects the correction guard, which permits
+  changing **only** status, dedicated annulment metadata and updated time.
+  Inserts and changes to original history are rejected on that path. Forging
+  the marker supplies neither table DML nor internal-helper EXECUTE.
+- Reason is required, trimmed and at most 1000 code points. Original award
+  timestamps, party identities, notes and delivered actor/time remain intact.
+  The storage consistency constraint can retain paired historical delivery
+  metadata, but the RPC never annuls delivered prizes. Re-annulment is refused; original annul reasons
+  cannot be overwritten.
+- Exactly one audit row is inserted by each successful RPC, in its transaction.
+  Normal events carry the prize, winner and award snapshots plus campaign ID;
+  annulment carries all nine correction fields (type, affected entity, related
+  draw, reason, actor, date, previous/new snapshots and an empty compensatory
+  movement list). There are no financial side effects. The separate annulment
+  and replacement-loading audit events preserve both sides of a correction.
+
+### Consolation and concurrency
+
+- `draw_generate_roster(uuid,text)` is replaced faithfully from SAN-77, removing
+  the Phase-12 refusal and adding authoritative previous-award evaluation and
+  the configured consolation installment coverage. Its isolated payment-cutoff
+  helper, ordinary number participation, commercial/party snapshot, regeneration,
+  freeze protection, extraordinary allocation and all other behavior remain.
+  The prior fail-closed assertions in 038 and integration now verify generation;
+  SQL/TS parity covers consolation as well as the earlier three types.
+- **Previous** means ascending `(draw_date, created_at, id)` within the same
+  campaign, strictly less than the target draw. Date is primary, creation time
+  resolves same-date draws, and UUID is the deterministic exact-timestamp
+  tie-breaker. Current and later draws cannot exclude.
+- Generation **and freezing** refuse consolation with 55000 while any
+  non-annulled previous draw has an excluding `pending_validation` prize, with
+  or without a loaded number: `previous draws of the campaign have unresolved
+prizes that exclude from consolation`. Resolved means awarded, pending delivery,
+  delivered, or unawarded; annulled prizes do not block.
+  The gate also precedes the existing freeze idempotent no-op; a repeated freeze
+  does not bypass unresolved-prize checks and never mutates the frozen snapshot.
+- Only an `awarded` or `delivered` award of a non-annulled prize of a
+  non-annulled previous draw whose
+  `excludes_from_consolation` is true excludes a bond. Merely loading an eligible
+  number blocks admission until resolved; an unawarded decision, a non-excluding
+  prize, or an annulled award/prize does not exclude. Active manual-pata membership maps physical award bonds to effective
+  parents, propagating a member win to all participating members.
+- Reason precedence matches SAN-76: annulled, not sold, already won, missing
+  required installment, insufficient installment coverage. The configured
+  consolation rule resolves through the existing SAN-77 helper, including
+  camel-case/snake-case precedence and column fallback.
+- Every prize operation discovers parents without locks, then takes campaign
+  SHARE → draw UPDATE → prize UPDATE → winner UPDATE → awards UPDATE, sorted
+  by UUID within each level. The draw lock serializes same-draw admission,
+  edits, resolution, delivery, correction and closure; no financial or ledger
+  locks are involved. pgTAP 042 includes two real dblink sessions calling the
+  RPCs: simultaneous result loads serialize and the loser rechecks state;
+  lifecycle waits for a prize write; a prize write waits for committed closure
+  and then refuses without audit.
+- Only consolation generation and freezing take campaign **UPDATE before draw
+  UPDATE**; all other draw types retain campaign **SHARE before draw UPDATE**.
+  Both RPCs discover campaign ID and draw type without locks first; no API RPC
+  changes an existing draw's type. Prize operations take campaign SHARE first.
+  This serializes consolation admission against
+  prior-prize mutations without locking previous draws out of order. Real dblink
+  races verify both gates wait and recheck a newly committed pending prize with
+  no state or audit writes on refusal. Two-session NOWAIT assertions also verify
+  ordinary generation and freezing permit a concurrent campaign SHARE lock,
+  avoiding campaign-wide exclusion of sales, deliveries and payment/prize RPCs
+  during ordinary draws; consolation alone retains that stronger serialization.
+- A resolved prize cannot revert to pending through the state machine. However,
+  creation of a new pending excluding prize on a previous draw between generation
+  and freeze is possible and tested: freeze refuses until resolution or annulment.
+  Once frozen, snapshots remain immutable; corrections never rewrite them.
+  Regenerate before freeze to capture changed resolved winners or corrections.
+
+### Known gaps and validation
+
+Review resolutions (PR #89):
+
+| Comment ID | Resolution                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4645352319 | Dedicated admin-only `prize.annul`; only pending validation, awarded, pending delivery and unawarded may be annulled; delivered refusal, source states, audit/history and resolver-only denial tested; state machine and domain aligned.          |
+| 4645352331 | Both consolation gates require all prior excluding prizes resolved, including unloaded prizes; campaign-first serialization and real two-session generation/freeze races; a newly created pending prize between generation and freeze is covered. |
+| 4645352347 | Duplicate loading returns readable 55000 under the prize lock, including a racing second loader; TS maps the conflict.                                                                                                                            |
+| 4645352356 | Completed draws reject prize creation/editing with 55000; SAN-117 remains explicitly listed below.                                                                                                                                                |
+
+- No RPC signatures changed. The new permission is reflected in the canonical
+  catalog, seed/RLS count assertions and Phase-1 acceptance. Phase-2 checks only
+  campaign/commission permission subsets and campaign navigation flags; neither
+  changes, so its expectations need no update. Existing SAN-77 roster/Phase-11
+  flows have no unresolved prior excluding prizes and require no fixture changes.
+
+- **SAN-117:** extraordinary numbers are not released when their draw is annulled;
+  this remains a separate follow-up and is not changed here.
+- **SAN-81 (pending product decision):** delivered prizes cannot be annulled.
+  The RPC explicitly refuses instead of voiding an already fulfilled award.
+- **SAN-77 (inherited product question):** payment cutoff remains the inclusive
+  Buenos Aires `payment_date`, not confirmation time, because payments have no
+  confirmation timestamp. This task neither invents that timestamp nor changes
+  cutoff semantics.
+- **SAN-81 scope:** no routes/UI, winner override, or automatic draw completion
+  is included; the task is SQL and services. Correction replacement is explicit,
+  not an automatic clone, and clients use the new prize ID. These are intentional
+  boundaries, not unimplemented RPC requirements.
+- Validation on the exclusively owned local DB: a clean local reset, then
+  `supabase test db` **before integration**, passed **41 files / 2957 assertions**
+  (042 plan **177**, including real two-session races and ordinary-draw campaign
+  SHARE compatibility); `pnpm seed:admin` followed
+  by `pnpm test:integration` passed **26 files / 210 tests**. `pnpm check` reported
+  **0 errors / 0 warnings**, `pnpm lint` passed, and `pnpm test` passed **135 files /
+  1696 tests**. The eight prize integration cases also passed individually and
+  shuffled with seed 81; each creates its own campaign and mutable records.
+  Existing SAN-77 coverage caught the required update of its historical
+  consolation-refusal assertion; SAN-80's FK-index check caught the need for a
+  full draw index after replacing position uniqueness with a partial index.
+- **SAN-81 lock-follow-up validation note:** the first integration run had
+  209 passing tests and one unrelated Phase-5 search-fixture failure: its random
+  RUN_ID suffix `be8f7ada` contains `ada`, so the business fixture also matches the
+  case-insensitive `Ada <RUN_ID>` search. Database inspection confirmed the extra
+  result was `Business 20261120172700-be8f7ada`, not a roster side effect.
+  An unchanged full-suite rerun passed all 210 tests. That pre-existing fixture
+  flake is outside this SQL lock follow-up and remains unfixed.
+
+## Implemented in SAN-82
+
+- `/campaigns/[id]/draws/[drawId]/winners` is the prize operations screen and is linked from
+  draw detail. It keeps configuration, load, resolution, delivery and correction controls
+  permission- and state-aware, while every action repeats the permission check and verifies
+  form-supplied prize IDs belong to the route draw before calling a service.
+- A successful winning-number submission reads the persisted result back immediately. The UI
+  formats the number with campaign padding and displays the frozen roster's real buyer and
+  collector snapshot keys, bond, eligibility, exact ineligibility label and whether resolution
+  is pending or the prize is unawarded. No current-party data is substituted for the snapshot.
+- Prize reads use the signed-in RLS client. Lists are fetched in deterministic 500-row
+  PostgREST pages so records beyond the 1,000-row default are not omitted. Missing prize lookups
+  preserve the repository `{ data: null, error: null }` contract.
+- Bond and buyer records list awards for their respective persisted `bond_id` / `buyer_id`.
+  Delivery timestamps are converted as instants to `America/Argentina/Buenos_Aires`; date-only
+  draw fields remain unchanged.
+- Correction follows SAN-81's replacement model: an annulled prize offers a prefilled create
+  form at the same position. Delivered prizes show the SAN-81 explanation and no annul control.
+  Textareas deliberately have no native `maxlength`; server and service validation count Unicode
+  code points.
+- Decision: prize history is visible only with a capability accepted by prize read RLS
+  (`draw.view`, `draw.load_winner`, or a prize action). A bond/buyer reader without one sees an
+  explicit permission message rather than causing an RLS query failure.
+- Known gaps are unchanged: **SAN-117** extraordinary-number release remains out of scope, and
+  **SAN-81** still forbids annulment of delivered prizes pending a product decision. No new
+  integration test or database change was required by this UI-only phase.

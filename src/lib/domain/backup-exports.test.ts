@@ -88,7 +88,7 @@ describe('exports', () => {
 			}
 		]);
 		const [head, line] = csv.replace('﻿', '').split('\r\n');
-		expect(head).toContain('withheld_commission_delta');
+		expect(head).toContain('cash_retained_delta');
 		expect(line).toContain('-150.00');
 		expect(line).toContain('25.50');
 		expect(line).toContain("'=HYPERLINK");
