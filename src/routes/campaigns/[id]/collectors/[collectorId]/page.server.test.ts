@@ -120,7 +120,7 @@ describe('/campaigns/[id]/collectors/[collectorId]', () => {
 		] as const) {
 			const test = setup(MANAGER, { rpc: { data: rpcData, error: null } });
 			const result = await update(test.locals, { ...fields, status });
-			expect(result).toMatchObject({ success: true, message: 'Collector updated.' });
+			expect(result).toMatchObject({ success: true, message: 'Cobrador actualizado.' });
 			expect(test.rpc).toHaveBeenCalledWith(
 				'collector_update',
 				expect.objectContaining({ p_id: COLLECTOR_ID, p_status: status })
@@ -135,7 +135,7 @@ describe('/campaigns/[id]/collectors/[collectorId]', () => {
 		const result = await update(test.locals);
 		expect(result).toMatchObject({
 			status: 409,
-			data: { message: expect.stringContaining('Someone else') }
+			data: { message: expect.stringContaining('Otra persona') }
 		});
 	});
 
@@ -191,7 +191,7 @@ describe('/campaigns/[id]/collectors/[collectorId]', () => {
 			]
 		});
 		expect((await load(loadEvent(hidden.locals)))?.profiles[0].fullName).toBe(
-			'Current linked user'
+			'Usuario vinculado actual'
 		);
 	});
 

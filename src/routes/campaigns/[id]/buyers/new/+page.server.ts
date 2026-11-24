@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		listActiveCollectorOptions(locals.supabase)
 	]);
 	if (campaign.error || collectors.error)
-		error(500, { message: 'Could not load the form. Please try again.' });
+		error(500, { message: 'No se pudo cargar el formulario. Volver a intentar.' });
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	return {
 		campaign: campaign.data,

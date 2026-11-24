@@ -55,32 +55,32 @@ describe('/campaigns/[id]/collectors/[collectorId] page', () => {
 		});
 		expect(body).toContain('#4');
 		expect(body).toContain('/settlements/s');
-		expect(body).toContain('Dec 31, 2025');
-		expect(body).toContain('Jan 1, 2026');
+		expect(body).toContain('31/12/2025');
+		expect(body).toContain('01/01/2026');
 	});
 	it('renders the eight sections with their empty states', () => {
 		const body = page(false);
 		for (const title of [
-			'General data',
-			'Assigned bonds',
-			'Associated buyers',
-			'Pending installments',
-			'Settlements',
-			'Current account',
-			'Monthly report',
-			'Audit'
+			'Datos generales',
+			'Bonos asignados',
+			'Compradores asociados',
+			'Cuotas pendientes',
+			'Rendiciones',
+			'Cuenta corriente',
+			'Informe mensual',
+			'Auditoría'
 		])
 			expect(body).toContain(title);
-		expect(body).toContain('No bonds are assigned in this campaign.');
-		expect(body).toContain('No associated buyers.');
-		expect(body).toContain('No data yet.');
-		expect(body).toContain('You do not have permission to view the audit log.');
+		expect(body).toContain('No hay bonos asignados en esta campaña');
+		expect(body).toContain('No hay compradores asociados');
+		expect(body).toContain('Todavía no hay datos.');
+		expect(body).toContain('No hay permiso para ver el registro de auditoría.');
 	});
 
 	it('renders editing only for collector managers', () => {
-		expect(page(false)).not.toContain('Save changes');
+		expect(page(false)).not.toContain('Guardar cambios');
 		expect(page(true)).toContain('action="?/update"');
-		expect(page(true)).toContain('Save changes');
+		expect(page(true)).toContain('Guardar cambios');
 	});
 
 	it('lists held bonds with their note and offers bulk return / reassign', () => {
@@ -113,6 +113,9 @@ describe('/campaigns/[id]/collectors/[collectorId] page', () => {
 		expect(body).toContain('formaction="?/returnBonds"');
 		expect(body).toContain('formaction="?/reassignBonds"');
 		expect(body).toContain('Beto');
+		expect(body).toContain('Devolver seleccionados');
+		expect(body).toContain('Reasignar seleccionados a');
+		expect(body).toContain('aria-label="Seleccionar 0068 / 4939"');
 
 		const readOnly = page(false, {
 			bonds: [bond('b0000000-0000-0000-0000-000000000001', 68, 'delivered_to_collector', 3)],
@@ -133,13 +136,13 @@ describe('collector sale sections', () => {
 					saleId: 's',
 					bondNumbers: ['0068'],
 					buyerName: 'Ada',
-					dueDate: '2027-01-01',
+					dueDate: '01/01/2027',
 					amount: '6000.00',
 					status: 'pending'
 				}
 			]
 		});
-		expect(body).toContain('2027-01-01');
+		expect(body).toContain('01/01/2027');
 		expect(body).toContain('Ada');
 		expect(body).toContain(`/sales/s`);
 	});
@@ -161,15 +164,15 @@ describe('collector sale sections', () => {
 			],
 			can: { manage: false, audit: false, viewRules: true, manageRules: true }
 		});
-		expect(body).toMatch(/data-testid="collector-balance"[^>]*>[^<]*17[.,]50/);
+		expect(body).toMatch(/data-testid="collector-balance"[\s\S]*\$.17,50/);
 		expect(body).toContain(`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}/ledger`);
 		expect(body).toContain('data-testid="special-rules"');
-		expect(body).toContain('Manage special rules');
+		expect(body).toContain('Gestionar reglas especiales');
 	});
 
 	it('hides the current account without ledger permissions', () => {
 		const body = page(false);
-		expect(body).toContain('You do not have permission to view the current account.');
+		expect(body).toContain('No hay permiso para ver la cuenta corriente.');
 		expect(body).not.toContain('/ledger');
 	});
 });

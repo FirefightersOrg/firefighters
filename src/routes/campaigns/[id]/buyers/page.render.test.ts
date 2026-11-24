@@ -46,7 +46,8 @@ describe('buyers page', () => {
 		expect(body).toContain('Lovelace, Ada');
 		expect(body).toContain(`href="/campaigns/${id}/buyers/${buyer.id}"`);
 	});
-	it('renders the empty state', () => expect(page([])).toContain('No buyers match these filters.'));
+	it('renders the empty state', () =>
+		expect(page([])).toContain('No hay compradores para estos filtros'));
 	it('keeps filters in pagination links', () => {
 		const body = page(
 			[buyer],
@@ -60,6 +61,7 @@ describe('buyers page', () => {
 		);
 		expect(body).toContain('q=Ada%20Lovelace&amp;type=individual');
 		expect(body).toContain('page=3');
-		expect(body).toContain('← Previous');
+		expect(body).toContain('Página 2 de 3');
+		expect(body).toContain('← Anterior');
 	});
 });

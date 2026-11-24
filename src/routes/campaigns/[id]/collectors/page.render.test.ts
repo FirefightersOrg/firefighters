@@ -22,13 +22,13 @@ function page(manage: boolean) {
 describe('/campaigns/[id]/collectors page', () => {
 	it('renders search, status filter, and its empty state', () => {
 		const body = page(false);
-		expect(body).toContain('Search');
-		expect(body).toContain('Status');
-		expect(body).toContain('No collectors match these filters.');
+		expect(body).toContain('Buscar');
+		expect(body).toContain('Estado');
+		expect(body).toContain('No hay cobradores para estos filtros');
 	});
 
-	it('shows New collector only to collector managers', () => {
-		expect(page(false)).not.toContain('New collector');
+	it('shows Nuevo cobrador only to collector managers', () => {
+		expect(page(false)).not.toContain('Nuevo cobrador');
 		expect(page(true)).toContain(`href="/campaigns/${CAMPAIGN_ID}/collectors/new"`);
 	});
 });

@@ -16,42 +16,42 @@ describe('mapPartyRpcError', () => {
 			{ code: '22023', message: 'a display name is required' },
 			'validation',
 			400,
-			'A display name is required.',
+			'Ingresar el nombre del cobrador.',
 			'displayName'
 		],
 		[
 			{ code: '22023', message: 'email is not valid' },
 			'validation',
 			400,
-			'Email is not valid.',
+			'Ingresar un correo electrónico válido.',
 			'email'
 		],
 		[
 			{ code: '22023', message: 'an individual buyer needs a first or last name' },
 			'validation',
 			400,
-			'An individual buyer needs a first or last name.',
+			'Ingresar el nombre o el apellido.',
 			'firstName'
 		],
 		[
 			{ code: '22023', message: 'a business buyer needs a business name' },
 			'validation',
 			400,
-			'A business buyer needs a business name.',
+			'Ingresar la razón social.',
 			'businessName'
 		],
 		[
 			{ code: '22023', message: 'tax id must be at most 30 characters' },
 			'validation',
 			400,
-			'Tax id must be at most 30 characters.',
+			'El CUIT debe tener como máximo 30 caracteres.',
 			'taxId'
 		],
 		[
 			{ code: '22023', message: `profile ${ID} not found` },
 			'validation',
 			400,
-			'That user does not exist.',
+			'El usuario elegido no existe.',
 			'userProfileId'
 		],
 		[

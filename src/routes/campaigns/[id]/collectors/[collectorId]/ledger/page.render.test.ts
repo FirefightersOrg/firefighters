@@ -67,20 +67,21 @@ describe('collector current account page', () => {
 	it('renders every required column, the running balance and the total', () => {
 		const body = page();
 		for (const column of [
-			'Date',
-			'Type',
-			'Source',
-			'Settlement',
-			'Payment',
-			'Debit',
-			'Credit',
-			'Balance',
-			'Status'
+			'Fecha',
+			'Tipo',
+			'Origen',
+			'Rendición',
+			'Pago',
+			'Débito',
+			'Crédito',
+			'Saldo',
+			'Estado'
 		])
-			expect(body).toContain(`>${column}</th>`);
-		expect(body).toContain('Commission generated');
-		expect(body).toContain('Adjustment in favor of Firefighters');
-		expect(body).toMatch(/data-testid="ledger-balance"[^>]*>[^<]*17[.,]50/);
+			expect(body).toMatch(new RegExp(`>\\s*${column}\\s*</th>`));
+		expect(body).toContain('Comisión generada');
+		expect(body).toContain('Ajuste a favor de Firefighters');
+		expect(body).toMatch(/data-testid="ledger-balance"[\s\S]*\$.17,50/);
+		expect(body).toContain('19/11/2026');
 		expect(body).toContain(
 			`/campaigns/${CAMPAIGN_ID}/settlements/s0000000-0000-4000-8000-000000000001`
 		);
@@ -88,10 +89,10 @@ describe('collector current account page', () => {
 
 	it('shows annulled adjustments struck through with both original and annulment reasons', () => {
 		const body = page();
-		expect(body).toContain('Annulled');
+		expect(body).toContain('Anulado');
 		expect(body).toContain('Entered twice');
 		expect(body).toContain('Cash shortfall');
-		expect(body).toContain('Annulment reason: Entered twice');
+		expect(body).toContain('Motivo de la anulación: Entered twice');
 		expect(body).toContain('line-through');
 	});
 
@@ -106,11 +107,12 @@ describe('collector current account page', () => {
 		const body = page({ adjustCommission: true, adjustLedger: true });
 		expect(body).toContain('?/adjustCommission');
 		expect(body).toContain('?/adjustLedger');
-		expect(body.match(/\?\/annul"/g)?.length).toBe(1);
+		expect(body.match(/data-annul=/g)?.length).toBe(1);
+		expect(body).toContain('action="?/annul"');
 		expect(body).toContain('name="reason"');
 	});
 
 	it('renders an empty state', () => {
-		expect(page(undefined, [])).toContain('No entries yet.');
+		expect(page(undefined, [])).toContain('Todavía no hay movimientos');
 	});
 });
