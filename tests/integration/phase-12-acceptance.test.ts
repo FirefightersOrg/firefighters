@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { compile } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
@@ -39,6 +40,41 @@ const codeOf = (promise: PromiseLike<unknown>) =>
 		() => 'ok',
 		(error: { code?: string }) => error.code
 	);
+const instantInBuenosAires = (value: string) =>
+	new Intl.DateTimeFormat('es-AR', {
+		dateStyle: 'short',
+		timeStyle: 'short',
+		timeZone: 'America/Argentina/Buenos_Aires'
+	}).format(new Date(value));
+const frozenText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const frozenBuyerLabel = (snapshot: Record<string, unknown>) =>
+	frozenText(snapshot.business_name) ||
+	[frozenText(snapshot.first_name), frozenText(snapshot.last_name)].filter(Boolean).join(' ') ||
+	'—';
+const regexEscape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const htmlEscape = (value: string) =>
+	value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;')
+		.replaceAll("'", '&#39;');
+const expectLabeledValue = (html: string, label: string, value: string) =>
+	expect(html).toMatch(
+		new RegExp(
+			`<dt[^>]*>${regexEscape(htmlEscape(label))}</dt>\\s*<dd[^>]*>${regexEscape(htmlEscape(value))}</dd>`
+		)
+	);
+const expectRenderedPrintCss = (rendered: { head: string; body: string }, source: string) => {
+	const css = (rendered as { css?: string | { code?: string } }).css;
+	const emitted = `${rendered.head}${rendered.body}${typeof css === 'string' ? css : (css?.code ?? '')}`;
+	if (emitted.includes('@media print')) {
+		expect(emitted).toContain('@media print');
+		return;
+	}
+	// Svelte server rendering does not emit scoped component CSS, so inspect the injected compiled CSS.
+	expect(compile(source, { css: 'injected' }).js.code).toContain('@media print');
+};
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
 	const { data, error } = await admin.rpc(name, args);
 	if (error) throw error;
@@ -679,11 +715,94 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 		);
 		await deliverPrize(admin, { prizeId: deliveredPrize, notes: 'Received by buyer' }, ctx());
 		const unawardedPrize = await f.prize(2);
+		const unawardedLoadRequest = ctx();
 		await loadWinningNumber(
 			admin,
 			{ prizeId: unawardedPrize, numberValue: 200, notes: 'Not paid' },
-			ctx()
+			unawardedLoadRequest
 		);
+		const { data: frozenEntries, error: frozenEntriesError } = await admin
+			.from('draw_roster_entries')
+			.select(
+				'number_value,bond_id,buyer_snapshot,collector_snapshot,eligible,ineligibility_reason'
+			)
+			.eq('draw_roster_id', f.rosterId)
+			.in('number_value', [100, 200])
+			.order('number_value')
+			.order('id');
+		if (frozenEntriesError) throw frozenEntriesError;
+		expect(frozenEntries).toHaveLength(2);
+		const deliveredEntry = frozenEntries!.find((entry) => entry.number_value === 100);
+		const unawardedEntry = frozenEntries!.find((entry) => entry.number_value === 200);
+		if (!deliveredEntry || !unawardedEntry) throw new Error('Missing frozen certificate entries');
+		const deliveredBond = await row('bonds', deliveredEntry.bond_id);
+		const unawardedBond = await row('bonds', unawardedEntry.bond_id);
+		const fixtureBuyer = await row('buyers', f.buyerId);
+		const fixtureCollector = await row('collectors', f.collectorId);
+		const deliveredAward = await admin
+			.from('prize_awards')
+			.select('delivered_at,delivered_by')
+			.eq('prize_id', deliveredPrize)
+			.single();
+		if (deliveredAward.error || !deliveredAward.data)
+			throw deliveredAward.error ?? new Error('Missing delivered prize award');
+		const [deliveredBy, unawardedAudit] = [
+			await row('profiles', deliveredAward.data.delivered_by),
+			(await audits(unawardedLoadRequest.requestId)).find(
+				(audit) => audit.action === 'draw.load_winner' && audit.entity_id === unawardedPrize
+			)
+		];
+		if (!unawardedAudit) throw new Error('Missing unawarded winning-number audit');
+		const unawardedBy = await row('profiles', unawardedAudit.actor_user_id);
+		expect(deliveredEntry).toMatchObject({
+			bond_id: f.bondId,
+			eligible: true,
+			buyer_snapshot: {
+				first_name: fixtureBuyer.first_name,
+				last_name: fixtureBuyer.last_name
+			},
+			collector_snapshot: { display_name: fixtureCollector.display_name }
+		});
+		expect(unawardedEntry).toMatchObject({
+			bond_id: f.unsoldId,
+			eligible: false,
+			ineligibility_reason: 'not_sold'
+		});
+		const draw = await row('draws', f.drawId);
+		const deliveredPrizeRow = await row('prizes', deliveredPrize);
+		const unawardedPrizeRow = await row('prizes', unawardedPrize);
+		const deliveryExpected = {
+			institutionName: 'Bomberos Voluntarios',
+			draw: `${draw.name} (Final)`,
+			drawDate: new Intl.DateTimeFormat('es-AR', { dateStyle: 'short' }).format(
+				new Date(`${draw.draw_date}T00:00:00`)
+			),
+			prize: `#${deliveredPrizeRow.position} — ${deliveredPrizeRow.name}`,
+			winningNumber: '0100',
+			associatedBond: deliveredBond.internal_code || deliveredEntry.bond_id,
+			buyer: frozenBuyerLabel(deliveredEntry.buyer_snapshot),
+			collector: frozenText(deliveredEntry.collector_snapshot.display_name),
+			rosterStatus: 'Eligible',
+			deliveryDate: instantInBuenosAires(deliveredAward.data.delivered_at),
+			registeredBy: deliveredBy.full_name,
+			notes: 'Received by buyer',
+			recipientSignature: 'Recipient signature',
+			recipientName: 'Name / clarification',
+			recipientDocument: 'DNI'
+		};
+		const unawardedExpected = {
+			institutionName: 'Bomberos Voluntarios',
+			draw: `${draw.name} (Final)`,
+			prize: `#${unawardedPrizeRow.position} — ${unawardedPrizeRow.name}`,
+			winningNumber: '0200',
+			associatedBond: unawardedBond.internal_code || unawardedEntry.bond_id,
+			buyer: '—',
+			reason: 'Bond not sold',
+			rosterStatus: 'Not eligible — Bond not sold',
+			registeredBy: unawardedBy.full_name,
+			date: instantInBuenosAires(unawardedAudit.created_at),
+			notes: 'Not paid'
+		};
 		const operatorFixture = seed.fixtures.find((fixture) => fixture.roleNames.includes('operator'));
 		if (!operatorFixture) throw new Error('Missing seeded operator fixture');
 		const operator = createClient(supabaseUrl, anonKey, {
@@ -722,40 +841,48 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 			}) as never;
 		const delivery = (await deliveryCertificateLoad(event(deliveredPrize)))! as any;
 		const unawarded = (await unawardedCertificateLoad(event(unawardedPrize)))! as any;
-		expect(delivery.document).toMatchObject({
-			draw: expect.any(String),
-			prize: expect.any(String),
-			winningNumber: '0100',
-			associatedBond: expect.any(String),
-			buyer: expect.any(String),
-			collector: expect.any(String),
-			rosterStatus: 'Eligible',
-			notes: 'Received by buyer',
-			registeredBy: 'System Administrator'
-		});
-		expect(unawarded.document).toMatchObject({
-			draw: expect.any(String),
-			prize: expect.any(String),
-			winningNumber: '0200',
-			associatedBond: expect.any(String),
-			buyer: '—',
-			reason: 'Bond not sold',
-			rosterStatus: 'Not eligible — Bond not sold',
-			notes: 'Not paid',
-			registeredBy: 'System Administrator'
-		});
-		const deliveryHtml = render(DeliveryCertificatePage, {
+		expect(delivery.document).toEqual(deliveryExpected);
+		expect(unawarded.document).toEqual(unawardedExpected);
+		const deliveryRendered = render(DeliveryCertificatePage, {
 			props: { data: delivery, params: {} } as any
-		}).body;
-		const unawardedHtml = render(UnawardedCertificatePage, {
+		});
+		const unawardedRendered = render(UnawardedCertificatePage, {
 			props: { data: unawarded, params: {} } as any
-		}).body;
-		for (const value of Object.values(delivery.document))
-			expect(deliveryHtml).toContain(String(value));
-		for (const value of Object.values(unawarded.document))
-			expect(unawardedHtml).toContain(String(value));
-		expect(deliveryCertificateSource).toContain('@media print');
-		expect(unawardedCertificateSource).toContain('@media print');
+		});
+		for (const [label, value] of [
+			['Draw', deliveryExpected.draw],
+			['Draw date', deliveryExpected.drawDate],
+			['Prize', deliveryExpected.prize],
+			['Winning number', deliveryExpected.winningNumber],
+			['Associated bond', deliveryExpected.associatedBond],
+			['Buyer', deliveryExpected.buyer],
+			['Collector', deliveryExpected.collector],
+			['Roster status', deliveryExpected.rosterStatus],
+			['Delivery date', deliveryExpected.deliveryDate],
+			['Registered by', deliveryExpected.registeredBy],
+			['Notes', deliveryExpected.notes]
+		])
+			expectLabeledValue(deliveryRendered.body, label, value);
+		expect(deliveryRendered.body).toMatch(
+			new RegExp(
+				`<div[^>]*>\\s*<span[^>]*></span>\\s*<strong[^>]*>${regexEscape(htmlEscape(deliveryExpected.recipientSignature))}</strong>\\s*</div>`
+			)
+		);
+		for (const [label, value] of [
+			['Draw', unawardedExpected.draw],
+			['Prize', unawardedExpected.prize],
+			['Winning number', unawardedExpected.winningNumber],
+			['Associated bond', unawardedExpected.associatedBond],
+			['Buyer', unawardedExpected.buyer],
+			['Reason for non-award', unawardedExpected.reason],
+			['Roster status', unawardedExpected.rosterStatus],
+			['Registered by', unawardedExpected.registeredBy],
+			['Date', unawardedExpected.date],
+			['Notes', unawardedExpected.notes]
+		])
+			expectLabeledValue(unawardedRendered.body, label, value);
+		expectRenderedPrintCss(deliveryRendered, deliveryCertificateSource);
+		expectRenderedPrintCss(unawardedRendered, unawardedCertificateSource);
 		const wrongDraw: any = event(deliveredPrize);
 		wrongDraw.params.drawId = randomUUID();
 		await expect(deliveryCertificateLoad(wrongDraw)).rejects.toMatchObject({ status: 404 });
@@ -763,7 +890,7 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 		wrongCampaign.params.id = randomUUID();
 		await expect(deliveryCertificateLoad(wrongCampaign)).rejects.toMatchObject({ status: 404 });
 		await expect(unawardedCertificateLoad(event(deliveredPrize))).rejects.toMatchObject({
-			status: expect.any(Number)
+			status: 404
 		});
 		await annulPrize(admin, { prizeId: unawardedPrize, reason: 'Certificate correction' }, ctx());
 		await expect(unawardedCertificateLoad(event(unawardedPrize))).rejects.toMatchObject({
