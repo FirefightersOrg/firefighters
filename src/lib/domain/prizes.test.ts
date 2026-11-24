@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	wonPrizeCount,
 	PRIZE_NAME_MAX,
 	PRIZE_DESCRIPTION_MAX,
 	PRIZE_NOTES_MAX,
@@ -33,11 +34,11 @@ describe('prize storage contracts', () => {
 	});
 	it('permits exactly documented prize transitions', () => {
 		expect(PRIZE_TRANSITIONS).toEqual({
-			pending_validation: ['awarded', 'unawarded'],
+			pending_validation: ['awarded', 'unawarded', 'annulled'],
 			awarded: ['pending_delivery', 'annulled'],
-			pending_delivery: ['delivered'],
+			pending_delivery: ['delivered', 'annulled'],
 			delivered: [],
-			unawarded: [],
+			unawarded: ['annulled'],
 			annulled: []
 		});
 		for (const from of PRIZE_STATUSES)
@@ -66,5 +67,19 @@ describe('prize storage contracts', () => {
 		for (const from of PRIZE_AWARD_STATUSES)
 			for (const to of PRIZE_AWARD_STATUSES)
 				expect(canTransitionPrizeAward(from, to)).toBe(PRIZE_AWARD_TRANSITIONS[from].includes(to));
+	});
+});
+
+describe('wonPrizeCount (SAN-82 review)', () => {
+	it('never counts annulled prizes as won', () => {
+		expect(
+			wonPrizeCount([
+				{ status: 'delivered' },
+				{ status: 'annulled' },
+				{ status: 'pending_delivery' }
+			])
+		).toBe(2);
+		expect(wonPrizeCount([{ status: 'annulled' }])).toBe(0);
+		expect(wonPrizeCount(null)).toBe(0);
 	});
 });

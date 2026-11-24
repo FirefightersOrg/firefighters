@@ -121,6 +121,38 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			'/campaigns/f0000000-0000-0000-0000-000000000001/payments/payment/print'
 		);
 	});
+	it('renders prize history and converts UTC delivery instants to Buenos Aires', () => {
+		const body = renderPage(record(), null, {
+			canViewPrizes: true,
+			prizes: [
+				{
+					id: 'prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Bike',
+					position: 1,
+					status: 'delivered',
+					deliveredAt: '2026-11-20T02:30:00+00:00'
+				},
+				{
+					id: 'annulled-prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Wrong bike',
+					position: 1,
+					status: 'annulled',
+					deliveredAt: null
+				}
+			]
+		});
+		expect(body).toContain('Prizes won (1)');
+		expect(body).toContain('Annulled — does not count as won');
+		expect(body).toContain('December');
+		expect(body).toContain('#1 — Bike');
+		expect(body).toContain('Delivered');
+		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('/draws/draw/winners');
+	});
 	it('shows the general data and the formatted numbers of a simple bond', () => {
 		const body = renderPage(record());
 		expect(body).toContain('Simple bond 0068');
@@ -128,7 +160,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('$ 60.000,00');
 		expect(body).toContain('INT-1');
 		expect(body).toContain('4939');
-		expect(body).toContain('Available');
+		expect(body).toContain('Disponible');
 		// No actions for this user.
 		expect(body).not.toContain('Annul bond');
 		expect(body).not.toContain('Ungroup pata');
@@ -323,7 +355,9 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			expect(body).toContain(`aria-labelledby="${id}-title"`);
 			expect(body).toContain(`href="#${id}"`);
 			expect(body).toMatch(
-				new RegExp(`<h2 id="${id}-title"[^>]*>\\s*<span[^>]*>${i + 1}\\.</span>\\s*${titles[i]}`)
+				new RegExp(
+					`<h2 id="${id}-title"[^>]*>\\s*(?:<!--[^>]*-->)*<span[^>]*>${i + 1}\\.</span>(?:<!--[^>]*-->)*\\s*${titles[i]}`
+				)
 			);
 		});
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds"`);

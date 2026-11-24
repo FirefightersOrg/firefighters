@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
-import { deliveryNoteLabel, type DeliveryNote } from '$lib/domain/deliveries';
+import { formatDateTime, formatPaddedNumber } from '$lib/format';
+import type { DeliveryNote } from '$lib/domain/deliveries';
 import { formatCampaignNumber } from '$lib/domain/numbering';
 import { campaignNumberingConfig } from '$lib/domain/campaigns';
 import type { Campaign } from '$lib/domain/campaigns';
@@ -77,17 +78,13 @@ export function buildPrintableDeliveryNote(
 	return {
 		institutionName,
 		campaign: campaign.name,
-		deliveryNoteNumber: deliveryNoteLabel(note.noteNumber),
+		deliveryNoteNumber: `Remito ${formatPaddedNumber(note.noteNumber, 4)}`,
 		reason: note.reason,
 		status: note.status,
 		// The institution works in Argentina: print the local date of the delivery.
-		date: new Intl.DateTimeFormat('es-AR', {
-			dateStyle: 'short',
-			timeStyle: 'short',
-			timeZone: 'America/Argentina/Buenos_Aires'
-		}).format(new Date(note.issuedAt)),
-		collector: note.collectorName ?? 'Collector',
-		registeredBy: note.createdByName ?? 'User',
+		date: formatDateTime(note.issuedAt),
+		collector: note.collectorName ?? 'Cobrador',
+		registeredBy: note.createdByName ?? 'Usuario',
 		deliveredBonds,
 		type: deliveredBonds.map((bond) => bond.type).join(', '),
 		baseAndAssociatedNumbers: deliveredBonds.flatMap((bond) =>
@@ -100,8 +97,8 @@ export function buildPrintableDeliveryNote(
 			...bond.numbers.flatMap((number) => (number.barcode ? [number.barcode] : []))
 		]),
 		notes: note.notes,
-		collectorSignature: 'Collector signature',
-		administrationSignature: 'Administration signature',
+		collectorSignature: 'Firma del cobrador',
+		administrationSignature: 'Firma de la administración',
 		bondCount: deliveredBonds.length,
 		unitCount: deliveredBonds.reduce((total, bond) => total + bond.units, 0)
 	};

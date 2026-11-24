@@ -5,9 +5,12 @@ import { requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { buildPrintableDeliveryNote } from '$lib/server/documents/delivery-note';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
+import { getDocumentActorName } from '$lib/server/repositories/document-actors';
 import { getDeliveryNote, listDeliveryNoteBonds } from '$lib/server/repositories/deliveries';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 
+const getDeliveryNoteActor = (supabase: App.Locals['supabase'], id: string) =>
+	getDocumentActorName(supabase, 'delivery_note', id);
 const NOTE_NOT_FOUND = 'Delivery note not found.';
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -22,11 +25,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!isUuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!isUuid(params.noteId)) error(404, { message: NOTE_NOT_FOUND });
 
-	const [campaign, note] = await Promise.all([
+	const [campaign, note, actor] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
-		getDeliveryNote(locals.supabase, params.id, params.noteId)
+		getDeliveryNote(locals.supabase, params.id, params.noteId),
+		getDeliveryNoteActor(locals.supabase, params.noteId)
 	]);
-	if (campaign.error || note.error) fail500(locals, params.noteId, campaign.error ?? note.error);
+	if (campaign.error || note.error || actor.error)
+		fail500(locals, params.noteId, campaign.error ?? note.error ?? actor.error);
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!note.data) error(404, { message: NOTE_NOT_FOUND });
 
@@ -45,7 +50,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	}
 
 	return {
-		document: buildPrintableDeliveryNote(campaign.data, note.data.note, bonds.data)
+		document: buildPrintableDeliveryNote(
+			campaign.data,
+			{ ...note.data.note, createdByName: actor.data },
+			bonds.data
+		)
 	};
 };
 

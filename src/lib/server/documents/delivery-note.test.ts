@@ -1,3 +1,4 @@
+import { formatDateTime } from '$lib/format';
 import { describe, expect, it } from 'vitest';
 import type { Campaign } from '$lib/domain/campaigns';
 import type { DeliveryNote } from '$lib/domain/deliveries';
@@ -68,22 +69,18 @@ describe('buildPrintableDeliveryNote', () => {
 		expect(doc).toMatchObject({
 			institutionName: 'Bomberos Test',
 			campaign: 'Bono 2027',
-			deliveryNoteNumber: 'Note 0007',
+			deliveryNoteNumber: 'Remito 0007',
 			collector: 'Ana Pérez',
 			registeredBy: 'Operator One',
 			notes: 'Box 3',
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración',
 			bondCount: 1,
 			unitCount: 1
 		});
-		expect(doc.date).toBe(
-			new Intl.DateTimeFormat('es-AR', {
-				dateStyle: 'short',
-				timeStyle: 'short',
-				timeZone: 'America/Argentina/Buenos_Aires'
-			}).format(new Date(note.issuedAt))
-		);
+		// SAN-131: shared helper, es-AR with four-digit year and 24 h time (was 12 h "p. m.").
+		expect(doc.date).toBe(formatDateTime(note.issuedAt));
+		expect(doc.date).toMatch(/^\d{2}\/\d{2}\/\d{4},? \d{2}:\d{2}$/);
 		expect(doc.deliveredBonds).toEqual([
 			{
 				type: 'Simple',

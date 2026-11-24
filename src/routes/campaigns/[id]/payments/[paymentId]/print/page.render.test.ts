@@ -8,11 +8,11 @@ describe('payment certificate print page', () =>
 			campaign: 'Bono 2027',
 			receiptNumber: 'SET-0007-12345678',
 			bond: '00068',
-			buyer: 'Buyer',
+			buyer: 'Comprador',
 			collector: 'Ana Pérez',
-			installments: 'Installment 1',
+			installments: 'Cuota 1',
 			amount: '$ 100,00',
-			method: 'Cash',
+			method: 'Efectivo',
 			paymentDate: '18/11/26',
 			createdAt: '18/11/26, 12:30',
 			registeredBy: 'Operator',
@@ -28,14 +28,14 @@ describe('payment certificate print page', () =>
 			'Bono 2027',
 			'SET-0007-12345678',
 			'00068',
-			'Buyer',
+			'Comprador',
 			'Ana Pérez',
-			'Installment 1',
+			'Cuota 1',
 			'$ 100,00',
-			'Cash',
+			'Efectivo',
 			'18/11/26',
 			'Operator',
-			'Registration date'
+			'Fecha de registro'
 		])
 			expect(body).toContain(text);
 	}));

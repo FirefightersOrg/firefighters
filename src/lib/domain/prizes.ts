@@ -1,4 +1,4 @@
-/** SAN-80 storage contracts. All text limits count Unicode code points. */
+/** SAN-80 storage and SAN-81 correction contracts. Text limits count Unicode code points. */
 export const PRIZE_NAME_MAX = 200;
 export const PRIZE_DESCRIPTION_MAX = 1000;
 export const PRIZE_NOTES_MAX = 1000;
@@ -23,11 +23,11 @@ export const PRIZE_STATUS_LABELS: Record<PrizeStatus, string> = {
 	annulled: 'Annulled'
 };
 export const PRIZE_TRANSITIONS: Record<PrizeStatus, readonly PrizeStatus[]> = {
-	pending_validation: ['awarded', 'unawarded'],
+	pending_validation: ['awarded', 'unawarded', 'annulled'],
 	awarded: ['pending_delivery', 'annulled'],
-	pending_delivery: ['delivered'],
+	pending_delivery: ['delivered', 'annulled'],
 	delivered: [],
-	unawarded: [],
+	unawarded: ['annulled'],
 	annulled: []
 };
 export const canTransitionPrize = (from: PrizeStatus, to: PrizeStatus) =>
@@ -70,3 +70,11 @@ export const PRIZE_AWARD_TRANSITIONS: Record<PrizeAwardStatus, readonly PrizeAwa
 };
 export const canTransitionPrizeAward = (from: PrizeAwardStatus, to: PrizeAwardStatus) =>
 	PRIZE_AWARD_TRANSITIONS[from].includes(to);
+
+/**
+ * Santi's decision (SAN-82 review): annulled prizes stay visible on bond/buyer records, labelled
+ * "Annulled", but never count as won.
+ */
+export function wonPrizeCount(prizes: ReadonlyArray<{ status: string }> | null | undefined) {
+	return (prizes ?? []).filter((prize) => prize.status !== 'annulled').length;
+}
