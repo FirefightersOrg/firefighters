@@ -15,7 +15,8 @@ const payment = {
 	paymentDate: '2026-11-18',
 	createdAt: '2026-11-18T15:30:00Z',
 	registeredBy: 'Operator',
-	settlementNumber: 7
+	settlementNumber: 7,
+	legend: null
 };
 const event = (locals: App.Locals, paymentId = ID) =>
 	({
@@ -42,7 +43,7 @@ describe('payment certificate load', () => {
 		vi.mocked(getPaymentCertificate).mockResolvedValue({ data: null, error: null });
 		await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
 	});
-	it.each(['pending_in_settlement', 'annulled'])(
+	it.each(['pending_in_settlement', 'draft'])(
 		'does not issue certificates for %s payments',
 		async (status) => {
 			vi.mocked(getPaymentCertificate).mockResolvedValue({
@@ -52,6 +53,33 @@ describe('payment certificate load', () => {
 			await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
 		}
 	);
+	const legend = {
+		kind: 'annulled' as const,
+		eventAt: '2026-11-18T16:00:00Z',
+		actor: 'Admin',
+		reason: 'Wrong receipt',
+		relatedPaymentId: null,
+		correctionType: 'annul'
+	};
+	it.each([
+		['confirmed', null],
+		['annulled', legend],
+		['adjusted', { ...legend, kind: 'corrected' as const, correctionType: 'correct_method' }]
+	] as const)('issues certificates for %s payments', async (status, paymentLegend) => {
+		vi.mocked(getPaymentCertificate).mockResolvedValue({
+			data: { status, payment: { ...payment, legend: paymentLegend } },
+			error: null
+		} as never);
+		const result = await load(event(setup()));
+		expect(result?.document.receiptNumber).toContain('SET-0007');
+	});
+	it('404s an annulled payment without a legend (a pending payment removed from an open settlement)', async () => {
+		vi.mocked(getPaymentCertificate).mockResolvedValue({
+			data: { status: 'annulled', payment: { ...payment, legend: null } },
+			error: null
+		} as never);
+		await expect(load(event(setup()))).rejects.toMatchObject({ status: 404 });
+	});
 	it('logs repository failures as 500', async () => {
 		vi.mocked(getPaymentCertificate).mockResolvedValue({ data: null, error: new Error('db') });
 		await expect(load(event(setup()))).rejects.toMatchObject({ status: 500 });
