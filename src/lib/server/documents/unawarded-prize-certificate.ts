@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/public';
+import { formatDateTime } from '$lib/format';
 import { campaignNumberingConfig, type Campaign } from '$lib/domain/campaigns';
 import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
 import { DRAW_INELIGIBILITY_REASON_LABELS } from '$lib/domain/draw-eligibility';
@@ -6,23 +7,19 @@ import { formatCampaignNumber } from '$lib/domain/numbering';
 import { frozenBuyerLabel } from './prize-delivery-certificate';
 import type { PrizeCertificateSource } from '$lib/server/repositories/printable-prizes';
 
-const instant = (value: string) =>
-	new Intl.DateTimeFormat('es-AR', {
-		dateStyle: 'short',
-		timeStyle: 'short',
-		timeZone: 'America/Argentina/Buenos_Aires'
-	}).format(new Date(value));
+/** Instant in Buenos Aires, 24 h (docs/copy.md): `31/12/2026, 23:30`. */
+const instant = (value: string) => formatDateTime(value);
 const reason = (source: PrizeCertificateSource) => {
-	if (source.winnerStatus === 'no_match') return 'Number not in the roster';
+	if (source.winnerStatus === 'no_match') return 'El número no está en el padrón';
 	if (source.winnerStatus === 'not_eligible')
 		return (
 			DRAW_INELIGIBILITY_REASON_LABELS[
 				source.ineligibilityReason as keyof typeof DRAW_INELIGIBILITY_REASON_LABELS
 			] ??
 			source.ineligibilityReason ??
-			'Not eligible'
+			'No habilitado'
 		);
-	return source.resolutionNotes || 'Manually left unawarded';
+	return source.resolutionNotes || 'Declarado no adjudicado';
 };
 
 export interface PrintableUnawardedPrizeCertificate {
@@ -50,17 +47,17 @@ export function buildPrintableUnawardedPrizeCertificate(
 		prize: `#${source.prizePosition} — ${source.prizeName}`,
 		winningNumber:
 			source.winningNumber === null
-				? 'Not loaded'
+				? 'Sin cargar'
 				: formatCampaignNumber(source.winningNumber, campaignNumberingConfig(campaign)),
 		associatedBond: source.bondLabel || source.bondId || '—',
 		buyer: source.buyerSnapshot ? frozenBuyerLabel(source.buyerSnapshot) : '—',
 		reason: reason(source),
 		rosterStatus:
 			source.rosterEligible === null
-				? 'Not in roster'
+				? 'No está en el padrón'
 				: source.rosterEligible
-					? 'Eligible'
-					: `Not eligible${source.ineligibilityReason ? ` — ${reason(source)}` : ''}`,
+					? 'Habilitado'
+					: `No habilitado${source.ineligibilityReason ? ` — ${reason(source)}` : ''}`,
 		registeredBy: source.unawardedByName || '—',
 		date: source.unawardedAt ? instant(source.unawardedAt) : '—',
 		notes: source.winnerNotes || source.resolutionNotes || '—'

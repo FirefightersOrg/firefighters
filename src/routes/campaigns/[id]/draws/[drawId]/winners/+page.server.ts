@@ -74,7 +74,7 @@ const invalid = (form: FormName, values: Record<string, string>) =>
 		form,
 		values,
 		errors: {},
-		message: 'Please correct the highlighted fields.'
+		message: 'Revisar los campos marcados.'
 	});
 const guard = (
 	locals: App.Locals,
@@ -82,12 +82,12 @@ const guard = (
 	form: FormName
 ) => {
 	if (permissionsUnavailable(locals.permissions))
-		return fail(500, { form, errors: {}, message: 'Could not load permissions.' });
+		return fail(500, { form, errors: {}, message: 'No se pudieron cargar los permisos.' });
 	if (!hasPermissionIn(locals.permissions, permission))
 		return fail(403, {
 			form,
 			errors: {},
-			message: 'You do not have permission to perform this action.'
+			message: 'No hay permiso para esta acción.'
 		});
 	return null;
 };
@@ -102,13 +102,15 @@ async function scopedPrize(
 		!uuid.safeParse(params.drawId).success ||
 		!uuid.safeParse(prizeId).success
 	)
-		return { failure: fail(404, { form, errors: {}, message: 'Prize not found.' }) };
+		return { failure: fail(404, { form, errors: {}, message: 'Premio no encontrado.' }) };
 	const draw = await getDraw(locals.supabase, params.id, params.drawId);
 	if (draw.error) return { failure: failure(draw.error, form) };
-	if (!draw.data) return { failure: fail(404, { form, errors: {}, message: 'Draw not found.' }) };
+	if (!draw.data)
+		return { failure: fail(404, { form, errors: {}, message: 'Sorteo no encontrado.' }) };
 	const prize = await getPrizeInDraw(locals.supabase, params.drawId, prizeId);
 	if (prize.error) return { failure: failure(prize.error, form) };
-	if (!prize.data) return { failure: fail(404, { form, errors: {}, message: 'Prize not found.' }) };
+	if (!prize.data)
+		return { failure: fail(404, { form, errors: {}, message: 'Premio no encontrado.' }) };
 	return { draw: draw.data, prize: prize.data };
 }
 async function scopedDraw(
@@ -117,10 +119,11 @@ async function scopedDraw(
 	form: FormName
 ) {
 	if (!uuid.safeParse(params.id).success || !uuid.safeParse(params.drawId).success)
-		return { failure: fail(404, { form, errors: {}, message: 'Draw not found.' }) };
+		return { failure: fail(404, { form, errors: {}, message: 'Sorteo no encontrado.' }) };
 	const draw = await getDraw(locals.supabase, params.id, params.drawId);
 	if (draw.error) return { failure: failure(draw.error, form) };
-	if (!draw.data) return { failure: fail(404, { form, errors: {}, message: 'Draw not found.' }) };
+	if (!draw.data)
+		return { failure: fail(404, { form, errors: {}, message: 'Sorteo no encontrado.' }) };
 	return { draw: draw.data };
 }
 
@@ -135,7 +138,7 @@ const presentPrize = (
 				formattedNumber: formatCampaignNumber(prize.winningNumber.numberValue, config),
 				reasonLabel:
 					prize.winningNumber.resultStatus === 'no_match'
-						? 'Number not in the roster'
+						? 'El número no está en el padrón'
 						: prize.winningNumber.ineligibilityReason
 							? (DRAW_INELIGIBILITY_REASON_LABELS[
 									prize.winningNumber
@@ -148,20 +151,20 @@ const presentPrize = (
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!READ_PERMISSIONS.some((permission) => hasPermissionIn(locals.permissions, permission)))
 		requirePermissionIn(locals.permissions, 'draw.view');
-	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Draw not found.' });
+	if (!uuid.safeParse(params.drawId).success) error(404, { message: 'Sorteo no encontrado.' });
 	const [campaign, draw] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getDraw(locals.supabase, params.id, params.drawId)
 	]);
-	if (campaign.error || draw.error) error(500, { message: 'Could not load prizes.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!draw.data) error(404, { message: 'Draw not found.' });
+	if (campaign.error || draw.error) error(500, { message: 'No se pudieron cargar los premios.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!draw.data) error(404, { message: 'Sorteo no encontrado.' });
 	const prizes = await listDrawPrizes(locals.supabase, draw.data.id);
-	if (prizes.error) error(500, { message: 'Could not load prizes.' });
+	if (prizes.error) error(500, { message: 'No se pudieron cargar los premios.' });
 	const configurable = !['completed', 'closed', 'annulled'].includes(draw.data.status);
 	const config = campaignNumberingConfig(campaign.data);
 	return {
@@ -200,7 +203,7 @@ export const actions: Actions = {
 				form: 'reverseDelivery',
 				success: true,
 				errors: {},
-				message: 'Prize delivery reversed.'
+				message: 'Entrega del premio revertida.'
 			};
 		} catch (cause) {
 			return failure(cause, 'reverseDelivery', values);
@@ -229,7 +232,7 @@ export const actions: Actions = {
 		if (!createPrizeSchema.safeParse(input).success) return invalid('create', values);
 		try {
 			await createPrize(locals.supabase, input, ctx(locals));
-			return { form: 'create', success: true, errors: {}, message: 'Prize created.' };
+			return { form: 'create', success: true, errors: {}, message: 'Premio creado.' };
 		} catch (cause) {
 			return failure(cause, 'create', values);
 		}
@@ -259,7 +262,7 @@ export const actions: Actions = {
 		if (!updatePrizeSchema.safeParse(input).success) return invalid('update', values);
 		try {
 			await updatePrize(locals.supabase, input, ctx(locals));
-			return { form: 'update', success: true, errors: {}, message: 'Prize updated.' };
+			return { form: 'update', success: true, errors: {}, message: 'Premio actualizado.' };
 		} catch (cause) {
 			return failure(cause, 'update', values);
 		}
@@ -295,7 +298,7 @@ export const actions: Actions = {
 				form: 'loadWinner',
 				success: true,
 				errors: {},
-				message: 'Winning number loaded.',
+				message: 'Número ganador cargado.',
 				result: presentPrize(refreshed.data, campaignNumberingConfig(campaign.data)).winningNumber
 			};
 		} catch (cause) {
@@ -316,7 +319,7 @@ export const actions: Actions = {
 		if (!parsed.success) return invalid('resolve', values);
 		try {
 			await resolvePrize(locals.supabase, parsed.data, ctx(locals));
-			return { form: 'resolve', success: true, errors: {}, message: 'Prize resolved.' };
+			return { form: 'resolve', success: true, errors: {}, message: 'Premio resuelto.' };
 		} catch (cause) {
 			return failure(cause, 'resolve', values);
 		}
@@ -333,7 +336,12 @@ export const actions: Actions = {
 		if (!deliverPrizeSchema.safeParse(values).success) return invalid('deliver', values);
 		try {
 			await deliverPrize(locals.supabase, values, ctx(locals));
-			return { form: 'deliver', success: true, errors: {}, message: 'Prize delivery recorded.' };
+			return {
+				form: 'deliver',
+				success: true,
+				errors: {},
+				message: 'Entrega del premio registrada.'
+			};
 		} catch (cause) {
 			return failure(cause, 'deliver', values);
 		}
@@ -350,7 +358,7 @@ export const actions: Actions = {
 		if (!annulPrizeSchema.safeParse(values).success) return invalid('annul', values);
 		try {
 			await annulPrize(locals.supabase, values, ctx(locals));
-			return { form: 'annul', success: true, errors: {}, message: 'Prize annulled.' };
+			return { form: 'annul', success: true, errors: {}, message: 'Premio anulado.' };
 		} catch (cause) {
 			return failure(cause, 'annul', values);
 		}

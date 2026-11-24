@@ -15,12 +15,12 @@ export const PRIZE_STATUSES = [
 ] as const;
 export type PrizeStatus = (typeof PRIZE_STATUSES)[number];
 export const PRIZE_STATUS_LABELS: Record<PrizeStatus, string> = {
-	pending_validation: 'Pending validation',
-	awarded: 'Awarded',
-	pending_delivery: 'Pending delivery',
-	delivered: 'Delivered',
-	unawarded: 'Unawarded',
-	annulled: 'Annulled'
+	pending_validation: 'Pendiente de validación',
+	awarded: 'Adjudicado',
+	pending_delivery: 'Pendiente de entrega',
+	delivered: 'Entregado',
+	unawarded: 'No adjudicado',
+	annulled: 'Anulado'
 };
 export const PRIZE_TRANSITIONS: Record<PrizeStatus, readonly PrizeStatus[]> = {
 	pending_validation: ['awarded', 'unawarded', 'annulled'],
@@ -40,10 +40,10 @@ export const WINNING_NUMBER_STATUSES = [
 ] as const;
 export type WinningNumberStatus = (typeof WINNING_NUMBER_STATUSES)[number];
 export const WINNING_NUMBER_STATUS_LABELS: Record<WinningNumberStatus, string> = {
-	pending_review: 'Pending review',
-	eligible_winner: 'Eligible winner',
-	not_eligible: 'Not eligible',
-	no_match: 'No match'
+	pending_review: 'Pendiente de revisión',
+	eligible_winner: 'Ganador habilitado',
+	not_eligible: 'No habilitado',
+	no_match: 'Sin coincidencia'
 };
 export const WINNING_NUMBER_TRANSITIONS: Record<
 	WinningNumberStatus,
@@ -59,9 +59,9 @@ export const canTransitionWinningNumber = (from: WinningNumberStatus, to: Winnin
 export const PRIZE_AWARD_STATUSES = ['awarded', 'delivered', 'annulled'] as const;
 export type PrizeAwardStatus = (typeof PRIZE_AWARD_STATUSES)[number];
 export const PRIZE_AWARD_STATUS_LABELS: Record<PrizeAwardStatus, string> = {
-	awarded: 'Awarded',
-	delivered: 'Delivered',
-	annulled: 'Annulled'
+	awarded: 'Adjudicado',
+	delivered: 'Entregado',
+	annulled: 'Anulado'
 };
 export const PRIZE_AWARD_TRANSITIONS: Record<PrizeAwardStatus, readonly PrizeAwardStatus[]> = {
 	awarded: ['delivered', 'annulled'],

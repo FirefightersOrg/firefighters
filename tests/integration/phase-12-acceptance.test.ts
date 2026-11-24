@@ -1,8 +1,8 @@
+import { readFileSync } from 'node:fs';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { compile } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
@@ -40,12 +40,19 @@ const codeOf = (promise: PromiseLike<unknown>) =>
 		() => 'ok',
 		(error: { code?: string }) => error.code
 	);
+// docs/copy.md: instants as `dd/mm/aaaa, HH:mm` (24 h) in Buenos Aires, computed independently.
 const instantInBuenosAires = (value: string) =>
 	new Intl.DateTimeFormat('es-AR', {
-		dateStyle: 'short',
-		timeStyle: 'short',
+		day: '2-digit',
+		month: '2-digit',
+		year: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+		hourCycle: 'h23',
 		timeZone: 'America/Argentina/Buenos_Aires'
-	}).format(new Date(value));
+	})
+		.format(new Date(value))
+		.replace(/\s/gu, ' ');
 const frozenText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 const frozenBuyerLabel = (snapshot: Record<string, unknown>) =>
 	frozenText(snapshot.business_name) ||
@@ -65,15 +72,12 @@ const expectLabeledValue = (html: string, label: string, value: string) =>
 			`<dt[^>]*>${regexEscape(htmlEscape(label))}</dt>\\s*<dd[^>]*>${regexEscape(htmlEscape(value))}</dd>`
 		)
 	);
-const expectRenderedPrintCss = (rendered: { head: string; body: string }, source: string) => {
-	const css = (rendered as { css?: string | { code?: string } }).css;
-	const emitted = `${rendered.head}${rendered.body}${typeof css === 'string' ? css : (css?.code ?? '')}`;
-	if (emitted.includes('@media print')) {
-		expect(emitted).toContain('@media print');
-		return;
-	}
-	// Svelte server rendering does not emit scoped component CSS, so inspect the injected compiled CSS.
-	expect(compile(source, { css: 'injected' }).js.code).toContain('@media print');
+// SAN-136: the certificates use the shared print stylesheet (like every printable document since
+// SAN-138), so the print CSS is asserted on that stylesheet and on the component importing it.
+const PRINT_CSS = readFileSync('src/lib/styles/print.css', 'utf8');
+const expectRenderedPrintCss = (_rendered: { head: string; body: string }, source: string) => {
+	expect(source).toContain("import '$lib/styles/print.css'");
+	expect(PRINT_CSS).toContain('@media print');
 };
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
 	const { data, error } = await admin.rpc(name, args);
@@ -491,7 +495,7 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 			annulPrize(admin, { prizeId, reason: 'Wrong result' }, deliveredAnnul)
 		).rejects.toMatchObject({
 			status: 409,
-			message: 'A delivered prize cannot be annulled. Reverse the delivery first.'
+			message: 'Un premio entregado no se puede anular. Primero hay que revertir la entrega.'
 		});
 		expect(await row('prizes', prizeId)).toEqual(deliveredBefore);
 		expect(await audits(deliveredAnnul.requestId)).toEqual([]);
@@ -809,20 +813,18 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 		const deliveryExpected = {
 			institutionName: 'Bomberos Voluntarios',
 			draw: `${draw.name} (Final)`,
-			drawDate: new Intl.DateTimeFormat('es-AR', { dateStyle: 'short' }).format(
-				new Date(`${draw.draw_date}T00:00:00`)
-			),
+			drawDate: draw.draw_date.split('-').reverse().join('/'),
 			prize: `#${deliveredPrizeRow.position} — ${deliveredPrizeRow.name}`,
 			winningNumber: '0100',
 			associatedBond: deliveredBond.internal_code || deliveredEntry.bond_id,
 			buyer: frozenBuyerLabel(deliveredEntry.buyer_snapshot),
 			collector: frozenText(deliveredEntry.collector_snapshot.display_name),
-			rosterStatus: 'Eligible',
+			rosterStatus: 'Habilitado',
 			deliveryDate: instantInBuenosAires(deliveredAward.data.delivered_at),
 			registeredBy: deliveredBy.full_name,
 			notes: 'Received by buyer',
-			recipientSignature: 'Recipient signature',
-			recipientName: 'Name / clarification',
+			recipientSignature: 'Firma de quien recibe',
+			recipientName: 'Aclaración',
 			recipientDocument: 'DNI'
 		};
 		const unawardedExpected = {
@@ -832,8 +834,8 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 			winningNumber: '0200',
 			associatedBond: unawardedBond.internal_code || unawardedEntry.bond_id,
 			buyer: '—',
-			reason: 'Bond not sold',
-			rosterStatus: 'Not eligible — Bond not sold',
+			reason: 'Bono no vendido',
+			rosterStatus: 'No habilitado — Bono no vendido',
 			registeredBy: unawardedBy.full_name,
 			date: instantInBuenosAires(unawardedAudit.created_at),
 			notes: 'Not paid'
@@ -885,35 +887,35 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 			props: { data: unawarded, params: {} } as any
 		});
 		for (const [label, value] of [
-			['Draw', deliveryExpected.draw],
-			['Draw date', deliveryExpected.drawDate],
-			['Prize', deliveryExpected.prize],
-			['Winning number', deliveryExpected.winningNumber],
-			['Associated bond', deliveryExpected.associatedBond],
-			['Buyer', deliveryExpected.buyer],
-			['Collector', deliveryExpected.collector],
-			['Roster status', deliveryExpected.rosterStatus],
-			['Delivery date', deliveryExpected.deliveryDate],
-			['Registered by', deliveryExpected.registeredBy],
-			['Notes', deliveryExpected.notes]
+			['Sorteo', deliveryExpected.draw],
+			['Fecha del sorteo', deliveryExpected.drawDate],
+			['Premio', deliveryExpected.prize],
+			['Número ganador', deliveryExpected.winningNumber],
+			['Bono asociado', deliveryExpected.associatedBond],
+			['Comprador', deliveryExpected.buyer],
+			['Cobrador', deliveryExpected.collector],
+			['Estado en el padrón', deliveryExpected.rosterStatus],
+			['Fecha de entrega', deliveryExpected.deliveryDate],
+			['Registrado por', deliveryExpected.registeredBy],
+			['Observaciones', deliveryExpected.notes]
 		])
 			expectLabeledValue(deliveryRendered.body, label, value);
 		expect(deliveryRendered.body).toMatch(
 			new RegExp(
-				`<div[^>]*>\\s*<span[^>]*></span>\\s*<strong[^>]*>${regexEscape(htmlEscape(deliveryExpected.recipientSignature))}</strong>\\s*</div>`
+				`<span class="doc-line"></span>${regexEscape(htmlEscape(deliveryExpected.recipientSignature))}<br`
 			)
 		);
 		for (const [label, value] of [
-			['Draw', unawardedExpected.draw],
-			['Prize', unawardedExpected.prize],
-			['Winning number', unawardedExpected.winningNumber],
-			['Associated bond', unawardedExpected.associatedBond],
-			['Buyer', unawardedExpected.buyer],
-			['Reason for non-award', unawardedExpected.reason],
-			['Roster status', unawardedExpected.rosterStatus],
-			['Registered by', unawardedExpected.registeredBy],
-			['Date', unawardedExpected.date],
-			['Notes', unawardedExpected.notes]
+			['Sorteo', unawardedExpected.draw],
+			['Premio', unawardedExpected.prize],
+			['Número ganador', unawardedExpected.winningNumber],
+			['Bono asociado', unawardedExpected.associatedBond],
+			['Comprador', unawardedExpected.buyer],
+			['Motivo de la no adjudicación', unawardedExpected.reason],
+			['Estado en el padrón', unawardedExpected.rosterStatus],
+			['Registrado por', unawardedExpected.registeredBy],
+			['Fecha', unawardedExpected.date],
+			['Observaciones', unawardedExpected.notes]
 		])
 			expectLabeledValue(unawardedRendered.body, label, value);
 		expectRenderedPrintCss(deliveryRendered, deliveryCertificateSource);
