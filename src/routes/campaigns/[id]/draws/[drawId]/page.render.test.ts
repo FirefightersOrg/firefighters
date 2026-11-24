@@ -49,6 +49,7 @@ describe('draw detail render', () => {
 		] as const) {
 			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
 			expect(body.includes('Annul draw')).toBe(allowed);
+			expect(body.includes('releases its reserved extra numbers')).toBe(allowed);
 		}
 	});
 	it('renders scheduled actions', () => {
