@@ -14,7 +14,7 @@ import { SETTLEMENT_NOTES_MAX } from '$lib/domain/payments';
 const uuid = z.guid();
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'settlement.create');
 	const [campaign, collectors] = await Promise.all([
@@ -22,8 +22,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		listActiveCollectorOptions(locals.supabase)
 	]);
 	if (campaign.error || collectors.error)
-		error(500, { message: 'Could not load settlement form.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+		error(500, { message: 'No se pudo cargar el formulario de la rendición.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	return {
 		campaign: campaign.data,
 		collectors: collectors.data ?? [],
@@ -33,13 +33,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 export const actions: Actions = {
 	create: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'create', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'create',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'settlement.create'))
 			return fail(403, {
 				form: 'create',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const form = await request.formData();
 		const values = {
@@ -54,7 +58,7 @@ export const actions: Actions = {
 				form: 'create',
 				values,
 				errors: parsed.error.flatten().fieldErrors,
-				message: 'Please correct the highlighted fields.'
+				message: 'Revisar los campos marcados.'
 			});
 		let id: string;
 		try {

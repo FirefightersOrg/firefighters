@@ -43,7 +43,7 @@ describe('sale registration page', () => {
 			form: 'sale',
 			errors: {
 				bondId: ['Choose a bond.'],
-				buyerId: ['Choose a buyer.'],
+				buyerId: ['Elegir un comprador.'],
 				firstDueDate: ['Bad date.']
 			}
 		});

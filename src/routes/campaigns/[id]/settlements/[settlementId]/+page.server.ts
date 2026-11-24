@@ -35,7 +35,7 @@ const denied = (locals: App.Locals, permission: PermissionCode) =>
 	!hasPermissionIn(locals.permissions, permission);
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (
 		!(
@@ -50,14 +50,15 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	)
 		requirePermissionIn(locals.permissions, 'settlement.view');
 	if (!uuid.safeParse(params.settlementId).success)
-		error(404, { message: 'Settlement not found.' });
+		error(404, { message: 'Rendición no encontrada.' });
 	const [campaign, settlement] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getSettlement(locals.supabase, params.id, params.settlementId)
 	]);
-	if (campaign.error || settlement.error) error(500, { message: 'Could not load settlement.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!settlement.data) error(404, { message: 'Settlement not found.' });
+	if (campaign.error || settlement.error)
+		error(500, { message: 'No se pudo cargar la rendición.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!settlement.data) error(404, { message: 'Rendición no encontrada.' });
 	const open = settlement.data.status === 'open';
 	const canCorrectPayment = hasPermissionIn(locals.permissions, 'payment.annul');
 	const canCorrectSettlement =
@@ -71,7 +72,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			: Promise.resolve({ data: [], error: null })
 	]);
 	if (totals.error || payments.error || candidates.error)
-		error(500, { message: 'Could not load settlement.' });
+		error(500, { message: 'No se pudo cargar la rendición.' });
 	return {
 		campaign: campaign.data,
 		settlement: settlement.data,
@@ -113,23 +114,23 @@ async function settlementForPaymentCorrection(
 	values: Record<string, string>
 ) {
 	if (!uuid.safeParse(params.id).success || !uuid.safeParse(params.settlementId).success)
-		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+		return fail(404, { form, values, errors: {}, message: 'Rendición no encontrada.' });
 	const settlement = await getSettlement(locals.supabase, params.id, params.settlementId);
 	if (settlement.error) return serviceFailure(settlement.error, form, values);
 	if (!settlement.data)
-		return fail(404, { form, values, errors: {}, message: 'Settlement not found.' });
+		return fail(404, { form, values, errors: {}, message: 'Rendición no encontrada.' });
 	return null;
 }
 export const actions: Actions = {
 	add: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'add', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, { form: 'add', errors: {}, message: 'No se pudieron cargar los permisos.' });
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.update_open') || denied(locals, 'payment.create'))
 			return fail(403, {
 				form: 'add',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const saleId = field(f, 'saleId');
@@ -142,8 +143,8 @@ export const actions: Actions = {
 		if (!uuid.safeParse(saleId).success || !ids.length || !['cash', 'transfer'].includes(method))
 			return fail(400, {
 				form: 'add',
-				errors: { installmentId: ['Select one or more installments.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: { installmentId: ['Elegir una o más cuotas.'] },
+				message: 'Revisar los campos marcados.'
 			});
 		const settlement = await getSettlement(locals.supabase, params.id, params.settlementId);
 		if (settlement.error) return serviceFailure(settlement.error, 'add');
@@ -151,7 +152,7 @@ export const actions: Actions = {
 			return fail(400, {
 				form: 'add',
 				errors: {},
-				message: 'This settlement is no longer open.'
+				message: 'Esta rendición ya no está abierta.'
 			});
 		const candidates = await listCollectorPaymentCandidates(
 			locals.supabase,
@@ -178,16 +179,16 @@ export const actions: Actions = {
 					'The amount cannot exceed the installment balance.'
 				];
 			else if (remaining === undefined)
-				validationErrors.installmentId = ['Select valid installments for the selected sale.'];
+				validationErrors.installmentId = ['Elegir cuotas válidas de la venta elegida.'];
 			else totalCents += cents;
 		}
 		if (new Set(ids).size !== ids.length)
-			validationErrors.installmentId = ['Select each installment only once.'];
+			validationErrors.installmentId = ['Elegir cada cuota una sola vez.'];
 		if (Object.keys(validationErrors).length)
 			return fail(400, {
 				form: 'add',
 				errors: validationErrors,
-				message: 'Please correct the highlighted fields.'
+				message: 'Revisar los campos marcados.'
 			});
 		const amount = centsToDecimalString(totalCents);
 		try {
@@ -202,7 +203,7 @@ export const actions: Actions = {
 				},
 				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
-			return { form: 'add', success: true, message: 'Payment added.', errors: {} };
+			return { form: 'add', success: true, message: 'Pago agregado.', errors: {} };
 		} catch (e) {
 			return serviceFailure(e, 'add');
 		}
@@ -212,14 +213,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'annulPayment',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'payment.annul'))
 			return fail(403, {
 				form: 'annulPayment',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const values = { paymentId: field(f, 'paymentId'), reason: field(f, 'reason') };
@@ -235,7 +236,7 @@ export const actions: Actions = {
 				requestId: locals.requestId ?? null,
 				permissions: locals.permissions ?? null
 			});
-			return { form: 'annulPayment', success: true, message: 'Payment annulled.', errors: {} };
+			return { form: 'annulPayment', success: true, message: 'Pago anulado.', errors: {} };
 		} catch (e) {
 			return serviceFailure(e, 'annulPayment', values);
 		}
@@ -245,14 +246,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctPaymentMethod',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'payment.annul'))
 			return fail(403, {
 				form: 'correctPaymentMethod',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -276,7 +277,7 @@ export const actions: Actions = {
 			return {
 				form: 'correctPaymentMethod',
 				success: true,
-				message: 'Payment method corrected.',
+				message: 'Método de pago corregido.',
 				errors: {}
 			};
 		} catch (e) {
@@ -288,14 +289,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'reassociateTransfer',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'payment.annul'))
 			return fail(403, {
 				form: 'reassociateTransfer',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -328,7 +329,7 @@ export const actions: Actions = {
 			return {
 				form: 'reassociateTransfer',
 				success: true,
-				message: 'Transfer reassociated.',
+				message: 'Transferencia reasociada.',
 				errors: {}
 			};
 		} catch (e) {
@@ -340,14 +341,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctSettlement',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.correct'))
 			return fail(403, {
 				form: 'correctSettlement',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const values = {
@@ -371,7 +372,7 @@ export const actions: Actions = {
 			return {
 				form: 'correctSettlement',
 				success: true,
-				message: 'Settlement correction recorded.',
+				message: 'Corrección de la rendición registrada.',
 				errors: {}
 			};
 		} catch (e) {
@@ -380,13 +381,17 @@ export const actions: Actions = {
 	},
 	remove: async ({ request, locals, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'remove', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'remove',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.update_open'))
 			return fail(403, {
 				form: 'remove',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const f = await request.formData();
 		const paymentId = field(f, 'paymentId'),
@@ -398,8 +403,8 @@ export const actions: Actions = {
 		)
 			return fail(400, {
 				form: 'remove',
-				errors: { reason: ['Enter an annulment reason within the maximum length.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: { reason: ['Ingresar un motivo de anulación dentro del largo máximo.'] },
+				message: 'Revisar los campos marcados.'
 			});
 		try {
 			await removePaymentFromSettlement(
@@ -407,20 +412,24 @@ export const actions: Actions = {
 				{ paymentId, reason },
 				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
-			return { form: 'remove', success: true, message: 'Payment removed.', errors: {} };
+			return { form: 'remove', success: true, message: 'Pago quitado.', errors: {} };
 		} catch (e) {
 			return serviceFailure(e, 'remove');
 		}
 	},
 	close: async ({ locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'close', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'close',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		if (denied(locals, 'settlement.close'))
 			return fail(403, {
 				form: 'close',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		try {
 			await closeSettlement(
@@ -428,7 +437,7 @@ export const actions: Actions = {
 				{ settlementId: params.settlementId },
 				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
 			);
-			return { form: 'close', success: true, message: 'Settlement closed.', errors: {} };
+			return { form: 'close', success: true, message: 'Rendición cerrada.', errors: {} };
 		} catch (e) {
 			return serviceFailure(e, 'close');
 		}

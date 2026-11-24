@@ -35,5 +35,5 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 function fail500(locals: App.Locals, err: unknown): never {
 	console.error('[deliveries] note load failed', { requestId: locals.requestId, error: err });
-	error(500, { message: 'Could not load the delivery note. Please try again.' });
+	error(500, { message: 'No se pudo cargar el remito. Volver a intentar.' });
 }

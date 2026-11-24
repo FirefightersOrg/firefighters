@@ -108,7 +108,7 @@ describe('settlement workspace', () => {
 		async (action) => {
 			expect(await run(action, null)).toMatchObject({
 				status: 500,
-				data: { form: action, message: 'Could not load permissions.' }
+				data: { form: action, message: 'No se pudieron cargar los permisos.' }
 			});
 			expect(getSettlement).not.toHaveBeenCalled();
 			expect(addPaymentToSettlement).not.toHaveBeenCalled();

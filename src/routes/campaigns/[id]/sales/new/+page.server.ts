@@ -49,7 +49,7 @@ const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
 				context.addIssue({
 					code: 'custom',
 					path: ['firstDueDate'],
-					message: 'Enter a valid first due date.'
+					message: 'Ingresar un primer vencimiento válido.'
 				});
 				return;
 			}
@@ -65,15 +65,16 @@ const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'sale.create');
 	const [campaign, buyers] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		listBuyers(locals.supabase, { search: url.searchParams.get('buyer') ?? '', pageSize: 30 })
 	]);
-	if (campaign.error || buyers.error) error(500, { message: 'Could not load sale registration.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (campaign.error || buyers.error)
+		error(500, { message: 'No se pudo cargar el registro de la venta.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	return {
 		campaign: campaign.data,
 		buyers: buyers.data?.items ?? [],
@@ -88,18 +89,25 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 export const actions: Actions = {
 	lookup: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'lookup', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'lookup',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		requirePermissionIn(locals.permissions, 'sale.create');
 		const query = field(await request.formData(), 'query');
 		if (!query)
-			return fail(400, { form: 'lookup', errors: { query: ['Enter a bond number or code.'] } });
+			return fail(400, {
+				form: 'lookup',
+				errors: { query: ['Ingresar un número o código de bono.'] }
+			});
 		const campaign = await getCampaignById(locals.supabase, params.id);
 		if (campaign.error || !campaign.data)
 			return fail(campaign.error ? 500 : 404, {
 				form: 'lookup',
 				errors: {},
-				message: campaign.error ? 'Could not search bonds.' : 'Campaign not found.'
+				message: campaign.error ? 'No se pudieron buscar los bonos.' : 'Campaña no encontrada.'
 			});
 		// A campaign number ("0068" or "68") searches base/associated numbers; anything else is a code.
 		let number: number | null;
@@ -114,13 +122,17 @@ export const actions: Actions = {
 			number !== null ? { number } : { code: query.slice(0, 200) }
 		);
 		if (result.error)
-			return fail(500, { form: 'lookup', errors: {}, message: 'Could not search bonds.' });
+			return fail(500, { form: 'lookup', errors: {}, message: 'No se pudieron buscar los bonos.' });
 		const collectors = await getCollectorsByIds(
 			locals.supabase,
 			result.data.flatMap((bond) => (bond.collectorId ? [bond.collectorId] : []))
 		);
 		if (collectors.error)
-			return fail(500, { form: 'lookup', errors: {}, message: 'Could not load collectors.' });
+			return fail(500, {
+				form: 'lookup',
+				errors: {},
+				message: 'No se pudieron cargar los cobradores.'
+			});
 		return {
 			form: 'lookup',
 			success: true,
@@ -136,13 +148,17 @@ export const actions: Actions = {
 	},
 	createBuyer: async ({ request, locals, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'buyer', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'buyer',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'buyer.manage'))
 			return fail(403, {
 				form: 'buyer',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const form = await request.formData();
 		const values = buyerValues(form);
@@ -170,7 +186,7 @@ export const actions: Actions = {
 				buyerId,
 				// The new buyer may not be among the listed buyers: the page adds it to the options.
 				buyerName: buyerDisplayName(parsed.data),
-				message: 'Buyer created.',
+				message: 'Comprador creado.',
 				errors: {}
 			};
 		} catch (err) {
@@ -180,13 +196,17 @@ export const actions: Actions = {
 	},
 	register: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
-			return fail(500, { form: 'sale', errors: {}, message: 'Could not load permissions.' });
+			return fail(500, {
+				form: 'sale',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'sale.create'))
 			return fail(403, {
 				form: 'sale',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const form = await request.formData();
 		const values = {
@@ -202,34 +222,44 @@ export const actions: Actions = {
 				const name = String(issue.path.at(-1));
 				if (name !== 'campaignId') (errors[name] ??= []).push(issue.message);
 			}
-		if (!uuid(values.bondId)) errors.bondId = ['Choose a delivered bond.'];
-		if (!uuid(values.buyerId)) errors.buyerId = ['Choose a buyer.'];
+		if (!uuid(values.bondId)) errors.bondId = ['Elegir un bono entregado.'];
+		if (!uuid(values.buyerId)) errors.buyerId = ['Elegir un comprador.'];
 		if (!PAYMENT_MODES.includes(values.paymentMode as PaymentMode))
-			errors.paymentMode = ['Choose a payment mode.'];
+			errors.paymentMode = ['Elegir una modalidad de pago.'];
 		if (Object.keys(errors).length)
 			return fail(400, {
 				form: 'sale',
 				values,
 				errors,
-				message: 'Please correct the highlighted fields.'
+				message: 'Revisar los campos marcados.'
 			});
 		const campaign = await getCampaignById(locals.supabase, params.id);
 		if (campaign.error)
-			return fail(500, { form: 'sale', values, errors: {}, message: 'Could not load campaign.' });
+			return fail(500, {
+				form: 'sale',
+				values,
+				errors: {},
+				message: 'No se pudo cargar la campaña.'
+			});
 		if (!campaign.data)
-			return fail(404, { form: 'sale', values, errors: {}, message: 'Campaign not found.' });
+			return fail(404, { form: 'sale', values, errors: {}, message: 'Campaña no encontrada.' });
 		const [buyer, bond] = await Promise.all([
 			getBuyer(locals.supabase, values.buyerId),
 			findBondsForSale(locals.supabase, params.id, { id: values.bondId })
 		]);
 		if (buyer.error || bond.error)
-			return fail(500, { form: 'sale', values, errors: {}, message: 'Could not validate sale.' });
+			return fail(500, {
+				form: 'sale',
+				values,
+				errors: {},
+				message: 'No se pudo validar la venta.'
+			});
 		if (!buyer.data)
 			return fail(404, {
 				form: 'sale',
 				values,
-				errors: { buyerId: ['Buyer not found.'] },
-				message: 'Buyer not found.'
+				errors: { buyerId: ['Comprador no encontrado.'] },
+				message: 'Comprador no encontrado.'
 			});
 		// The server-side RPC remains authoritative; this prevents a hand-crafted form from showing
 		// a misleading collector confirmation before it reaches the database.
@@ -243,7 +273,7 @@ export const actions: Actions = {
 						candidate?.reason ?? 'This bond is not delivered to a collector and cannot be sold.'
 					]
 				},
-				message: 'Bond is not available for sale.'
+				message: 'El bono no está disponible para la venta.'
 			});
 		let saleId: string;
 		try {

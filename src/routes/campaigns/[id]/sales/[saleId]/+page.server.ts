@@ -34,16 +34,16 @@ async function saleForAction(
 	values: Record<string, string>
 ) {
 	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
-		return fail(404, { form, values, errors: {}, message: 'Sale not found.' });
+		return fail(404, { form, values, errors: {}, message: 'Venta no encontrada.' });
 	const sale = await getSaleDetail(locals.supabase, params.id, params.saleId);
 	if (sale.error) return correctionFailure(sale.error, form, values);
-	if (!sale.data) return fail(404, { form, values, errors: {}, message: 'Sale not found.' });
+	if (!sale.data) return fail(404, { form, values, errors: {}, message: 'Venta no encontrada.' });
 	return null;
 }
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (
 		!hasPermissionIn(locals.permissions, 'sale.view') &&
@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	)
 		requirePermissionIn(locals.permissions, 'bond.view');
 	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
-		error(404, { message: 'Sale not found.' });
+		error(404, { message: 'Venta no encontrada.' });
 	const canCorrect = hasPermissionIn(locals.permissions, 'sale.correct');
 	const [campaign, sale, buyers, collectors] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
@@ -64,9 +64,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			: Promise.resolve({ data: [], error: null })
 	]);
 	if (campaign.error || sale.error || buyers.error || collectors.error)
-		error(500, { message: 'Could not load sale.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
-	if (!sale.data) error(404, { message: 'Sale not found.' });
+		error(500, { message: 'No se pudo cargar la venta.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	if (!sale.data) error(404, { message: 'Venta no encontrada.' });
 	const today = new Intl.DateTimeFormat('en-CA', {
 		timeZone: 'America/Argentina/Buenos_Aires'
 	}).format(new Date());
@@ -103,14 +103,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctBuyer',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'sale.correct'))
 			return fail(403, {
 				form: 'correctBuyer',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const data = await request.formData();
 		const values = { newBuyerId: field(data, 'newBuyerId'), reason: field(data, 'reason') };
@@ -122,7 +122,7 @@ export const actions: Actions = {
 				{ saleId: params.saleId, ...values },
 				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
 			);
-			return { form: 'correctBuyer', success: true, message: 'Buyer corrected.', errors: {} };
+			return { form: 'correctBuyer', success: true, message: 'Comprador corregido.', errors: {} };
 		} catch (cause) {
 			return correctionFailure(cause, 'correctBuyer', values);
 		}
@@ -132,14 +132,14 @@ export const actions: Actions = {
 			return fail(500, {
 				form: 'correctCollector',
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		requireCampaignViewer(locals, url);
 		if (!hasPermissionIn(locals.permissions, 'sale.correct'))
 			return fail(403, {
 				form: 'correctCollector',
 				errors: {},
-				message: 'You do not have permission to perform this action.'
+				message: 'No tenés permiso para hacer esta acción.'
 			});
 		const data = await request.formData();
 		const values = { newCollectorId: field(data, 'newCollectorId'), reason: field(data, 'reason') };
@@ -154,7 +154,7 @@ export const actions: Actions = {
 			return {
 				form: 'correctCollector',
 				success: true,
-				message: 'Collector corrected.',
+				message: 'Cobrador corregido.',
 				errors: {}
 			};
 		} catch (cause) {
