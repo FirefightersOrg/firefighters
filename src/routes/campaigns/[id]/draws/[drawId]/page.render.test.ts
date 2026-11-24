@@ -38,7 +38,7 @@ describe('draw detail render', () => {
 			const body = render(Page, { props: { data: value, form: null } as any }).body;
 			expect(body).not.toContain('action="?/annul"');
 			expect(body).not.toContain('action="?/complete"');
-			if (status === 'scheduled') expect(body).toContain('Edit scheduled draw');
+			if (status === 'scheduled') expect(body).toContain('Editar sorteo programado');
 		}
 	);
 	it('offers generated extraordinary annulment but not ordinary or frozen annulment', () => {
@@ -48,35 +48,35 @@ describe('draw detail render', () => {
 			['roster_frozen', 'extraordinary_full_payment', false]
 		] as const) {
 			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
-			expect(body.includes('Annul draw')).toBe(allowed);
-			expect(body.includes('releases its reserved extra numbers')).toBe(allowed);
+			expect(body.includes('Anular sorteo')).toBe(allowed);
+			expect(body.includes('libera los números extra reservados')).toBe(allowed);
 		}
 	});
 	it('renders scheduled actions', () => {
 		const body = render(Page, { props: { data: data('scheduled'), form: null } as any }).body;
-		expect(body).toContain('Edit scheduled draw');
-		expect(body).toContain('Generate roster');
-		expect(body).toContain('Annul draw');
+		expect(body).toContain('Editar sorteo programado');
+		expect(body).toContain('Generar padrón');
+		expect(body).toContain('Anular sorteo');
 	});
 	it('converts a UTC cutoff instant near midnight to the Buenos Aires wall clock', () => {
 		const value = data('scheduled');
 		value.draw.paymentCutoffAt = '2026-11-20T02:30:00+00:00';
 		const body = render(Page, { props: { data: value, form: null } as any }).body;
-		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
+		expect(body).toContain('2026-11-19 23:30 (hora de Buenos Aires)');
 		expect(body).toContain('value="2026-11-19T23:30"');
 	});
 	it('renders generated actions and consolation warning', () => {
 		expect(
 			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
-		).toContain('Freeze roster');
+		).toContain('Congelar padrón');
 		expect(
 			render(Page, { props: { data: data('scheduled', 'consolation'), form: null } as any }).body
-		).toContain('unavailable until draw results exist');
+		).toContain('premios de los sorteos anteriores');
 	});
 	it('offers completion only on a frozen draw (SAN-123)', () => {
 		const frozen = render(Page, { props: { data: data('roster_frozen'), form: null } as any }).body;
 		expect(frozen).toContain('action="?/complete"');
-		expect(frozen).toContain('Every prize must be resolved');
+		expect(frozen).toContain('Todos los premios tienen que estar resueltos');
 		expect(
 			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
 		).not.toContain('action="?/complete"');
@@ -86,6 +86,6 @@ describe('draw detail render', () => {
 	});
 	it('hides actions in a terminal state', () =>
 		expect(render(Page, { props: { data: data('closed'), form: null } as any }).body).not.toContain(
-			'Generate roster'
+			'Generar padrón'
 		));
 });
