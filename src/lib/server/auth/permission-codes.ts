@@ -1,5 +1,5 @@
 /**
- * Canonical list of all 47 granular permission codes defined in docs/permissions.md
+ * Canonical list of all 48 granular permission codes defined in docs/permissions.md
  * and seeded in the database.
  */
 export const PERMISSIONS = [
@@ -45,6 +45,7 @@ export const PERMISSIONS = [
 	'draw.load_winner',
 	'prize.resolve',
 	'prize.deliver',
+	'prize.annul',
 	'report.view_operational',
 	'report.view_financial',
 	'report.export',

@@ -4,6 +4,7 @@ import type { PageServerLoad } from './$types';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { hasPermissionIn, permissionsUnavailable } from '$lib/server/auth/permissions';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
+import { getDocumentActorName } from '$lib/server/repositories/document-actors';
 import { getSettlementPrint } from '$lib/server/repositories/printable-payments';
 import { buildPrintableSettlementDeliveryNote } from '$lib/server/documents/settlement-delivery-note';
 const uuid = (v: string) => z.guid().safeParse(v).success;
@@ -22,19 +23,25 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(403, { message: 'Permission denied.' });
 	if (!uuid(params.id) || !uuid(params.settlementId))
 		error(404, { message: 'Settlement not found.' });
-	const [campaign, settlement] = await Promise.all([
+	const [campaign, settlement, actor] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
-		getSettlementPrint(locals.supabase, params.id, params.settlementId)
+		getSettlementPrint(locals.supabase, params.id, params.settlementId),
+		getDocumentActorName(locals.supabase, 'settlement', params.settlementId)
 	]);
-	if (campaign.error || settlement.error) {
+	if (campaign.error || settlement.error || actor.error) {
 		console.error('[settlements] print load failed', {
 			requestId: locals.requestId,
 			settlementId: params.settlementId,
-			error: campaign.error ?? settlement.error
+			error: campaign.error ?? settlement.error ?? actor.error
 		});
 		error(500, { message: 'Could not load the settlement.' });
 	}
 	if (!campaign.data) error(404, { message: 'Campaign not found.' });
 	if (!settlement.data) error(404, { message: 'Settlement not found.' });
-	return { document: buildPrintableSettlementDeliveryNote(campaign.data, settlement.data) };
+	return {
+		document: buildPrintableSettlementDeliveryNote(campaign.data, {
+			...settlement.data,
+			closedBy: actor.data
+		})
+	};
 };
