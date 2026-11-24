@@ -66,12 +66,12 @@ describe('winners and prizes render', () => {
 					form: {
 						form: 'reverseDelivery',
 						success,
-						message: success ? 'Prize delivery reversed.' : 'Reversal failed.',
+						message: success ? 'Entrega del premio revertida.' : 'Reversal failed.',
 						values: { prizeId: 'prize-delivered', reason: 'Incorrect delivery' }
 					}
 				} as any
 			}).body;
-			expect(body).toContain(success ? 'Prize delivery reversed.' : 'Reversal failed.');
+			expect(body).toContain(success ? 'Entrega del premio revertida.' : 'Reversal failed.');
 			expect(body).toContain('Incorrect delivery');
 		}
 	});
@@ -134,7 +134,7 @@ describe('winners and prizes render', () => {
 				form: {
 					form: 'loadWinner',
 					success: true,
-					message: 'Winning number loaded.',
+					message: 'Número ganador cargado.',
 					result: immediate
 				}
 			} as any
