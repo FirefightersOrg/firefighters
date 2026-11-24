@@ -190,9 +190,17 @@ Product decisions (SAN-93): the three new `.view` permissions are implied by any
 
 ### Operational reports (SAN-86)
 
-`20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions.
+`20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions (known gap, SAN-140).
 
-The four reports (`report_bonds_by_status`, `report_bonds_by_collector`, `report_installments`, `report_collector_monthly`) are read-only `SECURITY DEFINER` functions that check `report.view_operational` and `campaign.view` themselves and return aggregates only (no buyer data). They are definers on purpose: a read-only user holds `report.view_operational` but not `sale.view` or `payment.view`, whose RLS would otherwise hide the data.
+The four reports (`report_bonds_by_status`, `report_bonds_by_collector`, `report_installments`, `report_collector_monthly`) are read-only `SECURITY DEFINER` functions that check `report.view_operational` and `campaign.view` themselves and return aggregates only (no buyer data). They are definers on purpose: a read-only user holds `report.view_operational` but not `sale.view` or `payment.view`, whose RLS would otherwise hide the data. The functions and the helper are revoked from `public`, `anon` and `service_role` and granted to `authenticated` only.
+
+### Financial and draw reports and exports (SAN-87)
+
+`20270108000000_financial_draw_reports.sql` grants `report.export` to `operator` (operations), `treasurer` and `read-only` (auditor); it was admin-only (SAN-90 backups). `report.view_financial` was already granted to `treasurer` and `read-only`.
+
+The seven financial and draw reports (`report_payments_by_date`, `report_settlements_by_collector`, `report_collector_accounts`, `report_collector_ledger`, `report_draw_rosters`, `report_draw_roster_entries`, `report_prizes`) are read-only `SECURITY DEFINER` functions that check `report.view_financial` and `campaign.view` themselves. They are revoked from `public`, `anon` and `service_role` and granted to `authenticated` only.
+
+Exports (`/campaigns/[id]/reports/export/[report]?format=csv|xlsx`) need `report.export`, `campaign.view` and the view permission of the report: `report.view_operational` for the four operational reports, `report.view_financial` for the financial and draw ones. So an operator exports only the operational reports. The backup exports (SAN-90) share `report.export` but still require the view permission of the exported data.
 
 ## Technical rules
 

@@ -184,18 +184,21 @@ beforeAll(async () => {
 		p_first_due_date: todayInBuenosAires(),
 		p_request_id: rid('sale')
 	});
-	const { data: plan } = await service
+	const { data: plan, error: planError } = await users.admin.client
 		.from('payment_plans')
 		.select('id')
 		.eq('sale_id', saleId)
 		.single();
-	const { data: installments } = await service
+	if (planError || !plan) throw new Error(`payment plan read failed: ${planError?.message}`);
+	const { data: installment, error: installmentError } = await users.admin.client
 		.from('installments')
 		.select('id')
-		.eq('payment_plan_id', plan!.id)
+		.eq('payment_plan_id', plan.id)
 		.eq('installment_number', 1)
-		.single()
-		.then((r) => ({ data: r.data ? [r.data] : [] }));
+		.single();
+	if (installmentError || !installment) {
+		throw new Error(`installment read failed: ${installmentError?.message}`);
+	}
 	const settlementId = await rpcId(users.admin.client, 'settlement_open', {
 		p_campaign_id: campaignId,
 		p_collector_id: collectorId,
@@ -207,7 +210,7 @@ beforeAll(async () => {
 		p_sale_id: saleId,
 		p_amount: 100,
 		p_payment_method: 'cash',
-		p_applications: [{ installment_id: installments![0]!.id, amount_applied: 100 }],
+		p_applications: [{ installment_id: installment.id, amount_applied: 100 }],
 		p_request_id: rid('payment')
 	});
 	await rpc(users.admin.client, 'settlement_close', {

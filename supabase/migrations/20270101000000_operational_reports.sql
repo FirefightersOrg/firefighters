@@ -203,11 +203,11 @@ begin
   order by c.display_name, ids.cid;
 end $$;
 
-revoke all on function public.report_require_operational(uuid) from public, anon, authenticated;
-revoke all on function public.report_bonds_by_status(uuid, uuid, text, text, text) from public, anon;
-revoke all on function public.report_bonds_by_collector(uuid, uuid, text, text, text) from public, anon;
-revoke all on function public.report_installments(uuid, uuid, text, date, date) from public, anon;
-revoke all on function public.report_collector_monthly(uuid, date, uuid) from public, anon;
+revoke all on function public.report_require_operational(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.report_bonds_by_status(uuid, uuid, text, text, text) from public, anon, service_role;
+revoke all on function public.report_bonds_by_collector(uuid, uuid, text, text, text) from public, anon, service_role;
+revoke all on function public.report_installments(uuid, uuid, text, date, date) from public, anon, service_role;
+revoke all on function public.report_collector_monthly(uuid, date, uuid) from public, anon, service_role;
 grant execute on function public.report_bonds_by_status(uuid, uuid, text, text, text) to authenticated;
 grant execute on function public.report_bonds_by_collector(uuid, uuid, text, text, text) to authenticated;
 grant execute on function public.report_installments(uuid, uuid, text, date, date) to authenticated;

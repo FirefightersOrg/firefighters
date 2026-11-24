@@ -1,7 +1,7 @@
 -- SAN-86: operational report functions (grants, access rule, aggregates, filters).
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(33);
+select plan(34);
 
 insert into auth.users(id, email)
 select ('a6460000-0000-0000-0000-00000000000' || n)::uuid, 'rep-' || n || '@example.com' from generate_series(1, 6) n;
@@ -140,6 +140,10 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
   where n.nspname = 'public' and p.proname like 'report\_%' and p.prosecdef and p.provolatile = 's'), 13, 'the report functions (SAN-86 and SAN-87) are stable security definer');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'report\_%' and p.proconfig::text like '%search_path=%'), 13, 'the report functions pin search_path');
+
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname like 'report\_%' and has_function_privilege('service_role', p.oid, 'execute')), 0,
+  'service_role cannot execute any report function or helper');
 
 select * from finish();
 rollback;

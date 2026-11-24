@@ -257,10 +257,3 @@ grant execute on function public.report_collector_ledger(uuid, uuid, date, date,
 grant execute on function public.report_draw_rosters(uuid, uuid) to authenticated;
 grant execute on function public.report_draw_roster_entries(uuid, uuid, boolean, integer, integer) to authenticated;
 grant execute on function public.report_prizes(uuid, uuid, text) to authenticated;
-
--- SAN-86 revoked its report functions from public and anon only; the service role does not use
--- them either, so the same hardening applies.
-revoke all on function public.report_bonds_by_status(uuid, uuid, text, text, text) from service_role;
-revoke all on function public.report_bonds_by_collector(uuid, uuid, text, text, text) from service_role;
-revoke all on function public.report_installments(uuid, uuid, text, date, date) from service_role;
-revoke all on function public.report_collector_monthly(uuid, date, uuid) from service_role;
