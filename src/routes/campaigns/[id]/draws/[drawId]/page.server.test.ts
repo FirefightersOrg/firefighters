@@ -58,6 +58,24 @@ beforeEach(() => {
 	vi.mocked(getCurrentDrawRoster).mockResolvedValue({ data: null, error: null });
 });
 describe('draw detail', () => {
+	it.each([
+		['extraordinary_full_payment', 'roster_generated', true],
+		['monthly', 'roster_generated', false],
+		['final', 'roster_generated', false],
+		['consolation', 'roster_generated', false],
+		['extraordinary_full_payment', 'roster_frozen', false]
+	])('annul capability for %s in %s is %s', async (drawType, status, expected) => {
+		vi.mocked(getDraw).mockResolvedValue({
+			data: { ...draw, drawType, status },
+			error: null
+		} as never);
+		const result = await load({
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.update'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never);
+		expect((result as any).can.annul).toBe(expected);
+	});
 	it('fails closed and denies load', async () => {
 		await expect(
 			load({

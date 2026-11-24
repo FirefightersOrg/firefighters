@@ -163,8 +163,8 @@ Possible results:
   preserves draw type and only edits scheduled draws; changing the installment takes the campaign
   lock before the draw lock and remains bounded by the campaign's installment count.
 - There is no `draw.annul` permission in `docs/permissions.md`, so annulment uses `draw.update`.
-  Only `scheduled -> annulled` is allowed, exactly as in `docs/state-machines.md` and SAN-75.
-  Generated/frozen draws cannot be annulled; no frozen history is changed or discarded.
+  Originally only `scheduled -> annulled` was allowed; SAN-117 adds the narrow
+  generated-extraordinary exception below. Frozen draws still cannot be annulled.
   Annulment has its own timestamp, actor and trimmed 1..1000-code-point reason.
 - Names are trimmed, nonblank and at most 200 Unicode code points. Configuration dates remain
   date-only; the payment cutoff is a timestamp. Monthly configuration requires a positive
@@ -233,13 +233,12 @@ Possible results:
   value then base UUID. The allocator reserves the lowest free values in ascending order,
   matching SAN-76. Capacity is checked before inserting anything; failure rolls back the whole
   invocation, including roster status, reservations and audit.
-- **Campaign-wide reuse decision:** one immutable extraordinary row per source base is reused
+- **Campaign-wide reuse decision:** one currently reserved extraordinary row per source base is reused
   on regeneration **and across later extraordinary draws in the same campaign**. No draw-specific
   ownership is invented on `bond_numbers`. A unique source-base index backs this invariant.
   Reused numbers remain visible as ineligible if that bond later fails payment eligibility.
-- Extraordinary allocation never reuses any historically reserved value, including released
-  values; existing ordinary bond creation can still reuse released ordinary numbers by its own
-  documented rules. Released extraordinary rows are never reactivated or replaced.
+- SAN-117 makes extraordinary allocation release-aware: released values and source bases can be
+  assigned again through a new row. Released historical rows are never reactivated or overwritten.
 - A campaign-specific transaction advisory lock (hash seed 77, distinct from financial seed 68)
   serializes extraordinary allocators after the roster locks. Number insertion also uses the
   existing bond-number guard's owner lock. These services do not acquire financial locks or
@@ -453,8 +452,7 @@ Review resolutions (PR #89):
   changes, so its expectations need no update. Existing SAN-77 roster/Phase-11
   flows have no unresolved prior excluding prizes and require no fixture changes.
 
-- **SAN-117:** extraordinary numbers are not released when their draw is annulled;
-  this remains a separate follow-up and is not changed here.
+- **SAN-117:** implemented below; the prior extraordinary-number release gap is closed.
 - **SAN-81 (pending product decision):** delivered prizes cannot be annulled.
   The RPC explicitly refuses instead of voiding an already fulfilled award.
 - **SAN-77 (inherited product question):** payment cutoff remains the inclusive
@@ -507,6 +505,36 @@ Review resolutions (PR #89):
 - Decision: prize history is visible only with a capability accepted by prize read RLS
   (`draw.view`, `draw.load_winner`, or a prize action). A bond/buyer reader without one sees an
   explicit permission message rather than causing an RLS query failure.
-- Known gaps are unchanged: **SAN-117** extraordinary-number release remains out of scope, and
+- At SAN-82 delivery, **SAN-117** extraordinary-number release remained out of scope (now implemented below), and
   **SAN-81** still forbids annulment of delivered prizes pending a product decision. No new
   integration test or database change was required by this UI-only phase.
+
+## Implemented in SAN-117
+
+- **Approved product exception:** an extraordinary full-payment draw may transition from
+  `roster_generated` to `annulled`, but never from frozen/completed/closed. Other draw types
+  remain scheduled-only for annulment. The transition guard, domain predicate and detail-page
+  annul capability agree; editing generated rules remains forbidden. Permission stays
+  `draw.update`; RPC signatures and authenticated grants are unchanged.
+- Extras are campaign-wide reservations, not draw-owned rows. Annulment considers every
+  extraordinary number referenced by any roster of the annulled draw (including superseded
+  rosters), and releases it only if **no roster of another non-annulled draw** references it.
+  Ineligible entries also count as references. No roster or entry is deleted or rewritten.
+- Release sets `released_at` and `released_by`; the number guard permits this narrow
+  extraordinary exception without changing ordinary mistaken-load release rules. The
+  source-base unique index applies to currently reserved extras only. Allocation checks
+  currently reserved values/source bases, allowing a later draw to reuse the value and source
+  in a **new UUID row**, while old snapshots retain the original number UUID/value.
+- The single `draw.annul` audit event contains before/after draw snapshots, trimmed reason and
+  sorted `new_value.released_number_ids` (an empty array when nothing is released). It is in the
+  same transaction as status and release; audit failure rolls back both changes.
+  Existing grants are retained, including SAN-23's trusted service-role bond-number access;
+  draw/roster direct DML remains revoked from all API roles.
+- Lock order: campaign SHARE → target draw UPDATE → its rosters in UUID order → campaign seed-77
+  advisory lock, matching extraordinary generation. No previous/other draw is locked and no
+  financial lock is acquired. Concurrent generation waits for annulment and can allocate a fresh
+  reservation after its committed release; conversely, annulment waits for generation and keeps
+  the newly referenced reservation.
+- Known inherited gaps: **SAN-81** delivered-prize annulment awaits a product decision;
+  **SAN-77** payment cutoff remains inclusive Buenos Aires payment date rather than confirmation
+  timestamp. SAN-117 does not change either. No new functional gap is known.

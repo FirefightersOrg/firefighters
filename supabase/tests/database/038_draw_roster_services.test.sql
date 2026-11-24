@@ -145,7 +145,7 @@ select ok(not has_function_privilege('authenticated','public.draw_payment_before
 insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind)
 select pg_temp.id('c'),pg_temp.id('bond5'),v,'extraordinary'
 from generate_series(0,9999)v where not exists (
-  select 1 from public.bond_numbers where campaign_id=pg_temp.id('c') and number_value=v);
+  select 1 from public.bond_numbers where campaign_id=pg_temp.id('c') and number_value=v and released_at is null);
 set local role authenticated;
 select throws_ok($$select public.draw_generate_roster(pg_temp.id('extra'),'038-exhaustion')$$,'55000','not enough free campaign numbers','exhaustion refused atomically after newly eligible bond');
 reset role;

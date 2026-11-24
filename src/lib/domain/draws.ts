@@ -31,6 +31,7 @@ export const DRAW_STATUS_LABELS: Record<DrawStatus, string> = {
 	closed: 'Closed',
 	annulled: 'Annulled'
 };
+/** Common transitions; use canTransitionDraw for the type-specific SAN-117 exception. */
 export const DRAW_TRANSITIONS: Record<DrawStatus, readonly DrawStatus[]> = {
 	scheduled: ['roster_generated', 'annulled'],
 	roster_generated: ['roster_frozen'],
@@ -39,8 +40,9 @@ export const DRAW_TRANSITIONS: Record<DrawStatus, readonly DrawStatus[]> = {
 	closed: [],
 	annulled: []
 };
-export const canTransitionDraw = (from: DrawStatus, to: DrawStatus) =>
-	DRAW_TRANSITIONS[from].includes(to);
+export const canTransitionDraw = (from: DrawStatus, to: DrawStatus, type?: DrawType) =>
+	DRAW_TRANSITIONS[from].includes(to) ||
+	(from === 'roster_generated' && to === 'annulled' && type === 'extraordinary_full_payment');
 export const DRAW_ROSTER_STATUSES = ['generated', 'frozen', 'superseded'] as const;
 export type DrawRosterStatus = (typeof DRAW_ROSTER_STATUSES)[number];
 export const DRAW_ROSTER_STATUS_LABELS: Record<DrawRosterStatus, string> = {
