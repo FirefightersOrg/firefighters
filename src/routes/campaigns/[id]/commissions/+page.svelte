@@ -1,16 +1,26 @@
 <script lang="ts">
-	import { statusWord } from '$lib/domain/status-word';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
-	import { cardClass } from '$lib/components/campaigns/styles';
 	import AnnulRuleAction from '$lib/components/commissions/AnnulRuleAction.svelte';
 	import CommissionRuleForm from '$lib/components/commissions/CommissionRuleForm.svelte';
 	import {
+		Alert,
+		Badge,
+		Button,
+		Card,
+		EmptyState,
+		PageHeader,
+		StatusBadge,
+		Table,
+		statusMeta,
+		type Tone,
+		type TableColumn
+	} from '$lib/components/ui';
+	import {
 		commissionRuleTiming,
-		formatCommissionRuleType,
-		formatCommissionValue,
-		formatValidity,
+		describeCommissionRuleType,
+		describeCommissionValue,
+		describeValidity,
+		type CommissionRule,
 		type CommissionRuleTiming
 	} from '$lib/domain/commissions';
 	import type { PageProps } from './$types';
@@ -53,189 +63,154 @@
 		Object.values(annulResult?.errors ?? {}).flat()[0] ?? annulResult?.message
 	);
 
-	const TIMING_LABELS: Record<CommissionRuleTiming, { label: string; tone: string }> = {
-		current: { label: 'In effect', tone: 'bg-green-50 text-green-800 ring-green-600/20' },
-		upcoming: { label: 'Upcoming', tone: 'bg-blue-50 text-blue-800 ring-blue-600/20' },
-		ended: { label: 'Ended', tone: 'bg-slate-100 text-slate-700 ring-slate-500/20' }
+	const TIMING_LABELS: Record<CommissionRuleTiming, { label: string; tone: Tone }> = {
+		current: { label: 'Vigente', tone: 'success' },
+		upcoming: { label: 'Próxima', tone: 'info' },
+		ended: { label: 'Finalizada', tone: 'neutral' }
 	};
+
+	type RuleRow = {
+		id: string;
+		rule: CommissionRule;
+		collector: string;
+		type: string;
+		commission: string;
+		validity: string;
+		annulled: boolean;
+		timing: CommissionRuleTiming;
+	};
+	function toRow(rule: CommissionRule & { collectorName?: string }): RuleRow {
+		return {
+			id: rule.id,
+			rule,
+			collector: rule.collectorName ?? '',
+			type: describeCommissionRuleType(rule),
+			commission: describeCommissionValue(rule),
+			validity: describeValidity(rule),
+			annulled: rule.status === 'annulled',
+			timing: commissionRuleTiming(rule, data.today)
+		};
+	}
+	const generalRows = $derived(data.rules.map(toRow));
+	const specialRows = $derived(data.specialRules.map(toRow));
+
+	const actionsColumn = $derived<TableColumn<RuleRow>[]>(
+		data.can.manage ? [{ key: 'actions', header: 'Acciones', align: 'right' }] : []
+	);
+	const generalColumns = $derived<TableColumn<RuleRow>[]>([
+		{ key: 'type', header: 'Tipo' },
+		{ key: 'commission', header: 'Comisión', align: 'right' },
+		{ key: 'validity', header: 'Vigencia' },
+		{ key: 'status', header: 'Estado' },
+		...actionsColumn
+	]);
+	const specialColumns = $derived<TableColumn<RuleRow>[]>([
+		{ key: 'collector', header: 'Cobrador' },
+		...generalColumns
+	]);
+	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
 </script>
 
 <svelte:head>
-	<title>Commission rules - {campaign.name} - Firefighters</title>
+	<title>Reglas de comisión - {campaign.name} - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a
-			href={resolve('/campaigns/[id]', { id: campaign.id })}
-			class="text-sm text-blue-700 hover:underline">← {campaign.name}</a
-		>
-		<div class="mt-2 flex flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">Commission rules</h1>
-			<StatusBadge kind="campaign" status={campaign.status} />
-		</div>
-		<p class="mt-1 text-sm text-slate-600">
-			General rules apply to every collector of this campaign. Special collector rules come later.
-		</p>
-	</div>
+{#snippet ruleCell(row: RuleRow, column: TableColumn<RuleRow>)}
+	{#if column.key === 'type' || column.key === 'collector'}
+		<span id="rule-{row.id}" class={row.annulled ? 'text-muted' : 'text-text'}>
+			{row[column.key]}
+		</span>
+	{:else if column.key === 'commission'}
+		<span class={row.annulled ? 'line-through' : ''}>{row.commission}</span>
+	{:else if column.key === 'validity'}
+		<span class="whitespace-nowrap">{row.validity}</span>
+	{:else if column.key === 'status'}
+		{#if row.annulled}
+			<StatusBadge kind="commissionRule" status="annulled" />
+			{#if row.rule.annulReason}
+				<p class="m-0 mt-1 max-w-xs text-caption break-words text-muted">{row.rule.annulReason}</p>
+			{/if}
+		{:else}
+			<Badge tone={TIMING_LABELS[row.timing].tone}>{TIMING_LABELS[row.timing].label}</Badge>
+		{/if}
+	{:else if column.key === 'actions'}
+		{#if !row.annulled}
+			<div class="flex justify-end gap-2">
+				<Button
+					variant="ghost"
+					size="sm"
+					href="{listHref}?edit={row.id}#edit-rule-title"
+					aria-label={row.collector
+						? `Editar regla especial de ${row.collector}`
+						: `Editar regla: ${row.type}, ${row.validity}`}>Editar</Button
+				>
+				<AnnulRuleAction
+					ruleId={row.id}
+					description={row.collector
+						? `${row.collector}: ${row.type}, ${row.commission}`
+						: `${row.type}, ${row.commission}, ${row.validity}`}
+				/>
+			</div>
+		{/if}
+	{/if}
+{/snippet}
 
+<PageHeader
+	title="Reglas de comisión"
+	description="Las reglas generales se aplican a todos los cobradores de esta campaña. Las reglas especiales por cobrador tienen prioridad."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
+		{ label: 'Reglas de comisión' }
+	]}
+>
+	{#snippet actions()}
+		<StatusBadge kind="campaign" status={campaign.status} />
+	{/snippet}
+</PageHeader>
+
+<div class="flex flex-col gap-6">
 	{#if annulResult}
-		<FormAlert kind={annulResult.success ? 'success' : 'error'} message={annulMessage} />
+		<Alert tone={annulResult.success ? 'success' : 'danger'}>{annulMessage}</Alert>
 	{/if}
 	{#if data.editNotFound}
-		<FormAlert
-			kind="warning"
-			message="That rule cannot be edited: it does not exist in this campaign or was annulled."
-		/>
+		<Alert tone="warning">
+			Esa regla no se puede editar: no existe en esta campaña o fue anulada.
+		</Alert>
 	{/if}
 	{#if campaign.status !== 'draft' && campaign.status !== 'active'}
-		<FormAlert kind="warning">
-			<p>
-				<strong>Read-only.</strong> This campaign is {statusWord(campaign.status)}; commission rules
-				can only be changed while a campaign is a draft or active.
-			</p>
-		</FormAlert>
+		<Alert tone="warning">
+			<strong>Solo lectura.</strong> Esta campaña está {statusLabel}; las reglas de comisión solo se
+			pueden cambiar mientras la campaña es un borrador o está activa.
+		</Alert>
 	{/if}
 
-	<section class={cardClass} aria-labelledby="rules-title">
-		<h2 id="rules-title" class="mb-4 text-base font-semibold">General rules</h2>
-		{#if data.rules.length === 0}
-			<p class="text-sm text-slate-600">No commission rules yet.</p>
-		{:else}
-			<div class="-mx-6 overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
-					<thead>
-						<tr class="text-left text-xs font-medium text-slate-500">
-							<th scope="col" class="px-6 py-2">Type</th>
-							<th scope="col" class="px-3 py-2 text-right">Commission</th>
-							<th scope="col" class="px-3 py-2">Validity</th>
-							<th scope="col" class="px-3 py-2">Status</th>
-							{#if data.can.manage}
-								<th scope="col" class="px-6 py-2"><span class="sr-only">Actions</span></th>
-							{/if}
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100">
-						{#each data.rules as rule (rule.id)}
-							{@const annulled = rule.status === 'annulled'}
-							{@const timing = TIMING_LABELS[commissionRuleTiming(rule, data.today)]}
-							<tr
-								id="rule-{rule.id}"
-								class={[annulled && 'text-slate-500', rule.id === editRule?.id && 'bg-blue-50']}
-							>
-								<td class="px-6 py-3 font-medium">{formatCommissionRuleType(rule)}</td>
-								<td class="px-3 py-3 text-right whitespace-nowrap tabular-nums">
-									<span class={[annulled && 'line-through']}>{formatCommissionValue(rule)}</span>
-								</td>
-								<td class="px-3 py-3 whitespace-nowrap">{formatValidity(rule)}</td>
-								<td class="px-3 py-3">
-									{#if annulled}
-										<span
-											class="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800 ring-1 ring-red-600/20 ring-inset"
-											>Annulled</span
-										>
-										{#if rule.annulReason}
-											<p class="mt-1 max-w-xs text-xs break-words">{rule.annulReason}</p>
-										{/if}
-									{:else}
-										<span
-											class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {timing.tone}"
-											>{timing.label}</span
-										>
-									{/if}
-								</td>
-								{#if data.can.manage}
-									<td class="px-6 py-3 text-right whitespace-nowrap">
-										{#if !annulled}
-											<div class="flex justify-end gap-4">
-												<a
-													href="{listHref}?edit={rule.id}#edit-rule-title"
-													class="text-sm font-medium text-blue-700 hover:underline"
-													aria-label="Edit rule: {formatCommissionRuleType(rule)}, {formatValidity(
-														rule
-													)}">Edit</a
-												>
-												<AnnulRuleAction
-													ruleId={rule.id}
-													description="{formatCommissionRuleType(rule)}, {formatCommissionValue(
-														rule
-													)}, {formatValidity(rule)}"
-												/>
-											</div>
-										{/if}
-									</td>
-								{/if}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-	</section>
+	<Card title="Reglas generales" id="rules" flush>
+		<Table columns={generalColumns} rows={generalRows} selectedKey={editRule?.id}>
+			{#snippet cell({ row, column })}
+				{@render ruleCell(row, column)}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState title="Todavía no hay reglas de comisión" />
+			{/snippet}
+		</Table>
+	</Card>
 
-	<section class={cardClass} aria-labelledby="special-rules-title">
-		<h2 id="special-rules-title" class="mb-1 text-base font-semibold">Special collector rules</h2>
-		<p class="mb-4 text-xs text-slate-500">
-			A special rule for a collector takes precedence over the general rules for that collector.
-		</p>
-		{#if data.specialRules.length === 0}
-			<p class="text-sm text-slate-600">No special collector rules.</p>
-		{:else}
-			<div class="-mx-6 overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
-					<thead>
-						<tr class="text-left text-xs font-medium text-slate-500">
-							<th scope="col" class="px-6 py-2">Collector</th>
-							<th scope="col" class="px-3 py-2">Type</th>
-							<th scope="col" class="px-3 py-2 text-right">Commission</th>
-							<th scope="col" class="px-3 py-2">Validity</th>
-							<th scope="col" class="px-3 py-2">Status</th>
-							{#if data.can.manage}
-								<th scope="col" class="px-6 py-2"><span class="sr-only">Actions</span></th>
-							{/if}
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100">
-						{#each data.specialRules as rule (rule.id)}
-							{@const annulled = rule.status === 'annulled'}
-							<tr id="rule-{rule.id}" class={[annulled && 'text-slate-500']}>
-								<td class="px-6 py-3 font-medium">{rule.collectorName}</td>
-								<td class="px-3 py-3">{formatCommissionRuleType(rule)}</td>
-								<td class="px-3 py-3 text-right whitespace-nowrap tabular-nums">
-									<span class={[annulled && 'line-through']}>{formatCommissionValue(rule)}</span>
-								</td>
-								<td class="px-3 py-3 whitespace-nowrap">{formatValidity(rule)}</td>
-								<td class="px-3 py-3">
-									{annulled
-										? 'Annulled'
-										: TIMING_LABELS[commissionRuleTiming(rule, data.today)].label}
-								</td>
-								{#if data.can.manage}
-									<td class="px-6 py-3 text-right whitespace-nowrap">
-										{#if !annulled}
-											<div class="flex justify-end gap-4">
-												<a
-													href="{listHref}?edit={rule.id}#edit-rule-title"
-													class="text-sm font-medium text-blue-700 hover:underline"
-													aria-label="Edit special rule for {rule.collectorName}">Edit</a
-												>
-												<AnnulRuleAction
-													ruleId={rule.id}
-													description="{rule.collectorName}: {formatCommissionRuleType(
-														rule
-													)}, {formatCommissionValue(rule)}"
-												/>
-											</div>
-										{/if}
-									</td>
-								{/if}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-	</section>
+	<Card
+		title="Reglas especiales por cobrador"
+		description="Una regla especial para un cobrador tiene prioridad sobre las reglas generales para ese cobrador."
+		id="special-rules"
+		flush
+	>
+		<Table columns={specialColumns} rows={specialRows} selectedKey={editRule?.id}>
+			{#snippet cell({ row, column })}
+				{@render ruleCell(row, column)}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState title="No hay reglas especiales por cobrador" />
+			{/snippet}
+		</Table>
+	</Card>
 
 	{#if data.can.manage}
 		<!-- Re-mount when switching between create and edit, between rules, or when a load brings a
@@ -250,8 +225,8 @@
 			/>
 		{/key}
 	{:else if campaign.status === 'draft' || campaign.status === 'active'}
-		<p class="text-xs text-slate-500">
-			Only users allowed to manage commission rules can change them.
+		<p class="m-0 text-body-sm text-muted">
+			Solo quienes tienen permiso para gestionar reglas de comisión pueden cambiarlas.
 		</p>
 	{/if}
 </div>

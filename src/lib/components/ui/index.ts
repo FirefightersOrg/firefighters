@@ -40,3 +40,11 @@ export type { StatusKind, StatusMeta, StatusOf } from './status';
 export { TONES, type MessageTone, type Tone } from './tones';
 export { TOAST_TIMEOUT_MS, toastTimeout } from './toast';
 // --- end SAN-129 ---------------------------------------------------------------------
+
+// --- SAN-132: form error summary ---
+export { default as FormErrorSummary } from './FormErrorSummary.svelte';
+// --- end SAN-132 ---
+
+// --- SAN-132: form result ---
+export { default as FormResult } from './FormResult.svelte';
+// --- end SAN-132 ---

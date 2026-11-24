@@ -1,75 +1,65 @@
 <script lang="ts">
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
-	import { cardClass, primaryButtonClass } from '$lib/components/campaigns/styles';
-	import { formatCampaignDate } from '$lib/domain/campaigns';
-	import { formatMoney } from '$lib/domain/money';
+	import { Button, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
+	import type { TableColumn } from '$lib/components/ui';
+	import { formatDate, formatMoney, formatNumber } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const rows = $derived(
+		data.campaigns.map((campaign) => ({
+			id: campaign.id,
+			name: campaign.name,
+			status: campaign.status,
+			dates: `${formatDate(campaign.startsAt)} – ${formatDate(campaign.endsAt)}`,
+			bondValue: formatMoney(campaign.simpleBondValue),
+			installments: `${campaign.installmentCount} × ${formatMoney(campaign.installmentValue)}`,
+			digits: formatNumber(campaign.numberDigits)
+		}))
+	);
+	type Row = (typeof rows)[number];
+
+	const columns: TableColumn<Row>[] = [
+		{ key: 'name', header: 'Nombre' },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'dates', header: 'Fechas' },
+		{ key: 'bondValue', header: 'Valor del bono', align: 'right' },
+		{ key: 'installments', header: 'Cuotas', align: 'right' },
+		{ key: 'digits', header: 'Dígitos', align: 'right' }
+	];
 </script>
 
 <svelte:head>
-	<title>Campaigns - Firefighters</title>
+	<title>Campañas - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div class="flex flex-wrap items-center justify-between gap-4">
-		<div>
-			<h1 class="text-2xl font-bold tracking-tight">Campaigns</h1>
-			<p class="text-sm text-slate-500">Bond campaigns, newest first.</p>
-		</div>
+<PageHeader title="Campañas" description="Campañas de bonos, de la más reciente a la más antigua.">
+	{#snippet actions()}
 		{#if data.canCreate}
-			<a href={resolve('/campaigns/new')} class={primaryButtonClass}>New campaign</a>
+			<Button variant="primary" href={resolve('/campaigns/new')} icon="plus">Nueva campaña</Button>
 		{/if}
-	</div>
+	{/snippet}
+</PageHeader>
 
-	{#if data.campaigns.length === 0}
-		<div class="{cardClass} text-center text-sm text-slate-500">
-			No campaigns yet.
-			{#if data.canCreate}Create the first one with “New campaign”.{/if}
-		</div>
-	{:else}
-		<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-			<table class="min-w-full divide-y divide-slate-200 text-sm">
-				<thead
-					class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
-				>
-					<tr>
-						<th scope="col" class="px-4 py-3">Name</th>
-						<th scope="col" class="px-4 py-3">Status</th>
-						<th scope="col" class="px-4 py-3">Dates</th>
-						<th scope="col" class="px-4 py-3 text-right">Bond value</th>
-						<th scope="col" class="px-4 py-3 text-right">Installments</th>
-						<th scope="col" class="px-4 py-3 text-right">Digits</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-slate-100">
-					{#each data.campaigns as campaign (campaign.id)}
-						<tr class="hover:bg-slate-50">
-							<td class="px-4 py-3 font-medium">
-								<a
-									href={resolve('/campaigns/[id]', { id: campaign.id })}
-									class="text-blue-700 hover:underline"
-								>
-									{campaign.name}
-								</a>
-							</td>
-							<td class="px-4 py-3"><StatusBadge kind="campaign" status={campaign.status} /></td>
-							<td class="whitespace-nowrap px-4 py-3 text-slate-600">
-								{formatCampaignDate(campaign.startsAt)} – {formatCampaignDate(campaign.endsAt)}
-							</td>
-							<td class="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-								{formatMoney(campaign.simpleBondValue)}
-							</td>
-							<td class="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-600">
-								{campaign.installmentCount} × {formatMoney(campaign.installmentValue)}
-							</td>
-							<td class="px-4 py-3 text-right tabular-nums">{campaign.numberDigits}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
-</div>
+<Table {columns} {rows} caption="Campañas registradas">
+	{#snippet cell({ row, column })}
+		{#if column.key === 'name'}
+			<a
+				href={resolve('/campaigns/[id]', { id: row.id })}
+				class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+			>
+				{row.name}
+			</a>
+		{:else if column.key === 'status'}
+			<StatusBadge kind="campaign" status={row.status} />
+		{:else}
+			{row[column.key as keyof Row]}
+		{/if}
+	{/snippet}
+	{#snippet empty()}
+		<EmptyState title="Todavía no hay campañas">
+			{#if data.canCreate}Crear la primera con «Nueva campaña».{/if}
+		</EmptyState>
+	{/snippet}
+</Table>

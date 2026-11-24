@@ -1,13 +1,13 @@
 <script lang="ts">
+	import { OVERFLOW_POLICY_LABELS } from '$lib/domain/campaigns';
 	import { OVERFLOW_POLICIES } from '$lib/domain/numbering';
 	import {
 		MAX_NUMBER_DIGITS,
 		previewNumberingInput,
 		type CampaignFieldErrors
 	} from '$lib/schemas/campaign';
-	import FieldError from './FieldError.svelte';
+	import { Field, Select, TextInput } from '$lib/components/ui';
 	import NumberingPreview from './NumberingPreview.svelte';
-	import { hintClass, inputClass, labelClass } from './styles';
 
 	/**
 	 * Numbering rules: digits, maximum number, associated-number offset and overflow policy, with a
@@ -28,10 +28,6 @@
 		errors?: CampaignFieldErrors;
 	} = $props();
 
-	const OVERFLOW_POLICY_LABELS: Record<string, string> = {
-		reject: 'Reject (block numbers whose associated number exceeds the maximum)'
-	};
-
 	const preview = $derived(
 		previewNumberingInput({ numberDigits, maxNumber, associatedNumberOffset, overflowPolicy })
 	);
@@ -39,105 +35,99 @@
 		new Set(preview.state === 'invalid' ? preview.issues.map((issue) => issue.field) : [])
 	);
 
-	/** Server errors win; otherwise a problem found by the live preview marks the field invalid. */
-	function invalid(field: string): 'true' | undefined {
-		return errors[field]?.length || previewIssueFields.has(field) ? 'true' : undefined;
+	/** A problem found by the live preview marks the field invalid (the list below explains it). */
+	function previewInvalid(field: string): true | undefined {
+		return previewIssueFields.has(field) ? true : undefined;
 	}
 
-	function describedBy(field: string): string {
-		const ids = [`${field}-hint`];
-		if (errors[field]?.length) ids.push(`${field}-error`);
-		else if (previewIssueFields.has(field)) ids.push(`${field}-preview-error`);
-		return ids.join(' ');
+	/** The preview's explanation is linked from the field unless a server error replaces it. */
+	function previewDescription(field: string): string | undefined {
+		return !errors[field]?.length && previewIssueFields.has(field)
+			? `${field}-preview-error`
+			: undefined;
 	}
 </script>
 
-<fieldset class="space-y-4">
-	<legend class="text-sm font-semibold text-slate-900">Numbering</legend>
+<fieldset class="m-0 flex flex-col gap-5 border-0 p-0">
+	<legend class="mb-3 p-0 text-heading-3 text-text">Numeración</legend>
 
-	<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-		<div>
-			<label for="numberDigits" class={labelClass}>Number of digits</label>
-			<input
-				id="numberDigits"
+	<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+		<Field
+			label="Cantidad de dígitos"
+			id="numberDigits"
+			hint="Ancho visible: con 4 dígitos, 68 se muestra 0068 (de 1 a {MAX_NUMBER_DIGITS})."
+			error={errors.numberDigits?.[0]}
+			required
+		>
+			<TextInput
 				name="numberDigits"
 				type="text"
 				inputmode="numeric"
 				pattern="[0-9]*"
 				autocomplete="off"
-				required
+				invalid={previewInvalid('numberDigits')}
+				aria-describedby={previewDescription('numberDigits')}
 				bind:value={numberDigits}
-				aria-invalid={invalid('numberDigits')}
-				aria-describedby={describedBy('numberDigits')}
-				class={inputClass}
 			/>
-			<p id="numberDigits-hint" class={hintClass}>
-				Visible width, e.g. 4 → 0068 (1-{MAX_NUMBER_DIGITS}).
-			</p>
-			<FieldError id="numberDigits-error" errors={errors.numberDigits} />
-		</div>
+		</Field>
 
-		<div>
-			<label for="maxNumber" class={labelClass}>Maximum number</label>
-			<input
-				id="maxNumber"
+		<Field
+			label="Número máximo"
+			id="maxNumber"
+			hint="Mayor número válido; debe entrar en los dígitos."
+			error={errors.maxNumber?.[0]}
+			required
+		>
+			<TextInput
 				name="maxNumber"
 				type="text"
 				inputmode="numeric"
 				pattern="[0-9]*"
 				autocomplete="off"
-				required
+				invalid={previewInvalid('maxNumber')}
+				aria-describedby={previewDescription('maxNumber')}
 				bind:value={maxNumber}
-				aria-invalid={invalid('maxNumber')}
-				aria-describedby={describedBy('maxNumber')}
-				class={inputClass}
 			/>
-			<p id="maxNumber-hint" class={hintClass}>Highest valid number; must fit in the digits.</p>
-			<FieldError id="maxNumber-error" errors={errors.maxNumber} />
-		</div>
+		</Field>
 
-		<div>
-			<label for="associatedNumberOffset" class={labelClass}>Associated number offset</label>
-			<input
-				id="associatedNumberOffset"
+		<Field
+			label="Desfase del número asociado"
+			id="associatedNumberOffset"
+			hint="Número asociado = número base + desfase."
+			error={errors.associatedNumberOffset?.[0]}
+			required
+		>
+			<TextInput
 				name="associatedNumberOffset"
 				type="text"
 				inputmode="numeric"
 				pattern="[0-9]*"
 				autocomplete="off"
-				required
+				invalid={previewInvalid('associatedNumberOffset')}
+				aria-describedby={previewDescription('associatedNumberOffset')}
 				bind:value={associatedNumberOffset}
-				aria-invalid={invalid('associatedNumberOffset')}
-				aria-describedby={describedBy('associatedNumberOffset')}
-				class={inputClass}
 			/>
-			<p id="associatedNumberOffset-hint" class={hintClass}>
-				Associated number = base number + offset.
-			</p>
-			<FieldError id="associatedNumberOffset-error" errors={errors.associatedNumberOffset} />
-		</div>
+		</Field>
 	</div>
 
-	<div>
-		<label for="overflowPolicy" class={labelClass}>Overflow policy</label>
-		<select
-			id="overflowPolicy"
+	<Field
+		label="Política de desborde"
+		id="overflowPolicy"
+		hint="Qué pasa cuando el número base más el desfase supera el máximo."
+		error={errors.overflowPolicy?.[0]}
+		required
+	>
+		<Select
 			name="overflowPolicy"
-			required
+			invalid={previewInvalid('overflowPolicy')}
+			aria-describedby={previewDescription('overflowPolicy')}
+			options={OVERFLOW_POLICIES.map((policy) => ({
+				value: policy,
+				label: OVERFLOW_POLICY_LABELS[policy]
+			}))}
 			bind:value={overflowPolicy}
-			aria-invalid={invalid('overflowPolicy')}
-			aria-describedby={describedBy('overflowPolicy')}
-			class={inputClass}
-		>
-			{#each OVERFLOW_POLICIES as policy (policy)}
-				<option value={policy}>{OVERFLOW_POLICY_LABELS[policy] ?? policy}</option>
-			{/each}
-		</select>
-		<p id="overflowPolicy-hint" class={hintClass}>
-			What happens when base number + offset exceeds the maximum.
-		</p>
-		<FieldError id="overflowPolicy-error" errors={errors.overflowPolicy} />
-	</div>
+		/>
+	</Field>
 
 	<NumberingPreview {preview} />
 </fieldset>

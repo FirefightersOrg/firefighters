@@ -1,14 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
+	import { Alert, Button, Card, FormResult, PageHeader } from '$lib/components/ui';
+	import { GENERAL_FIELDS, RULES_FIELDS } from '$lib/components/campaigns/fields';
 	import GeneralFields from '$lib/components/campaigns/GeneralFields.svelte';
 	import RulesFields from '$lib/components/campaigns/RulesFields.svelte';
-	import {
-		cardClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
 	import {
 		defaultRulesValues,
 		emptyGeneralValues,
@@ -38,61 +34,57 @@
 </script>
 
 <svelte:head>
-	<title>New campaign - Firefighters</title>
+	<title>Nueva campaña - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a href={resolve('/campaigns')} class="text-sm text-blue-700 hover:underline">← Campaigns</a>
-		<h1 class="mt-2 text-2xl font-bold tracking-tight">New campaign</h1>
-		<p class="text-sm text-slate-500">The campaign starts as a draft.</p>
-	</div>
+<PageHeader
+	title="Nueva campaña"
+	description="La campaña comienza como borrador."
+	breadcrumbs={[{ label: 'Campañas', href: resolve('/campaigns') }, { label: 'Nueva campaña' }]}
+/>
 
-	{#if form?.message}
-		<FormAlert message={form.message} />
-	{/if}
+<form
+	method="POST"
+	class="flex flex-col gap-6"
+	use:enhance={() => {
+		submitting = true;
+		return async ({ update }) => {
+			try {
+				await update({ reset: false });
+			} finally {
+				submitting = false;
+			}
+		};
+	}}
+>
+	<FormResult
+		result={form ? { success: false, message: form.message, errors } : null}
+		fields={[...GENERAL_FIELDS, ...RULES_FIELDS]}
+	/>
 
-	<form
-		method="POST"
-		class="space-y-6"
-		use:enhance={() => {
-			submitting = true;
-			return async ({ update }) => {
-				try {
-					await update({ reset: false });
-				} finally {
-					submitting = false;
-				}
-			};
-		}}
-	>
-		<section class={cardClass}>
-			<h2 class="mb-4 text-base font-semibold">General</h2>
-			<GeneralFields
-				bind:name={general.name}
-				bind:startsOn={general.startsOn}
-				bind:endsOn={general.endsOn}
-				{errors}
-			/>
-		</section>
+	<Card title="Datos generales" id="general">
+		<GeneralFields
+			bind:name={general.name}
+			bind:startsOn={general.startsOn}
+			bind:endsOn={general.endsOn}
+			{errors}
+		/>
+	</Card>
 
-		<section class="{cardClass} space-y-4">
-			<h2 class="text-base font-semibold">Rules</h2>
-			<FormAlert kind="warning">
-				<p>
-					Rules can be changed while the campaign is a draft. <strong
-						>Activating the campaign freezes them</strong
-					>: they cannot be edited afterwards.
-				</p>
-			</FormAlert>
+	<Card title="Reglas" id="rules">
+		<div class="flex flex-col gap-5">
+			<Alert tone="warning">
+				Las reglas se pueden cambiar mientras la campaña es un borrador.
+				<strong>Activar la campaña las congela</strong>: después no se pueden editar.
+			</Alert>
 			<RulesFields bind:values={rules} {errors} />
-		</section>
-
-		<div class="flex justify-end gap-2">
-			<a href={resolve('/campaigns')} class={secondaryButtonClass}>Cancel</a>
-			<button type="submit" disabled={submitting || installmentError} class={primaryButtonClass}>
-				{submitting ? 'Creating…' : 'Create campaign'}
-			</button>
 		</div>
-	</form>
-</div>
+	</Card>
+
+	<div class="flex flex-wrap gap-2">
+		<Button type="submit" variant="primary" loading={submitting} disabled={installmentError}>
+			{submitting ? 'Creando…' : 'Crear campaña'}
+		</Button>
+		<Button href={resolve('/campaigns')}>Cancelar</Button>
+	</div>
+</form>

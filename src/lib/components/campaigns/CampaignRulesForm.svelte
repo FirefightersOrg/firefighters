@@ -9,11 +9,19 @@
 		CAMPAIGN_RULES_REASON_MAX_LENGTH,
 		type CampaignFieldErrors
 	} from '$lib/schemas/campaign';
-	import FieldError from './FieldError.svelte';
-	import FormAlert from './FormAlert.svelte';
+	import {
+		Alert,
+		Button,
+		Card,
+		Checkbox,
+		Field,
+		FormResult,
+		Icon,
+		Textarea
+	} from '$lib/components/ui';
+	import { RULES_FIELDS } from './fields';
 	import RulesFields from './RulesFields.svelte';
 	import { diffCampaignRules } from './rules-diff';
-	import { cardClass, hintClass, inputClass, labelClass, primaryButtonClass } from './styles';
 	import { campaignEditSnapshot, rulesValuesOf } from './types';
 
 	/**
@@ -62,6 +70,11 @@
 	let confirmedFor = $state<string | null>(null);
 	const confirmErrors = $derived(result?.errors[CAMPAIGN_RULES_CONFIRM_FIELD]);
 	const reasonErrors = $derived(result?.errors[CAMPAIGN_RULES_REASON_FIELD]);
+	const SUMMARY_FIELDS = [
+		...RULES_FIELDS,
+		{ name: CAMPAIGN_RULES_REASON_FIELD, label: 'Motivo' },
+		{ name: CAMPAIGN_RULES_CONFIRM_FIELD, label: 'Confirmación de la revisión' }
+	];
 	// Refilled from the submitted values when JavaScript is off (only when they were based on the
 	// loaded version, like the rule values above); cleared after a successful save.
 	function initialReason() {
@@ -73,113 +86,104 @@
 	let changeReason = $state(initialReason());
 </script>
 
-<section class="{cardClass} space-y-4" aria-labelledby="rules-title">
-	<h2 id="rules-title" class="text-base font-semibold">Rules</h2>
-	<FormAlert kind="warning">
-		<p>
-			Rules can only be changed while the campaign is a draft. Every saved change is recorded in the
-			audit log with its previous and new values. <strong
-				>Activating the campaign freezes the rules.</strong
-			>
-		</p>
-	</FormAlert>
-	<form
-		method="POST"
-		action="?/rules"
-		class="space-y-4"
-		use:enhance={() => {
-			submitting = true;
-			return async ({ update, result: actionResult }) => {
-				try {
-					await update({ reset: false });
-					if (actionResult.type === 'success') changeReason = '';
-				} finally {
-					submitting = false;
-				}
-			};
-		}}
-	>
-		{#if result}
-			<FormAlert kind={result.success ? 'success' : 'error'} message={result.message} />
-		{/if}
-		<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
-		<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
-		<RulesFields bind:values errors={result?.errors ?? {}} />
-
-		<div
-			id="rules-changes"
-			aria-live="polite"
-			class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
+<Card title="Reglas" id="rules">
+	<div class="flex flex-col gap-5">
+		<Alert tone="warning">
+			Las reglas solo se pueden cambiar mientras la campaña es un borrador. Cada cambio guardado
+			queda en el registro de auditoría con sus valores anterior y nuevo.
+			<strong>Activar la campaña congela las reglas.</strong>
+		</Alert>
+		<form
+			method="POST"
+			action="?/rules"
+			class="flex flex-col gap-5"
+			use:enhance={() => {
+				submitting = true;
+				return async ({ update, result: actionResult }) => {
+					try {
+						await update({ reset: false });
+						if (actionResult.type === 'success') changeReason = '';
+					} finally {
+						submitting = false;
+					}
+				};
+			}}
 		>
-			<h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Changes to save</h3>
-			{#if changes.length === 0}
-				<p class="mt-2 text-slate-500">No rule has been changed yet.</p>
-			{:else}
-				<ul class="mt-2 space-y-1">
-					{#each changes as change (change.field)}
-						<li>
-							<span class="font-medium">{change.label}:</span>
-							<span class="tabular-nums text-slate-500 line-through decoration-slate-400"
-								>{change.from}</span
-							>
-							<span aria-hidden="true">→</span><span class="sr-only">changes to</span>
-							<span class="tabular-nums font-medium text-slate-900">{change.to}</span>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
+			<FormResult {result} fields={SUMMARY_FIELDS} />
+			<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
+			<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
+			<RulesFields bind:values errors={result?.errors ?? {}} />
 
-		<div>
-			<label for={CAMPAIGN_RULES_REASON_FIELD} class={labelClass}>Reason (optional)</label>
-			<textarea
+			<div
+				id="rules-changes"
+				aria-live="polite"
+				class="rounded-md border border-border bg-surface-sunken p-4 text-body-sm"
+			>
+				<h3 class="m-0 text-label text-muted">Cambios a guardar</h3>
+				{#if changes.length === 0}
+					<p class="m-0 mt-2 text-muted">Todavía no se cambió ninguna regla.</p>
+				{:else}
+					<ul class="m-0 mt-2 list-none space-y-1 p-0">
+						{#each changes as change (change.field)}
+							<li>
+								<span class="text-label">{change.label}:</span>
+								<span class="tabular-nums text-muted line-through">{change.from}</span>
+								<span aria-hidden="true">→</span><span class="sr-only">cambia a</span>
+								<span class="text-label tabular-nums text-text">{change.to}</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+
+			<Field
+				label="Motivo"
 				id={CAMPAIGN_RULES_REASON_FIELD}
-				name={CAMPAIGN_RULES_REASON_FIELD}
-				rows="2"
-				maxlength={CAMPAIGN_RULES_REASON_MAX_LENGTH}
-				bind:value={changeReason}
-				aria-invalid={reasonErrors?.length ? 'true' : undefined}
-				aria-describedby={reasonErrors?.length
-					? `${CAMPAIGN_RULES_REASON_FIELD}-hint ${CAMPAIGN_RULES_REASON_FIELD}-error`
-					: `${CAMPAIGN_RULES_REASON_FIELD}-hint`}
-				class={inputClass}></textarea>
-			<p id="{CAMPAIGN_RULES_REASON_FIELD}-hint" class={hintClass}>
-				Why the rules change, e.g. a board decision. Saved in the audit log with the change (up to
-				{CAMPAIGN_RULES_REASON_MAX_LENGTH} characters).
-			</p>
-			<FieldError id="{CAMPAIGN_RULES_REASON_FIELD}-error" errors={reasonErrors} />
-		</div>
+				hint="Por qué cambian las reglas, por ejemplo una decisión de la comisión directiva. Se guarda en el registro de auditoría con el cambio (hasta {CAMPAIGN_RULES_REASON_MAX_LENGTH} caracteres)."
+				error={reasonErrors?.[0]}
+				optional
+			>
+				<Textarea
+					name={CAMPAIGN_RULES_REASON_FIELD}
+					rows={2}
+					maxlength={CAMPAIGN_RULES_REASON_MAX_LENGTH}
+					bind:value={changeReason}
+				/>
+			</Field>
 
-		<div>
-			<div class="flex items-start gap-2">
-				<input
+			<div class="flex flex-col gap-1">
+				<Checkbox
 					id={CAMPAIGN_RULES_CONFIRM_FIELD}
 					name={CAMPAIGN_RULES_CONFIRM_FIELD}
-					type="checkbox"
 					value={CAMPAIGN_RULES_CONFIRM_VALUE}
 					required
-					checked={confirmedFor === changesKey}
-					onchange={(event) => {
-						confirmedFor = event.currentTarget.checked ? changesKey : null;
-					}}
-					aria-invalid={confirmErrors?.length ? 'true' : undefined}
+					label="Se revisaron estos cambios en las reglas. Quedan registrados en el registro de auditoría y las reglas se congelan al activar la campaña."
 					aria-describedby={confirmErrors?.length
 						? `rules-changes ${CAMPAIGN_RULES_CONFIRM_FIELD}-error`
 						: 'rules-changes'}
-					class="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+					bind:checked={
+						() => confirmedFor === changesKey,
+						(checked) => {
+							confirmedFor = checked ? changesKey : null;
+						}
+					}
 				/>
-				<label for={CAMPAIGN_RULES_CONFIRM_FIELD} class="text-sm text-slate-700">
-					I reviewed these rule changes. I understand they are recorded in the audit log and that
-					the rules freeze when the campaign is activated.
-				</label>
+				{#if confirmErrors?.length}
+					<p
+						id="{CAMPAIGN_RULES_CONFIRM_FIELD}-error"
+						class="m-0 flex items-start gap-1 text-body-sm text-danger-text"
+					>
+						<Icon name="error" size="sm" class="mt-0.5" />
+						<span>{confirmErrors[0]}</span>
+					</p>
+				{/if}
 			</div>
-			<FieldError id="{CAMPAIGN_RULES_CONFIRM_FIELD}-error" errors={confirmErrors} />
-		</div>
 
-		<div class="flex justify-end">
-			<button type="submit" disabled={submitting || installmentError} class={primaryButtonClass}>
-				{submitting ? 'Saving…' : 'Save rules'}
-			</button>
-		</div>
-	</form>
-</section>
+			<div>
+				<Button type="submit" loading={submitting} disabled={installmentError}
+					>Guardar reglas</Button
+				>
+			</div>
+		</form>
+	</div>
+</Card>
