@@ -29,14 +29,14 @@ function page(form: any = null) {
 describe('sale registration page', () => {
 	it('renders lookup, inline buyer and registration workflow', () => {
 		const body = page();
-		expect(body).toContain('Find a delivered bond');
-		expect(body).toContain('Create a buyer');
-		expect(body).toContain('Confirm sale');
+		expect(body).toContain('Buscar un bono entregado');
+		expect(body).toContain('Crear un comprador');
+		expect(body).toContain('Confirmar venta');
 		expect(body).not.toContain('firstDueDate');
-		expect(body).toContain('Collector: Select a bond to see its holder.');
+		expect(body).toContain('Cobrador: elegir un bono para ver quién lo tiene.');
 		expect(body).not.toContain('Confirmed collector');
-		expect(body).toContain('4. Schedule preview');
-		expect(body).toContain('Showing first 1 of 31');
+		expect(body).toContain('4. Vista previa del plan');
+		expect(body).toContain('Se muestran los primeros 1 de 31');
 	});
 	it('renders field errors with their accessible descriptions', () => {
 		const body = page({
@@ -53,7 +53,7 @@ describe('sale registration page', () => {
 	});
 	it('renders lookup refusal and buyer duplicate warning', () => {
 		expect(page({ form: 'lookup', found: [] }).toString()).toContain(
-			'Available bonds must be delivered first'
+			'Los bonos disponibles se tienen que entregar primero'
 		);
 		expect(
 			page({
