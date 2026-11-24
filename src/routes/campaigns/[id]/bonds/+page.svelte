@@ -104,8 +104,10 @@
 	{#snippet actions()}
 		<div class="flex flex-wrap items-center gap-2">
 			{#if data.can.create}
-				<Button variant="primary" icon="plus" href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
-					>Cargar bono</Button
+				<Button
+					variant="primary"
+					icon="plus"
+					href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}>Cargar bono</Button
 				>
 				<Button href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
 					>Cargar pata</Button
@@ -132,13 +134,7 @@
 		<form method="GET" action={listHref} class="flex flex-col gap-5">
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 				<Field label="Número base" id="filter-base" error={errors.base}>
-					<TextInput
-						name="base"
-						inputmode="numeric"
-						autocomplete="off"
-						mono
-						value={values.base}
-					/>
+					<TextInput name="base" inputmode="numeric" autocomplete="off" mono value={values.base} />
 				</Field>
 				<Field label="Número asociado" id="filter-associated" error={errors.associated}>
 					<TextInput
@@ -158,27 +154,19 @@
 					<TextInput name="code" autocomplete="off" mono value={values.code} />
 				</Field>
 				<Field label="Tipo" id="filter-type" error={errors.type}>
-					<Select
-						name="type"
-						value={values.type}
-						options={typeOptions}
-					/>
+					<Select name="type" value={values.type} options={typeOptions} />
 				</Field>
 				<Field label="Estado comercial" id="filter-status" error={errors.status}>
-					<Select
-						name="status"
-						value={values.status}
-						options={statusOptions}
-					/>
+					<Select name="status" value={values.status} options={statusOptions} />
 				</Field>
 				<Field label="Estado financiero" id="filter-financial" error={errors.financial}>
-					<Select
-						name="financial"
-						value={values.financial}
-						options={financialOptions}
-					/>
+					<Select name="financial" value={values.financial} options={financialOptions} />
 				</Field>
-				<Field label="Cobrador" id="filter-collector" hint="Disponible con cobradores y compradores (fase 5).">
+				<Field
+					label="Cobrador"
+					id="filter-collector"
+					hint="Disponible con cobradores y compradores (fase 5)."
+				>
 					<Select disabled options={anyOption} />
 				</Field>
 				<Field label="Comprador" id="filter-buyer">

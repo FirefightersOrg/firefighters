@@ -354,7 +354,10 @@ export function bondTotalValueCents(simpleBondValue: string, units: number): num
 		throw new BondError('invalid_value', `Valor de bono simple no válido: ${simpleBondValue}`);
 	}
 	if (!Number.isSafeInteger(units) || units < 1) {
-		throw new BondError('invalid_value', `Cantidad de unidades comerciales no válida: ${String(units)}`);
+		throw new BondError(
+			'invalid_value',
+			`Cantidad de unidades comerciales no válida: ${String(units)}`
+		);
 	}
 	const total = cents * units;
 	if (!Number.isSafeInteger(total) || total > MAX_MONEY_CENTS) {
@@ -433,7 +436,10 @@ export function validateManualGrouping(
 	config?: CampaignNumberingConfig
 ): BondComposition {
 	if (members.length < MIN_PATA_SIZE) {
-		throw new BondError('group_too_small', `Una pata necesita al menos ${MIN_PATA_SIZE} bonos simples`);
+		throw new BondError(
+			'group_too_small',
+			`Una pata necesita al menos ${MIN_PATA_SIZE} bonos simples`
+		);
 	}
 	const seen = new Set<string>();
 	for (const member of members) {

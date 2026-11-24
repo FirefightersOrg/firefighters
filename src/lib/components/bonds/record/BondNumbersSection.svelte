@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { Table, type TableColumn } from '$lib/components/ui';
 	import RecordSection from './RecordSection.svelte';
 	import type { BondRecordNumber } from './types';
 
 	/**
-	 * Bond record, 2. "Participating numbers" (base, associated, extraordinary), padded like the
+	 * Bond record, 2. "Números participantes" (base, associated, extraordinary), padded like the
 	 * campaign shows them. A manual pata owns no numbers: its members' numbers are shown, each
 	 * linking to its member bond.
 	 */
@@ -14,51 +15,52 @@
 		numbers
 	}: { campaignId: string; bondId: string; numbers: BondRecordNumber[] } = $props();
 
-	const KIND_LABELS = { base: 'Base', associated: 'Associated', extraordinary: 'Extraordinary' };
+	const KIND_LABELS = { base: 'Base', associated: 'Asociado', extraordinary: 'Extraordinario' };
 	const released = $derived(numbers.some((n) => n.released));
+
+	type NumberRow = BondRecordNumber & { id: number } & Record<string, unknown>;
+	const columns: TableColumn<NumberRow>[] = [
+		{ key: 'formatted', header: 'Número' },
+		{ key: 'role', header: 'Rol' },
+		{ key: 'notes', header: 'Observaciones' }
+	];
+	const rows = $derived(numbers.map((n, id) => ({ ...n, id })) as NumberRow[]);
 </script>
 
 <RecordSection id="numbers">
 	{#if numbers.length === 0}
-		<p class="text-sm text-slate-500">This bond has no participating numbers.</p>
+		<p class="m-0 text-body-sm text-muted">Este bono no tiene números participantes.</p>
 	{:else}
 		{#if released}
-			<p class="mb-3 text-sm text-slate-600">
-				Released numbers no longer count for this bond and can be entered again.
+			<p class="m-0 mb-3 text-body-sm text-muted">
+				Los números liberados ya no cuentan para este bono y se pueden ingresar de nuevo.
 			</p>
 		{/if}
-		<table class="w-full text-left text-sm">
-			<thead class="text-xs text-slate-500">
-				<tr>
-					<th scope="col" class="py-1 font-medium">Number</th>
-					<th scope="col" class="py-1 font-medium">Role</th>
-					<th scope="col" class="py-1 font-medium"><span class="sr-only">Notes</span></th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-slate-100">
-				{#each numbers as number, i (i)}
-					<tr>
-						<td class="py-1.5 font-mono text-base font-semibold tabular-nums">
-							<span class={number.released ? 'text-slate-400 line-through' : ''}
-								>{number.formatted}</span
+		<Table {columns} {rows} caption="Números participantes" density="compact">
+			{#snippet cell({ row, column })}
+				{#if column.key === 'formatted'}
+					<span
+						class="font-mono text-body font-semibold tabular-nums {row.released
+							? 'text-subtle line-through'
+							: ''}">{row.formatted}</span
+					>
+				{:else if column.key === 'role'}
+					{KIND_LABELS[row.kind]}
+				{:else if column.key === 'notes'}
+					<span class="text-caption text-muted">
+						{#if row.released}Liberado{/if}
+						{#if row.ownerBondId !== bondId}
+							<a
+								href={resolve('/campaigns/[id]/bonds/[bondId]', {
+									id: campaignId,
+									bondId: row.ownerBondId
+								})}
+								class="text-primary-text underline-offset-2 hover:underline">Bono miembro</a
 							>
-						</td>
-						<td class="py-1.5">{KIND_LABELS[number.kind]}</td>
-						<td class="py-1.5 text-xs text-slate-500">
-							{#if number.released}Released{/if}
-							{#if number.ownerBondId !== bondId}
-								<a
-									href={resolve('/campaigns/[id]/bonds/[bondId]', {
-										id: campaignId,
-										bondId: number.ownerBondId
-									})}
-									class="text-blue-700 hover:underline">Member bond</a
-								>
-							{/if}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+						{/if}
+					</span>
+				{/if}
+			{/snippet}
+		</Table>
 	{/if}
 </RecordSection>

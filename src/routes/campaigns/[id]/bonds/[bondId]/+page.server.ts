@@ -279,7 +279,8 @@ export const actions: Actions = {
 		const result: BondFormResult = {
 			form: 'ungroup',
 			success: true,
-			message: 'Pata desagrupada. Quedó anulada y sus bonos vuelven a estar disponibles por separado.',
+			message:
+				'Pata desagrupada. Quedó anulada y sus bonos vuelven a estar disponibles por separado.',
 			errors: {}
 		};
 		return result;
@@ -464,7 +465,9 @@ async function returnAction({ request, locals, params, url }: RequestEvent) {
 			'La custodia del bono está desactualizada. Recargar la página y volver a intentar.',
 			{
 				errors: {
-					fromCollectorId: ['La custodia del bono está desactualizada. Recargar la página y volver a intentar.']
+					fromCollectorId: [
+						'La custodia del bono está desactualizada. Recargar la página y volver a intentar.'
+					]
 				}
 			}
 		);
@@ -508,7 +511,9 @@ async function reassignAction({ request, locals, params, url }: RequestEvent) {
 			'La custodia del bono está desactualizada. Recargar la página y volver a intentar.',
 			{
 				errors: {
-					fromCollectorId: ['La custodia del bono está desactualizada. Recargar la página y volver a intentar.']
+					fromCollectorId: [
+						'La custodia del bono está desactualizada. Recargar la página y volver a intentar.'
+					]
 				},
 				values
 			}

@@ -108,7 +108,8 @@ export const actions: Actions = {
 	start: async ({ request, locals, params, url }) => {
 		const denied = checkImportActionPermission(locals, url, 'start', 'bond.scan');
 		if (denied) return denied;
-		if (!isUuid(params.id)) return importFormFailure('start', 404, IMPORT_MESSAGES.campaignNotFound);
+		if (!isUuid(params.id))
+			return importFormFailure('start', 404, IMPORT_MESSAGES.campaignNotFound);
 		const formData = await request.formData();
 		const notes = textField(formData, 'notes');
 		if (notes && notes.length > 2000) {
@@ -169,7 +170,8 @@ export const actions: Actions = {
 			});
 			return importFormFailure('scan', 500, IMPORT_MESSAGES.internal, { values });
 		}
-		if (!campaignResult.data) return importFormFailure('scan', 404, IMPORT_MESSAGES.campaignNotFound);
+		if (!campaignResult.data)
+			return importFormFailure('scan', 404, IMPORT_MESSAGES.campaignNotFound);
 		if (!canLoadBonds(campaignResult.data.status)) {
 			return importFormFailure('scan', 409, campaignLockedMessage(campaignResult.data.status), {
 				values
@@ -210,7 +212,8 @@ export const actions: Actions = {
 		const result: ImportFormResult = {
 			form: 'scan',
 			success: scanned?.status !== 'error',
-			message: (scanned?.errorMessage ? translateImportMessage(scanned.errorMessage) : null) ??
+			message:
+				(scanned?.errorMessage ? translateImportMessage(scanned.errorMessage) : null) ??
 				`Código ${barcode} cargado.`,
 			summary,
 			scanned,

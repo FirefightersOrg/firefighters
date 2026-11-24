@@ -55,7 +55,8 @@ export const actions: Actions = {
 	upload: async ({ request, locals, params, url }) => {
 		const denied = checkImportActionPermission(locals, url, 'upload', 'bond.import');
 		if (denied) return denied;
-		if (!isUuid(params.id)) return importFormFailure('upload', 404, IMPORT_MESSAGES.campaignNotFound);
+		if (!isUuid(params.id))
+			return importFormFailure('upload', 404, IMPORT_MESSAGES.campaignNotFound);
 
 		const formData = await request.formData();
 		const file = formData.get('file');
@@ -73,7 +74,9 @@ export const actions: Actions = {
 		}
 		if (file.size > IMPORT_MAX_FILE_BYTES) return fileFailure('El archivo supera los 5 MB.');
 		if (fileName.length > IMPORT_FILE_NAME_MAX_LENGTH) {
-			return fileFailure(`El nombre del archivo supera los ${IMPORT_FILE_NAME_MAX_LENGTH} caracteres.`);
+			return fileFailure(
+				`El nombre del archivo supera los ${IMPORT_FILE_NAME_MAX_LENGTH} caracteres.`
+			);
 		}
 		if (notes && notes.length > IMPORT_NOTES_MAX_LENGTH) {
 			const message = `Las notas admiten hasta ${IMPORT_NOTES_MAX_LENGTH} caracteres.`;

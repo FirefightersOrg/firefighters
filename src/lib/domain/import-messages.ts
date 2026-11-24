@@ -52,7 +52,8 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => string][] = [
 	],
 	[
 		/^The pata code (.+) is also used as a row barcode in this import\.?$/,
-		(m) => `El código de pata ${m[1]} también se usa como código de barras de una fila en esta importación.`
+		(m) =>
+			`El código de pata ${m[1]} también se usa como código de barras de una fila en esta importación.`
 	],
 	[
 		/^A pata needs at least (\d+) rows \(this group has (\d+)\)\.?$/,
@@ -115,13 +116,19 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => string][] = [
 	[/^a barcode is required/, () => 'Se requiere un código de barras'],
 	[/^a rollback reason is required/, () => 'Se requiere un motivo para revertir la importación'],
 	[/^at least one row is required/, () => 'Se requiere al menos una fila'],
+	[/^a batch can stage at most (\d+) rows/, (m) => `Un lote admite como máximo ${m[1]} filas`],
 	[
-		/^a batch can stage at most (\d+) rows/,
-		(m) => `Un lote admite como máximo ${m[1]} filas`
+		/^a file import needs the original file name/,
+		() => 'La importación de un archivo necesita el nombre original'
 	],
-	[/^a file import needs the original file name/, () => 'La importación de un archivo necesita el nombre original'],
-	[/^barcode_scan sessions do not keep a file name/, () => 'Una sesión de escaneo no tiene archivo'],
-	[/^file name is too long/, () => 'El nombre del archivo es demasiado largo (máximo 255 caracteres)'],
+	[
+		/^barcode_scan sessions do not keep a file name/,
+		() => 'Una sesión de escaneo no tiene archivo'
+	],
+	[
+		/^file name is too long/,
+		() => 'El nombre del archivo es demasiado largo (máximo 255 caracteres)'
+	],
 	[/^a pata row needs its grupo_pata/, () => 'Una fila de pata necesita su grupo_pata'],
 	[/^only a pata row can have a grupo_pata/, () => 'Solo una fila de pata puede tener grupo_pata'],
 	[/^invalid import source type/, () => 'Tipo de origen de importación no válido'],

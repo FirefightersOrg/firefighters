@@ -592,7 +592,8 @@ export function rowsFromTable(table: readonly TableRow[], joiner = ','): ImportF
 				`(la fila de encabezado debe ser ${IMPORT_COLUMNS.join(',')})`
 		);
 	}
-	if (data.length === 0) throw new ImportFileError('empty_file', 'El archivo no tiene filas de datos');
+	if (data.length === 0)
+		throw new ImportFileError('empty_file', 'El archivo no tiene filas de datos');
 	if (data.length > IMPORT_MAX_ROWS) {
 		throw new ImportFileError(
 			'too_many_rows',

@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-	BOND_COMMERCIAL_STATUS_LABELS,
-	bondTotalValueCents,
-	BondError
-} from '$lib/domain/bonds';
+import { BOND_COMMERCIAL_STATUS_LABELS, bondTotalValueCents, BondError } from '$lib/domain/bonds';
 import { centsToDecimalString } from '$lib/domain/money';
 import {
 	calculateAssociatedNumber,

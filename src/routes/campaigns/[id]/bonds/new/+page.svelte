@@ -175,7 +175,6 @@
 								hint="Con o sin ceros a la izquierda (68 o 0068)."
 								error={baseNumberErrors?.[0]}
 							>
-								<!-- svelte-ignore a11y_autofocus -->
 								<TextInput
 									name="baseNumber"
 									type="text"
@@ -200,7 +199,12 @@
 
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<div>
-							<Field label="Código interno" id="internalCode" optional error={internalCodeErrors?.[0]}>
+							<Field
+								label="Código interno"
+								id="internalCode"
+								optional
+								error={internalCodeErrors?.[0]}
+							>
 								<TextInput
 									name="internalCode"
 									type="text"

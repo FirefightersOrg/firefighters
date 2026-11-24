@@ -218,13 +218,13 @@
 			<Card title="Pata impresa" id="printed">
 				<div class="flex flex-col gap-5">
 					<p class="m-0 text-body-sm text-muted">
-						Ingresar los {MIN_PATA_SIZE} o más números base impresos en la pata. Cada uno trae su
-						número asociado (base + <span class="tabular-nums">{campaign.associatedNumberOffset}</span
-						>).
+						Ingresar los {MIN_PATA_SIZE} o más números base impresos en la pata. Cada uno trae su número
+						asociado (base + <span class="tabular-nums">{campaign.associatedNumberOffset}</span>).
 					</p>
 					{#if campaign.status === 'draft'}
 						<Alert tone="warning">
-							Esta campaña es un borrador. <strong>Guardar el primer bono congela sus reglas</strong>
+							Esta campaña es un borrador. <strong>Guardar el primer bono congela sus reglas</strong
+							>
 							(precio, cuotas, numeración, política de desborde y modo de código de barras).
 						</Alert>
 					{/if}
@@ -397,7 +397,9 @@
 							{#each grouping.selected as bond (bond.id)}
 								<li class="flex items-center justify-between gap-3 py-2">
 									<span>
-										<span class="font-mono tabular-nums">{bond.baseFormatted ?? 'Bono desconocido'}</span>
+										<span class="font-mono tabular-nums"
+											>{bond.baseFormatted ?? 'Bono desconocido'}</span
+										>
 										{#if bond.problem}
 											<span class="ml-2 text-caption text-danger-text">{bond.problem}</span>
 											{#if bond.pataId}

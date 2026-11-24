@@ -97,8 +97,10 @@ export const BOND_MESSAGES = {
 	bondNotFound: 'No se encontró el bono. Puede que se haya quitado o que no haya acceso a él.',
 	internal: 'Algo salió mal. Volver a intentar.',
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
-	campaignLocked: 'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa.',
-	manualPataAnnul: 'Una pata agrupada manualmente no se puede anular directamente. Desagruparla en su lugar.',
+	campaignLocked:
+		'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa.',
+	manualPataAnnul:
+		'Una pata agrupada manualmente no se puede anular directamente. Desagruparla en su lugar.',
 	duplicate: 'Un número o código ya está en uso en otro bono de esta campaña.'
 } as const;
 
@@ -125,10 +127,7 @@ const DB_MESSAGES_ES: [RegExp, (m: RegExpExecArray) => string][] = [
 	[/^an active profile is required/, () => 'Se requiere un perfil activo para modificar bonos'],
 	[/^at least one base number is required/, () => 'Se requiere al menos un número base'],
 	[/^base numbers (must be a flat list|cannot be empty)/, () => 'Los números base no son válidos'],
-	[
-		/^base number (\S+) is negative/,
-		(m) => `El número base ${m[1]} no puede ser negativo`
-	],
+	[/^base number (\S+) is negative/, (m) => `El número base ${m[1]} no puede ser negativo`],
 	[
 		/^number (\S+) exceeds the campaign maximum number (\S+)/,
 		(m) => `El número ${m[1]} supera el número máximo de la campaña ${m[2]}`
@@ -155,7 +154,10 @@ const DB_MESSAGES_ES: [RegExp, (m: RegExpExecArray) => string][] = [
 		/^barcode (.+) is already used by bond (\S+)/,
 		(m) => `El código de barras ${m[1]} ya está en uso en el bono ${m[2]}`
 	],
-	[/^a pata needs at least (\d+) simple bonds/, (m) => `Una pata necesita al menos ${m[1]} bonos simples`],
+	[
+		/^a pata needs at least (\d+) simple bonds/,
+		(m) => `Una pata necesita al menos ${m[1]} bonos simples`
+	],
 	[/^member bond ids cannot be empty/, () => 'Se requiere elegir los bonos que forman la pata'],
 	[/^bond (\S+) is listed more than once/, (m) => `El bono ${m[1]} figura más de una vez`],
 	[/^bond (.+) not found/, () => BOND_MESSAGES_NOT_FOUND],
@@ -173,7 +175,10 @@ const DB_MESSAGES_ES: [RegExp, (m: RegExpExecArray) => string][] = [
 		/^bond (.+) already belongs to manually grouped pata (\S+)/,
 		(m) => `El bono ${m[1]} ya pertenece a la pata manual ${m[2]}`
 	],
-	[/^a reason is required to ungroup a pata/, () => 'Se requiere un motivo para desagrupar una pata'],
+	[
+		/^a reason is required to ungroup a pata/,
+		() => 'Se requiere un motivo para desagrupar una pata'
+	],
 	[/^a reason is required to annul a bond/, () => 'Se requiere un motivo para anular un bono'],
 	[
 		/^bond (\S+) is not a manually grouped pata/,

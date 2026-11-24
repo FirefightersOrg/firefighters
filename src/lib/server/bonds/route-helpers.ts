@@ -130,7 +130,9 @@ export function duplicateNumbersFieldMessage(conflicts: readonly BondNumberConfl
 	const numbers = conflicts.map((c) => c.formatted);
 	const owners = new Set(conflicts.map((c) => c.bondId)).size;
 	const subject =
-		numbers.length === 1 ? `El número ${numbers[0]} ya está` : `Los números ${numbers.join(', ')} ya están`;
+		numbers.length === 1
+			? `El número ${numbers[0]} ya está`
+			: `Los números ${numbers.join(', ')} ya están`;
 	return `${subject} en uso en ${owners === 1 ? 'otro bono' : 'otros bonos'} de esta campaña.`;
 }
 
@@ -173,9 +175,7 @@ export function bondServiceFailure(
 	if (err.field) {
 		const bondId = err.kind === 'conflict' ? err.conflictingBondId : undefined;
 		const message = withoutBondIds(
-			bondId
-				? err.message.replace(BOND_ID_REFERENCE, ' en otro bono de esta campaña')
-				: err.message
+			bondId ? err.message.replace(BOND_ID_REFERENCE, ' en otro bono de esta campaña') : err.message
 		);
 		return bondFormFailure(form, err.status, FIX_FIELDS_MESSAGE, {
 			errors: { [err.field]: [message] },

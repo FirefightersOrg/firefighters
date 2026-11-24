@@ -89,7 +89,8 @@ export const IMPORT_MESSAGES = {
 	sessionClosed: 'Esta sesión de importación está cerrada y ya no se puede modificar.',
 	itemRemoved: 'Esta fila ya se quitó.',
 	itemLinked: 'Esta fila ya creó un bono y no se puede modificar.',
-	notScanSession: 'Los escaneos solo se pueden agregar a una sesión de escaneo de códigos de barras.',
+	notScanSession:
+		'Los escaneos solo se pueden agregar a una sesión de escaneo de códigos de barras.',
 	duplicateRow: 'Un número de fila del archivo ya está cargado en esta sesión.'
 } as const;
 

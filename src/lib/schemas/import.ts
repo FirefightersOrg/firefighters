@@ -56,10 +56,18 @@ export const importSessionCreateSchema = z
 	})
 	.superRefine((value, ctx) => {
 		if (value.sourceType === 'barcode_scan' && value.fileName !== null) {
-			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'Una sesión de escaneo no tiene archivo' });
+			ctx.addIssue({
+				code: 'custom',
+				path: ['fileName'],
+				message: 'Una sesión de escaneo no tiene archivo'
+			});
 		}
 		if (value.sourceType !== 'barcode_scan' && value.fileName === null) {
-			ctx.addIssue({ code: 'custom', path: ['fileName'], message: 'El nombre del archivo es obligatorio' });
+			ctx.addIssue({
+				code: 'custom',
+				path: ['fileName'],
+				message: 'El nombre del archivo es obligatorio'
+			});
 		}
 	});
 export type ImportSessionCreateInput = z.output<typeof importSessionCreateSchema>;
