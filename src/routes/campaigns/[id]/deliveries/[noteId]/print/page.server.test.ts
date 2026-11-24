@@ -70,7 +70,7 @@ describe('/campaigns/[id]/deliveries/[noteId]/print', () => {
 		vi.mocked(listDeliveryNoteBonds).mockResolvedValue({ data: [], error: null });
 		const data = (await load(event(setup())))!;
 		expect(data.document).toMatchObject({
-			deliveryNoteNumber: 'Note 0003',
+			deliveryNoteNumber: 'Remito 0003',
 			collector: 'Ana',
 			bondCount: 0
 		});

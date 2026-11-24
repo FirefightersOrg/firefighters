@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatMoney } from '$lib/format';
 import type { RepositoryResult } from './campaigns';
 import type { SettlementPrintSource } from '$lib/server/documents/settlement-delivery-note';
 import type { PaymentCertificateSource } from '$lib/server/documents/payment-certificate';
@@ -22,11 +23,12 @@ const payment = (row: any): PaymentCertificateSource => ({
 	installments:
 		(row.payment_installments ?? [])
 			.map(
-				(x: any) => `Installment ${x.installments?.installment_number ?? '—'} (${x.amount_applied})`
+				(x: any) =>
+					`Cuota ${x.installments?.installment_number ?? '—'} (${formatMoney(x.amount_applied, { decimals: 'always' })})`
 			)
 			.join(', ') || '—',
 	amount: row.amount,
-	method: row.payment_method === 'cash' ? 'Cash' : 'Transfer',
+	method: row.payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
 	paymentDate: row.payment_date,
 	createdAt: row.created_at,
 	registeredBy: row.profiles?.full_name ?? '—',
