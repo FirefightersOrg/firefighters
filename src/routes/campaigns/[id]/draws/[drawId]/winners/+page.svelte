@@ -245,9 +245,54 @@
 					{/if}
 
 					{#if prize.status === 'delivered'}
-						<p class="rounded bg-slate-50 p-2 text-sm text-slate-600">
-							Delivered prizes cannot be annulled.
-						</p>
+						<div class="flex flex-wrap items-center gap-3 rounded bg-slate-50 p-2 text-sm">
+							<p class="text-slate-600">Delivered prizes cannot be annulled.</p>
+							<a
+								class="text-blue-700 underline"
+								target="_blank"
+								rel="noreferrer"
+								href={resolve(
+									'/campaigns/[id]/draws/[drawId]/winners/[prizeId]/delivery-certificate',
+									{
+										id: data.campaign.id,
+										drawId: data.draw.id,
+										prizeId: prize.id
+									}
+								)}>Print delivery certificate</a
+							>
+						</div>
+					{:else if prize.status === 'unawarded'}
+						<div class="flex flex-wrap items-center gap-3">
+							<a
+								class="text-sm text-blue-700 underline"
+								target="_blank"
+								rel="noreferrer"
+								href={resolve(
+									'/campaigns/[id]/draws/[drawId]/winners/[prizeId]/unawarded-certificate',
+									{
+										id: data.campaign.id,
+										drawId: data.draw.id,
+										prizeId: prize.id
+									}
+								)}>Print unawarded certificate</a
+							>
+							{#if data.can.annul}
+								<details class="rounded border border-red-200 p-3">
+									<summary class="cursor-pointer text-sm font-medium text-red-700"
+										>Annul prize</summary
+									>
+									<form method="POST" action="?/annul" class="mt-3">
+										<input type="hidden" name="prizeId" value={prize.id} />
+										<label class={labelClass} for="annul-reason-{prize.id}"
+											>Reason (max. {data.reasonMax} Unicode characters)</label
+										>
+										<textarea class={inputClass} id="annul-reason-{prize.id}" name="reason" required
+										></textarea>
+										<button class="{secondaryButtonClass} mt-2">Confirm annulment</button>
+									</form>
+								</details>
+							{/if}
+						</div>
 					{:else if data.can.annul && prize.status !== 'annulled'}
 						<details class="rounded border border-red-200 p-3">
 							<summary class="cursor-pointer text-sm font-medium text-red-700">Annul prize</summary>
