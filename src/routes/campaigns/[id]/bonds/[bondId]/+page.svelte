@@ -1,6 +1,6 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
-	import BondStatusBadge from '$lib/components/bonds/BondStatusBadge.svelte';
 	import BondActionsSection from '$lib/components/bonds/record/BondActionsSection.svelte';
 	import BondAuditSection from '$lib/components/bonds/record/BondAuditSection.svelte';
 	import BondCustodySection from '$lib/components/bonds/record/BondCustodySection.svelte';
@@ -69,7 +69,7 @@
 		</nav>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">{title}</h1>
-			<BondStatusBadge status={general.commercialStatus} />
+			<StatusBadge kind="bondCommercial" status={general.commercialStatus} />
 		</div>
 		<nav aria-label="Record sections" class="mt-3">
 			<ol class="flex flex-wrap gap-x-4 gap-y-1 text-xs">

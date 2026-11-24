@@ -160,7 +160,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('$ 60.000,00');
 		expect(body).toContain('INT-1');
 		expect(body).toContain('4939');
-		expect(body).toContain('Available');
+		expect(body).toContain('Disponible');
 		// No actions for this user.
 		expect(body).not.toContain('Annul bond');
 		expect(body).not.toContain('Ungroup pata');
@@ -355,7 +355,9 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 			expect(body).toContain(`aria-labelledby="${id}-title"`);
 			expect(body).toContain(`href="#${id}"`);
 			expect(body).toMatch(
-				new RegExp(`<h2 id="${id}-title"[^>]*>\\s*<span[^>]*>${i + 1}\\.</span>\\s*${titles[i]}`)
+				new RegExp(
+					`<h2 id="${id}-title"[^>]*>\\s*(?:<!--[^>]*-->)*<span[^>]*>${i + 1}\\.</span>(?:<!--[^>]*-->)*\\s*${titles[i]}`
+				)
 			);
 		});
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds"`);
