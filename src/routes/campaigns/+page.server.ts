@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const result = await listCampaigns(locals.supabase);
 	if (result.error) {
 		console.error('[campaigns] list failed', { requestId: locals.requestId, error: result.error });
-		error(500, { message: 'Could not load campaigns. Please try again.' });
+		error(500, { message: 'No se pudieron cargar las campañas. Volver a intentar.' });
 	}
 
 	return {

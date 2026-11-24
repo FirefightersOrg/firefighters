@@ -6,7 +6,11 @@ import TransitionAction from './TransitionAction.svelte';
 function reasonField(toStatus: 'active' | 'closing' | 'closed' | 'annulled') {
 	const { body } = render(TransitionAction, { props: { toStatus } });
 	const textarea = body.match(/<textarea[^>]*>/)?.[0];
-	const label = body.match(/<label[^>]*>([\s\S]*?)<\/label>/)?.[1].trim();
+	const label = body
+		.match(/<label[^>]*>([\s\S]*?)<\/label>/)?.[1]
+		.replace(/<!--[\s\S]*?-->|<[^>]+>/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 	return { textarea, label };
 }
 
@@ -19,7 +23,7 @@ describe('TransitionAction', () => {
 			expect(textarea).toContain('name="reason"');
 			expect(textarea).toContain(`maxlength="${CAMPAIGN_REASON_MAX_LENGTH}"`);
 			expect(textarea).not.toMatch(/\brequired\b/);
-			expect(label).toBe('Reason (optional)');
+			expect(label).toBe('Motivo (opcional)');
 		}
 	);
 
@@ -28,6 +32,6 @@ describe('TransitionAction', () => {
 		expect(textarea).toContain('name="reason"');
 		expect(textarea).toContain(`maxlength="${CAMPAIGN_REASON_MAX_LENGTH}"`);
 		expect(textarea).toMatch(/\brequired\b/);
-		expect(label).toBe('Reason (required)');
+		expect(label).toBe('Motivo');
 	});
 });

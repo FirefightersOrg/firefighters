@@ -2,9 +2,9 @@
 	import { enhance } from '$app/forms';
 	import type { Campaign } from '$lib/domain/campaigns';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
-	import FormAlert from './FormAlert.svelte';
+	import { Button, Card, FormResult } from '$lib/components/ui';
+	import { GENERAL_FIELDS } from './fields';
 	import GeneralFields from './GeneralFields.svelte';
-	import { cardClass, primaryButtonClass } from './styles';
 	import { campaignEditSnapshot, generalValuesOf } from './types';
 
 	/** Edit form for name and dates; posts to the page's `?/update` action. */
@@ -39,12 +39,11 @@
 	let submitting = $state(false);
 </script>
 
-<section class={cardClass} aria-labelledby="general-title">
-	<h2 id="general-title" class="mb-4 text-base font-semibold">General data</h2>
+<Card title="Datos generales" id="general">
 	<form
 		method="POST"
 		action="?/update"
-		class="space-y-4"
+		class="flex flex-col gap-5"
 		use:enhance={() => {
 			submitting = true;
 			return async ({ update }) => {
@@ -56,9 +55,7 @@
 			};
 		}}
 	>
-		{#if result}
-			<FormAlert kind={result.success ? 'success' : 'error'} message={result.message} />
-		{/if}
+		<FormResult {result} fields={GENERAL_FIELDS} />
 		<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
 		<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
 		<GeneralFields
@@ -69,10 +66,8 @@
 			{nameReadonly}
 			{datesReadonly}
 		/>
-		<div class="flex justify-end">
-			<button type="submit" disabled={submitting} class={primaryButtonClass}>
-				{submitting ? 'Saving…' : 'Save general data'}
-			</button>
+		<div>
+			<Button type="submit" loading={submitting}>Guardar datos generales</Button>
 		</div>
 	</form>
-</section>
+</Card>

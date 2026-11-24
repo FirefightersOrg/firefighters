@@ -131,14 +131,14 @@ function wholeNumber(label: string, { min, max = INT4_MAX }: { min: number; max?
 	return z
 		.string()
 		.trim()
-		.min(1, { message: `${label} is required`, abort: true })
-		.regex(/^\d+$/, `${label} must be a whole number`)
+		.min(1, { message: `Ingresar un valor para ${label.toLowerCase()}`, abort: true })
+		.regex(/^\d+$/, `${label} debe ser un número entero`)
 		.transform(Number)
 		.pipe(
 			z
 				.number()
-				.min(min, `${label} must be at least ${min}`)
-				.max(max, `${label} must be at most ${max}`)
+				.min(min, `${label} debe ser al menos ${min}`)
+				.max(max, `${label} debe ser como máximo ${max}`)
 		);
 }
 
@@ -147,13 +147,13 @@ const optionalDay = (label: string) =>
 		.string()
 		.trim()
 		.refine((value) => value === '' || z.iso.date().safeParse(value).success, {
-			message: `${label} must be a valid date (YYYY-MM-DD)`
+			message: `${label} debe ser una fecha válida (AAAA-MM-DD)`
 		})
 		.transform((value) => (value === '' ? null : value));
 
 /** Shown when the hidden version field is missing or malformed (e.g. a form from an old page). */
 export const CAMPAIGN_VERSION_INVALID_MESSAGE =
-	'This form is out of date. Reload the page and try again.';
+	'El formulario está desactualizado. Recargar la página y volver a intentar.';
 
 /**
  * The campaign version as loaded: an ISO 8601 timestamp with an offset, exactly as PostgREST
@@ -170,27 +170,27 @@ const generalShape = {
 	name: z
 		.string()
 		.trim()
-		.min(1, 'Name is required')
-		.max(CAMPAIGN_NAME_MAX_LENGTH, `Name must be at most ${CAMPAIGN_NAME_MAX_LENGTH} characters`),
-	startsOn: optionalDay('Start date'),
-	endsOn: optionalDay('End date')
+		.min(1, 'El nombre es obligatorio')
+		.max(CAMPAIGN_NAME_MAX_LENGTH, `El nombre admite hasta ${CAMPAIGN_NAME_MAX_LENGTH} caracteres`),
+	startsOn: optionalDay('La fecha de inicio'),
+	endsOn: optionalDay('La fecha de fin')
 };
 
 const numberingShape = {
-	numberDigits: wholeNumber('Number of digits', { min: 1, max: MAX_NUMBER_DIGITS }),
-	maxNumber: wholeNumber('Maximum number', { min: 1, max: MAX_CAMPAIGN_NUMBER }),
-	associatedNumberOffset: wholeNumber('Associated number offset', {
+	numberDigits: wholeNumber('La cantidad de dígitos', { min: 1, max: MAX_NUMBER_DIGITS }),
+	maxNumber: wholeNumber('El número máximo', { min: 1, max: MAX_CAMPAIGN_NUMBER }),
+	associatedNumberOffset: wholeNumber('El desfase del número asociado', {
 		min: 0,
 		max: MAX_CAMPAIGN_NUMBER
 	}),
-	overflowPolicy: z.string().trim().min(1, 'Overflow policy is required')
+	overflowPolicy: z.string().trim().min(1, 'La política de desborde es obligatoria')
 };
 
 const rulesShape = {
 	simpleBondValue: z
 		.string()
 		.trim()
-		.min(1, { message: 'Simple bond value is required', abort: true })
+		.min(1, { message: 'El valor del bono simple es obligatorio', abort: true })
 		// Argentine format (`60.000,50`), parsed exactly like the live preview in the browser.
 		.transform((value, ctx) => {
 			const cents = parseMoneyInput(value);
@@ -203,12 +203,12 @@ const rulesShape = {
 		.pipe(
 			z
 				.number()
-				.min(1, 'Simple bond value must be greater than 0')
-				.max(MAX_MONEY_CENTS, 'Simple bond value is too large')
+				.min(1, 'El valor del bono simple debe ser mayor que 0')
+				.max(MAX_MONEY_CENTS, 'El valor del bono simple es demasiado grande')
 		),
-	installmentCount: wholeNumber('Number of installments', { min: 1 }),
+	installmentCount: wholeNumber('La cantidad de cuotas', { min: 1 }),
 	...numberingShape,
-	barcodeMode: z.enum(BARCODE_MODES, { message: 'Choose how barcodes are read' }),
+	barcodeMode: z.enum(BARCODE_MODES, { message: 'Elegir cómo se leen los códigos de barras' }),
 	// Optional regex (blank = none). Whether it compiles as a Postgres regex is checked by the
 	// database (JavaScript and Postgres regex syntax differ). The field is only rendered for the
 	// modes that use it, so it may be missing: missing or blank = no pattern.
@@ -219,7 +219,7 @@ const rulesShape = {
 		// character in the database but two in JavaScript.
 		.refine(
 			(value) => [...value].length <= BARCODE_PATTERN_MAX_LENGTH,
-			`Barcode pattern must be at most ${BARCODE_PATTERN_MAX_LENGTH} characters`
+			`El patrón del código de barras admite hasta ${BARCODE_PATTERN_MAX_LENGTH} caracteres`
 		)
 		.optional()
 		.transform((value) => (value ? value : null))
@@ -232,19 +232,32 @@ const rulesShape = {
 type RefinementCtx = z.RefinementCtx;
 
 const NUMBERING_FIELD_LABELS: Record<keyof CampaignNumberingConfig, string> = {
-	numberDigits: 'number of digits',
-	maxNumber: 'maximum number',
-	associatedNumberOffset: 'associated number offset',
-	overflowPolicy: 'overflow policy'
+	numberDigits: 'La cantidad de dígitos',
+	maxNumber: 'El número máximo',
+	associatedNumberOffset: 'El desfase del número asociado',
+	overflowPolicy: 'La política de desborde'
 };
 
-/** Rewrites a domain message ("maxNumber must ...") with form labels ("Maximum number must ..."). */
+/** Spanish message for an English domain issue of `validateNumberingConfig` (docs/copy.md). */
 function humanizeNumberingMessage(message: string): string {
-	const text = Object.entries(NUMBERING_FIELD_LABELS).reduce(
-		(acc, [key, label]) => acc.replace(new RegExp(`\\b${key}\\b`, 'g'), label),
-		message
-	);
-	return text.charAt(0).toUpperCase() + text.slice(1);
+	const label = (key: string) =>
+		NUMBERING_FIELD_LABELS[key as keyof CampaignNumberingConfig] ?? key;
+	let m = /^(\w+) must be a positive integer$/.exec(message);
+	if (m) return `${label(m[1])} debe ser un número entero positivo`;
+	m = /^(\w+) must be a non-negative integer$/.exec(message);
+	if (m) return `${label(m[1])} debe ser un número entero, 0 o mayor`;
+	m = /^maxNumber must not exceed (\d+)/.exec(message);
+	if (m) return `${label('maxNumber')} no puede superar ${m[1]}`;
+	m = /^numberDigits must not exceed (\d+)/.exec(message);
+	if (m) return `${label('numberDigits')} no puede superar ${m[1]}`;
+	m = /^maxNumber must fit in (\d+) digits \(at most (\d+)\)/.exec(message);
+	if (m) return `${label('maxNumber')} debe entrar en ${m[1]} dígitos (hasta ${m[2]})`;
+	m = /^associatedNumberOffset must not exceed maxNumber \((\d+)\)/.exec(message);
+	if (m) return `${label('associatedNumberOffset')} no puede superar el número máximo (${m[1]})`;
+	if (message.startsWith('overflowPolicy must be one of')) {
+		return `${label('overflowPolicy')} no es válida`;
+	}
+	return message;
 }
 
 interface ParsedNumbering {
@@ -305,7 +318,8 @@ function refineBarcodePattern(
 		ctx.addIssue({
 			code: 'custom',
 			path: ['barcodePattern'],
-			message: 'A barcode pattern is only used with the internal or external/legacy code modes'
+			message:
+				'El patrón del código de barras solo se usa con los modos de código interno o externo o heredado'
 		});
 	}
 }
@@ -319,7 +333,7 @@ function refineDates(
 		ctx.addIssue({
 			code: 'custom',
 			path: ['endsOn'],
-			message: 'End date must be on or after the start date'
+			message: 'La fecha de fin debe ser igual o posterior a la fecha de inicio'
 		});
 	}
 }
@@ -414,14 +428,14 @@ export const campaignRulesUpdateSchema = z
 			.trim()
 			.max(
 				CAMPAIGN_RULES_REASON_MAX_LENGTH,
-				`Reason must be at most ${CAMPAIGN_RULES_REASON_MAX_LENGTH} characters`
+				`El motivo admite hasta ${CAMPAIGN_RULES_REASON_MAX_LENGTH} caracteres`
 			)
 			.transform((value) => (value === '' ? null : value)),
 		// A non-fatal check (not z.literal), so the rule errors are still reported with it.
 		[CAMPAIGN_RULES_CONFIRM_FIELD]: z
 			.string()
 			.refine((value) => value === CAMPAIGN_RULES_CONFIRM_VALUE, {
-				message: 'Confirm that you reviewed the rule changes'
+				message: 'Confirmar que se revisaron los cambios en las reglas'
 			})
 	})
 	.superRefine((value, ctx) => {
@@ -450,13 +464,13 @@ export const campaignCreateSchema = z
 /** Status change. Annulling requires a reason. */
 export const campaignTransitionSchema = z
 	.object({
-		toStatus: z.enum(CAMPAIGN_TRANSITION_TARGETS, { message: 'Unknown status change' }),
+		toStatus: z.enum(CAMPAIGN_TRANSITION_TARGETS, { message: 'Cambio de estado desconocido' }),
 		reason: z
 			.string()
 			.trim()
 			.max(
 				CAMPAIGN_REASON_MAX_LENGTH,
-				`Reason must be at most ${CAMPAIGN_REASON_MAX_LENGTH} characters`
+				`El motivo admite hasta ${CAMPAIGN_REASON_MAX_LENGTH} caracteres`
 			)
 			.transform((value) => (value === '' ? null : value))
 	})
@@ -465,7 +479,7 @@ export const campaignTransitionSchema = z
 			ctx.addIssue({
 				code: 'custom',
 				path: ['reason'],
-				message: 'A reason is required to annul a campaign'
+				message: 'Se requiere un motivo para anular una campaña'
 			});
 		}
 	});

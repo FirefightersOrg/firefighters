@@ -81,28 +81,28 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'The simple bond value cannot be split into 7 equal installments. Choose a value and a number of installments that divide exactly (to the cent).',
+			'El valor del bono simple no se puede dividir en 7 cuotas iguales. Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).',
 			'installmentCount'
 		],
 		[
 			{ code: '22023', message: 'simple bond value must have at most 2 decimal places' },
 			'validation',
 			400,
-			'Simple bond value must have at most 2 decimal places.',
+			'El valor del bono simple no es válido.',
 			'simpleBondValue'
 		],
 		[
 			{ code: '22023', message: 'installment count must be greater than 0' },
 			'validation',
 			400,
-			'Installment count must be greater than 0.',
+			'La cantidad de cuotas no es válida.',
 			'installmentCount'
 		],
 		[
 			{ code: '22023', message: 'campaign name is required' },
 			'validation',
 			400,
-			'Name is required.',
+			'El nombre es obligatorio.',
 			'name'
 		],
 		[
@@ -116,7 +116,7 @@ describe('mapCampaignRpcError', () => {
 			{ code: '22023', message: 'invalid target status: draft' },
 			'validation',
 			400,
-			'Unknown status change.',
+			'Cambio de estado desconocido.',
 			'toStatus'
 		],
 		[
@@ -134,7 +134,7 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'Maximum number must fit in the number of digits.',
+			'El número máximo debe entrar en la cantidad de dígitos.',
 			'maxNumber'
 		],
 		[
@@ -145,7 +145,7 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'End date must be after the start date.',
+			'La fecha de fin debe ser posterior a la fecha de inicio.',
 			'endsOn'
 		],
 		[
@@ -180,14 +180,14 @@ describe('mapCampaignRpcError', () => {
 			{ code: '23514', message: 'invalid campaign status transition: closed -> active' },
 			'conflict',
 			409,
-			'This campaign is closed and cannot be moved to active. Reload the page to see its current status.',
+			'Esta campaña está cerrada y no se puede pasar a activa. Recargar la página para ver su estado actual.',
 			undefined
 		],
 		[
 			{ code: '23514', message: 'invalid campaign status transition: active -> active' },
 			'conflict',
 			409,
-			'The campaign is already active.',
+			'La campaña ya está activa.',
 			undefined
 		],
 		[
@@ -234,7 +234,7 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'A commission rule applies to installment 5. Use at least 5 installments, or edit or annul that commission rule first.',
+			'Una regla de comisión se aplica a la cuota 5. Usar al menos 5 cuotas, o editar o anular antes esa regla de comisión.',
 			'installmentCount'
 		],
 		[
@@ -257,7 +257,7 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'Number of digits must be between 1 and 10.',
+			'La cantidad de dígitos debe estar entre 1 y 10.',
 			'numberDigits'
 		],
 		[
@@ -268,14 +268,14 @@ describe('mapCampaignRpcError', () => {
 			},
 			'validation',
 			400,
-			'A required value is missing.',
+			'Falta un valor obligatorio.',
 			'barcodeMode'
 		],
 		[
 			{ code: '22003', message: 'numeric field overflow' },
 			'validation',
 			400,
-			'A value is too large.',
+			'Un valor es demasiado grande.',
 			undefined
 		],
 		[
@@ -447,7 +447,7 @@ describe('campaign service', () => {
 		});
 		expect(err.kind).toBe('validation');
 		expect(err.field).toBe('barcodePattern');
-		expect(err.message).toMatch(/^Barcode pattern must be a valid regular expression/);
+		expect(err.message).toMatch(/^El patrón del código de barras no es válido/);
 	});
 
 	it('updateCampaignRules passes the audit reason', async () => {
@@ -512,7 +512,7 @@ describe('campaign service', () => {
 			status: 409,
 			message: CAMPAIGN_MESSAGES.staleVersion
 		});
-		expect(err.message).toMatch(/changed by someone else.*Reload the page/);
+		expect(err.message).toMatch(/Otra persona modificó.*Recargar la página/);
 		expect(console.error).not.toHaveBeenCalled();
 	});
 

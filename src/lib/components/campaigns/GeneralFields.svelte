@@ -1,8 +1,7 @@
 <script lang="ts">
+	import { Field, TextInput } from '$lib/components/ui';
 	import type { CampaignFieldErrors } from '$lib/schemas/campaign';
 	import { CAMPAIGN_NAME_MAX_LENGTH } from '$lib/schemas/campaign';
-	import FieldError from './FieldError.svelte';
-	import { hintClass, inputClass, labelClass } from './styles';
 
 	/**
 	 * Name, start date and end date. Values are the raw input strings (dates as YYYY-MM-DD).
@@ -25,57 +24,42 @@
 	} = $props();
 </script>
 
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
 	<div class="sm:col-span-2">
-		<label for="name" class={labelClass}>Name</label>
-		<input
-			id="name"
-			name="name"
-			type="text"
-			required
-			maxlength={CAMPAIGN_NAME_MAX_LENGTH}
-			readonly={nameReadonly}
-			bind:value={name}
-			aria-invalid={errors.name ? 'true' : undefined}
-			aria-describedby={errors.name ? 'name-error' : undefined}
-			class={inputClass}
-		/>
-		<FieldError id="name-error" errors={errors.name} />
+		<Field label="Nombre" id="name" error={errors.name?.[0]} required>
+			<TextInput
+				name="name"
+				type="text"
+				maxlength={CAMPAIGN_NAME_MAX_LENGTH}
+				readonly={nameReadonly}
+				bind:value={name}
+			/>
+		</Field>
 	</div>
 
-	<div>
-		<label for="startsOn" class={labelClass}>Start date</label>
-		<input
-			id="startsOn"
+	<Field label="Fecha de inicio" id="startsOn" error={errors.startsOn?.[0]} optional>
+		<TextInput
 			name="startsOn"
 			type="date"
 			readonly={datesReadonly}
+			aria-describedby="dates-hint"
 			bind:value={startsOn}
-			aria-invalid={errors.startsOn ? 'true' : undefined}
-			aria-describedby={errors.startsOn ? 'startsOn-error' : 'dates-hint'}
-			class={inputClass}
 		/>
-		<FieldError id="startsOn-error" errors={errors.startsOn} />
-	</div>
+	</Field>
 
-	<div>
-		<label for="endsOn" class={labelClass}>End date</label>
-		<input
-			id="endsOn"
+	<Field label="Fecha de fin" id="endsOn" error={errors.endsOn?.[0]} optional>
+		<TextInput
 			name="endsOn"
 			type="date"
 			readonly={datesReadonly}
 			min={startsOn || undefined}
+			aria-describedby="dates-hint"
 			bind:value={endsOn}
-			aria-invalid={errors.endsOn ? 'true' : undefined}
-			aria-describedby={errors.endsOn ? 'endsOn-error' : 'dates-hint'}
-			class={inputClass}
 		/>
-		<FieldError id="endsOn-error" errors={errors.endsOn} />
-	</div>
+	</Field>
 
-	<p id="dates-hint" class="{hintClass} sm:col-span-2">
-		Both dates are required to activate the campaign. Days are in Argentina time: the campaign
-		starts at 00:00 of the start date and ends at 23:59 of the end date.
+	<p id="dates-hint" class="m-0 max-w-prose text-body-sm text-muted sm:col-span-2">
+		Ambas fechas son necesarias para activar la campaña. Los días se toman en hora de Argentina: la
+		campaña empieza a las 00:00 de la fecha de inicio y termina a las 23:59 de la fecha de fin.
 	</p>
 </div>

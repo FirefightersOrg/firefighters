@@ -25,7 +25,7 @@ import {
 
 const NBSP = '\u00a0';
 const MONEY_FORMAT_ERROR =
-	'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)';
+	'Ingresar un monto como 60.000 o 60.000,50 (puntos para los miles, coma para hasta 2 decimales)';
 
 const rules = {
 	simpleBondValue: '60000',
@@ -87,7 +87,7 @@ describe('campaignCreateSchema', () => {
 		expect(wrongMode.success).toBe(false);
 		if (!wrongMode.success) {
 			expect(campaignFieldErrors(wrongMode.error).barcodePattern?.[0]).toMatch(
-				/only used with the internal or external\/legacy code modes/
+				/solo se usa con los modos de código interno o externo o heredado/
 			);
 		}
 	});
@@ -164,7 +164,7 @@ describe('campaignCreateSchema', () => {
 				installmentCount: '7'
 			})
 		);
-		expect(errors.installmentCount?.[0]).toMatch(/^\$\u00a060\.000,00 cannot be split into 7/);
+		expect(errors.installmentCount?.[0]).toMatch(/^\$\u00a060\.000,00 no se puede dividir en 7/);
 	});
 
 	it('rejects a value that does not divide exactly into the installments', () => {
@@ -172,8 +172,8 @@ describe('campaignCreateSchema', () => {
 			campaignCreateSchema.safeParse({ ...general, ...rules, installmentCount: '7' })
 		);
 		expect(errors.installmentCount).toEqual([
-			`$${NBSP}60.000,00 cannot be split into 7 equal installments. ` +
-				'Choose a value and a number of installments that divide exactly (to the cent).'
+			`$${NBSP}60.000,00 no se puede dividir en 7 cuotas iguales. ` +
+				'Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).'
 		]);
 	});
 
@@ -186,23 +186,23 @@ describe('campaignCreateSchema', () => {
 				installmentCount: '3'
 			})
 		);
-		expect(errors.installmentCount?.[0]).toMatch(/cannot be split into 3 equal installments/);
+		expect(errors.installmentCount?.[0]).toMatch(/no se puede dividir en 3 cuotas iguales/);
 	});
 
 	it.each([
-		['simpleBondValue', '0', 'Simple bond value must be greater than 0'],
+		['simpleBondValue', '0', 'El valor del bono simple debe ser mayor que 0'],
 		['simpleBondValue', '60000.001', MONEY_FORMAT_ERROR],
 		['simpleBondValue', '60,000', MONEY_FORMAT_ERROR],
 		['simpleBondValue', '60.000,505', MONEY_FORMAT_ERROR],
 		['simpleBondValue', '1,234.56', MONEY_FORMAT_ERROR],
-		['simpleBondValue', '0,00', 'Simple bond value must be greater than 0'],
-		['simpleBondValue', '', 'Simple bond value is required'],
-		['installmentCount', '0', 'Number of installments must be at least 1'],
-		['installmentCount', '2.5', 'Number of installments must be a whole number'],
-		['numberDigits', '11', 'Number of digits must be at most 10'],
-		['maxNumber', '-1', 'Maximum number must be a whole number'],
-		['barcodeMode', '', 'Choose how barcodes are read'],
-		['barcodeMode', 'qr', 'Choose how barcodes are read']
+		['simpleBondValue', '0,00', 'El valor del bono simple debe ser mayor que 0'],
+		['simpleBondValue', '', 'El valor del bono simple es obligatorio'],
+		['installmentCount', '0', 'La cantidad de cuotas debe ser al menos 1'],
+		['installmentCount', '2.5', 'La cantidad de cuotas debe ser un número entero'],
+		['numberDigits', '11', 'La cantidad de dígitos debe ser como máximo 10'],
+		['maxNumber', '-1', 'El número máximo debe ser un número entero'],
+		['barcodeMode', '', 'Elegir cómo se leen los códigos de barras'],
+		['barcodeMode', 'qr', 'Elegir cómo se leen los códigos de barras']
 	])('rejects %s = %j', (field, value, message) => {
 		const errors = errorsOf(
 			campaignCreateSchema.safeParse({ ...general, ...rules, [field]: value })
@@ -214,7 +214,7 @@ describe('campaignCreateSchema', () => {
 		const tooWide = errorsOf(
 			campaignCreateSchema.safeParse({ ...general, ...rules, maxNumber: '10000' })
 		);
-		expect(tooWide.maxNumber).toEqual(['Maximum number must fit in 4 digits (at most 9999)']);
+		expect(tooWide.maxNumber).toEqual(['El número máximo debe entrar en 4 dígitos (hasta 9999)']);
 
 		const offset = errorsOf(
 			campaignCreateSchema.safeParse({
@@ -225,13 +225,13 @@ describe('campaignCreateSchema', () => {
 			})
 		);
 		expect(offset.associatedNumberOffset).toEqual([
-			'Associated number offset must not exceed maximum number (9999)'
+			'El desfase del número asociado no puede superar el número máximo (9999)'
 		]);
 
 		const policy = errorsOf(
 			campaignCreateSchema.safeParse({ ...general, ...rules, overflowPolicy: 'wrap' })
 		);
-		expect(policy.overflowPolicy).toEqual(['Overflow policy must be one of: reject']);
+		expect(policy.overflowPolicy).toEqual(['La política de desborde no es válida']);
 	});
 
 	it('accepts a 5-digit configuration', () => {
@@ -254,7 +254,7 @@ describe('campaignCreateSchema', () => {
 				endsOn: '2027-03-01'
 			})
 		);
-		expect(errors.name).toEqual(['Name is required']);
+		expect(errors.name).toEqual(['El nombre es obligatorio']);
 	});
 });
 
@@ -281,7 +281,9 @@ describe('campaignGeneralSchema', () => {
 				expectedUpdatedAt: VERSION
 			})
 		);
-		expect(errors.endsOn).toEqual(['End date must be on or after the start date']);
+		expect(errors.endsOn).toEqual([
+			'La fecha de fin debe ser igual o posterior a la fecha de inicio'
+		]);
 	});
 
 	it('rejects malformed dates', () => {
@@ -293,8 +295,8 @@ describe('campaignGeneralSchema', () => {
 				expectedUpdatedAt: VERSION
 			})
 		);
-		expect(errors.startsOn).toEqual(['Start date must be a valid date (YYYY-MM-DD)']);
-		expect(errors.endsOn).toEqual(['End date must be a valid date (YYYY-MM-DD)']);
+		expect(errors.startsOn).toEqual(['La fecha de inicio debe ser una fecha válida (AAAA-MM-DD)']);
+		expect(errors.endsOn).toEqual(['La fecha de fin debe ser una fecha válida (AAAA-MM-DD)']);
 	});
 });
 
@@ -366,7 +368,7 @@ describe('campaignRulesUpdateSchema (existing campaign)', () => {
 				campaignRulesUpdateSchema.safeParse({ ...confirmed, confirmRulesChange })
 			);
 			expect(errors).toEqual({
-				confirmRulesChange: ['Confirm that you reviewed the rule changes']
+				confirmRulesChange: ['Confirmar que se revisaron los cambios en las reglas']
 			});
 		}
 	});
@@ -397,7 +399,7 @@ describe('campaignRulesUpdateSchema (existing campaign)', () => {
 		const errors = errorsOf(
 			campaignRulesUpdateSchema.safeParse({ ...confirmed, changeReason: 'x'.repeat(501) })
 		);
-		expect(errors).toEqual({ changeReason: ['Reason must be at most 500 characters'] });
+		expect(errors).toEqual({ changeReason: ['El motivo admite hasta 500 caracteres'] });
 	});
 });
 
@@ -443,7 +445,7 @@ describe('previewNumberingInput (live preview)', () => {
 		expect(previewNumberingInput({ ...numbering, maxNumber: '10000' })).toEqual({
 			state: 'invalid',
 			issues: [
-				{ field: 'maxNumber', message: 'Maximum number must fit in 4 digits (at most 9999)' }
+				{ field: 'maxNumber', message: 'El número máximo debe entrar en 4 dígitos (hasta 9999)' }
 			]
 		});
 		expect(
@@ -451,10 +453,10 @@ describe('previewNumberingInput (live preview)', () => {
 		).toEqual({
 			state: 'invalid',
 			issues: [
-				{ field: 'numberDigits', message: 'Number of digits must be at most 10' },
+				{ field: 'numberDigits', message: 'La cantidad de dígitos debe ser como máximo 10' },
 				{
 					field: 'associatedNumberOffset',
-					message: 'Associated number offset must be a whole number'
+					message: 'El desfase del número asociado debe ser un número entero'
 				}
 			]
 		});
@@ -464,7 +466,7 @@ describe('previewNumberingInput (live preview)', () => {
 		});
 		expect(previewNumberingInput({ ...numbering, overflowPolicy: 'wrap' })).toEqual({
 			state: 'invalid',
-			issues: [{ field: 'overflowPolicy', message: 'Overflow policy must be one of: reject' }]
+			issues: [{ field: 'overflowPolicy', message: 'La política de desborde no es válida' }]
 		});
 	});
 });
@@ -553,13 +555,15 @@ describe('MAX_CAMPAIGN_NUMBER', () => {
 		expect(campaignNumberingSchema.safeParse(tenDigits).success).toBe(true);
 		for (const maxNumber of ['2147483648', '9999999999']) {
 			const errors = errorsOf(campaignNumberingSchema.safeParse({ ...tenDigits, maxNumber }));
-			expect(errors.maxNumber).toEqual([`Maximum number must be at most ${MAX_CAMPAIGN_NUMBER}`]);
+			expect(errors.maxNumber).toEqual([
+				`El número máximo debe ser como máximo ${MAX_CAMPAIGN_NUMBER}`
+			]);
 		}
 		const errors = errorsOf(
 			campaignNumberingSchema.safeParse({ ...tenDigits, associatedNumberOffset: '2147483648' })
 		);
 		expect(errors.associatedNumberOffset).toContain(
-			`Associated number offset must be at most ${MAX_CAMPAIGN_NUMBER}`
+			`El desfase del número asociado debe ser como máximo ${MAX_CAMPAIGN_NUMBER}`
 		);
 	});
 });
@@ -592,7 +596,7 @@ describe('campaignTransitionSchema', () => {
 		for (const toStatus of ['active', 'annulled']) {
 			const errors = errorsOf(campaignTransitionSchema.safeParse({ toStatus, reason }));
 			expect(errors.reason).toEqual([
-				`Reason must be at most ${CAMPAIGN_REASON_MAX_LENGTH} characters`
+				`El motivo admite hasta ${CAMPAIGN_REASON_MAX_LENGTH} caracteres`
 			]);
 		}
 	});
@@ -601,12 +605,12 @@ describe('campaignTransitionSchema', () => {
 		const errors = errorsOf(
 			campaignTransitionSchema.safeParse({ toStatus: 'annulled', reason: '  ' })
 		);
-		expect(errors.reason).toEqual(['A reason is required to annul a campaign']);
+		expect(errors.reason).toEqual(['Se requiere un motivo para anular una campaña']);
 	});
 
 	it('rejects unknown targets (draft is never a target)', () => {
 		const errors = errorsOf(campaignTransitionSchema.safeParse({ toStatus: 'draft', reason: '' }));
-		expect(errors.toStatus).toEqual(['Unknown status change']);
+		expect(errors.toStatus).toEqual(['Cambio de estado desconocido']);
 	});
 });
 

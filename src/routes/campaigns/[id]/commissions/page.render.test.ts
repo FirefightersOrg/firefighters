@@ -59,7 +59,7 @@ function page(manage: boolean, extra: Record<string, unknown> = {}) {
 describe('/campaigns/[id]/commissions page (SAN-69 special rules)', () => {
 	it('lists special collector rules with the collector name', () => {
 		const body = page(false);
-		expect(body).toContain('Special collector rules');
+		expect(body).toContain('Reglas especiales por cobrador');
 		expect(body).toContain('Ada Collector');
 	});
 
@@ -69,6 +69,6 @@ describe('/campaigns/[id]/commissions page (SAN-69 special rules)', () => {
 	});
 
 	it('shows an empty state without special rules', () => {
-		expect(page(false, { specialRules: [] })).toContain('No special collector rules.');
+		expect(page(false, { specialRules: [] })).toContain('No hay reglas especiales por cobrador');
 	});
 });

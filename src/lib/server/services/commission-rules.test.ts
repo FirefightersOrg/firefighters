@@ -74,49 +74,49 @@ describe('mapCommissionRuleRpcError', () => {
 			{ code: '22023', message: 'installment number must be between 1 and 10' },
 			'validation',
 			400,
-			'Installment number must be between 1 and 10.',
+			'El número de cuota debe estar entre 1 y 10.',
 			'installmentNumber'
 		],
 		[
 			{ code: '22023', message: 'installment number is required for custom rules' },
 			'validation',
 			400,
-			'Installment number is required for custom rules.',
+			'El número de cuota no es válido.',
 			'installmentNumber'
 		],
 		[
 			{ code: '22023', message: 'percentage must have at most 2 decimal places' },
 			'validation',
 			400,
-			'Percentage must have at most 2 decimal places.',
+			'El porcentaje no es válido.',
 			'percentage'
 		],
 		[
 			{ code: '22023', message: 'fixed amount must be greater than 0' },
 			'validation',
 			400,
-			'Fixed amount must be greater than 0.',
+			'El monto fijo no es válido.',
 			'fixedAmount'
 		],
 		[
 			{ code: '22023', message: 'exactly one of percentage or fixed amount is required' },
 			'validation',
 			400,
-			'Enter either a percentage or a fixed amount.',
+			'Ingresar un porcentaje o un monto fijo, no ambos.',
 			'valueKind'
 		],
 		[
 			{ code: '22023', message: 'invalid commission rule type: bonus' },
 			'validation',
 			400,
-			'Unknown rule type.',
+			'Tipo de regla desconocido.',
 			'ruleType'
 		],
 		[
 			{ code: '22023', message: 'valid to date must be on or after the valid from date' },
 			'validation',
 			400,
-			'Valid to must be on or after the valid from date.',
+			'La fecha de fin de vigencia debe ser igual o posterior a la de inicio.',
 			'validTo'
 		],
 		[
@@ -134,7 +134,7 @@ describe('mapCommissionRuleRpcError', () => {
 			},
 			'validation',
 			400,
-			'Percentage must be greater than 0 and at most 100.',
+			'El porcentaje debe ser mayor que 0 y hasta 100.',
 			'percentage'
 		],
 		[
@@ -144,7 +144,7 @@ describe('mapCommissionRuleRpcError', () => {
 			},
 			'validation',
 			400,
-			'Installment number must be between 1 and 10.',
+			'El número de cuota debe estar entre 1 y 10.',
 			'installmentNumber'
 		],
 		[
@@ -187,14 +187,14 @@ describe('mapCommissionRuleRpcError', () => {
 			{ code: '22023', message: 'fixed amount must be a finite number' },
 			'validation',
 			400,
-			'Fixed amount must be a finite number.',
+			'El monto fijo no es válido.',
 			'fixedAmount'
 		],
 		[
 			{ code: '22023', message: 'percentage must be a finite number' },
 			'validation',
 			400,
-			'Percentage must be a finite number.',
+			'El porcentaje no es válido.',
 			'percentage'
 		],
 		[
@@ -276,7 +276,7 @@ describe('commission rule service', () => {
 			status: 409,
 			message: COMMISSION_RULE_MESSAGES.staleVersion
 		});
-		expect(err.message).toMatch(/changed by someone else.*Reload the page/);
+		expect(err.message).toMatch(/Otra persona modificó.*Recargar la página/);
 		expect(console.error).not.toHaveBeenCalled();
 	});
 

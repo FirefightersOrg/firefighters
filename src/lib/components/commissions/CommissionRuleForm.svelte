@@ -2,19 +2,18 @@
 	import { applyAction, enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
-		cardClass,
-		hintClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
+		Button,
+		Card,
+		Field,
+		FormResult,
+		RadioGroup,
+		Select,
+		TextInput
+	} from '$lib/components/ui';
 	import {
-		COMMISSION_RULE_TYPE_HINTS,
-		COMMISSION_RULE_TYPE_LABELS,
+		COMMISSION_RULE_TYPE_HINTS_ES,
+		COMMISSION_RULE_TYPE_LABELS_ES,
 		COMMISSION_RULE_TYPES,
 		type CommissionRule
 	} from '$lib/domain/commissions';
@@ -108,20 +107,26 @@
 
 	let submitting = $state(false);
 	const fieldId = (name: string) => `${prefix}-${name}`;
-	const describedBy = (name: string, hint = false) =>
-		[hint ? `${fieldId(name)}-hint` : '', errors[name]?.length ? `${fieldId(name)}-error` : '']
-			.filter(Boolean)
-			.join(' ') || undefined;
+	const SUMMARY_FIELDS = $derived(
+		[
+			{ name: 'ruleType', label: 'Tipo de regla' },
+			{ name: 'installmentNumber', label: 'Número de cuota' },
+			{ name: 'valueKind', label: 'Comisión' },
+			{ name: 'percentage', label: 'Porcentaje' },
+			{ name: 'fixedAmount', label: 'Monto fijo' },
+			{ name: 'validFrom', label: 'Vigente desde' },
+			{ name: 'validTo', label: 'Vigente hasta' },
+			{ name: 'appliesToCollectorId', label: 'Se aplica a' },
+			{ name: 'reason', label: 'Nota' }
+		].map((field) => ({ ...field, id: fieldId(field.name) }))
+	);
 </script>
 
-<section class={cardClass} aria-labelledby="{prefix}-rule-title">
-	<h2 id="{prefix}-rule-title" class="mb-4 text-base font-semibold">
-		{editing ? 'Edit rule' : 'Add a rule'}
-	</h2>
+<Card title={editing ? 'Editar regla' : 'Agregar una regla'} id="{prefix}-rule">
 	<form
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
-		class="rule-form space-y-4"
+		class="rule-form flex flex-col gap-5"
 		use:enhance={() => {
 			submitting = true;
 			return async ({ result: actionResult, update }) => {
@@ -142,222 +147,171 @@
 			};
 		}}
 	>
-		{#if result}
-			<FormAlert kind={result.success ? 'success' : 'error'} message={result.message} />
-		{/if}
+		<FormResult {result} fields={SUMMARY_FIELDS} />
 		{#if rule}
 			<input type="hidden" name="ruleId" value={rule.id} />
 			<!-- Version the edit is based on (optimistic concurrency): see expectedVersion above. -->
 			<input type="hidden" name="expectedUpdatedAt" value={expectedVersion} />
 		{/if}
 
-		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
 			<div class="sm:col-span-2">
-				<label for={fieldId('ruleType')} class={labelClass}>Rule type</label>
-				<select
+				<Field
+					label="Tipo de regla"
 					id={fieldId('ruleType')}
-					name="ruleType"
+					hint={COMMISSION_RULE_TYPES.map(
+						(type) =>
+							`${COMMISSION_RULE_TYPE_LABELS_ES[type]}: ${COMMISSION_RULE_TYPE_HINTS_ES[type]}`
+					).join(' ')}
+					error={errors.ruleType?.[0]}
 					required
-					aria-invalid={errors.ruleType?.length ? 'true' : undefined}
-					aria-describedby={describedBy('ruleType', true)}
-					class={inputClass}
 				>
-					<option value="" disabled selected={initial.ruleType === ''}>Choose a type…</option>
-					{#each COMMISSION_RULE_TYPES as type (type)}
-						<option value={type} selected={initial.ruleType === type}>
-							{COMMISSION_RULE_TYPE_LABELS[type]}
-						</option>
-					{/each}
-				</select>
-				<p id="{fieldId('ruleType')}-hint" class={hintClass}>
-					{#each COMMISSION_RULE_TYPES as type, i (type)}{i > 0 ? ' ' : ''}<span
-							><strong>{COMMISSION_RULE_TYPE_LABELS[type]}:</strong>
-							{COMMISSION_RULE_TYPE_HINTS[type]}</span
-						>{/each}
-				</p>
-				<FieldError id="{fieldId('ruleType')}-error" errors={errors.ruleType} />
+					<Select
+						name="ruleType"
+						placeholder="Elegir un tipo…"
+						value={initial.ruleType}
+						options={COMMISSION_RULE_TYPES.map((type) => ({
+							value: type,
+							label: COMMISSION_RULE_TYPE_LABELS_ES[type]
+						}))}
+					/>
+				</Field>
 			</div>
 
 			<div class="installment-field">
-				<label for={fieldId('installmentNumber')} class={labelClass}>Installment number</label>
-				<input
+				<Field
+					label="Número de cuota"
 					id={fieldId('installmentNumber')}
-					name="installmentNumber"
-					type="text"
-					inputmode="numeric"
-					pattern="[0-9]*"
-					autocomplete="off"
-					placeholder="1"
-					value={initial.installmentNumber}
-					aria-invalid={errors.installmentNumber?.length ? 'true' : undefined}
-					aria-describedby={describedBy('installmentNumber', true)}
-					class={inputClass}
-				/>
-				<p id="{fieldId('installmentNumber')}-hint" class={hintClass}>
-					Only for a specific installment: 1 to {installmentCount}.
-				</p>
-				<FieldError id="{fieldId('installmentNumber')}-error" errors={errors.installmentNumber} />
+					hint="Solo para una cuota específica: de 1 a {installmentCount}."
+					error={errors.installmentNumber?.[0]}
+				>
+					<TextInput
+						name="installmentNumber"
+						type="text"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						autocomplete="off"
+						placeholder="1"
+						value={initial.installmentNumber}
+					/>
+				</Field>
 			</div>
 		</div>
 
-		<fieldset>
-			<legend class={labelClass}>Commission</legend>
-			<div class="mt-2 flex flex-wrap gap-4 text-sm">
-				<label class="inline-flex items-center gap-2">
-					<input
-						type="radio"
-						name="valueKind"
-						value="percentage"
-						checked={initial.valueKind === 'percentage'}
-					/>
-					Percentage of the payment
-				</label>
-				<label class="inline-flex items-center gap-2">
-					<input
-						type="radio"
-						name="valueKind"
-						value="fixed_amount"
-						checked={initial.valueKind === 'fixed_amount'}
-					/>
-					Fixed amount per payment
-				</label>
-			</div>
-			<FieldError id="{fieldId('valueKind')}-error" errors={errors.valueKind} />
+		<RadioGroup
+			legend="Comisión"
+			name="valueKind"
+			defaultValue={initial.valueKind}
+			error={errors.valueKind?.[0]}
+			options={[
+				{ value: 'percentage', label: 'Porcentaje del pago' },
+				{ value: 'fixed_amount', label: 'Monto fijo por pago' }
+			]}
+		/>
 
-			<div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-				<div class="percentage-field">
-					<label for={fieldId('percentage')} class={labelClass}>Percentage (%)</label>
-					<input
-						id={fieldId('percentage')}
+		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="percentage-field">
+				<Field
+					label="Porcentaje (%)"
+					id={fieldId('percentage')}
+					hint="Por ejemplo 25 o 12,5 (coma para decimales, hasta 100)."
+					error={errors.percentage?.[0]}
+				>
+					<TextInput
 						name="percentage"
 						type="text"
 						inputmode="decimal"
 						autocomplete="off"
 						placeholder="12,5"
 						value={initial.percentage}
-						aria-invalid={errors.percentage?.length ? 'true' : undefined}
-						aria-describedby={describedBy('percentage', true)}
-						class={inputClass}
 					/>
-					<p id="{fieldId('percentage')}-hint" class={hintClass}>
-						e.g. 25 or 12,5 (comma for decimals, up to 100).
-					</p>
-					<FieldError id="{fieldId('percentage')}-error" errors={errors.percentage} />
-				</div>
-				<div class="fixed-field">
-					<label for={fieldId('fixedAmount')} class={labelClass}>Fixed amount ($)</label>
-					<input
-						id={fieldId('fixedAmount')}
+				</Field>
+			</div>
+			<div class="fixed-field">
+				<Field
+					label="Monto fijo ($)"
+					id={fieldId('fixedAmount')}
+					hint="En pesos, por ejemplo 1.500 o 1.500,50."
+					error={errors.fixedAmount?.[0]}
+				>
+					<TextInput
 						name="fixedAmount"
 						type="text"
 						inputmode="decimal"
 						autocomplete="off"
+						prefix="$"
 						placeholder="1.500"
 						value={initial.fixedAmount}
-						aria-invalid={errors.fixedAmount?.length ? 'true' : undefined}
-						aria-describedby={describedBy('fixedAmount', true)}
-						class={inputClass}
 					/>
-					<p id="{fieldId('fixedAmount')}-hint" class={hintClass}>
-						In pesos, e.g. 1.500 or 1.500,50.
-					</p>
-					<FieldError id="{fieldId('fixedAmount')}-error" errors={errors.fixedAmount} />
-				</div>
+				</Field>
 			</div>
-		</fieldset>
+		</div>
 
-		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-			<div>
-				<label for={fieldId('validFrom')} class={labelClass}>Valid from</label>
-				<input
-					id={fieldId('validFrom')}
-					name="validFrom"
-					type="date"
-					required
-					value={initial.validFrom}
-					aria-invalid={errors.validFrom?.length ? 'true' : undefined}
-					aria-describedby={describedBy('validFrom')}
-					class={inputClass}
-				/>
-				<FieldError id="{fieldId('validFrom')}-error" errors={errors.validFrom} />
-			</div>
-			<div>
-				<label for={fieldId('validTo')} class={labelClass}>Valid to (optional)</label>
-				<input
-					id={fieldId('validTo')}
-					name="validTo"
-					type="date"
-					value={initial.validTo}
-					aria-invalid={errors.validTo?.length ? 'true' : undefined}
-					aria-describedby={describedBy('validTo', true)}
-					class={inputClass}
-				/>
-				<p id="{fieldId('validTo')}-hint" class={hintClass}>
-					Both days included. Leave empty for no end date.
-				</p>
-				<FieldError id="{fieldId('validTo')}-error" errors={errors.validTo} />
-			</div>
+		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<Field label="Vigente desde" id={fieldId('validFrom')} error={errors.validFrom?.[0]} required>
+				<TextInput name="validFrom" type="date" value={initial.validFrom} />
+			</Field>
+			<Field
+				label="Vigente hasta"
+				id={fieldId('validTo')}
+				hint="Ambos días incluidos. Dejarlo vacío si no tiene fecha de fin."
+				error={errors.validTo?.[0]}
+				optional
+			>
+				<TextInput name="validTo" type="date" value={initial.validTo} />
+			</Field>
 			{#if !editing && collectors.length > 0}
-				<div>
-					<label for={fieldId('appliesToCollectorId')} class={labelClass}>Applies to</label>
-					<select
-						id={fieldId('appliesToCollectorId')}
+				<Field
+					label="Se aplica a"
+					id={fieldId('appliesToCollectorId')}
+					hint="Una regla especial para un cobrador tiene prioridad sobre las reglas generales."
+					error={errors.appliesToCollectorId?.[0]}
+				>
+					<Select
 						name="appliesToCollectorId"
-						class={inputClass}
-						aria-describedby="{fieldId('appliesToCollectorId')}-hint"
-					>
-						<option value="">All collectors (general rule)</option>
-						{#each collectors as collector (collector.id)}
-							<option
-								value={collector.id}
-								selected={result?.values?.appliesToCollectorId === collector.id}
-								>{collector.displayName}</option
-							>
-						{/each}
-					</select>
-					<p id="{fieldId('appliesToCollectorId')}-hint" class={hintClass}>
-						A special rule for one collector takes precedence over the general rules.
-					</p>
-					<FieldError
-						id="{fieldId('appliesToCollectorId')}-error"
-						errors={errors.appliesToCollectorId}
+						value={result?.values?.appliesToCollectorId ?? ''}
+						options={[
+							{ value: '', label: 'Todos los cobradores (regla general)' },
+							...collectors.map((collector) => ({
+								value: collector.id,
+								label: collector.displayName
+							}))
+						]}
 					/>
-				</div>
+				</Field>
 			{/if}
-			<div>
-				<label for={fieldId('reason')} class={labelClass}>Note (optional)</label>
-				<input
-					id={fieldId('reason')}
+			<Field
+				label="Nota"
+				id={fieldId('reason')}
+				hint="Se guarda en el registro de auditoría."
+				error={errors.reason?.[0]}
+				optional
+			>
+				<TextInput
 					name="reason"
 					type="text"
 					maxlength={COMMISSION_REASON_MAX_LENGTH}
 					value={initial.reason}
-					aria-describedby={describedBy('reason', true)}
-					class={inputClass}
 				/>
-				<p id="{fieldId('reason')}-hint" class={hintClass}>Saved in the audit log.</p>
-				<FieldError id="{fieldId('reason')}-error" errors={errors.reason} />
-			</div>
+			</Field>
 		</div>
 
-		<p class="text-xs text-slate-500">
-			Rules of the same type (and installment) cannot overlap in time. To change a rule from a date
-			on, set an end date on the current rule and add a new one starting the next day.
+		<p class="m-0 max-w-prose text-body-sm text-muted">
+			Las reglas del mismo tipo (y cuota) no pueden superponerse en el tiempo. Para cambiar una
+			regla desde una fecha, ponerle fecha de fin a la regla actual y agregar una nueva que empiece
+			al día siguiente.
 		</p>
 
-		<div class="flex flex-wrap justify-end gap-2">
+		<div class="flex flex-wrap gap-2">
+			<Button type="submit" variant="primary" loading={submitting}>
+				{editing ? 'Guardar regla' : 'Agregar regla'}
+			</Button>
 			{#if editing}
-				<a
-					href={resolve('/campaigns/[id]/commissions', { id: campaignId })}
-					class={secondaryButtonClass}>Cancel</a
-				>
+				<Button href={resolve('/campaigns/[id]/commissions', { id: campaignId })}>Cancelar</Button>
 			{/if}
-			<button type="submit" disabled={submitting} class={primaryButtonClass}>
-				{#if submitting}Saving…{:else}{editing ? 'Save rule' : 'Add rule'}{/if}
-			</button>
 		</div>
 	</form>
-</section>
+</Card>
 
 <style>
 	/* Without JavaScript too: show the installment number only for "Specific installment", and

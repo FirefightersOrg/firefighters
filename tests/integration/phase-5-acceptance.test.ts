@@ -714,20 +714,20 @@ describe('Phase 5: collectors and buyers', () => {
 			event(users.admin, `/campaigns/${campaignId}`, { id: campaignId })
 		);
 		const adminHtml = render(CampaignPage, { props: { data: adminData } as never }).body;
-		expect(adminHtml).toContain('Collectors →');
-		expect(adminHtml).toContain('Buyers →');
+		expect(adminHtml).toContain('>Cobradores</a>');
+		expect(adminHtml).toContain('>Compradores</a>');
 		const operatorData = await campaignLoad(
 			event(users.operator, `/campaigns/${campaignId}`, { id: campaignId })
 		);
 		const operatorHtml = render(CampaignPage, { props: { data: operatorData } as never }).body;
 		// SAN-93 (#44): the operator has collector.view and buyer.manage.
-		expect(operatorHtml).toContain('Buyers →');
-		expect(operatorHtml).toContain('Collectors →');
+		expect(operatorHtml).toContain('>Compradores</a>');
+		expect(operatorHtml).toContain('>Cobradores</a>');
 		for (const user of [users.treasurer, users['read-only']]) {
 			const data = await campaignLoad(event(user, `/campaigns/${campaignId}`, { id: campaignId }));
 			const html = render(CampaignPage, { props: { data } as never }).body;
-			expect(html).not.toContain('Collectors →');
-			expect(html).not.toContain('Buyers →');
+			expect(html).not.toContain('>Cobradores</a>');
+			expect(html).not.toContain('>Compradores</a>');
 		}
 	});
 });
