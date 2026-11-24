@@ -155,7 +155,8 @@
 	<p class="mb-4 text-body-sm">
 		<a
 			href="{resolve('/campaigns/[id]/reports', { id: data.campaign.id })}?collector={data.collector
-				.id}#monthly-title">Resumen operativo mensual →</a
+				.id}#monthly-title"
+			class="text-primary-text underline-offset-2 hover:underline">Resumen operativo mensual →</a
 		>
 	</p>
 {/if}
