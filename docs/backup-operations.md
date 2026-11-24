@@ -208,6 +208,7 @@ diff before.txt restored.txt
 
 It reports: bonds per campaign and status (count and value), payments per campaign and status
 (count and amount), correction link counts and deltas, settlements per campaign and status (totals), collector balances per campaign
-(credits minus debits, annulled entries excluded) and integrity checks that must return no rows.
-Frozen roster counts are pending (Phase 11). Differences must be explained by the accepted loss
-window only; anything else blocks reopening.
+(credits minus debits, annulled entries excluded), frozen roster entry counts per draw (section 6;
+compare them with the source before reopening) and integrity checks that must return no rows.
+Only winners and prizes counts are still pending (Phase 12). Differences must be explained by the
+accepted loss window only; anything else blocks reopening.
