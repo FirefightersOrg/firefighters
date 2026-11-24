@@ -1,7 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad } from './$types';
-import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
+import {
+	hasPermissionIn,
+	permissionsUnavailable,
+	requirePermissionIn
+} from '$lib/server/auth/permissions';
 import { buyerDisplayName } from '$lib/domain/parties';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import {
@@ -26,9 +30,12 @@ import {
 	requireBuyerManage,
 	validateBuyer
 } from '$lib/server/buyers/route-helpers';
+import { listBuyerPrizes } from '$lib/server/repositories/prizes';
 
 const valid = (id: string) => z.guid().safeParse(id).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
+	if (permissionsUnavailable(locals.permissions))
+		error(500, { message: 'Could not load permissions.' });
 	requireCampaignViewer(locals, url);
 	if (!hasPermissionIn(locals.permissions, 'buyer.view'))
 		requirePermissionIn(locals.permissions, 'buyer.manage');
@@ -44,26 +51,39 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!buyerResult.data) error(404, { message: 'Buyer not found.' });
 	const buyer = buyerResult.data;
-	const [collectorResult, auditResult, campaignBondsResult, historicalBondsResult, salesResult] =
-		await Promise.all([
-			buyer.usualCollectorId
-				? getCollector(locals.supabase, buyer.usualCollectorId)
-				: Promise.resolve({ data: null, error: null }),
-			hasPermissionIn(locals.permissions, 'audit.view')
-				? listAuditEntriesForEntities(locals.supabase, 'buyer', [buyer.id], {
-						limit: AUDIT_ENTRIES_LIMIT + 1
-					})
-				: Promise.resolve(null),
-			listBuyerBonds(locals.supabase, buyer.id, { campaignId: campaignResult.data.id }),
-			listBuyerBonds(locals.supabase, buyer.id, { excludeCampaignId: campaignResult.data.id }),
-			listBuyerSalesAndInstallments(locals.supabase, campaignResult.data.id, buyer.id)
-		]);
+	const canViewPrizes = (
+		['draw.view', 'draw.load_winner', 'prize.resolve', 'prize.deliver', 'prize.annul'] as const
+	).some((permission) => hasPermissionIn(locals.permissions, permission));
+	const [
+		collectorResult,
+		auditResult,
+		campaignBondsResult,
+		historicalBondsResult,
+		salesResult,
+		prizesResult
+	] = await Promise.all([
+		buyer.usualCollectorId
+			? getCollector(locals.supabase, buyer.usualCollectorId)
+			: Promise.resolve({ data: null, error: null }),
+		hasPermissionIn(locals.permissions, 'audit.view')
+			? listAuditEntriesForEntities(locals.supabase, 'buyer', [buyer.id], {
+					limit: AUDIT_ENTRIES_LIMIT + 1
+				})
+			: Promise.resolve(null),
+		listBuyerBonds(locals.supabase, buyer.id, { campaignId: campaignResult.data.id }),
+		listBuyerBonds(locals.supabase, buyer.id, { excludeCampaignId: campaignResult.data.id }),
+		listBuyerSalesAndInstallments(locals.supabase, campaignResult.data.id, buyer.id),
+		canViewPrizes
+			? listBuyerPrizes(locals.supabase, campaignResult.data.id, buyer.id)
+			: Promise.resolve({ data: [], error: null })
+	]);
 	if (
 		collectorResult.error ||
 		auditResult?.error ||
 		campaignBondsResult.error ||
 		historicalBondsResult.error ||
-		salesResult.error
+		salesResult.error ||
+		prizesResult.error
 	)
 		error(500, { message: 'Could not load the buyer. Please try again.' });
 	return {
@@ -92,6 +112,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		salesTotal: salesResult.data?.salesTotal ?? 0,
 		installments: salesResult.data?.installments ?? [],
 		installmentsTotal: salesResult.data?.installmentsTotal ?? 0,
+		prizes: prizesResult.data ?? [],
+		canViewPrizes,
 		canManage: hasPermissionIn(locals.permissions, 'buyer.manage'),
 		audit: auditResult
 			? {
@@ -103,6 +125,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 export const actions: Actions = {
 	update: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				success: false,
+				values: {},
+				errors: {},
+				message: 'Could not load permissions.'
+			});
 		const denied = requireBuyerManage(locals, url);
 		if (denied) return denied;
 		if (!valid(params.id))
