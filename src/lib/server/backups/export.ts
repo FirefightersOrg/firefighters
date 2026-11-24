@@ -64,7 +64,11 @@ export function exportPageFetcher(
 ): FetchPage {
 	const def = BACKUP_EXPORTS[kind];
 	return async (after) => {
-		let q = supabase.from(def.table).select(def.select).eq('campaign_id', campaignId);
+		let q = supabase
+			.from(def.table)
+			.select(def.select)
+			.eq(def.campaignColumn ?? 'campaign_id', campaignId);
+		for (const [column, value] of Object.entries(def.filters ?? {})) q = q.eq(column, value);
 		if (def.periodColumn) {
 			const isDate = def.periodColumn === 'payment_date';
 			if (period.from) {

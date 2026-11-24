@@ -134,6 +134,21 @@ Possible results:
   exhaustion raises a typed error and returns no partial assignment.
 - SAN-76 does not persist these assignments or generate/freeze rosters; SAN-77 owns both operations.
 
+## SAN-78 UI decisions
+
+- A `datetime-local` cutoff is treated as a Buenos Aires wall-clock value and persisted with the
+  `-03:00` offset. Date-only draw dates remain date-only and are never passed through `Date`.
+- The optional consolation installment is stored in
+  `eligibility_rule.consolation_rule.required_installment_number`, matching the snake-case snapshot
+  accepted by SAN-76. Other draw types currently use an empty eligibility object because their MVP
+  rules are fixed in this document.
+- Roster reads fetch every RLS-visible row in deterministic 500-row PostgREST pages, then apply the
+  combined formatted-number/bond/buyer/collector search and eligibility filter before presenting
+  50-row UI pages. This deliberately favors correct results past PostgREST's 1,000-row default.
+- All draw capabilities grant navigation/read access, matching `draw_can_read`; action buttons still
+  require their specific permission. The roster marks persisted `bond_numbers.number_kind =
+'extraordinary'` explicitly so historical extra participation is distinguishable.
+
 ## Implemented in SAN-77
 
 ### Trusted writes and configuration
