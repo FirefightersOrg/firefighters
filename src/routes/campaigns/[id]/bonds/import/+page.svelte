@@ -1,7 +1,7 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
@@ -12,7 +12,6 @@
 		primaryButtonClass,
 		secondaryButtonClass
 	} from '$lib/components/campaigns/styles';
-	import ImportSessionStatusBadge from '$lib/components/imports/ImportSessionStatusBadge.svelte';
 	import { IMPORT_MAX_FILE_BYTES } from '$lib/domain/imports';
 	import { IMPORT_SOURCE_LABELS } from '$lib/domain/import-preview';
 	import type { PageProps } from './$types';
@@ -43,7 +42,7 @@
 		<a href={campaignHref} class="text-sm text-blue-700 hover:underline">← {campaign.name}</a>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">Import bonds from a file</h1>
-			<CampaignStatusBadge status={campaign.status} />
+			<StatusBadge kind="campaign" status={campaign.status} />
 		</div>
 		<p class="text-sm text-slate-500">
 			Upload a CSV or Excel file, review the rows and confirm. Nothing is created until you confirm.
@@ -166,9 +165,9 @@ pata,PATA1200,1315,PATA1200-1315</pre>
 								</td>
 								<td class="py-2 pr-4 text-slate-600">{IMPORT_SOURCE_LABELS[session.sourceType]}</td>
 								<td class="py-2 pr-4">
-									<ImportSessionStatusBadge
-										status={session.status}
-										rolledBack={session.rolledBackAt !== null}
+									<StatusBadge
+										kind="importSession"
+										status={session.rolledBackAt !== null ? 'rolled_back' : session.status}
 									/>
 								</td>
 								<td class="py-2 pr-4 text-slate-600 tabular-nums"

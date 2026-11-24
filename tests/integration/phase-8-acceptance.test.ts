@@ -11,6 +11,7 @@ import {
 	SettlementServiceError
 } from '$lib/server/services/settlements';
 import { formatMoney } from '$lib/domain/money';
+import { formatMoney as formatMoneyEs } from '$lib/format';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
@@ -734,21 +735,21 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		expect(openDocument.closingDate).toBe('—');
 		expect(openDocument).toMatchObject({
 			campaign: `[it-p8 ${RUN_ID}] settlements`,
-			settlementNumberLabel: expect.stringMatching(/^Settlement \d{4}$/),
+			settlementNumberLabel: expect.stringMatching(/^Rendición \d{4}$/),
 			collector: collector!.display_name,
 			closedBy: null,
 			notes: 'C5 delivery note',
-			manualAdjustments: '0 — No manual adjustments have been recorded.',
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature'
+			manualAdjustments: '0 — No se registraron ajustes manuales.',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración'
 		});
 		expect(openDocument.openingDate).not.toBe('—');
 		expect(openDocument.payments).toEqual([
 			expect.objectContaining({
 				bond: paddedBond,
 				buyer: `Phase ${RUN_ID}`,
-				installments: 'Installment 1 (100.00)',
-				method: 'Cash',
+				installments: `Cuota 1 (${formatMoneyEs('100.00', { decimals: 'always' })})`,
+				method: 'Efectivo',
 				amount: formatMoney('100.00')
 			})
 		]);
@@ -829,13 +830,13 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		expect(document.preliminary).toBe(false);
 		expect(document).toMatchObject({
 			campaign: `[it-p8 ${RUN_ID}] settlements`,
-			settlementNumberLabel: `Settlement ${String(stored!.settlement_number).padStart(4, '0')}`,
+			settlementNumberLabel: `Rendición ${String(stored!.settlement_number).padStart(4, '0')}`,
 			collector: collector!.display_name,
 			closedBy: users.treasurer.profile.full_name,
 			notes: 'C5 delivery note',
-			manualAdjustments: '0 — No manual adjustments have been recorded.',
-			collectorSignature: 'Collector signature',
-			administrationSignature: 'Administration signature'
+			manualAdjustments: '0 — No se registraron ajustes manuales.',
+			collectorSignature: 'Firma del cobrador',
+			administrationSignature: 'Firma de la administración'
 		});
 		expect(document.openingDate).not.toBe('—');
 		expect(document.closingDate).not.toBe('—');
@@ -843,8 +844,8 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			expect.objectContaining({
 				bond: paddedBond,
 				buyer: `Phase ${RUN_ID}`,
-				installments: 'Installment 1 (100.00)',
-				method: 'Cash',
+				installments: `Cuota 1 (${formatMoneyEs('100.00', { decimals: 'always' })})`,
+				method: 'Efectivo',
 				amount: formatMoney('100.00')
 			})
 		]);
@@ -868,14 +869,15 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			bond: paddedBond,
 			buyer: `Phase ${RUN_ID}`,
 			collector: collector!.display_name,
-			installments: 'Installment 1 (100.00)',
+			installments: `Cuota 1 (${formatMoneyEs('100.00', { decimals: 'always' })})`,
 			amount: formatMoney('100.00'),
-			method: 'Cash',
+			method: 'Efectivo',
 			registeredBy: users.operator.profile.full_name,
 			receiptNumber: `SET-${String(stored!.settlement_number).padStart(4, '0')}-${confirmedPaymentId.slice(0, 8).toUpperCase()}`
 		});
-		const [year, month, day] = baDate(-1).split('-').map(Number);
-		expect(certificate.document.paymentDate).toBe(`${day}/${month}/${String(year).slice(-2)}`);
+		// SAN-131 / SAN-138: es-AR calendar date, zero-padded with a four-digit year.
+		const [year, month, day] = baDate(-1).split('-');
+		expect(certificate.document.paymentDate).toBe(`${day}/${month}/${year}`);
 		expect(certificate.document.createdAt).not.toBe('—');
 		const closedWorkspace = (await settlementLoad(
 			event(users.treasurer, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
