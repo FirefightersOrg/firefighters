@@ -206,7 +206,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 		table: 'draw_roster_entries',
 		// Only frozen rosters (never generated/superseded). The campaign hangs off the draw.
 		select:
-			'id, draw_roster_id, bond_id, number_value, eligible, ineligibility_reason, buyer_snapshot, collector_snapshot, draw_rosters!inner(id, status, frozen_at, draws!inner(id, campaign_id, name, draw_type, draw_date))',
+			'id, draw_roster_id, bond_id, bond_number_id, number_value, eligible, ineligibility_reason, buyer_snapshot, collector_snapshot, bond_numbers!inner(number_kind, source_base_number_id), draw_rosters!inner(id, status, frozen_at, draws!inner(id, campaign_id, name, draw_type, draw_date))',
 		// (draw_roster_id, number_value) is unique, so the order is total.
 		order: ['draw_roster_id', 'number_value'],
 		permissions: ['draw.view'],
@@ -221,6 +221,9 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			{ header: 'frozen_at', value: (r) => buenosAiresDateTime(r.draw_rosters?.frozen_at) },
 			col('number', 'number_value'),
 			col('bond_id', 'bond_id'),
+			col('bond_number_id', 'bond_number_id'),
+			{ header: 'number_kind', value: (r) => r.bond_numbers?.number_kind },
+			{ header: 'source_base_number_id', value: (r) => r.bond_numbers?.source_base_number_id },
 			col('eligible', 'eligible'),
 			col('ineligibility_reason', 'ineligibility_reason', true),
 			{ header: 'buyer_id', value: (r) => r.buyer_snapshot?.id },

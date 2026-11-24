@@ -139,7 +139,10 @@ the download instead of producing a file that looks complete. Each export is log
 
 Frozen rosters (SAN-113): one row per entry of every `frozen` roster of the campaign (generated and
 superseded rosters are excluded), with draw id/name/type/date, roster id, `frozen_at` (Buenos Aires
-time), entry number, bond id, eligibility and reason, and the buyer and collector snapshots taken
+time), entry number, bond id, `bond_number_id`, `number_kind` (`base`, `associated` or
+`extraordinary`) and `source_base_number_id` (the base number an associated one hangs from, empty
+otherwise; both read from `bond_numbers`, so extra numbers can be told apart from base numbers when
+justifying historical results), eligibility and reason, and the buyer and collector snapshots taken
 when the roster was generated. Ordered by (`draw_roster_id`, `number_value`), which is unique.
 
 Pending (Phase 12 tables do not exist yet): **winners and prizes**. Hooks are marked
