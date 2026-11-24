@@ -491,7 +491,7 @@ describe('Phase 12: winner validation, prize resolution, and certificates', () =
 			annulPrize(admin, { prizeId, reason: 'Wrong result' }, deliveredAnnul)
 		).rejects.toMatchObject({
 			status: 409,
-			message: 'A delivered prize cannot be annulled; pending product decision.'
+			message: 'A delivered prize cannot be annulled. Reverse the delivery first.'
 		});
 		expect(await row('prizes', prizeId)).toEqual(deliveredBefore);
 		expect(await audits(deliveredAnnul.requestId)).toEqual([]);
