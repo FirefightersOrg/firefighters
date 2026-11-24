@@ -40,8 +40,8 @@ export function splitIntoInstallments(
  */
 export function notExactInstallmentsMessage(simpleBondValue: string, installmentCount: number) {
 	return (
-		`${formatMoney(simpleBondValue)} cannot be split into ${installmentCount} equal installments. ` +
-		'Choose a value and a number of installments that divide exactly (to the cent).'
+		`${formatMoney(simpleBondValue)} no se puede dividir en ${installmentCount} cuotas iguales. ` +
+		'Elegir un valor y una cantidad de cuotas que se dividan exactamente (al centavo).'
 	);
 }
 
@@ -83,14 +83,14 @@ export function previewInstallmentValue(
 		return {
 			state: 'error',
 			field: 'simpleBondValue',
-			message: 'Enter a simple bond value greater than 0.'
+			message: 'Ingresar un valor del bono simple mayor que 0.'
 		};
 	}
 	if (!/^\d+$/.test(countRaw) || Number(countRaw) <= 0) {
 		return {
 			state: 'error',
 			field: 'installmentCount',
-			message: 'Enter a whole number of installments greater than 0.'
+			message: 'Ingresar una cantidad entera de cuotas mayor que 0.'
 		};
 	}
 
@@ -103,7 +103,7 @@ export function previewInstallmentValue(
 			message:
 				split.reason === 'not_exact'
 					? notExactInstallmentsMessage(centsToDecimalString(totalCents), count)
-					: 'Enter a whole number of installments greater than 0.'
+					: 'Ingresar una cantidad entera de cuotas mayor que 0.'
 		};
 	}
 	return {

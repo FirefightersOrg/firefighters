@@ -47,7 +47,7 @@
 
 <div class="flex max-w-form flex-col gap-1">
 	<label for={id} class="text-label text-text">
-		{label}{#if optional}<span class="font-normal text-muted"> (opcional)</span>{/if}
+		{label}{#if optional}&nbsp;<span class="font-normal text-muted">(opcional)</span>{/if}
 	</label>
 	{#if hint}
 		<p id={hintId} class="m-0 text-body-sm text-muted">{hint}</p>

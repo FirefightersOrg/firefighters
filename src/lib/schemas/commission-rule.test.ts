@@ -83,10 +83,10 @@ describe('commissionRuleSchema', () => {
 	});
 
 	it.each([
-		['', 'Installment number is required for a specific installment rule'],
-		['0', 'Installment number must be between 1 and 10'],
-		['11', 'Installment number must be between 1 and 10'],
-		['2,5', 'Installment number must be a whole number']
+		['', 'El número de cuota es obligatorio para una regla de cuota específica'],
+		['0', 'El número de cuota debe estar entre 1 y 10'],
+		['11', 'El número de cuota debe estar entre 1 y 10'],
+		['2,5', 'El número de cuota debe ser un número entero']
 	])('custom installment %j is rejected', (installmentNumber, message) => {
 		expect(errorsOf({ ...base, ruleType: 'custom', installmentNumber }).installmentNumber).toEqual([
 			message
@@ -97,15 +97,15 @@ describe('commissionRuleSchema', () => {
 		expect(
 			errorsOf({ ...base, ruleType: 'custom', installmentNumber: '2' }, commissionRuleSchema(1))
 				.installmentNumber
-		).toEqual(['This campaign has a single installment: use 1']);
+		).toEqual(['Esta campaña tiene una sola cuota: usar 1']);
 	});
 
 	it.each([
-		['', 'Percentage is required'],
-		['0', 'Percentage must be greater than 0 and at most 100'],
-		['0,00', 'Percentage must be greater than 0 and at most 100'],
-		['100,01', 'Percentage must be greater than 0 and at most 100'],
-		['150', 'Percentage must be greater than 0 and at most 100'],
+		['', 'El porcentaje es obligatorio'],
+		['0', 'El porcentaje debe ser mayor que 0 y hasta 100'],
+		['0,00', 'El porcentaje debe ser mayor que 0 y hasta 100'],
+		['100,01', 'El porcentaje debe ser mayor que 0 y hasta 100'],
+		['150', 'El porcentaje debe ser mayor que 0 y hasta 100'],
 		['12,345', PERCENT_INPUT_FORMAT_MESSAGE],
 		['-5', PERCENT_INPUT_FORMAT_MESSAGE],
 		['abc', PERCENT_INPUT_FORMAT_MESSAGE]
@@ -114,9 +114,9 @@ describe('commissionRuleSchema', () => {
 	});
 
 	it.each([
-		['', 'Fixed amount is required'],
-		['0', 'Fixed amount must be greater than 0'],
-		['0,00', 'Fixed amount must be greater than 0'],
+		['', 'El monto fijo es obligatorio'],
+		['0', 'El monto fijo debe ser mayor que 0'],
+		['0,00', 'El monto fijo debe ser mayor que 0'],
 		['1,234.56', MONEY_INPUT_FORMAT_MESSAGE],
 		['1000000000000', MONEY_INPUT_FORMAT_MESSAGE]
 	])('fixed amount %j is rejected', (fixedAmount, message) => {
@@ -127,17 +127,19 @@ describe('commissionRuleSchema', () => {
 
 	it('requires a rule type and a value kind', () => {
 		const errors = errorsOf({ ...base, ruleType: '', valueKind: '' });
-		expect(errors.ruleType).toEqual(['Choose a rule type']);
-		expect(errors.valueKind).toEqual(['Choose a percentage or a fixed amount']);
+		expect(errors.ruleType).toEqual(['Elegir un tipo de regla']);
+		expect(errors.valueKind).toEqual(['Elegir un porcentaje o un monto fijo']);
 	});
 
 	it('validates the dates (inclusive, end optional)', () => {
-		expect(errorsOf({ ...base, validFrom: '' }).validFrom).toEqual(['Valid from is required']);
+		expect(errorsOf({ ...base, validFrom: '' }).validFrom).toEqual([
+			'La fecha de inicio de vigencia es obligatoria'
+		]);
 		expect(errorsOf({ ...base, validFrom: '2026-02-30' }).validFrom).toEqual([
-			'Valid from must be a valid date (YYYY-MM-DD)'
+			'La fecha de inicio de vigencia debe ser una fecha válida (AAAA-MM-DD)'
 		]);
 		expect(errorsOf({ ...base, validTo: '2025-12-31' }).validTo).toEqual([
-			'Valid to must be on or after the valid from date'
+			'La fecha de fin de vigencia debe ser igual o posterior a la de inicio'
 		]);
 		expect(schema.parse({ ...base, validTo: '2026-01-01' }).validTo).toBe('2026-01-01');
 	});
@@ -169,7 +171,7 @@ describe('commissionRuleUpdateSchema', () => {
 				{ ...base, ruleId: 'nope', expectedUpdatedAt: VERSION },
 				commissionRuleUpdateSchema(10) as never
 			).ruleId
-		).toEqual(['Unknown commission rule']);
+		).toEqual(['Regla de comisión desconocida']);
 	});
 
 	it.each([
@@ -201,7 +203,7 @@ describe('commissionRuleAnnulSchema', () => {
 		expect(parsed.success).toBe(false);
 		if (!parsed.success) {
 			expect(commissionRuleFieldErrors(parsed.error).reason).toEqual([
-				'A reason is required to annul a commission rule'
+				'Se requiere un motivo para anular una regla de comisión'
 			]);
 		}
 	});

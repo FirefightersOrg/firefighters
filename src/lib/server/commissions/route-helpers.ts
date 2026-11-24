@@ -27,7 +27,7 @@ export interface CommissionRuleFormResult {
 	values?: Record<string, string>;
 }
 
-export const FIX_FIELDS_MESSAGE = 'Please correct the highlighted fields.';
+export const FIX_FIELDS_MESSAGE = 'Revisar los campos marcados.';
 
 /**
  * Actions: active user (else redirect to login). Returns a 403 `fail()` result without

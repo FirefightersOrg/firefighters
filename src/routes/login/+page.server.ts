@@ -7,12 +7,13 @@ import { endSession } from '$lib/server/auth/session';
 import { SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE } from '$lib/server/auth/route-guard';
 
 const MESSAGES = {
-	invalidInput: 'Please provide a valid email and password',
-	invalidCredentials: 'Invalid email or password',
-	rateLimited: 'Too many sign-in attempts. Please wait a moment and try again.',
-	serviceUnavailable: 'The sign-in service is temporarily unavailable. Please try again.',
-	statusUnavailable: 'Unable to verify account status. Please try again.',
-	notActive: 'Your account is not active. Please contact an administrator.'
+	invalidInput: 'Ingresar un correo electrónico y una contraseña válidos',
+	invalidCredentials: 'Correo electrónico o contraseña incorrectos',
+	rateLimited: 'Demasiados intentos de inicio de sesión. Esperar un momento y volver a intentar.',
+	serviceUnavailable:
+		'El servicio de inicio de sesión no está disponible por el momento. Volver a intentar.',
+	statusUnavailable: 'No se pudo verificar el estado de la cuenta. Volver a intentar.',
+	notActive: 'La cuenta no está activa. Contactar a un administrador.'
 } as const;
 
 type ProfileAccess = 'active' | 'not_active' | 'error';

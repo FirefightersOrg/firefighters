@@ -75,7 +75,7 @@ export function campaignFormSuccess(form: CampaignFormName, message: string): Ca
 	return { form, success: true, message, errors: {} };
 }
 
-export const FIX_FIELDS_MESSAGE = 'Please correct the highlighted fields.';
+export const FIX_FIELDS_MESSAGE = 'Revisar los campos marcados.';
 
 /**
  * 400 failure for a schema validation error. A missing or malformed version (the hidden

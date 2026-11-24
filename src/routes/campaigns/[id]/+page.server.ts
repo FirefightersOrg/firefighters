@@ -41,10 +41,10 @@ import {
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
 const TRANSITION_SUCCESS = {
-	active: 'Campaign activated. Its rules are now frozen.',
-	closing: 'Campaign moved to closing.',
-	closed: 'Campaign closed.',
-	annulled: 'Campaign annulled.'
+	active: 'Campaña activada. Sus reglas quedaron congeladas.',
+	closing: 'La campaña pasó a cierre.',
+	closed: 'Campaña cerrada.',
+	annulled: 'Campaña anulada.'
 } as const;
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: params.id,
 			error: result.error
 		});
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	}
 	if (!result.data) {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
@@ -159,7 +159,10 @@ export const actions: Actions = {
 			const changed = await updateCampaignGeneral(locals.supabase, params.id, input, {
 				requestId: locals.requestId
 			});
-			return campaignFormSuccess('general', changed ? 'Changes saved.' : 'No changes to save.');
+			return campaignFormSuccess(
+				'general',
+				changed ? 'Cambios guardados.' : 'No hay cambios para guardar.'
+			);
 		} catch (err) {
 			return campaignServiceFailure('general', err, values);
 		}
@@ -182,7 +185,10 @@ export const actions: Actions = {
 			const changed = await updateCampaignRules(locals.supabase, params.id, parsed.data, {
 				requestId: locals.requestId
 			});
-			return campaignFormSuccess('rules', changed ? 'Rules saved.' : 'No changes to save.');
+			return campaignFormSuccess(
+				'rules',
+				changed ? 'Reglas guardadas.' : 'No hay cambios para guardar.'
+			);
 		} catch (err) {
 			return campaignServiceFailure('rules', err, values);
 		}
