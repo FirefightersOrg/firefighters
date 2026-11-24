@@ -37,11 +37,44 @@ const data = (prizes: unknown[], can: Record<string, boolean> = {}) => ({
 		resolve: true,
 		deliver: true,
 		annul: true,
+		reverseDelivery: true,
 		...can
 	}
 });
 
 describe('winners and prizes render', () => {
+	it('shows reversal only with permission and delivered state; reversed prizes cannot print', () => {
+		for (const status of ['delivered', 'pending_delivery', 'annulled', 'unawarded']) {
+			for (const reverseDelivery of [true, false]) {
+				const body = render(Page, {
+					props: { data: data([prize(status)], { reverseDelivery }), form: null } as any
+				}).body;
+				expect(body.includes('Reverse delivery')).toBe(status === 'delivered' && reverseDelivery);
+				expect(body.includes('Print delivery certificate')).toBe(status === 'delivered');
+				if (status === 'delivered' && reverseDelivery) {
+					expect(body).toContain('name="reason" required');
+					expect(body).not.toContain('maxlength');
+				}
+			}
+		}
+	});
+	it('renders reversal feedback and preserves the submitted reason', () => {
+		for (const success of [true, false]) {
+			const body = render(Page, {
+				props: {
+					data: data([prize('delivered')]),
+					form: {
+						form: 'reverseDelivery',
+						success,
+						message: success ? 'Prize delivery reversed.' : 'Reversal failed.',
+						values: { prizeId: 'prize-delivered', reason: 'Incorrect delivery' }
+					}
+				} as any
+			}).body;
+			expect(body).toContain(success ? 'Prize delivery reversed.' : 'Reversal failed.');
+			expect(body).toContain('Incorrect delivery');
+		}
+	});
 	it('renders state-aware configure, load, resolve, deliver and replacement actions', () => {
 		const body = render(Page, {
 			props: {

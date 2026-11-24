@@ -363,7 +363,9 @@ Possible results:
   The domain and documented state machine include audited correction from
   **pending_validation, awarded, pending_delivery, or unawarded only**, including
   an incorrect unloaded, unmatched or ineligible result. A delivered prize
-  returns 55000: `a delivered prize cannot be annulled; pending product decision`.
+  returns 55000 (the legacy SQL message still contains `pending product decision`
+  for compatibility; SAN-125 resolves that decision and the service now explains
+  that delivery must be reversed first).
   Correction requires `prize.annul`, not `prize.resolve`.
   A transaction-local marker selects the correction guard, which permits
   changing **only** status, dedicated annulment metadata and updated time.
@@ -436,27 +438,12 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
   Once frozen, snapshots remain immutable; corrections never rewrite them.
   Regenerate before freeze to capture changed resolved winners or corrections.
 
-### Known gaps and validation
-
-Review resolutions (PR #89):
-
-| Comment ID | Resolution                                                                                                                                                                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4645352319 | Dedicated admin-only `prize.annul`; only pending validation, awarded, pending delivery and unawarded may be annulled; delivered refusal, source states, audit/history and resolver-only denial tested; state machine and domain aligned.          |
-| 4645352331 | Both consolation gates require all prior excluding prizes resolved, including unloaded prizes; campaign-first serialization and real two-session generation/freeze races; a newly created pending prize between generation and freeze is covered. |
-| 4645352347 | Duplicate loading returns readable 55000 under the prize lock, including a racing second loader; TS maps the conflict.                                                                                                                            |
-| 4645352356 | Completed draws reject prize creation/editing with 55000; SAN-117 remains explicitly listed below.                                                                                                                                                |
-
-- No RPC signatures changed. The new permission is reflected in the canonical
-  catalog, seed/RLS count assertions and Phase-1 acceptance. Phase-2 checks only
-  campaign/commission permission subsets and campaign navigation flags; neither
-  changes, so its expectations need no update. Existing SAN-77 roster/Phase-11
-  flows have no unresolved prior excluding prizes and require no fixture changes.
+### Known gaps and decisions
 
 - **SAN-117:** extraordinary numbers are not released when their draw is annulled;
   this remains a separate follow-up and is not changed here.
-- **SAN-81 (pending product decision):** delivered prizes cannot be annulled.
-  The RPC explicitly refuses instead of voiding an already fulfilled award.
+- **SAN-125 decision (supersedes SAN-81's pending question):** delivered prizes
+  cannot be annulled; mistaken delivery uses a separate audited reversal.
 - **SAN-77 (inherited product question):** payment cutoff remains the inclusive
   Buenos Aires `payment_date`, not confirmation time, because payments have no
   confirmation timestamp. This task neither invents that timestamp nor changes
@@ -465,24 +452,6 @@ Review resolutions (PR #89):
   is included; the task is SQL and services. Correction replacement is explicit,
   not an automatic clone, and clients use the new prize ID. These are intentional
   boundaries, not unimplemented RPC requirements.
-- Validation on the exclusively owned local DB: a clean local reset, then
-  `supabase test db` **before integration**, passed **41 files / 2957 assertions**
-  (042 plan **177**, including real two-session races and ordinary-draw campaign
-  SHARE compatibility); `pnpm seed:admin` followed
-  by `pnpm test:integration` passed **26 files / 210 tests**. `pnpm check` reported
-  **0 errors / 0 warnings**, `pnpm lint` passed, and `pnpm test` passed **135 files /
-  1696 tests**. The eight prize integration cases also passed individually and
-  shuffled with seed 81; each creates its own campaign and mutable records.
-  Existing SAN-77 coverage caught the required update of its historical
-  consolation-refusal assertion; SAN-80's FK-index check caught the need for a
-  full draw index after replacing position uniqueness with a partial index.
-- **SAN-81 lock-follow-up validation note:** the first integration run had
-  209 passing tests and one unrelated Phase-5 search-fixture failure: its random
-  RUN_ID suffix `be8f7ada` contains `ada`, so the business fixture also matches the
-  case-insensitive `Ada <RUN_ID>` search. Database inspection confirmed the extra
-  result was `Business 20261120172700-be8f7ada`, not a roster side effect.
-  An unchanged full-suite rerun passed all 210 tests. That pre-existing fixture
-  flake is outside this SQL lock follow-up and remains unfixed.
 
 ## Implemented in SAN-82
 
@@ -508,5 +477,34 @@ Review resolutions (PR #89):
   (`draw.view`, `draw.load_winner`, or a prize action). A bond/buyer reader without one sees an
   explicit permission message rather than causing an RLS query failure.
 - Known gaps are unchanged: **SAN-117** extraordinary-number release remains out of scope, and
-  **SAN-81** still forbids annulment of delivered prizes pending a product decision. No new
-  integration test or database change was required by this UI-only phase.
+  **SAN-81** forbids annulment of delivered prizes (now decided by SAN-125).
+
+## SAN-125 — audited delivery reversal
+
+- New RPC `prize_reverse_delivery(p_prize_id uuid, p_reason text, p_request_id text default null)`
+  returns void; service `reversePrizeDelivery` and winners action `reverseDelivery`
+  use the dedicated `prize.reverse_delivery` permission, seeded only to admin.
+  Authorization checks permission codes, never role names. The reason is trimmed,
+  mandatory and limited to 1000 Unicode code points in SQL and Zod.
+- Decision: use an append-only `prize_delivery_reversals` table rather than single
+  reversal columns, so multiple deliver/reverse cycles preserve **every** original
+  `delivered_at`, `delivered_by`, delivery notes and full award snapshot. The award
+  returns to `awarded` with its original resolution notes (from the resolution audit)
+  and the prize to `pending_delivery`. No winner, roster, party or award identity changes.
+- The RPC atomically archives the delivery, changes both statuses and records
+  `prize.reverse_delivery` with before/after snapshots, actor, reason and request id.
+  No financial movement is needed. Non-delivered or repeated reversals fail with
+  55000 without writes; authorization fails with 42501 before state/validation.
+- Locking is unchanged: `prize_lock` acquires campaign → draw → prize → winning
+  numbers → awards. Racing reversals serialize; the loser rechecks state without
+  a history or audit write.
+- No certificate RPC/route contract change is needed: the current award's delivery
+  fields are cleared, and the existing route requires **both** prize and award to
+  be delivered. Reversed prizes cannot issue a delivery certificate; redelivery
+  issues one for the new current delivery. Previously printed paper cannot be recalled.
+- The winners form appears only for delivered prizes with the new permission,
+  preserves failed input, and uses a required reason textarea without native maxlength.
+- Known inherited gaps: **SAN-117** extraordinary-number release on draw annulment;
+  **SAN-77** payment cutoff is inclusive Buenos Aires payment date, not a missing
+  confirmation timestamp. The former **SAN-81** delivered-annulment product gap
+  is resolved by **SAN-125**, not silently waived.
