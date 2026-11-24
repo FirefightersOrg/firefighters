@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(153);
+select plan(154);
 insert into auth.users(id,email)
 select ('a6380000-0000-0000-0000-00000000000'||n)::uuid,'roster-'||n||'@example.com' from generate_series(1,2)n;
 insert into public.profiles(id,auth_user_id,full_name,email,status)
@@ -118,6 +118,8 @@ select throws_ok($$select public.draw_generate_roster(pg_temp.id('monthly'),'038
 create temp table freeze_before as select to_jsonb(r) as row from public.draw_rosters r where r.draw_id=pg_temp.id('monthly') and r.status='frozen';
 select lives_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-freeze-twice')$$,'repeated freeze is an idempotent no-op');
 select is((select to_jsonb(r) from public.draw_rosters r where r.draw_id=pg_temp.id('monthly') and r.status='frozen'),(select row from freeze_before),'repeated freeze leaves the frozen roster identical');
+-- SAN-119: the repeated freeze writes no audit row (only the first freeze is audited).
+select is((select count(*)::int from public.audit_log where request_id='038-freeze-twice'),0,'repeated freeze writes no audit row');
 reset role;
 create temp table frozen_before as select * from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-monthly');
 update public.payments set status='confirmed' where id=pg_temp.id('pay3');
@@ -145,7 +147,7 @@ select ok(not has_function_privilege('authenticated','public.draw_payment_before
 insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind)
 select pg_temp.id('c'),pg_temp.id('bond5'),v,'extraordinary'
 from generate_series(0,9999)v where not exists (
-  select 1 from public.bond_numbers where campaign_id=pg_temp.id('c') and number_value=v);
+  select 1 from public.bond_numbers where campaign_id=pg_temp.id('c') and number_value=v and released_at is null);
 set local role authenticated;
 select throws_ok($$select public.draw_generate_roster(pg_temp.id('extra'),'038-exhaustion')$$,'55000','not enough free campaign numbers','exhaustion refused atomically after newly eligible bond');
 reset role;

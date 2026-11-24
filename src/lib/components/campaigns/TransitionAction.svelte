@@ -1,19 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { Button, Dialog, Field, Textarea } from '$lib/components/ui';
 	import { CAMPAIGN_REASON_MAX_LENGTH } from '$lib/schemas/campaign';
 	import type { CampaignTransitionTarget } from '$lib/domain/campaigns';
-	import {
-		dangerButtonClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from './styles';
 
 	/**
-	 * A status-change button with a confirmation dialog. The dialog is an HTML popover
-	 * (`popovertarget`), so it opens without JavaScript; with JavaScript the form is enhanced.
-	 * Posts `toStatus` and `reason` to the page's `?/transition` action. Every transition takes a
+	 * A status-change button with a confirmation `Dialog`. Posts `toStatus` and `reason` to the
+	 * page's `?/transition` action (enhanced when JavaScript is on). Every transition takes a
 	 * reason (stored in the audit log); only annulment requires one.
 	 */
 	let {
@@ -27,112 +20,104 @@
 
 	const CONFIG: Record<
 		CampaignTransitionTarget,
-		{ label: string; title: string; body: string; confirm: string; tone: string }
+		{
+			label: string;
+			title: string;
+			body: string;
+			confirm: string;
+			tone: 'default' | 'danger';
+			primary: boolean;
+		}
 	> = {
 		active: {
-			label: 'Activate',
-			title: 'Activate this campaign?',
+			label: 'Activar',
+			title: '¿Activar esta campaña?',
 			body:
-				'Activation freezes the rules: numbering, installments, bond value, overflow policy and ' +
-				'barcode mode can no longer be changed. Name and dates stay editable.',
-			confirm: 'Activate campaign',
-			tone: primaryButtonClass
+				'La activación congela las reglas: la numeración, las cuotas, el valor del bono, la ' +
+				'política de desborde y el modo de código de barras ya no se pueden cambiar. El nombre y ' +
+				'las fechas siguen siendo editables.',
+			confirm: 'Activar campaña',
+			tone: 'default',
+			primary: true
 		},
 		closing: {
-			label: 'Start closing',
-			title: 'Move this campaign to closing?',
-			body: 'Dates become read-only and the campaign can only be closed afterwards. This cannot be undone.',
-			confirm: 'Start closing',
-			tone: secondaryButtonClass
+			label: 'Iniciar cierre',
+			title: '¿Pasar esta campaña a cierre?',
+			body: 'Las fechas pasan a solo lectura y después la campaña solo se puede cerrar. No se puede deshacer.',
+			confirm: 'Iniciar cierre',
+			tone: 'default',
+			primary: false
 		},
 		closed: {
-			label: 'Close campaign',
-			title: 'Close this campaign?',
-			body: 'A closed campaign is read-only and allows no further operations. This cannot be undone.',
-			confirm: 'Close campaign',
-			tone: secondaryButtonClass
+			label: 'Cerrar campaña',
+			title: '¿Cerrar esta campaña?',
+			body: 'Una campaña cerrada es de solo lectura y no admite más operaciones. No se puede deshacer.',
+			confirm: 'Cerrar campaña',
+			tone: 'default',
+			primary: false
 		},
 		annulled: {
-			label: 'Annul',
-			title: 'Annul this campaign?',
-			body: 'The campaign is kept for the record but can no longer be used. This cannot be undone.',
-			confirm: 'Annul campaign',
-			tone: dangerButtonClass
+			label: 'Anular',
+			title: '¿Anular esta campaña?',
+			body: 'La campaña se conserva como registro, pero ya no se puede usar. No se puede deshacer.',
+			confirm: 'Anular campaña',
+			tone: 'danger',
+			primary: false
 		}
 	};
 
 	const config = $derived(CONFIG[toStatus]);
 	const popoverId = $derived(`confirm-${toStatus}`);
 	const reasonRequired = $derived(toStatus === 'annulled');
-	let popover = $state<HTMLElement>();
+	let open = $state(false);
 	let submitting = $state(false);
 </script>
 
 <div>
-	<button
-		type="button"
-		popovertarget={popoverId}
+	<Button
+		variant={config.primary ? 'primary' : 'secondary'}
 		disabled={!!blockedReason}
 		aria-describedby={blockedReason ? `${popoverId}-blocked` : undefined}
-		class={config.tone}
+		onclick={() => (open = true)}
 	>
 		{config.label}
-	</button>
+	</Button>
 	{#if blockedReason}
-		<p id="{popoverId}-blocked" class="mt-1 text-xs text-slate-500">{blockedReason}</p>
+		<p id="{popoverId}-blocked" class="m-0 mt-1 max-w-prose text-body-sm text-muted">
+			{blockedReason}
+		</p>
 	{/if}
 </div>
 
-<div
-	id={popoverId}
-	popover="auto"
-	bind:this={popover}
-	role="dialog"
-	aria-labelledby="{popoverId}-title"
-	class="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-900/40"
->
-	<h3 id="{popoverId}-title" class="text-lg font-semibold">{config.title}</h3>
-	<p class="mt-2 text-sm text-slate-600">{config.body}</p>
-
-	<form
-		method="POST"
-		action="?/transition"
-		class="mt-4 space-y-4"
-		use:enhance={() => {
+<Dialog
+	{open}
+	onClose={() => (open = false)}
+	title={config.title}
+	description={config.body}
+	confirmLabel={config.confirm}
+	tone={config.tone}
+	loading={submitting}
+	action="?/transition"
+	enhance={(form) =>
+		enhance(form, () => {
 			submitting = true;
 			return async ({ update }) => {
 				try {
-					popover?.hidePopover();
+					open = false;
 					await update();
 				} finally {
 					submitting = false;
 				}
 			};
-		}}
+		})}
+>
+	<input type="hidden" name="toStatus" value={toStatus} />
+	<Field
+		label="Motivo"
+		id="{popoverId}-reason"
+		optional={!reasonRequired}
+		required={reasonRequired}
 	>
-		<input type="hidden" name="toStatus" value={toStatus} />
-		<div>
-			<label for="{popoverId}-reason" class={labelClass}>
-				Reason ({reasonRequired ? 'required' : 'optional'})
-			</label>
-			<textarea
-				id="{popoverId}-reason"
-				name="reason"
-				required={reasonRequired}
-				rows="3"
-				maxlength={CAMPAIGN_REASON_MAX_LENGTH}
-				class={inputClass}></textarea>
-		</div>
-		<div class="flex flex-wrap justify-end gap-2">
-			<button
-				type="button"
-				popovertarget={popoverId}
-				popovertargetaction="hide"
-				class={secondaryButtonClass}
-			>
-				Cancel
-			</button>
-			<button type="submit" disabled={submitting} class={config.tone}>{config.confirm}</button>
-		</div>
-	</form>
-</div>
+		<Textarea name="reason" rows={3} maxlength={CAMPAIGN_REASON_MAX_LENGTH} />
+	</Field>
+</Dialog>

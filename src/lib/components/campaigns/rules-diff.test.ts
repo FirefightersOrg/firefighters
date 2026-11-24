@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Campaign } from '$lib/domain/campaigns';
+import { formatMoney } from '$lib/format';
 import { diffCampaignRules } from './rules-diff';
 import { rulesValuesOf, type CampaignRulesValues } from './types';
 
-const NBSP = ' ';
+const money = (value: string) => formatMoney(value);
 
 const campaign: Campaign = {
 	id: 'f0000000-0000-0000-0000-000000000001',
@@ -64,25 +65,25 @@ describe('diffCampaignRules', () => {
 		).toEqual([
 			{
 				field: 'simpleBondValue',
-				label: 'Simple bond value',
-				from: `$${NBSP}60.000,00`,
-				to: `$${NBSP}72.000,00`
+				label: 'Valor del bono simple',
+				from: money('60000.00'),
+				to: money('72000.00')
 			},
-			{ field: 'installmentCount', label: 'Number of installments', from: '10', to: '12' },
+			{ field: 'installmentCount', label: 'Cantidad de cuotas', from: '10', to: '12' },
 			// 72.000 / 12 = 6.000: unchanged, so not listed.
-			{ field: 'numberDigits', label: 'Number of digits', from: '4', to: '5' },
-			{ field: 'maxNumber', label: 'Maximum number', from: '9999', to: '99999' },
+			{ field: 'numberDigits', label: 'Cantidad de dígitos', from: '4', to: '5' },
+			{ field: 'maxNumber', label: 'Número máximo', from: '9999', to: '99999' },
 			{
 				field: 'associatedNumberOffset',
-				label: 'Associated number offset',
+				label: 'Desfase del número asociado',
 				from: '4871',
 				to: '10000'
 			},
 			{
 				field: 'barcodeMode',
-				label: 'Barcode mode',
-				from: 'Barcode is the base number',
-				to: 'Internal code'
+				label: 'Modo de código de barras',
+				from: 'El código de barras es el número base',
+				to: 'Código interno'
 			}
 		]);
 	});
@@ -100,8 +101,8 @@ describe('diffCampaignRules', () => {
 			)
 		).toContainEqual({
 			field: 'barcodePattern',
-			label: 'Barcode pattern',
-			from: '(empty)',
+			label: 'Patrón del código de barras',
+			from: '(vacío)',
 			to: '^X(\\d+)'
 		});
 		expect(
@@ -111,21 +112,21 @@ describe('diffCampaignRules', () => {
 			})
 		).toContainEqual({
 			field: 'barcodePattern',
-			label: 'Barcode pattern',
+			label: 'Patrón del código de barras',
 			from: '^BC-(\\d+)$',
-			to: '(empty)'
+			to: '(vacío)'
 		});
 		expect(diffCampaignRules(withPattern, rulesValuesOf(withPattern))).toEqual([]);
 	});
 
 	it('includes the calculated installment value when it changes', () => {
 		expect(diffCampaignRules(campaign, values({ installmentCount: '12' }))).toEqual([
-			{ field: 'installmentCount', label: 'Number of installments', from: '10', to: '12' },
+			{ field: 'installmentCount', label: 'Cantidad de cuotas', from: '10', to: '12' },
 			{
 				field: 'installmentValue',
-				label: 'Installment value (calculated)',
-				from: `$${NBSP}6.000,00`,
-				to: `$${NBSP}5.000,00`
+				label: 'Valor de la cuota (calculado)',
+				from: money('6000.00'),
+				to: money('5000.00')
 			}
 		]);
 	});
@@ -139,12 +140,17 @@ describe('diffCampaignRules', () => {
 		).toEqual([
 			{
 				field: 'simpleBondValue',
-				label: 'Simple bond value',
-				from: `$${NBSP}60.000,00`,
-				to: '60,000 (invalid)'
+				label: 'Valor del bono simple',
+				from: money('60000.00'),
+				to: '60,000 (inválido)'
 			},
-			{ field: 'installmentCount', label: 'Number of installments', from: '10', to: '(empty)' },
-			{ field: 'overflowPolicy', label: 'Overflow policy', from: 'reject', to: 'wrap' }
+			{ field: 'installmentCount', label: 'Cantidad de cuotas', from: '10', to: '(vacío)' },
+			{
+				field: 'overflowPolicy',
+				label: 'Política de desborde',
+				from: 'Rechazar (bloquea los números cuyo número asociado supera el máximo)',
+				to: 'wrap'
+			}
 		]);
 	});
 });

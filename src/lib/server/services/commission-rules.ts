@@ -58,48 +58,49 @@ interface PostgrestLikeError {
 }
 
 export const COMMISSION_RULE_MESSAGES = {
-	permission: 'You do not have permission to manage commission rules.',
-	ruleNotFound: 'Commission rule not found. It may have been removed from this campaign.',
-	campaignNotFound: 'Campaign not found.',
-	internal: 'Something went wrong. Please try again.',
-	invalid: 'Some values are invalid. Please review the form.',
+	permission: 'No hay permiso para gestionar reglas de comisión.',
+	ruleNotFound: 'No se encontró la regla de comisión. Puede haberse quitado de esta campaña.',
+	campaignNotFound: 'No se encontró la campaña.',
+	internal: 'Algo salió mal. Volver a intentar.',
+	invalid: 'Hay valores no válidos. Revisar el formulario.',
 	overlap:
-		'This rule overlaps an existing active rule of the same type in this campaign. ' +
-		'Change the dates, or end or annul the other rule first.',
-	campaignLocked: 'Commission rules can only be changed while the campaign is a draft or active.',
-	annulled: 'This rule was annulled and can no longer be changed.',
-	alreadyAnnulled: 'This rule is already annulled.',
-	reasonRequired: 'A reason is required to annul a commission rule.',
+		'Esta regla se superpone con una regla activa del mismo tipo en esta campaña. ' +
+		'Cambiar las fechas, o terminar o anular antes la otra regla.',
+	campaignLocked:
+		'Las reglas de comisión solo se pueden cambiar mientras la campaña es un borrador o está activa.',
+	annulled: 'Esta regla fue anulada y ya no se puede cambiar.',
+	alreadyAnnulled: 'Esta regla ya está anulada.',
+	reasonRequired: 'Se requiere un motivo para anular una regla de comisión.',
 	staleVersion:
-		'This commission rule was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.'
+		'Otra persona modificó esta regla de comisión mientras se editaba. Recargar la página para ver los últimos cambios y volver a hacer la edición.'
 } as const;
 
 /** Friendly messages for the table CHECK constraints (backstops of the function checks). */
 const CONSTRAINT_MESSAGES: Record<string, { field?: CommissionRuleFormField; message: string }> = {
-	commission_rules_rule_type_check: { field: 'ruleType', message: 'Unknown rule type.' },
+	commission_rules_rule_type_check: { field: 'ruleType', message: 'Tipo de regla desconocido.' },
 	commission_rules_one_value: {
 		field: 'valueKind',
-		message: 'Enter either a percentage or a fixed amount.'
+		message: 'Ingresar un porcentaje o un monto fijo, no ambos.'
 	},
 	commission_rules_percentage_range: {
 		field: 'percentage',
-		message: 'Percentage must be greater than 0 and at most 100.'
+		message: 'El porcentaje debe ser mayor que 0 y hasta 100.'
 	},
 	commission_rules_fixed_amount_positive: {
 		field: 'fixedAmount',
-		message: 'Fixed amount must be greater than 0.'
+		message: 'El monto fijo debe ser mayor que 0.'
 	},
 	commission_rules_installment_number_custom: {
 		field: 'installmentNumber',
-		message: 'Installment number is only used (and required) for a specific installment rule.'
+		message: 'El número de cuota solo se usa (y es obligatorio) en una regla de cuota específica.'
 	},
 	commission_rules_annul_reason_max_length: {
 		field: 'reason',
-		message: `Reason must be at most ${COMMISSION_REASON_MAX_LENGTH} characters.`
+		message: `El motivo admite hasta ${COMMISSION_REASON_MAX_LENGTH} caracteres.`
 	},
 	commission_rules_validity_order: {
 		field: 'validTo',
-		message: 'Valid to must be on or after the valid from date.'
+		message: 'La fecha de fin de vigencia debe ser igual o posterior a la de inicio.'
 	}
 };
 
@@ -133,30 +134,34 @@ export function mapCommissionRuleRpcError(
 			if (range) {
 				return err(
 					'validation',
-					`Installment number must be between 1 and ${range[1]}.`,
+					`El número de cuota debe estar entre 1 y ${range[1]}.`,
 					'installmentNumber'
 				);
 			}
 			if (message.startsWith('installment number')) {
-				return err('validation', `${capitalize(message)}.`, 'installmentNumber');
+				return err('validation', 'El número de cuota no es válido.', 'installmentNumber');
 			}
 			if (message.startsWith('percentage')) {
-				return err('validation', `${capitalize(message)}.`, 'percentage');
+				return err('validation', 'El porcentaje no es válido.', 'percentage');
 			}
 			if (message.startsWith('fixed amount')) {
-				return err('validation', `${capitalize(message)}.`, 'fixedAmount');
+				return err('validation', 'El monto fijo no es válido.', 'fixedAmount');
 			}
 			if (message.startsWith('exactly one of percentage or fixed amount')) {
-				return err('validation', 'Enter either a percentage or a fixed amount.', 'valueKind');
+				return err('validation', 'Ingresar un porcentaje o un monto fijo, no ambos.', 'valueKind');
 			}
 			if (message.startsWith('invalid commission rule type')) {
-				return err('validation', 'Unknown rule type.', 'ruleType');
+				return err('validation', 'Tipo de regla desconocido.', 'ruleType');
 			}
 			if (message === 'valid from date is required') {
-				return err('validation', 'Valid from is required.', 'validFrom');
+				return err('validation', 'La fecha de inicio de vigencia es obligatoria.', 'validFrom');
 			}
 			if (message.startsWith('valid to date')) {
-				return err('validation', 'Valid to must be on or after the valid from date.', 'validTo');
+				return err(
+					'validation',
+					'La fecha de fin de vigencia debe ser igual o posterior a la de inicio.',
+					'validTo'
+				);
 			}
 			if (message.startsWith('a reason is required')) {
 				return err('validation', COMMISSION_RULE_MESSAGES.reasonRequired, 'reason');
@@ -177,7 +182,7 @@ export function mapCommissionRuleRpcError(
 			if (exceeds) {
 				return err(
 					'validation',
-					`Installment number must be between 1 and ${exceeds[1]}.`,
+					`El número de cuota debe estar entre 1 y ${exceeds[1]}.`,
 					'installmentNumber'
 				);
 			}
@@ -194,13 +199,13 @@ export function mapCommissionRuleRpcError(
 			if (message.includes('while the campaign is draft or active')) {
 				return err('conflict', COMMISSION_RULE_MESSAGES.campaignLocked);
 			}
-			return err('conflict', 'This change is not allowed in the current state.');
+			return err('conflict', 'Este cambio no está permitido en el estado actual.');
 
 		case '23502':
-			return err('validation', 'A required value is missing.');
+			return err('validation', 'Falta un valor obligatorio.');
 
 		case '22003':
-			return err('validation', 'A value is too large.');
+			return err('validation', 'Un valor es demasiado grande.');
 
 		case '22P02':
 		case '22007':
@@ -210,10 +215,6 @@ export function mapCommissionRuleRpcError(
 		default:
 			return err('internal', COMMISSION_RULE_MESSAGES.internal);
 	}
-}
-
-function capitalize(text: string): string {
-	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export interface CommissionRuleRequestContext {

@@ -26,8 +26,9 @@ export interface SettlementPrintSource {
 		commission: string;
 		commissionPaid: string;
 		net: string;
-		balance: string;
+		balance: string | null;
 	};
+	balanceSnapshotMissing?: boolean;
 	payments: SettlementPrintPayment[];
 }
 export interface PrintableSettlementDeliveryNote extends SettlementPrintSource {
@@ -42,7 +43,8 @@ export interface PrintableSettlementDeliveryNote extends SettlementPrintSource {
 	administrationSignature: string;
 }
 const date = (value: string | null) => formatDateTime(value);
-const money = (value: string) => formatMoney(value, { decimals: 'always' });
+const money = (value: string | null) =>
+	value == null ? '—' : formatMoney(value, { decimals: 'always' });
 /** Builds all 20 fields mandated for a settlement delivery note. Open settlements are explicitly preliminary. */
 export function buildPrintableSettlementDeliveryNote(
 	campaign: Campaign,
@@ -60,6 +62,7 @@ export function buildPrintableSettlementDeliveryNote(
 		manualAdjustments: '0 — No se registraron ajustes manuales.',
 		collectorSignature: 'Firma del cobrador',
 		administrationSignature: 'Firma de la administración',
+		balanceSnapshotMissing: source.balanceSnapshotMissing ?? false,
 		totals: Object.fromEntries(
 			Object.entries(source.totals).map(([key, value]) => [key, money(value)])
 		) as SettlementPrintSource['totals'],

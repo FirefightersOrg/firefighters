@@ -41,7 +41,7 @@ function runAction(
 const VERSION = '2026-11-16T12:00:00.123456+00:00';
 const STALE_ERROR = { code: 'PT409', message: 'campaign was modified by someone else' };
 const STALE_MESSAGE =
-	'This campaign was changed by someone else while you were editing it. Reload the page to see the latest changes, then make your edit again.';
+	'Otra persona modificó esta campaña mientras se editaba. Recargar la página para ver los últimos cambios y volver a hacer la edición.';
 
 const rulesForm = {
 	simpleBondValue: '60.000,00',
@@ -306,7 +306,7 @@ describe('/campaigns/[id]', () => {
 			await expect(runAction('update', makeLocals({ supabase }), fields)).resolves.toEqual({
 				form: 'general',
 				success: true,
-				message: 'Changes saved.',
+				message: 'Cambios guardados.',
 				errors: {}
 			});
 			expect(rpc).toHaveBeenCalledWith('campaign_update', {
@@ -321,7 +321,7 @@ describe('/campaigns/[id]', () => {
 			rpc.mockResolvedValueOnce({ data: false, error: null });
 			await expect(runAction('update', makeLocals({ supabase }), fields)).resolves.toMatchObject({
 				success: true,
-				message: 'No changes to save.'
+				message: 'No hay cambios para guardar.'
 			});
 		});
 
@@ -359,7 +359,7 @@ describe('/campaigns/[id]', () => {
 			})) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
-				endsOn: ['End date must be on or after the start date']
+				endsOn: ['La fecha de fin debe ser igual o posterior a la fecha de inicio']
 			});
 		});
 
@@ -376,7 +376,7 @@ describe('/campaigns/[id]', () => {
 			const result = (await runAction('update', makeLocals({ supabase }), fields)) as ActionFailure;
 			expect(result.status).toBe(409);
 			expect(result.data.message).toBe(
-				'The name of a closed or annulled campaign cannot be changed.'
+				'El nombre de una campaña cerrada o anulada no se puede cambiar.'
 			);
 		});
 
@@ -415,7 +415,7 @@ describe('/campaigns/[id]', () => {
 				)) as ActionFailure;
 				expect(result.status).toBe(400);
 				expect(result.data.message).toBe(
-					'This form is out of date. Reload the page and try again.'
+					'El formulario está desactualizado. Recargar la página y volver a intentar.'
 				);
 				expect(rpc).not.toHaveBeenCalled();
 			}
@@ -448,7 +448,7 @@ describe('/campaigns/[id]', () => {
 			await expect(runAction('rules', makeLocals({ supabase }), rulesForm)).resolves.toMatchObject({
 				form: 'rules',
 				success: true,
-				message: 'Rules saved.'
+				message: 'Reglas guardadas.'
 			});
 			expect(rpc).toHaveBeenCalledWith('campaign_update_rules', {
 				p_id: CAMPAIGN_ID,
@@ -489,7 +489,7 @@ describe('/campaigns/[id]', () => {
 			})) as ActionFailure;
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
-				changeReason: ['Reason must be at most 500 characters']
+				changeReason: ['El motivo admite hasta 500 caracteres']
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -507,7 +507,7 @@ describe('/campaigns/[id]', () => {
 				)) as ActionFailure;
 				expect(result.status).toBe(400);
 				expect(result.data.errors).toEqual({
-					confirmRulesChange: ['Confirm that you reviewed the rule changes']
+					confirmRulesChange: ['Confirmar que se revisaron los cambios en las reglas']
 				});
 				// Submitted values come back so the form (and its change summary) can be refilled.
 				expect(result.data.values).toMatchObject({ simpleBondValue: '60.000,00' });
@@ -523,7 +523,7 @@ describe('/campaigns/[id]', () => {
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
 				simpleBondValue: [
-					'Enter an amount like 60.000 or 60.000,50 (dots for thousands, comma for up to 2 decimals)'
+					'Ingresar un monto como 60.000 o 60.000,50 (puntos para los miles, coma para hasta 2 decimales)'
 				]
 			});
 		});
@@ -571,7 +571,9 @@ describe('/campaigns/[id]', () => {
 				rulesForm
 			)) as ActionFailure;
 			expect(result.status).toBe(409);
-			expect(result.data.message).toMatch(/only be changed while the campaign is a draft/);
+			expect(result.data.message).toMatch(
+				/solo se pueden cambiar mientras la campaña es un borrador/
+			);
 		});
 
 		it('maps "rules frozen by bonds" (draft with bonds) to 409 with the reason', async () => {
@@ -593,7 +595,7 @@ describe('/campaigns/[id]', () => {
 			expect(result.data).toMatchObject({
 				form: 'rules',
 				message:
-					'Rules can no longer be changed: this campaign already has bonds, and their numbers and values depend on the rules.'
+					'Las reglas ya no se pueden cambiar: esta campaña ya tiene bonos y sus números y valores dependen de las reglas.'
 			});
 		});
 	});
@@ -628,7 +630,9 @@ describe('/campaigns/[id]', () => {
 				reason: '   '
 			})) as ActionFailure;
 			expect(result.status).toBe(400);
-			expect(result.data.errors).toEqual({ reason: ['A reason is required to annul a campaign'] });
+			expect(result.data.errors).toEqual({
+				reason: ['Se requiere un motivo para anular una campaña']
+			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
@@ -662,7 +666,7 @@ describe('/campaigns/[id]', () => {
 			).resolves.toEqual({
 				form: 'transition',
 				success: true,
-				message: 'Campaign annulled.',
+				message: 'Campaña anulada.',
 				errors: {}
 			});
 			expect(rpc).toHaveBeenCalledWith('campaign_transition', {
@@ -674,9 +678,9 @@ describe('/campaigns/[id]', () => {
 		});
 
 		it.each([
-			['active', 'Campaign activated. Its rules are now frozen.'],
-			['closing', 'Campaign moved to closing.'],
-			['closed', 'Campaign closed.']
+			['active', 'Campaña activada. Sus reglas quedaron congeladas.'],
+			['closing', 'La campaña pasó a cierre.'],
+			['closed', 'Campaña cerrada.']
 		])('passes an optional reason through for %s', async (toStatus, message) => {
 			const { supabase, rpc } = mockSupabase();
 			await expect(
@@ -718,7 +722,7 @@ describe('/campaigns/[id]', () => {
 			})) as ActionFailure;
 			expect(result.status).toBe(409);
 			expect(result.data.message).toBe(
-				'Set both the start and end dates before activating the campaign.'
+				'Definir las fechas de inicio y de fin antes de activar la campaña.'
 			);
 		});
 

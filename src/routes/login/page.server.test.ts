@@ -5,8 +5,9 @@ import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfile } from '../../app';
 
 const activeProfile = { id: 'p-1', status: 'active' } as UserProfile;
-const NOT_ACTIVE = 'Your account is not active. Please contact an administrator.';
-const SERVICE_UNAVAILABLE = 'The sign-in service is temporarily unavailable. Please try again.';
+const NOT_ACTIVE = 'La cuenta no está activa. Contactar a un administrador.';
+const SERVICE_UNAVAILABLE =
+	'El servicio de inicio de sesión no está disponible por el momento. Volver a intentar.';
 
 type FailResult = { status: number; data: Record<string, unknown> };
 
@@ -186,7 +187,7 @@ describe('/login +page.server', () => {
 			const result = (await actions.default(event)) as FailResult;
 			expect(result.status).toBe(400);
 			expect(result.data.email).toBe('invalid-email');
-			expect(result.data.message).toBe('Please provide a valid email and password');
+			expect(result.data.message).toBe('Ingresar un correo electrónico y una contraseña válidos');
 			expect(result.data.errors).toBeDefined();
 		});
 
@@ -209,7 +210,7 @@ describe('/login +page.server', () => {
 			const result = (await actions.default(event)) as FailResult;
 			expect(result.status).toBe(400);
 			expect(result.data.email).toBe('user@firefighters.local');
-			expect(result.data.message).toBe('Invalid email or password');
+			expect(result.data.message).toBe('Correo electrónico o contraseña incorrectos');
 			expect(signOutMock).not.toHaveBeenCalled();
 		});
 
@@ -294,7 +295,9 @@ describe('/login +page.server', () => {
 
 			const result = (await actions.default(event)) as FailResult;
 			expect(result.status).toBe(503);
-			expect(result.data.message).toBe('Unable to verify account status. Please try again.');
+			expect(result.data.message).toBe(
+				'No se pudo verificar el estado de la cuenta. Volver a intentar.'
+			);
 			expect(signOutMock).toHaveBeenCalledTimes(1);
 		});
 

@@ -1,11 +1,14 @@
 import {
-	BARCODE_MODE_LABELS,
+	BARCODE_MODE_LABELS_ES,
+	OVERFLOW_POLICY_LABELS,
 	barcodeModeUsesPattern,
 	type BarcodeMode,
 	type Campaign
 } from '$lib/domain/campaigns';
 import { previewInstallmentValue } from '$lib/domain/installments';
-import { formatCents, formatMoney, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
+import { centsToDecimalString, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
+import type { OverflowPolicy } from '$lib/domain/numbering';
+import { formatMoney } from '$lib/format';
 import type { CampaignRulesValues } from './types';
 
 /** One rule that differs between the saved campaign and the form, formatted for display. */
@@ -16,10 +19,10 @@ export interface RuleChange {
 	to: string;
 }
 
-const EMPTY = '(empty)';
+const EMPTY = '(vacío)';
 
 function invalid(raw: string): string {
-	return raw.trim() === '' ? EMPTY : `${raw.trim()} (invalid)`;
+	return raw.trim() === '' ? EMPTY : `${raw.trim()} (inválido)`;
 }
 
 function parseWhole(raw: string): number | null {
@@ -28,7 +31,7 @@ function parseWhole(raw: string): number | null {
 }
 
 function barcodeLabel(mode: string): string {
-	return BARCODE_MODE_LABELS[mode as BarcodeMode] ?? (mode.trim() === '' ? EMPTY : mode);
+	return BARCODE_MODE_LABELS_ES[mode as BarcodeMode] ?? (mode.trim() === '' ? EMPTY : mode);
 }
 
 /**
@@ -45,9 +48,12 @@ export function diffCampaignRules(campaign: Campaign, values: CampaignRulesValue
 	if (typedCents !== savedCents) {
 		changes.push({
 			field: 'simpleBondValue',
-			label: 'Simple bond value',
+			label: 'Valor del bono simple',
 			from: formatMoney(campaign.simpleBondValue),
-			to: typedCents === null ? invalid(values.simpleBondValue) : formatCents(typedCents)
+			to:
+				typedCents === null
+					? invalid(values.simpleBondValue)
+					: formatMoney(centsToDecimalString(typedCents))
 		});
 	}
 
@@ -67,35 +73,41 @@ export function diffCampaignRules(campaign: Campaign, values: CampaignRulesValue
 		}
 	};
 
-	pushWhole('installmentCount', 'Number of installments', campaign.installmentCount);
+	pushWhole('installmentCount', 'Cantidad de cuotas', campaign.installmentCount);
 
 	const installment = previewInstallmentValue(values.simpleBondValue, values.installmentCount);
 	if (installment.state === 'ok' && installment.installmentValue !== campaign.installmentValue) {
 		changes.push({
 			field: 'installmentValue',
-			label: 'Installment value (calculated)',
+			label: 'Valor de la cuota (calculado)',
 			from: formatMoney(campaign.installmentValue),
 			to: formatMoney(installment.installmentValue)
 		});
 	}
 
-	pushWhole('numberDigits', 'Number of digits', campaign.numberDigits);
-	pushWhole('maxNumber', 'Maximum number', campaign.maxNumber);
-	pushWhole('associatedNumberOffset', 'Associated number offset', campaign.associatedNumberOffset);
+	pushWhole('numberDigits', 'Cantidad de dígitos', campaign.numberDigits);
+	pushWhole('maxNumber', 'Número máximo', campaign.maxNumber);
+	pushWhole(
+		'associatedNumberOffset',
+		'Desfase del número asociado',
+		campaign.associatedNumberOffset
+	);
 
 	if (values.overflowPolicy.trim() !== campaign.overflowPolicy) {
 		changes.push({
 			field: 'overflowPolicy',
-			label: 'Overflow policy',
-			from: campaign.overflowPolicy,
-			to: values.overflowPolicy.trim() || EMPTY
+			label: 'Política de desborde',
+			from: OVERFLOW_POLICY_LABELS[campaign.overflowPolicy] ?? campaign.overflowPolicy,
+			to:
+				OVERFLOW_POLICY_LABELS[values.overflowPolicy.trim() as OverflowPolicy] ??
+				(values.overflowPolicy.trim() || EMPTY)
 		});
 	}
 
 	if (values.barcodeMode !== campaign.barcodeMode) {
 		changes.push({
 			field: 'barcodeMode',
-			label: 'Barcode mode',
+			label: 'Modo de código de barras',
 			from: barcodeLabel(campaign.barcodeMode),
 			to: barcodeLabel(values.barcodeMode)
 		});
@@ -106,7 +118,7 @@ export function diffCampaignRules(campaign: Campaign, values: CampaignRulesValue
 	if (pattern !== (campaign.barcodePattern ?? '')) {
 		changes.push({
 			field: 'barcodePattern',
-			label: 'Barcode pattern',
+			label: 'Patrón del código de barras',
 			from: campaign.barcodePattern ?? EMPTY,
 			to: pattern || EMPTY
 		});

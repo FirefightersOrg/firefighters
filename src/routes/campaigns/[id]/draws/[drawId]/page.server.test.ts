@@ -8,7 +8,8 @@ vi.mock('$lib/server/repositories/draws', () => ({
 vi.mock('$lib/server/services/draws', async (original) => ({
 	...(await original<any>()),
 	updateDraw: vi.fn(),
-	annulDraw: vi.fn()
+	annulDraw: vi.fn(),
+	completeDraw: vi.fn()
 }));
 vi.mock('$lib/server/services/draw-rosters', async (original) => ({
 	...(await original<any>()),
@@ -18,7 +19,7 @@ vi.mock('$lib/server/services/draw-rosters', async (original) => ({
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
-import { annulDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
+import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
@@ -58,6 +59,47 @@ beforeEach(() => {
 	vi.mocked(getCurrentDrawRoster).mockResolvedValue({ data: null, error: null });
 });
 describe('draw detail', () => {
+	it('draw.update permits editing but not annulment or completion', async () => {
+		const loaded = (await load({
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.update'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never)) as any;
+		expect(loaded.can).toMatchObject({ edit: true, annul: false, complete: false });
+		expect(
+			await run('annul', ['campaign.view', 'draw.update'], { reason: 'Reason' })
+		).toMatchObject({ status: 403 });
+		expect(annulDraw).not.toHaveBeenCalled();
+	});
+	it('offers annulment to draw.annul without edit permission', async () => {
+		const loaded = (await load({
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.view', 'draw.annul'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never)) as any;
+		expect(loaded.can).toMatchObject({ edit: false, annul: true, complete: false });
+		expect(await run('annul', ['campaign.view', 'draw.annul'], { reason: 'Reason' })).toMatchObject(
+			{ success: true }
+		);
+	});
+	it.each([
+		['extraordinary_full_payment', 'roster_generated', true],
+		['monthly', 'roster_generated', false],
+		['final', 'roster_generated', false],
+		['consolation', 'roster_generated', false],
+		['extraordinary_full_payment', 'roster_frozen', false]
+	])('annul capability for %s in %s is %s', async (drawType, status, expected) => {
+		vi.mocked(getDraw).mockResolvedValue({
+			data: { ...draw, drawType, status },
+			error: null
+		} as never);
+		const result = await load({
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.view', 'draw.annul'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never);
+		expect((result as any).can.annul).toBe(expected);
+	});
 	it('fails closed and denies load', async () => {
 		await expect(
 			load({
@@ -76,7 +118,7 @@ describe('draw detail', () => {
 	});
 	it.each([
 		['update', 'draw.update'],
-		['annul', 'draw.update'],
+		['annul', 'draw.annul'],
 		['generate', 'draw.generate_roster'],
 		['freeze', 'draw.freeze_roster']
 	] as const)('denies %s without %s and performs no write', async (action, permission) => {
@@ -99,7 +141,7 @@ describe('draw detail', () => {
 	);
 	it('validates a 1001-code-point annulment reason and freeze confirmation', async () => {
 		expect(
-			await run('annul', ['campaign.view', 'draw.update'], { reason: '🧯'.repeat(1001) })
+			await run('annul', ['campaign.view', 'draw.annul'], { reason: '🧯'.repeat(1001) })
 		).toMatchObject({ status: 400 });
 		expect(await run('freeze', ['campaign.view', 'draw.freeze_roster'])).toMatchObject({
 			status: 400
@@ -142,5 +184,73 @@ describe('draw detail', () => {
 		);
 		const saved = vi.mocked(updateDraw).mock.calls.at(-1)?.[1].paymentCutoffAt;
 		expect(Date.parse(saved as string)).toBe(Date.parse(utcCutoff));
+	});
+	describe('complete (SAN-123)', () => {
+		const frozen = { ...draw, status: 'roster_frozen' };
+		const loadAs = async (permissions: string[], status: string) => {
+			vi.mocked(getDraw).mockResolvedValue({ data: { ...draw, status }, error: null } as never);
+			return (await load({
+				locals: makeLocals({ permissions }),
+				params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+				url: new URL(url)
+			} as never)) as any;
+		};
+		beforeEach(() => {
+			vi.mocked(completeDraw).mockReset();
+			vi.mocked(getDraw).mockResolvedValue({ data: frozen, error: null } as never);
+		});
+		it('is offered only on a frozen draw with draw.complete', async () => {
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.complete'], 'roster_frozen')).can
+					.complete
+			).toBe(true);
+			expect((await loadAs(['campaign.view', 'draw.view'], 'roster_frozen')).can.complete).toBe(
+				false
+			);
+			expect((await loadAs(['campaign.view', 'draw.update'], 'roster_frozen')).can.complete).toBe(
+				false
+			);
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.complete'], 'roster_generated')).can
+					.complete
+			).toBe(false);
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.complete'], 'completed')).can.complete
+			).toBe(false);
+		});
+		it('denies with draw.update alone and fails closed without permissions', async () => {
+			expect(await run('complete', ['campaign.view', 'draw.update'])).toMatchObject({
+				status: 403
+			});
+			expect(await run('complete', null)).toMatchObject({ status: 500 });
+			expect(completeDraw).not.toHaveBeenCalled();
+		});
+		it('404s a draw outside the route campaign', async () => {
+			vi.mocked(getDraw).mockResolvedValue({ data: null, error: null } as never);
+			expect(await run('complete', ['campaign.view', 'draw.complete'])).toMatchObject({
+				status: 404
+			});
+			expect(completeDraw).not.toHaveBeenCalled();
+		});
+		it('completes with the request context', async () => {
+			vi.mocked(completeDraw).mockResolvedValue(undefined);
+			expect(await run('complete', ['campaign.view', 'draw.complete'])).toMatchObject({
+				form: 'complete',
+				success: true
+			});
+			expect(completeDraw).toHaveBeenCalledWith(
+				expect.anything(),
+				{ drawId: DRAW_ID },
+				expect.objectContaining({ permissions: expect.arrayContaining(['draw.complete']) })
+			);
+		});
+		it('maps unresolved prizes to a 409 with the service message', async () => {
+			vi.mocked(completeDraw).mockRejectedValue(
+				new DrawServiceError('conflict', 'resolve every prize of the draw before completing it')
+			);
+			const result = (await run('complete', ['campaign.view', 'draw.complete'])) as any;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({ form: 'complete' });
+		});
 	});
 });
