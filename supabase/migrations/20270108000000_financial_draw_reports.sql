@@ -228,7 +228,11 @@ begin
   perform public.report_require_financial(p_campaign_id);
   return query
   select pr.id, d.id, d.name, d.draw_date, pr.position, pr.name, pr.status, wn.number_value, wn.result_status,
-    coalesce(nullif(btrim(b.business_name), ''), nullif(btrim(concat_ws(' ', b.first_name, b.last_name)), '')),
+    coalesce(
+      nullif(btrim(e.buyer_snapshot ->> 'business_name'), ''),
+      nullif(btrim(concat_ws(' ', e.buyer_snapshot ->> 'first_name', e.buyer_snapshot ->> 'last_name')), ''),
+      nullif(btrim(b.business_name), ''),
+      nullif(btrim(concat_ws(' ', b.first_name, b.last_name)), '')),
     c.display_name, pa.status,
     (pa.awarded_at at time zone 'America/Argentina/Buenos_Aires')::date,
     (pa.delivered_at at time zone 'America/Argentina/Buenos_Aires')::date
@@ -236,6 +240,7 @@ begin
   join public.draws d on d.id = pr.draw_id and d.campaign_id = p_campaign_id
   left join public.winning_numbers wn on wn.prize_id = pr.id
   left join public.prize_awards pa on pa.prize_id = pr.id and pa.status <> 'annulled'
+  left join public.draw_roster_entries e on e.id = wn.matched_roster_entry_id
   left join public.buyers b on b.id = pa.buyer_id
   left join public.collectors c on c.id = pa.collector_id
   where (p_draw_id is null or d.id = p_draw_id) and (p_status is null or pr.status = p_status)

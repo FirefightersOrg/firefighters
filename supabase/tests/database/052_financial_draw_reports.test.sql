@@ -1,7 +1,7 @@
 -- SAN-87: financial and draw report functions (grants, access rule, aggregates, filters).
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(49);
+select plan(50);
 
 insert into auth.users(id, email)
 select ('a6470000-0000-0000-0000-00000000000' || n)::uuid, 'frep-' || n || '@example.com' from generate_series(1, 6) n;
@@ -204,6 +204,11 @@ select results_eq($$select prize_name, prize_status, winning_number, result_stat
 select results_eq($$select prize_name from public.report_prizes(pg_temp.id('c'), pg_temp.id('d1'), 'unawarded')$$,
   $$values ('Second prize'::text)$$, 'prizes filter by status and draw');
 select is((select count(*)::int from public.report_prizes(pg_temp.id('c'), pg_temp.id('d2'))), 0, 'prizes filter by draw');
+reset role;
+update public.buyers set first_name = 'Renombrada' where id = pg_temp.id('buyer');
+set local role authenticated;
+select results_eq($$select buyer_name from public.report_prizes(pg_temp.id('c'), pg_temp.id('d1'), 'awarded')$$,
+  $$values ('Eva Paz'::text)$$, 'prizes show the frozen roster snapshot name, as the certificates do, after the buyer is renamed');
 select is((select count(*)::int from public.report_prizes(pg_temp.id('other'))), 0, 'prizes are scoped to the campaign');
 
 -- Read only and hardening
