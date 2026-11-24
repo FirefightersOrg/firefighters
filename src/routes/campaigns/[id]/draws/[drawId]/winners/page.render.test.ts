@@ -50,6 +50,7 @@ describe('winners and prizes render', () => {
 					prize('pending_validation', result),
 					prize('pending_delivery', result),
 					prize('delivered', result),
+					prize('unawarded', result),
 					prize('annulled')
 				]),
 				form: null
@@ -60,6 +61,9 @@ describe('winners and prizes render', () => {
 		expect(body).toContain('Record resolution');
 		expect(body).toContain('Record delivery');
 		expect(body).toContain('Delivered prizes cannot be annulled.');
+		expect(body).toContain('Print delivery certificate');
+		expect(body).toContain('Print unawarded certificate');
+		expect(body).toContain('target="_blank"');
 		expect(body).toContain('Create replacement at position 1');
 	});
 
@@ -80,6 +84,8 @@ describe('winners and prizes render', () => {
 		expect(body).not.toContain('Configure a prize');
 		expect(body).not.toContain('Validate against frozen roster');
 		expect(body).not.toContain('Annul prize');
+		expect(body).not.toContain('Print delivery certificate');
+		expect(body).not.toContain('Print unawarded certificate');
 	});
 
 	it('renders the immediate real-shaped validation result and exact plain-language reason', () => {
