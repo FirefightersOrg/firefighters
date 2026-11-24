@@ -19,7 +19,9 @@ const data = (status: string, type = 'monthly') => ({
 	reasonMax: 1000,
 	can: {
 		edit: status === 'scheduled',
-		annul: status === 'scheduled',
+		annul:
+			status === 'scheduled' ||
+			(status === 'roster_generated' && type === 'extraordinary_full_payment'),
 		generate: status === 'scheduled',
 		regenerate: status === 'roster_generated',
 		freeze: status === 'roster_generated',
@@ -39,6 +41,16 @@ describe('draw detail render', () => {
 			if (status === 'scheduled') expect(body).toContain('Edit scheduled draw');
 		}
 	);
+	it('offers generated extraordinary annulment but not ordinary or frozen annulment', () => {
+		for (const [status, type, allowed] of [
+			['roster_generated', 'extraordinary_full_payment', true],
+			['roster_generated', 'monthly', false],
+			['roster_frozen', 'extraordinary_full_payment', false]
+		] as const) {
+			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
+			expect(body.includes('Annul draw')).toBe(allowed);
+		}
+	});
 	it('renders scheduled actions', () => {
 		const body = render(Page, { props: { data: data('scheduled'), form: null } as any }).body;
 		expect(body).toContain('Edit scheduled draw');

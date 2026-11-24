@@ -10,7 +10,7 @@ import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
 import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
-import { DRAW_REASON_MAX } from '$lib/domain/draws';
+import { canTransitionDraw, DRAW_REASON_MAX } from '$lib/domain/draws';
 import { field, readDrawFields, uuid, validateDrawFields } from '$lib/server/draws/route-helpers';
 
 const canRead = (permissions: readonly string[] | null | undefined) =>
@@ -82,7 +82,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		reasonMax: DRAW_REASON_MAX,
 		can: {
 			edit: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),
-			annul: scheduled && hasPermissionIn(locals.permissions, 'draw.annul'),
+			annul:
+				canTransitionDraw(draw.data.status, 'annulled', draw.data.drawType) &&
+				hasPermissionIn(locals.permissions, 'draw.annul'),
 			generate: scheduled && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			regenerate: generated && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			freeze: generated && hasPermissionIn(locals.permissions, 'draw.freeze_roster'),

@@ -46,4 +46,12 @@ describe('draw storage domain', () => {
 			for (const to of DRAW_ROSTER_STATUSES)
 				expect(canTransitionDrawRoster(from, to)).toBe(DRAW_ROSTER_TRANSITIONS[from].includes(to));
 	});
+	it('allows generated annulment only for extraordinary draws, never frozen draws', () => {
+		for (const type of DRAW_TYPES) {
+			expect(canTransitionDraw('roster_generated', 'annulled', type)).toBe(
+				type === 'extraordinary_full_payment'
+			);
+			expect(canTransitionDraw('roster_frozen', 'annulled', type)).toBe(false);
+		}
+	});
 });
