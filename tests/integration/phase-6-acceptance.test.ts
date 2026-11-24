@@ -330,7 +330,7 @@ describe('Phase 6: delivery and printable delivery note', () => {
 		const doc = data.document;
 		for (const value of [
 			printCampaignName,
-			'Note 0001',
+			'Remito 0001',
 			`Collector A ${RUN_ID}`,
 			users.operator.profile.full_name,
 			'0100 / 4971',
@@ -349,8 +349,8 @@ describe('Phase 6: delivery and printable delivery note', () => {
 		expect(html.split('Simple').length - 1).toBe(4);
 		expect(doc.deliveredBonds).toHaveLength(2);
 		expect(html).toContain('—');
-		expect(html).toContain('ORIGINAL – Administration');
-		expect(html).toContain('DUPLICATE – Collector');
+		expect(html).toContain('ORIGINAL – Administración');
+		expect(html).toContain('DUPLICADO – Cobrador');
 	});
 	it('C3 returns and reassigns via bond and collector actions, while rejected lost custody is unchanged', async () => {
 		const returned = await bond(),

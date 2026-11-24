@@ -1381,7 +1381,7 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 					expect(html, `${role}: section ${section.id}`).toContain(`id="${section.id}"`);
 					expect(html).toMatch(
 						new RegExp(
-							`${i + 1}\\.</span>\\s*${section.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+							`${i + 1}\\.</span>(?:\\s|<!--[^>]*-->)*${section.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
 						)
 					);
 				});
