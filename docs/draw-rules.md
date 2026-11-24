@@ -479,6 +479,21 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
 - Known gaps are unchanged: **SAN-117** extraordinary-number release remains out of scope, and
   **SAN-81** forbids annulment of delivered prizes (now decided by SAN-125).
 
+## Implemented in SAN-123: completing a draw
+
+- `draw_complete(p_draw_id, p_request_id)` / `completeDraw` moves a draw from `roster_frozen` to
+  `completed` (the only path to that state). Permission: `draw.update`, like `draw_annul`, until
+  SAN-118 splits the draw permissions.
+- Preconditions: at least one resolved non-annulled prize (Santi, #93: a draw with no prizes, or
+  only annulled ones, cannot complete), and no non-annulled prize of the draw in `pending_validation` (with or without a
+  loaded number). `pending_delivery` counts as resolved: deliveries can be recorded after completion.
+  Otherwise `55000` ("resolve every prize of the draw before completing it"), with no write.
+- Locks: campaign SHARE → draw UPDATE (`prize_lock_draw`) → the draw's prizes FOR SHARE in id order,
+  so concurrent prize writes serialize with the completion.
+- One `draw.complete` audit row with the before/after draw. After completion, prize creation and
+  winner loading are refused; void-only prize annulment still works (SAN-81).
+- The draw detail page offers "Complete draw" only on frozen draws to users with `draw.update`.
+
 ## SAN-125 — audited delivery reversal
 
 - New RPC `prize_reverse_delivery(p_prize_id uuid, p_reason text, p_request_id text default null)`
