@@ -24,7 +24,8 @@ const data = (status: string, type = 'monthly') => ({
 			(status === 'roster_generated' && type === 'extraordinary_full_payment'),
 		generate: status === 'scheduled',
 		regenerate: status === 'roster_generated',
-		freeze: status === 'roster_generated'
+		freeze: status === 'roster_generated',
+		complete: status === 'roster_frozen'
 	}
 });
 describe('draw detail render', () => {
@@ -36,6 +37,7 @@ describe('draw detail render', () => {
 		] as const) {
 			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
 			expect(body.includes('Annul draw')).toBe(allowed);
+			expect(body.includes('releases its reserved extra numbers')).toBe(allowed);
 		}
 	});
 	it('renders scheduled actions', () => {
@@ -58,6 +60,17 @@ describe('draw detail render', () => {
 		expect(
 			render(Page, { props: { data: data('scheduled', 'consolation'), form: null } as any }).body
 		).toContain('unavailable until draw results exist');
+	});
+	it('offers completion only on a frozen draw (SAN-123)', () => {
+		const frozen = render(Page, { props: { data: data('roster_frozen'), form: null } as any }).body;
+		expect(frozen).toContain('action="?/complete"');
+		expect(frozen).toContain('Every prize must be resolved');
+		expect(
+			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
+		).not.toContain('action="?/complete"');
+		expect(
+			render(Page, { props: { data: data('completed'), form: null } as any }).body
+		).not.toContain('action="?/complete"');
 	});
 	it('hides actions in a terminal state', () =>
 		expect(render(Page, { props: { data: data('closed'), form: null } as any }).body).not.toContain(

@@ -24,12 +24,12 @@ export const DRAW_STATUSES = [
 ] as const;
 export type DrawStatus = (typeof DRAW_STATUSES)[number];
 export const DRAW_STATUS_LABELS: Record<DrawStatus, string> = {
-	scheduled: 'Scheduled',
-	roster_generated: 'Roster generated',
-	roster_frozen: 'Roster frozen',
-	completed: 'Completed',
-	closed: 'Closed',
-	annulled: 'Annulled'
+	scheduled: 'Programado',
+	roster_generated: 'Padrón generado',
+	roster_frozen: 'Padrón congelado',
+	completed: 'Realizado',
+	closed: 'Cerrado',
+	annulled: 'Anulado'
 };
 /** Common transitions; use canTransitionDraw for the type-specific SAN-117 exception. */
 export const DRAW_TRANSITIONS: Record<DrawStatus, readonly DrawStatus[]> = {
@@ -46,9 +46,9 @@ export const canTransitionDraw = (from: DrawStatus, to: DrawStatus, type?: DrawT
 export const DRAW_ROSTER_STATUSES = ['generated', 'frozen', 'superseded'] as const;
 export type DrawRosterStatus = (typeof DRAW_ROSTER_STATUSES)[number];
 export const DRAW_ROSTER_STATUS_LABELS: Record<DrawRosterStatus, string> = {
-	generated: 'Generated',
-	frozen: 'Frozen',
-	superseded: 'Superseded'
+	generated: 'Generado',
+	frozen: 'Congelado',
+	superseded: 'Reemplazado'
 };
 export const DRAW_ROSTER_TRANSITIONS: Record<DrawRosterStatus, readonly DrawRosterStatus[]> = {
 	generated: ['frozen', 'superseded'],

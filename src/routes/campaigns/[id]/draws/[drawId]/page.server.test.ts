@@ -8,7 +8,8 @@ vi.mock('$lib/server/repositories/draws', () => ({
 vi.mock('$lib/server/services/draws', async (original) => ({
 	...(await original<any>()),
 	updateDraw: vi.fn(),
-	annulDraw: vi.fn()
+	annulDraw: vi.fn(),
+	completeDraw: vi.fn()
 }));
 vi.mock('$lib/server/services/draw-rosters', async (original) => ({
 	...(await original<any>()),
@@ -18,7 +19,7 @@ vi.mock('$lib/server/services/draw-rosters', async (original) => ({
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
-import { annulDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
+import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
@@ -160,5 +161,67 @@ describe('draw detail', () => {
 		);
 		const saved = vi.mocked(updateDraw).mock.calls.at(-1)?.[1].paymentCutoffAt;
 		expect(Date.parse(saved as string)).toBe(Date.parse(utcCutoff));
+	});
+	describe('complete (SAN-123)', () => {
+		const frozen = { ...draw, status: 'roster_frozen' };
+		const loadAs = async (permissions: string[], status: string) => {
+			vi.mocked(getDraw).mockResolvedValue({ data: { ...draw, status }, error: null } as never);
+			return (await load({
+				locals: makeLocals({ permissions }),
+				params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+				url: new URL(url)
+			} as never)) as any;
+		};
+		beforeEach(() => {
+			vi.mocked(completeDraw).mockReset();
+			vi.mocked(getDraw).mockResolvedValue({ data: frozen, error: null } as never);
+		});
+		it('is offered only on a frozen draw with draw.update', async () => {
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.update'], 'roster_frozen')).can.complete
+			).toBe(true);
+			expect((await loadAs(['campaign.view', 'draw.view'], 'roster_frozen')).can.complete).toBe(
+				false
+			);
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.update'], 'roster_generated')).can
+					.complete
+			).toBe(false);
+			expect(
+				(await loadAs(['campaign.view', 'draw.view', 'draw.update'], 'completed')).can.complete
+			).toBe(false);
+		});
+		it('denies without draw.update and fails closed without permissions', async () => {
+			expect(await run('complete', ['campaign.view'])).toMatchObject({ status: 403 });
+			expect(await run('complete', null)).toMatchObject({ status: 500 });
+			expect(completeDraw).not.toHaveBeenCalled();
+		});
+		it('404s a draw outside the route campaign', async () => {
+			vi.mocked(getDraw).mockResolvedValue({ data: null, error: null } as never);
+			expect(await run('complete', ['campaign.view', 'draw.update'])).toMatchObject({
+				status: 404
+			});
+			expect(completeDraw).not.toHaveBeenCalled();
+		});
+		it('completes with the request context', async () => {
+			vi.mocked(completeDraw).mockResolvedValue(undefined);
+			expect(await run('complete', ['campaign.view', 'draw.update'])).toMatchObject({
+				form: 'complete',
+				success: true
+			});
+			expect(completeDraw).toHaveBeenCalledWith(
+				expect.anything(),
+				{ drawId: DRAW_ID },
+				expect.objectContaining({ permissions: expect.arrayContaining(['draw.update']) })
+			);
+		});
+		it('maps unresolved prizes to a 409 with the service message', async () => {
+			vi.mocked(completeDraw).mockRejectedValue(
+				new DrawServiceError('conflict', 'resolve every prize of the draw before completing it')
+			);
+			const result = (await run('complete', ['campaign.view', 'draw.update'])) as any;
+			expect(result.status).toBe(409);
+			expect(result.data).toMatchObject({ form: 'complete' });
+		});
 	});
 });

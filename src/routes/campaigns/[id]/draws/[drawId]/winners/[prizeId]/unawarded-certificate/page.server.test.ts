@@ -42,6 +42,9 @@ const event = (permissions: string[] | null = ['campaign.view', 'draw.view']) =>
 		url: new URL('http://localhost/certificate')
 	}) as never;
 
+/** ICU emits a regular, no-break or narrow no-break space (U+202F) before `p. m.` depending on version. */
+const plainSpaces = (value: string) => value.replace(/\s/gu, ' ');
+
 describe('unawarded prize certificate load', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -64,7 +67,7 @@ describe('unawarded prize certificate load', () => {
 	});
 	it('returns all manual-unaward fields', async () => {
 		const result = (await load(event()))!;
-		expect(result.document).toMatchObject({
+		expect({ ...result.document, date: plainSpaces(result.document.date) }).toMatchObject({
 			prize: '#2 — Trip',
 			winningNumber: '0008',
 			reason: 'Declined',

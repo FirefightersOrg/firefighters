@@ -1,0 +1,213 @@
+/* Printable documents (SAN-138): delivery note, settlement delivery note, payment certificate.
+   Cimiento tokens and type styles, print-safe: borders for structure, no shadows, no tinted
+   backgrounds. Documents always print in the light theme, even if the system prefers dark. */
+
+/* Pin the light theme. The repeated :has() raises specificity above the dark-mode media rule
+   in tokens.css (:root:not([data-theme]):not([data-theme])). */
+:root:has(.doc-sheet):has(.doc-sheet):has(.doc-sheet) {
+	color-scheme: light;
+	--bg: #ffffff;
+	--surface: #ffffff;
+	--text: #15181d;
+	--text-muted: #4c5462;
+	--border: #dde1e7;
+	--border-strong: #868e9a;
+	--primary: #2350c4;
+	--primary-hover: #1b3f9e;
+	--on-primary: #ffffff;
+	--danger: #c22e1c;
+	--danger-text: #a12617;
+	--warning: #a85a00;
+	--warning-text: #7a4100;
+}
+
+.doc-toolbar {
+	max-width: 190mm;
+	margin: 0 auto;
+	padding: var(--space-4) 0;
+	text-align: right;
+}
+.doc-toolbar button {
+	min-height: var(--control-md);
+	padding: 0 var(--space-4);
+	border: 1px solid var(--primary);
+	border-radius: var(--radius-md);
+	background: var(--primary);
+	color: var(--on-primary);
+	font:
+		500 14px/20px 'IBM Plex Sans',
+		'Segoe UI',
+		system-ui,
+		sans-serif;
+	cursor: pointer;
+}
+.doc-toolbar button:hover {
+	background: var(--primary-hover);
+}
+
+.doc-sheet {
+	max-width: 190mm;
+	margin: 0 auto var(--space-8);
+	padding: 10mm;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+	font-size: 13px;
+	line-height: 20px;
+	font-variant-numeric: tabular-nums;
+}
+.doc-sheet p {
+	margin: 0;
+}
+
+.doc-header {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--space-4);
+	padding-bottom: var(--space-3);
+	border-bottom: 2px solid var(--text);
+}
+.doc-institution {
+	font-size: 12px;
+	line-height: 16px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.doc-title {
+	margin: var(--space-1) 0;
+	font-size: 24px;
+	line-height: 32px;
+	font-weight: 600;
+}
+.doc-meta {
+	text-align: right;
+}
+.doc-copy {
+	font-size: 12px;
+	line-height: 16px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.doc-number {
+	font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+	font-size: 14px;
+	line-height: 20px;
+	font-weight: 500;
+}
+
+/* Status legends (ANULADA, CORREGIDA, borrador). Border and word carry the meaning, not fill. */
+.doc-legend {
+	display: inline-block;
+	margin-top: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	border: 2px solid var(--danger);
+	border-radius: var(--radius-sm);
+	color: var(--danger-text);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+}
+.doc-legend-draft {
+	border-color: var(--warning);
+	color: var(--warning-text);
+}
+
+.doc-fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(45mm, 1fr));
+	gap: var(--space-3) var(--space-8);
+	margin: var(--space-4) 0;
+}
+.doc-fields.doc-fields-2 {
+	grid-template-columns: repeat(2, 1fr);
+}
+.doc-fields dt {
+	font-size: 12px;
+	line-height: 16px;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+.doc-fields dd {
+	margin: 0;
+	font-weight: 600;
+}
+
+.doc-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.doc-table th,
+.doc-table td {
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--border-strong);
+	text-align: left;
+	vertical-align: top;
+}
+.doc-table th {
+	font-weight: 500;
+	color: var(--text-muted);
+}
+.doc-table .num {
+	text-align: right;
+}
+.doc-table tfoot td {
+	font-weight: 600;
+}
+.doc-code {
+	display: block;
+	font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.doc-notes {
+	margin: var(--space-4) 0;
+}
+.doc-signatures {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--space-12);
+	margin-top: var(--space-12);
+	text-align: center;
+}
+.doc-signatures > div {
+	flex: 1;
+}
+.doc-signatures small {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+.doc-line {
+	display: block;
+	margin-bottom: var(--space-1);
+	border-top: 1px solid var(--text);
+}
+
+@media print {
+	.doc-toolbar {
+		display: none;
+	}
+	.doc-sheet {
+		max-width: none;
+		margin: 0;
+		padding: 0;
+		border: none;
+		break-after: page;
+	}
+	.doc-sheet:last-of-type {
+		break-after: auto;
+	}
+	.doc-table tr,
+	.doc-signatures {
+		break-inside: avoid;
+	}
+	.doc-table thead {
+		display: table-header-group;
+	}
+	@page {
+		size: A4;
+		margin: 12mm;
+	}
+}

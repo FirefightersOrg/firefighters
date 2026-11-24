@@ -7,6 +7,8 @@ import {
 	resolvePrize,
 	deliverPrize,
 	annulPrize,
+	reversePrizeDelivery,
+	reversePrizeDeliverySchema,
 	createPrizeSchema,
 	updatePrizeSchema,
 	loadWinningNumberSchema,
@@ -26,7 +28,7 @@ it.each([
 	],
 	[
 		'a delivered prize cannot be annulled; pending product decision',
-		'A delivered prize cannot be annulled; pending product decision.'
+		'A delivered prize cannot be annulled. Reverse the delivery first.'
 	],
 	['completed draws cannot configure prizes', 'Completed draws cannot configure prizes.'],
 	[
@@ -40,6 +42,14 @@ it.each([
 	});
 });
 const cases = [
+	[
+		'reverse',
+		(db: SupabaseClient, ctx: PrizeRequestContext) =>
+			reversePrizeDelivery(db, { prizeId: id, reason: ' Mistake ' }, ctx),
+		'prize.reverse_delivery',
+		'prize_reverse_delivery',
+		{ p_prize_id: id, p_reason: 'Mistake' }
+	],
 	[
 		'create',
 		(db: SupabaseClient, ctx: PrizeRequestContext) =>
@@ -143,6 +153,26 @@ describe.each(cases)('%s prize', (action, run, permission, name, args) => {
 	});
 });
 describe('prize validation', () => {
+	it('validates reversal code points before calling the database', async () => {
+		const rpc = vi.fn();
+		for (const reason of ['', ' ', '🧯'.repeat(1001)]) {
+			expect(reversePrizeDeliverySchema.safeParse({ prizeId: id, reason }).success).toBe(false);
+			await expect(
+				reversePrizeDelivery(
+					{ rpc } as unknown as SupabaseClient,
+					{ prizeId: id, reason },
+					{
+						requestId: 'invalid-reversal',
+						permissions: ['prize.reverse_delivery']
+					}
+				)
+			).rejects.toMatchObject({ status: 400 });
+		}
+		expect(
+			reversePrizeDeliverySchema.parse({ prizeId: id, reason: ` ${'🧯'.repeat(1000)} ` }).reason
+		).toBe('🧯'.repeat(1000));
+		expect(rpc).not.toHaveBeenCalled();
+	});
 	it('matches DB code-point limits, trimming and optional nulls', () => {
 		expect(
 			createPrizeSchema.parse({ drawId: id, ...fields, name: ` ${'🧯'.repeat(200)} ` }).name

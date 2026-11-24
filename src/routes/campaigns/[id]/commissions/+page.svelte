@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { statusWord } from '$lib/domain/status-word';
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import { cardClass } from '$lib/components/campaigns/styles';
 	import AnnulRuleAction from '$lib/components/commissions/AnnulRuleAction.svelte';
 	import CommissionRuleForm from '$lib/components/commissions/CommissionRuleForm.svelte';
-	import { CAMPAIGN_STATUS_LABELS } from '$lib/domain/campaigns';
 	import {
 		commissionRuleTiming,
 		formatCommissionRuleType,
@@ -72,7 +72,7 @@
 		>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">Commission rules</h1>
-			<CampaignStatusBadge status={campaign.status} />
+			<StatusBadge kind="campaign" status={campaign.status} />
 		</div>
 		<p class="mt-1 text-sm text-slate-600">
 			General rules apply to every collector of this campaign. Special collector rules come later.
@@ -91,10 +91,8 @@
 	{#if campaign.status !== 'draft' && campaign.status !== 'active'}
 		<FormAlert kind="warning">
 			<p>
-				<strong>Read-only.</strong> This campaign is {CAMPAIGN_STATUS_LABELS[
-					campaign.status
-				].toLowerCase()}; commission rules can only be changed while a campaign is a draft or
-				active.
+				<strong>Read-only.</strong> This campaign is {statusWord(campaign.status)}; commission rules
+				can only be changed while a campaign is a draft or active.
 			</p>
 		</FormAlert>
 	{/if}

@@ -1,9 +1,9 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import BondConflictLinks from '$lib/components/bonds/BondConflictLinks.svelte';
 	import PataNumbersPreview from '$lib/components/bonds/PataNumbersPreview.svelte';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import FieldError from '$lib/components/campaigns/FieldError.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
@@ -158,7 +158,7 @@
 		<a href={campaignHref} class="text-sm text-blue-700 hover:underline">← {campaign.name}</a>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">Load a pata</h1>
-			<CampaignStatusBadge status={campaign.status} />
+			<StatusBadge kind="campaign" status={campaign.status} />
 		</div>
 		<p class="text-sm text-slate-500">
 			A pata sells N base numbers together: it is worth N simple bonds. New patas are available for

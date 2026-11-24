@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { statusWord } from '$lib/domain/status-word';
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import CampaignGeneralForm from '$lib/components/campaigns/CampaignGeneralForm.svelte';
 	import CampaignRulesForm from '$lib/components/campaigns/CampaignRulesForm.svelte';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
 	import { cardClass } from '$lib/components/campaigns/styles';
@@ -12,7 +13,6 @@
 		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
 		canEditCampaignRules,
-		CAMPAIGN_STATUS_LABELS,
 		formatCampaignDate
 	} from '$lib/domain/campaigns';
 	import { formatInteger, formatMoney } from '$lib/domain/money';
@@ -43,7 +43,7 @@
 		<a href={resolve('/campaigns')} class="text-sm text-blue-700 hover:underline">← Campaigns</a>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-bold tracking-tight">{campaign.name}</h1>
-			<CampaignStatusBadge status={campaign.status} />
+			<StatusBadge kind="campaign" status={campaign.status} />
 		</div>
 		{#if data.can.viewCommissions || data.can.viewAudit || data.can.loadBonds || data.can.viewBonds || data.can.viewCollectors || data.can.viewBuyers || data.can.viewDeliveries || data.can.viewSales || data.can.viewSettlements || data.can.viewDraws || data.can.exportBackups}
 			<nav aria-label="Campaign sections" class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -190,11 +190,9 @@
 				<FormAlert kind="warning">
 					{#if frozenByStatus}
 						<p>
-							<strong>Rules are frozen.</strong> This campaign is {CAMPAIGN_STATUS_LABELS[
-								campaign.status
-							].toLowerCase()}, and rules (price, installments, numbering, overflow policy and
-							barcode mode) can only be changed while a campaign is a draft. They are shown
-							read-only above.
+							<strong>Rules are frozen.</strong> This campaign is {statusWord(campaign.status)}, and
+							rules (price, installments, numbering, overflow policy and barcode mode) can only be
+							changed while a campaign is a draft. They are shown read-only above.
 						</p>
 					{:else}
 						<p>
