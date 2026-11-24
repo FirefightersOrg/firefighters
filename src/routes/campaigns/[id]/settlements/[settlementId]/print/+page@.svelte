@@ -1,198 +1,116 @@
 <script lang="ts">
+	import '$lib/styles/print.css';
 	import type { PageProps } from './$types';
+
+	/** Printable settlement delivery note (remito de rendición), original and duplicate. Styles: `$lib/styles/print.css`. */
 	let { data }: PageProps = $props();
 	const doc = $derived(data.document);
-	const copies = ['ORIGINAL – Administration', 'DUPLICATE – Collector'];
+	const copies = ['ORIGINAL – Administración', 'DUPLICADO – Cobrador'];
 </script>
 
 <svelte:head><title>{doc.settlementNumberLabel} - {doc.campaign}</title></svelte:head>
-<div class="toolbar"><button type="button" onclick={() => window.print()}>Print</button></div>
+<div class="doc-toolbar">
+	<button type="button" onclick={() => window.print()}>Imprimir</button>
+</div>
 {#each copies as copy (copy)}
-	<article class="sheet">
-		<header>
+	<article class="doc-sheet">
+		<header class="doc-header">
 			<div>
-				<p class="institution">{doc.institutionName}</p>
-				<h1>Settlement delivery note</h1>
+				<p class="doc-institution">{doc.institutionName}</p>
+				<h1 class="doc-title">Remito de rendición</h1>
 				<p>{doc.campaign}</p>
-				{#if doc.preliminary}<p class="preliminary">PRELIMINARY / DRAFT — OPEN SETTLEMENT</p>{/if}
+				{#if doc.preliminary}<p class="doc-legend doc-legend-draft">
+						PRELIMINAR / BORRADOR — RENDICIÓN ABIERTA
+					</p>{/if}
 				{#if doc.status === 'annulled'}
-					<p class="preliminary">ANULADA — ANNULLED SETTLEMENT — NOT VALID</p>
+					<p class="doc-legend">ANULADA — RENDICIÓN SIN VALIDEZ</p>
 				{:else if doc.status === 'corrected'}
-					<p class="preliminary">CORREGIDA — CORRECTED SETTLEMENT — NOT VALID</p>
+					<p class="doc-legend">CORREGIDA — RENDICIÓN SIN VALIDEZ</p>
 				{/if}
 			</div>
-			<div class="meta">
-				<p class="copy">{copy}</p>
-				<p><strong>{doc.settlementNumberLabel}</strong></p>
+			<div class="doc-meta">
+				<p class="doc-copy">{copy}</p>
+				<p class="doc-number">{doc.settlementNumberLabel}</p>
 			</div>
 		</header>
-		<dl>
+		<dl class="doc-fields">
 			<div>
-				<dt>Opening date</dt>
+				<dt>Fecha de apertura</dt>
 				<dd>{doc.openingDate}</dd>
 			</div>
 			<div>
-				<dt>Closing date</dt>
+				<dt>Fecha de cierre</dt>
 				<dd>{doc.closingDate}</dd>
 			</div>
 			<div>
-				<dt>Collector</dt>
+				<dt>Cobrador</dt>
 				<dd>{doc.collector}</dd>
 			</div>
 			<div>
-				<dt>Closed by</dt>
+				<dt>Cerrada por</dt>
 				<dd>{doc.closedBy ?? '—'}</dd>
 			</div>
 		</dl>
-		<table>
-			<thead
-				><tr><th>Bond</th><th>Buyer</th><th>Paid installments</th><th>Method</th><th>Amount</th></tr
-				></thead
-			><tbody
-				>{#each doc.payments as payment, i (i)}<tr
-						><td>{payment.bond}</td><td>{payment.buyer}</td><td>{payment.installments}</td><td
-							>{payment.method}</td
-						><td>{payment.amount}</td></tr
-					>{/each}</tbody
-			>
+		<table class="doc-table">
+			<thead>
+				<tr>
+					<th>Bono</th>
+					<th>Comprador</th>
+					<th>Cuotas pagadas</th>
+					<th>Medio de pago</th>
+					<th class="num">Importe</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each doc.payments as payment, i (i)}
+					<tr>
+						<td><span class="doc-code">{payment.bond}</span></td>
+						<td>{payment.buyer}</td>
+						<td>{payment.installments}</td>
+						<td>{payment.method}</td>
+						<td class="num">{payment.amount}</td>
+					</tr>
+				{/each}
+			</tbody>
 		</table>
-		<dl class="totals">
+		<dl class="doc-fields">
 			<div>
-				<dt>Cash total</dt>
+				<dt>Total en efectivo</dt>
 				<dd>{doc.totals.cash}</dd>
 			</div>
 			<div>
-				<dt>Transfer total</dt>
+				<dt>Total por transferencia</dt>
 				<dd>{doc.totals.transfer}</dd>
 			</div>
 			<div>
-				<dt>Grand total</dt>
+				<dt>Total general</dt>
 				<dd>{doc.totals.amount}</dd>
 			</div>
 			<div>
-				<dt>Generated commission</dt>
+				<dt>Comisión generada</dt>
 				<dd>{doc.totals.commission}</dd>
 			</div>
 			<div>
-				<dt>Settled commission</dt>
+				<dt>Comisión liquidada</dt>
 				<dd>{doc.totals.commissionPaid}</dd>
 			</div>
 			<div>
-				<dt>Manual adjustments</dt>
+				<dt>Ajustes manuales</dt>
 				<dd>{doc.manualAdjustments}</dd>
 			</div>
 			<div>
-				<dt>Net for Firefighters</dt>
+				<dt>Neto para Bomberos</dt>
 				<dd>{doc.totals.net}</dd>
 			</div>
 			<div>
-				<dt>Resulting collector balance</dt>
+				<dt>Saldo resultante del cobrador</dt>
 				<dd>{doc.totals.balance}</dd>
 			</div>
 		</dl>
-		<p><strong>Notes:</strong> {doc.notes ?? '—'}</p>
-		<div class="signatures">
-			<div><span></span>{doc.collectorSignature}</div>
-			<div><span></span>{doc.administrationSignature}</div>
+		<p class="doc-notes"><strong>Observaciones:</strong> {doc.notes ?? '—'}</p>
+		<div class="doc-signatures">
+			<div><span class="doc-line"></span>{doc.collectorSignature}</div>
+			<div><span class="doc-line"></span>{doc.administrationSignature}</div>
 		</div>
-	</article>{/each}
-
-<style>
-	:global(body) {
-		background: #fff;
-		color: #000;
-	}
-	.toolbar {
-		padding: 1rem;
-		text-align: right;
-	}
-	.toolbar button {
-		border: 1px solid #333;
-		padding: 0.4rem 1rem;
-	}
-	.sheet {
-		max-width: 190mm;
-		margin: 0 auto 2rem;
-		padding: 10mm;
-		font-size: 10pt;
-		border: 1px solid #ddd;
-	}
-	header {
-		display: flex;
-		justify-content: space-between;
-		border-bottom: 2px solid #000;
-	}
-	.institution,
-	.copy {
-		font-weight: 700;
-	}
-	.meta {
-		text-align: right;
-	}
-	.preliminary {
-		font-weight: 700;
-		border: 2px solid #b00020;
-		padding: 0.25rem;
-		color: #b00020;
-	}
-	dl {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem 2rem;
-		margin: 0.75rem 0;
-	}
-	dl div {
-		min-width: 20%;
-	}
-	dt {
-		font-size: 9pt;
-		color: #444;
-	}
-	dd {
-		margin: 0;
-		font-weight: 600;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	th,
-	td {
-		border: 1px solid #999;
-		padding: 0.25rem;
-		text-align: left;
-	}
-	.signatures {
-		display: flex;
-		gap: 3rem;
-		margin-top: 3rem;
-		text-align: center;
-	}
-	.signatures div {
-		flex: 1;
-	}
-	.signatures span {
-		display: block;
-		border-top: 1px solid #000;
-		margin-bottom: 0.25rem;
-	}
-	@media print {
-		.toolbar {
-			display: none;
-		}
-		.sheet {
-			border: none;
-			margin: 0;
-			padding: 0;
-			max-width: none;
-			break-after: page;
-		}
-		.sheet:last-of-type {
-			break-after: auto;
-		}
-		@page {
-			size: A4;
-			margin: 12mm;
-		}
-	}
-</style>
+	</article>
+{/each}

@@ -45,14 +45,14 @@ export const BOND_COMMERCIAL_STATUSES = [
 export type BondCommercialStatus = (typeof BOND_COMMERCIAL_STATUSES)[number];
 
 export const BOND_COMMERCIAL_STATUS_LABELS: Record<BondCommercialStatus, string> = {
-	created: 'Created',
-	available: 'Available',
-	delivered_to_collector: 'Delivered to collector',
-	sold: 'Sold',
-	returned: 'Returned',
-	lost: 'Lost',
-	annulled: 'Annulled',
-	closed: 'Closed'
+	created: 'Creado',
+	available: 'Disponible',
+	delivered_to_collector: 'Entregado al cobrador',
+	sold: 'Vendido',
+	returned: 'Devuelto',
+	lost: 'Extraviado',
+	annulled: 'Anulado',
+	closed: 'Cerrado'
 };
 
 export const BOND_FINANCIAL_STATUSES = [
@@ -67,13 +67,13 @@ export const BOND_FINANCIAL_STATUSES = [
 export type BondFinancialStatus = (typeof BOND_FINANCIAL_STATUSES)[number];
 
 export const BOND_FINANCIAL_STATUS_LABELS: Record<BondFinancialStatus, string> = {
-	no_payments: 'No payments',
-	partial_payments: 'Partial payments',
-	up_to_date: 'Up to date',
-	overdue: 'Overdue',
-	fully_paid: 'Fully paid',
-	uncollectible: 'Uncollectible',
-	annulled: 'Annulled'
+	no_payments: 'Sin pagos',
+	partial_payments: 'Pagos parciales',
+	up_to_date: 'Al día',
+	overdue: 'En mora',
+	fully_paid: 'Pagado',
+	uncollectible: 'Incobrable',
+	annulled: 'Anulado'
 };
 
 export const BOND_KIND_LABELS: Record<BondKind, string> = {

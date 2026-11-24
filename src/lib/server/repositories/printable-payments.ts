@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatMoney } from '$lib/format';
 import type { RepositoryResult } from './campaigns';
 import type { SettlementPrintSource } from '$lib/server/documents/settlement-delivery-note';
 import type { PaymentCertificateSource } from '$lib/server/documents/payment-certificate';
 
 const paymentRows =
-	'id,amount::text,payment_method,payment_date,status,created_at,settlement_id,collectors(display_name),profiles!payments_created_by_fkey(full_name),settlements(settlement_number),sales!inner(buyers(first_name,last_name,business_name),bonds!inner(bond_numbers(number_value,number_kind,source_base_number_id))),payment_installments(amount_applied::text,installments(installment_number))';
+	'id,amount::text,payment_method,payment_date,status,created_at,settlement_id,collectors(display_name),settlements(settlement_number),sales!inner(buyers(first_name,last_name,business_name),bonds!inner(bond_numbers(number_value,number_kind,source_base_number_id))),payment_installments(amount_applied::text,installments(installment_number))';
 const buyer = (
 	value: { first_name: string; last_name: string; business_name: string | null } | null
 ) => value?.business_name || [value?.first_name, value?.last_name].filter(Boolean).join(' ') || '—';
@@ -22,14 +23,16 @@ const payment = (row: any): PaymentCertificateSource => ({
 	installments:
 		(row.payment_installments ?? [])
 			.map(
-				(x: any) => `Installment ${x.installments?.installment_number ?? '—'} (${x.amount_applied})`
+				(x: any) =>
+					`Cuota ${x.installments?.installment_number ?? '—'} (${formatMoney(x.amount_applied, { decimals: 'always' })})`
 			)
 			.join(', ') || '—',
 	amount: row.amount,
-	method: row.payment_method === 'cash' ? 'Cash' : 'Transfer',
+	method: row.payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
 	paymentDate: row.payment_date,
 	createdAt: row.created_at,
-	registeredBy: row.profiles?.full_name ?? '—',
+	// SAN-122: filled by the print route through document_actor_name (profiles is not readable).
+	registeredBy: '—',
 	settlementNumber: row.settlements?.settlement_number ?? null
 });
 export async function getSettlementPrint(
@@ -40,7 +43,7 @@ export async function getSettlementPrint(
 	const { data: settlement, error } = await supabase
 		.from('settlements')
 		.select(
-			'settlement_number,status,opened_at,closed_at,notes,collectors(display_name),profiles!settlements_closed_by_fkey(full_name),total_cash::text,total_transfer::text,total_amount::text,commission_amount::text,commission_paid_amount::text,net_to_firefighters::text'
+			'settlement_number,status,opened_at,closed_at,notes,collectors(display_name),total_cash::text,total_transfer::text,total_amount::text,commission_amount::text,commission_paid_amount::text,net_to_firefighters::text'
 		)
 		.eq('id', settlementId)
 		.eq('campaign_id', campaignId)
@@ -95,7 +98,8 @@ export async function getSettlementPrint(
 			openedAt: settlement.opened_at,
 			closedAt: settlement.closed_at,
 			collector: settlement.collectors?.display_name ?? '—',
-			closedBy: settlement.profiles?.full_name ?? null,
+			// SAN-122: filled by the print route through document_actor_name.
+			closedBy: null,
 			notes: settlement.notes,
 			totals,
 			payments: (rows ?? []).map((row) => {

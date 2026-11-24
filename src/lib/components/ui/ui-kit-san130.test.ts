@@ -214,3 +214,30 @@ describe('AppHeader', () => {
 		expect(body).not.toContain('aria-expanded');
 	});
 });
+
+describe('keyboard and mobile access (review fixes)', () => {
+	it('Table with onRowClick puts a real button in the first cell of each row', () => {
+		const { body } = render(Table, { props: { columns, rows, onRowClick: () => {} } });
+		const buttons = body.match(/<button[^>]*type="button"/g) ?? [];
+		expect(buttons).toHaveLength(rows.length);
+	});
+
+	it('Table without onRowClick has no buttons', () => {
+		expect(render(Table, { props: { columns, rows } }).body).not.toContain('<button');
+	});
+
+	it('AppHeader keeps the session visible below 720px when there are no links', () => {
+		const { body } = render(AppHeader, {
+			props: { product: 'X', user: 'Ana', logoutAction: '/logout' }
+		});
+		expect(body).toContain('Cerrar sesión');
+		expect(body).not.toContain('hidden items-center gap-3 min-[720px]:flex');
+	});
+
+	it('AppHeader hides the desktop session below 720px when the mobile menu has it', () => {
+		const { body } = render(AppHeader, {
+			props: { product: 'X', links: [{ label: 'A', href: '/a' }], logoutAction: '/logout' }
+		});
+		expect(body).toContain('hidden items-center gap-3 min-[720px]:flex');
+	});
+});

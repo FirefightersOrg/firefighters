@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Toast from '$lib/components/ui/Toast.svelte';
 	import { applyUpdate, watchForUpdate } from './update';
 
 	let registration: ServiceWorkerRegistration | null = null;
@@ -24,17 +25,17 @@
 </script>
 
 {#if available}
-	<div
-		role="status"
-		class="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm shadow-lg"
-	>
-		<span>Nueva versión disponible</span>
-		<button
-			type="button"
-			class="rounded-md bg-gray-900 px-3 py-1.5 font-medium text-white hover:bg-gray-700"
-			onclick={reload}
-		>
-			Recargar
-		</button>
-	</div>
+	<!-- Has an action, so the toast stays until the person reloads (no auto-dismiss). -->
+	<Toast tone="info">
+		Nueva versión disponible
+		{#snippet action()}
+			<button
+				type="button"
+				class="min-h-control-sm cursor-pointer rounded-md bg-primary px-3 text-label font-medium text-on-primary hover:bg-primary-hover"
+				onclick={reload}
+			>
+				Recargar
+			</button>
+		{/snippet}
+	</Toast>
 {/if}

@@ -80,7 +80,14 @@
 		{/if}
 
 		<div class="ml-auto flex items-center gap-3">
-			<div class="hidden items-center gap-3 min-[720px]:flex">{@render session()}</div>
+			<!-- Without links there is no mobile menu, so the session stays visible at every width. -->
+			<div
+				class={links.length
+					? 'hidden items-center gap-3 min-[720px]:flex'
+					: 'flex items-center gap-3'}
+			>
+				{@render session()}
+			</div>
 			{#if links.length}
 				<button
 					type="button"

@@ -39,7 +39,10 @@
 		caption?: string;
 		density?: 'comfortable' | 'compact';
 		selectedKey?: string | number;
-		/** Rows stay keyboard-accessible only through a real link or button inside the row. */
+		/**
+		 * Row action. The first cell is wrapped in a real button so it is reachable with the
+		 * keyboard (Enter/Space bubble to the row); keep that cell free of other interactive content.
+		 */
 		onRowClick?: (row: Row) => void;
 		/** Any CSS length: enables vertical scrolling with the sticky header. */
 		maxHeight?: string;
@@ -60,6 +63,14 @@
 	}
 	const padding = $derived(density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-3');
 </script>
+
+{#snippet content(row: Row, column: TableColumn<Row>)}
+	{#if cell}
+		{@render cell({ row, column })}
+	{:else}
+		{textOf(row, column)}
+	{/if}
+{/snippet}
 
 <div
 	class="overflow-x-auto rounded-lg border border-border bg-surface"
@@ -96,16 +107,21 @@
 					data-selected={selected ? 'true' : undefined}
 					onclick={onRowClick ? () => onRowClick(row) : undefined}
 				>
-					{#each columns as column (column.key)}
+					{#each columns as column, i (column.key)}
 						<td
 							class="{padding} {alignClass[column.align ?? 'left']}"
 							class:font-mono={column.mono}
 							class:tabular-nums={column.align === 'right'}
 						>
-							{#if cell}
-								{@render cell({ row, column })}
+							{#if onRowClick && i === 0}
+								<button
+									type="button"
+									class="m-0 w-full cursor-pointer rounded-sm border-0 bg-transparent p-0 text-inherit [font:inherit] [text-align:inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+								>
+									{@render content(row, column)}
+								</button>
 							{:else}
-								{textOf(row, column)}
+								{@render content(row, column)}
 							{/if}
 						</td>
 					{/each}

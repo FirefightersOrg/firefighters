@@ -22,7 +22,7 @@ const source = (status: 'open' | 'closed' = 'closed') => ({
 		balance: '0.00'
 	},
 	payments: [
-		{ bond: '68', buyer: 'Buyer', installments: 'Installment 1', method: 'Cash', amount: '100.00' }
+		{ bond: '68', buyer: 'Buyer', installments: 'Cuota 1', method: 'Efectivo', amount: '100.00' }
 	]
 });
 const event = (locals: App.Locals, settlementId = ID) =>
@@ -68,5 +68,43 @@ describe('settlement print load', () => {
 		vi.mocked(getSettlementPrint).mockResolvedValue({ data: null, error: new Error('db') });
 		await expect(load(event(setup()))).rejects.toMatchObject({ status: 500 });
 		expect(console.error).toHaveBeenCalled();
+	});
+});
+
+describe('settlement print closing user (SAN-122)', () => {
+	const withRpc = (rpc: { data: unknown; error: unknown }) => {
+		const mock = mockSupabase({
+			tables: { campaigns: { data: campaignRow(), error: null } },
+			rpc: rpc as never
+		});
+		return {
+			mock,
+			locals: makeLocals({
+				supabase: mock.supabase,
+				permissions: ['campaign.view', 'settlement.view']
+			})
+		};
+	};
+	beforeEach(() => {
+		vi.mocked(getSettlementPrint).mockReset();
+		vi.mocked(getSettlementPrint).mockResolvedValue({
+			data: { ...source(), closedBy: null },
+			error: null
+		} as never);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+	it('shows the closing user from document_actor_name', async () => {
+		const { mock, locals } = withRpc({ data: 'Treasurer Two', error: null });
+		const result = (await load(event(locals)))! as { document: Record<string, unknown> };
+		expect(JSON.stringify(result.document)).toContain('Treasurer Two');
+		expect(mock.rpc).toHaveBeenCalledWith('document_actor_name', {
+			p_kind: 'settlement',
+			p_id: ID
+		});
+	});
+	it('answers 500 when the lookup fails', async () => {
+		await expect(
+			load(event(withRpc({ data: null, error: { code: '42501', message: 'denied' } }).locals))
+		).rejects.toMatchObject({ status: 500 });
 	});
 });
