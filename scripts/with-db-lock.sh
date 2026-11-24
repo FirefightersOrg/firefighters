@@ -8,8 +8,9 @@
 # up as "Could not load the permissions", PGRST303 and "Hook timed out" failures. The lock lives in
 # the git common dir, so all worktrees of this repo share it.
 #
-# Portable `mkdir` lock (macOS has no `flock`). A lock is stale when its owner pid is gone or it is
-# older than DB_LOCK_STALE_SECONDS (default 3600; a lock still being initialised counts as fresh). DB_LOCK_WAIT_SECONDS bounds the wait (default
+# Portable `mkdir` lock (macOS has no `flock`). A lock is stale only when its owner pid is gone, or
+# when it has no pid and is older than DB_LOCK_STALE_SECONDS (default 3600). A live owner is never
+# displaced. DB_LOCK_WAIT_SECONDS bounds the wait (default
 # 3600; 0 = forever).
 set -u
 
@@ -36,16 +37,18 @@ owner_pid() { cat "$lock_dir/pid" 2>/dev/null; }
 # mtime of the lock dir (BSD stat on macOS, GNU stat on Linux).
 lock_mtime() { stat -f %m "$lock_dir" 2>/dev/null || stat -c %Y "$lock_dir" 2>/dev/null || echo 0; }
 
+# A lock is stale only when its owner is provably gone: the pid file names a dead process, or the
+# lock never got a pid (the owner died between `mkdir` and writing it) and is older than the
+# threshold. A live owner is never displaced, however long it runs, so two commands can never hold
+# the lock at once (a wedged holder is bounded by DB_LOCK_WAIT_SECONDS on the waiters instead).
 lock_is_stale() {
 	local pid started now
 	pid=$(owner_pid)
-	if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-		return 0
+	if [ -n "$pid" ]; then
+		! kill -0 "$pid" 2>/dev/null
+		return
 	fi
-	# The owner writes pid/started right after `mkdir`. A lock that has no `started` yet is brand
-	# new, not ancient: fall back to the directory mtime so a waiter never steals it.
-	started=$(cat "$lock_dir/started" 2>/dev/null)
-	[ -n "$started" ] || started=$(lock_mtime)
+	started=$(lock_mtime)
 	now=$(date +%s)
 	[ $((now - started)) -ge "$stale_after" ]
 }
@@ -64,10 +67,14 @@ remove_stale_lock() {
 }
 
 held=0
+token="$$.$RANDOM$RANDOM.$(date +%s)"
 cleanup() {
 	if [ "$held" = "1" ]; then
-		rm -rf "$lock_dir"
 		held=0
+		# Release only a lock that is still ours: never delete a successor's lock.
+		if [ "$(cat "$lock_dir/token" 2>/dev/null)" = "$token" ]; then
+			rm -rf "$lock_dir"
+		fi
 	fi
 }
 # On a signal, clean up and exit with the conventional code; the child gets the same signal
@@ -97,6 +104,7 @@ until mkdir "$lock_dir" 2>/dev/null; do
 	waited=$((waited + 2))
 done
 held=1
+echo "$token" >"$lock_dir/token"
 echo $$ >"$lock_dir/pid"
 date +%s >"$lock_dir/started"
 [ "$announced" = "1" ] && echo "local Supabase lock acquired after ${waited}s" >&2
