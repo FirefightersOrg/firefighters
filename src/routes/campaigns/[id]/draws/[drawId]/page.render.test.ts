@@ -29,6 +29,18 @@ const data = (status: string, type = 'monthly') => ({
 	}
 });
 describe('draw detail render', () => {
+	it.each(['scheduled', 'roster_frozen'])(
+		'hides lifecycle controls without permission on %s',
+		(status) => {
+			const value = data(status);
+			value.can.annul = false;
+			value.can.complete = false;
+			const body = render(Page, { props: { data: value, form: null } as any }).body;
+			expect(body).not.toContain('action="?/annul"');
+			expect(body).not.toContain('action="?/complete"');
+			if (status === 'scheduled') expect(body).toContain('Edit scheduled draw');
+		}
+	);
 	it('offers generated extraordinary annulment but not ordinary or frozen annulment', () => {
 		for (const [status, type, allowed] of [
 			['roster_generated', 'extraordinary_full_payment', true],

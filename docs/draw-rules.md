@@ -162,7 +162,7 @@ Possible results:
   and a draft/active campaign (55000 otherwise),
   preserves draw type and only edits scheduled draws; changing the installment takes the campaign
   lock before the draw lock and remains bounded by the campaign's installment count.
-- There is no `draw.annul` permission in `docs/permissions.md`, so annulment uses `draw.update`.
+- Annulment requires the admin-only `draw.annul` permission (SAN-118), not `draw.update`.
   Originally only `scheduled -> annulled` was allowed; SAN-117 adds the narrow
   generated-extraordinary exception below. Frozen draws still cannot be annulled.
   Annulment has its own timestamp, actor and trimmed 1..1000-code-point reason.
@@ -439,7 +439,7 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
 
 ### Known gaps and decisions
 
-- **SAN-117:** implemented below; the prior extraordinary-number release gap is closed.
+- **SAN-117:** implemented below; the extraordinary-number release gap is closed.
 - **SAN-125 decision (supersedes SAN-81's pending question):** delivered prizes
   cannot be annulled; mistaken delivery uses a separate audited reversal.
 - **SAN-77 (inherited product question):** payment cutoff remains the inclusive
@@ -480,8 +480,8 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
 ## Implemented in SAN-123: completing a draw
 
 - `draw_complete(p_draw_id, p_request_id)` / `completeDraw` moves a draw from `roster_frozen` to
-  `completed` (the only path to that state). Permission: `draw.update`, like `draw_annul`, until
-  SAN-118 splits the draw permissions.
+  `completed` (the only path to that state). Permission: admin-only `draw.complete` (SAN-118).
+  `draw.update` does not authorize completion or annulment.
 - Preconditions: at least one resolved non-annulled prize (Santi, #93: a draw with no prizes, or
   only annulled ones, cannot complete), and no non-annulled prize of the draw in `pending_validation` (with or without a
   loaded number). `pending_delivery` counts as resolved: deliveries can be recorded after completion.
@@ -490,7 +490,18 @@ prizes that exclude from consolation`. Resolved means awarded, pending delivery,
   so concurrent prize writes serialize with the completion.
 - One `draw.complete` audit row with the before/after draw. After completion, prize creation and
   winner loading are refused; void-only prize annulment still works (SAN-81).
-- The draw detail page offers "Complete draw" only on frozen draws to users with `draw.update`.
+- The draw detail page offers "Complete draw" only on frozen draws to users with `draw.complete`.
+
+## SAN-118: independent lifecycle permissions
+
+- Migration `20270103000000_draw_annul_complete_permissions.sql` seeds `draw.annul` and
+  `draw.complete` for admin only, following Santi's Phase 12 decision. Existing `draw.update`
+  grants stay unchanged; there is no implied lifecycle grant for custom roles.
+- RPC signatures, validation, state transitions, locks, audit snapshots and execution grants
+  are unchanged. No lock change was made, so no new dblink test is needed; existing concurrency
+  tests remain part of the full database suite.
+- Service and route guards use the same independent permissions. Phase 2 navigation is
+  unchanged because no navigation flag or seeded non-admin grant changes.
 
 ## SAN-125 — audited delivery reversal
 

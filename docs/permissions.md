@@ -100,18 +100,20 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 ### Draws and prizes
 
-| Permission               | Description                                                       |
-| ------------------------ | ----------------------------------------------------------------- |
-| `draw.view`              | View draws.                                                       |
-| `draw.create`            | Create draws.                                                     |
-| `draw.update`            | Edit scheduled draws.                                             |
-| `draw.generate_roster`   | Generate roster.                                                  |
-| `draw.freeze_roster`     | Freeze roster.                                                    |
-| `draw.load_winner`       | Load winning number.                                              |
-| `prize.resolve`          | Resolve award or non-award.                                       |
-| `prize.deliver`          | Record prize delivery.                                            |
-| `prize.annul`            | Annul an undelivered prize (admin only).                          |
-| `prize.reverse_delivery` | Reverse a mistaken delivery with a mandatory reason (admin only). |
+| Permission               | Description                                                            |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `draw.view`              | View draws.                                                            |
+| `draw.create`            | Create draws.                                                          |
+| `draw.update`            | Edit scheduled draws.                                                  |
+| `draw.annul`             | Annul scheduled draws, and generated extraordinary draws (admin only). |
+| `draw.complete`          | Complete frozen draws (admin only).                                    |
+| `draw.generate_roster`   | Generate roster.                                                       |
+| `draw.freeze_roster`     | Freeze roster.                                                         |
+| `draw.load_winner`       | Load winning number.                                                   |
+| `prize.resolve`          | Resolve award or non-award.                                            |
+| `prize.deliver`          | Record prize delivery.                                                 |
+| `prize.annul`            | Annul an undelivered prize (admin only).                               |
+| `prize.reverse_delivery` | Reverse a mistaken delivery with a mandatory reason (admin only).      |
 
 ### Reports, audit, and users
 
@@ -155,6 +157,8 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `commission.rule_manage` |   yes |       no |        no |        no |        no |
 | `commission.adjust`      |   yes |       no |       yes |        no |        no |
 | `draw.view`              |   yes |      yes |       yes |        no |        no |
+| `draw.annul`             |   yes |       no |        no |        no |        no |
+| `draw.complete`          |   yes |       no |        no |        no |        no |
 | `draw.freeze_roster`     |   yes |       no |       yes |        no |        no |
 | `draw.load_winner`       |   yes |      yes |       yes |        no |        no |
 | `prize.annul`            |   yes |       no |        no |        no |        no |

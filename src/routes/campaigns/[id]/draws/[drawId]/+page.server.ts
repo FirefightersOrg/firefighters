@@ -84,12 +84,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			edit: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),
 			annul:
 				canTransitionDraw(draw.data.status, 'annulled', draw.data.drawType) &&
-				hasPermissionIn(locals.permissions, 'draw.update'),
+				hasPermissionIn(locals.permissions, 'draw.annul'),
 			generate: scheduled && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			regenerate: generated && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			freeze: generated && hasPermissionIn(locals.permissions, 'draw.freeze_roster'),
 			complete:
-				draw.data.status === 'roster_frozen' && hasPermissionIn(locals.permissions, 'draw.update')
+				draw.data.status === 'roster_frozen' && hasPermissionIn(locals.permissions, 'draw.complete')
 		}
 	};
 };
@@ -122,7 +122,7 @@ export const actions: Actions = {
 		}
 	},
 	annul: async ({ request, locals, params, url }) => {
-		const denied = guard(locals, 'draw.update', 'annul');
+		const denied = guard(locals, 'draw.annul', 'annul');
 		if (denied) return denied;
 		requireCampaignViewer(locals, url);
 		const scoped = await scopedDraw(locals, params, 'annul');
@@ -150,7 +150,7 @@ export const actions: Actions = {
 		}
 	},
 	complete: async ({ locals, params, url }) => {
-		const denied = guard(locals, 'draw.update', 'complete');
+		const denied = guard(locals, 'draw.complete', 'complete');
 		if (denied) return denied;
 		requireCampaignViewer(locals, url);
 		const scoped = await scopedDraw(locals, params, 'complete');
