@@ -40,6 +40,6 @@
 		class={cn(CONTROL_CLASS, mono && 'font-mono text-[15px]', prefix && 'pl-9', className)}
 		aria-invalid={isInvalid ? 'true' : undefined}
 		aria-describedby={joinIds(describedby, field?.describedBy)}
-		aria-required={rest.required || !field?.required ? undefined : 'true'}
+		required={rest.required || field?.required || undefined}
 	/>
 </div>

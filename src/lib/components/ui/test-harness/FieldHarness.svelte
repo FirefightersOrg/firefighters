@@ -4,6 +4,7 @@
 	import TextInput from '../TextInput.svelte';
 	import Select from '../Select.svelte';
 	import Textarea from '../Textarea.svelte';
+	import Checkbox from '../Checkbox.svelte';
 
 	let {
 		control,
@@ -12,7 +13,7 @@
 		optional,
 		required
 	}: {
-		control: 'text' | 'select' | 'textarea';
+		control: 'text' | 'select' | 'textarea' | 'checkbox';
 		hint?: string;
 		error?: string;
 		optional?: boolean;
@@ -25,6 +26,8 @@
 		<TextInput name="name" />
 	{:else if control === 'select'}
 		<Select name="name" options={['a', 'b']} placeholder="Elegir…" />
+	{:else if control === 'checkbox'}
+		<Checkbox name="name" />
 	{:else}
 		<Textarea name="name" />
 	{/if}

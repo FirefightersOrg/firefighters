@@ -7,8 +7,8 @@ export const COLLECTOR_STATUSES = ['active', 'inactive'] as const;
 export type CollectorStatus = (typeof COLLECTOR_STATUSES)[number];
 
 export const COLLECTOR_STATUS_LABELS: Record<CollectorStatus, string> = {
-	active: 'Active',
-	inactive: 'Inactive'
+	active: 'Activo',
+	inactive: 'Inactivo'
 };
 
 export const BUYER_TYPES = ['individual', 'business'] as const;

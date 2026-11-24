@@ -128,4 +128,4 @@ Cimiento no tiene logotipo: el nombre del producto se compone en `heading-3` con
 - Cada campo tiene `<label>`; ayudas y errores enlazados con `aria-describedby`; `aria-invalid` en campos con error.
 - Alertas de error con `role="alert"`; avisos y confirmaciones con `role="status"`.
 - Diálogos con `aria-modal`, foco atrapado y devuelto al cerrar; `Esc` cierra.
-- `lang="es"` en el documento.
+- `lang="es-AR"` en el documento.

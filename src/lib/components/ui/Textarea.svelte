@@ -30,4 +30,4 @@
 	class={cn(CONTROL_CLASS, 'min-h-24 resize-y', className)}
 	aria-invalid={isInvalid ? 'true' : undefined}
 	aria-describedby={joinIds(describedby, field?.describedBy)}
-	aria-required={rest.required || !field?.required ? undefined : 'true'}></textarea>
+	required={rest.required || field?.required || undefined}></textarea>

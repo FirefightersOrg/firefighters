@@ -15,6 +15,17 @@ pnpm dev
 
 Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `pnpm format`, `pnpm format:check`. Stop Supabase with `supabase stop`.
 
+**Testing against the local Supabase:** there is one local stack per machine, shared by every worktree. Two runs at once (integration suites, `db reset`, pgTAP) corrupt each other's data and starve auth, which shows up as "Could not load the permissions (my_permissions)", PGRST303 sign-in errors and "Hook timed out" failures. Run anything that touches the local DB through the lock, which queues callers across all worktrees (`scripts/with-db-lock.sh`, a `mkdir` lock in the git common dir with stale-lock recovery):
+
+```bash
+pnpm db:reset            # supabase db reset
+pnpm db:test             # supabase test db (pgTAP)
+APP_ENV=local pnpm seed:admin
+APP_ENV=local pnpm test:integration
+```
+
+Prefer these over calling `supabase db reset` / `supabase test db` directly. A waiting run prints "waiting for local Supabase lock…" and proceeds when the holder finishes. Tune with `DB_LOCK_WAIT_SECONDS` and `DB_LOCK_STALE_SECONDS`. `pnpm seed:admin` also goes through the lock (it writes Auth users, profiles and roles). If the Supabase CLI is not on your `PATH`, set `SUPABASE_BIN` to the path of the binary (default: `supabase`).
+
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
 **Hosted Supabase Auth settings:** `supabase/config.toml` only configures the local stack. In the hosted project (Dashboard → Authentication), set the minimum password length to 8 to match the app's Zod schema and `minimum_password_length` in `config.toml`. Auth enforces it on password updates but not on admin user creation, which relies on the Zod check.

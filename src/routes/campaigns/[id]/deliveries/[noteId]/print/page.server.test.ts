@@ -70,7 +70,7 @@ describe('/campaigns/[id]/deliveries/[noteId]/print', () => {
 		vi.mocked(listDeliveryNoteBonds).mockResolvedValue({ data: [], error: null });
 		const data = (await load(event(setup())))!;
 		expect(data.document).toMatchObject({
-			deliveryNoteNumber: 'Note 0003',
+			deliveryNoteNumber: 'Remito 0003',
 			collector: 'Ana',
 			bondCount: 0
 		});
@@ -104,5 +104,50 @@ describe('/campaigns/[id]/deliveries/[noteId]/print', () => {
 			'[deliveries] print load failed',
 			expect.objectContaining({ noteId: NOTE_ID, error: expect.any(Error) })
 		);
+	});
+});
+
+describe('delivery note registering user (SAN-122)', () => {
+	const note = {
+		id: NOTE_ID,
+		campaignId: CAMPAIGN_ID,
+		noteNumber: 3,
+		collectorId: 'c',
+		collectorName: 'Ana',
+		status: 'issued',
+		reason: 'delivery',
+		issuedAt: '2026-11-18T15:30:00Z',
+		createdBy: 'u',
+		createdByName: null,
+		notes: null,
+		bondCount: 0
+	};
+	const withRpc = (rpc: { data: unknown; error: unknown }) => {
+		const mock = mockSupabase({
+			tables: { campaigns: { data: campaignRow(), error: null } },
+			rpc: rpc as never
+		});
+		return { mock, locals: makeLocals({ supabase: mock.supabase, permissions: VIEWER }) };
+	};
+	beforeEach(() => {
+		vi.mocked(getDeliveryNote).mockResolvedValue({
+			data: { note, bondIds: [] },
+			error: null
+		} as never);
+		vi.mocked(listDeliveryNoteBonds).mockResolvedValue({ data: [], error: null });
+	});
+	it('shows the name from document_actor_name instead of the unreadable profile', async () => {
+		const { mock, locals } = withRpc({ data: 'Operator Two', error: null });
+		const data = (await load(event(locals)))!;
+		expect(data.document).toMatchObject({ registeredBy: 'Operator Two' });
+		expect(mock.rpc).toHaveBeenCalledWith('document_actor_name', {
+			p_kind: 'delivery_note',
+			p_id: NOTE_ID
+		});
+	});
+	it('answers 500 when the lookup fails', async () => {
+		await expect(
+			load(event(withRpc({ data: null, error: { code: '42501', message: 'denied' } }).locals))
+		).rejects.toMatchObject({ status: 500 });
 	});
 });

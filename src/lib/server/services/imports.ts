@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from '$lib/domain/campaigns';
+import { statusWord } from '$lib/domain/status-word';
 import { compileBarcodePattern } from '$lib/domain/barcodes';
 import {
 	IMPORT_BATCH_MAX_ROWS,
@@ -118,8 +118,7 @@ export function mapImportRpcError(rpcError: PostgrestLikeError): ImportServiceEr
 		case '55000': {
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
-				const label =
-					CAMPAIGN_STATUS_LABELS[window[1] as CampaignStatus]?.toLowerCase() ?? window[1];
+				const label = statusWord(window[1]);
 				return err('conflict', `${IMPORT_MESSAGES.campaignLocked} This campaign is ${label}.`);
 			}
 			if (

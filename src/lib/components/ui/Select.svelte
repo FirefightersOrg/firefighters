@@ -48,7 +48,7 @@
 		)}
 		aria-invalid={isInvalid ? 'true' : undefined}
 		aria-describedby={joinIds(describedby, field?.describedBy)}
-		aria-required={rest.required || !field?.required ? undefined : 'true'}
+		required={rest.required || field?.required || undefined}
 	>
 		{#if placeholder}
 			<option value="" disabled selected={value === undefined || value === ''}>{placeholder}</option

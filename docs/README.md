@@ -20,6 +20,7 @@ This folder contains the functional, technical, and operational design of the Fi
 - `screens.md`: priority screens and functional experience.
 - `draw-rules.md`: draw rules, rosters, and winners.
 - `documents.md`: printable HTML delivery notes and certificates.
+- `copy.md`: Spanish UI voice, formatting rules (`src/lib/format.ts`) and domain glossary.
 - `corrections.md`: annulled and audited corrections.
 
 ## Technical documents

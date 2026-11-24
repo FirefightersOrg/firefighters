@@ -111,7 +111,7 @@ describe('Button', () => {
 });
 
 describe('Field wiring', () => {
-	it.each(['text', 'select', 'textarea'] as const)(
+	it.each(['text', 'select', 'textarea', 'checkbox'] as const)(
 		'links label, hint and error to a %s',
 		(control) => {
 			const out = html(FieldHarness, {
@@ -141,11 +141,22 @@ describe('Field wiring', () => {
 		expect(out).not.toMatch(/\saria-invalid=/);
 	});
 
-	it('adds (opcional) and aria-required', () => {
+	it('adds (opcional)', () => {
 		expect(html(FieldHarness, { control: 'text', optional: true })).toContain('(opcional)');
-		expect(html(FieldHarness, { control: 'text', required: true })).toContain(
-			'aria-required="true"'
-		);
+	});
+
+	it.each(['text', 'select', 'textarea', 'checkbox'] as const)(
+		'passes the native required attribute to a %s',
+		(control) => {
+			const out = html(FieldHarness, { control, required: true });
+			expect(out).toMatch(/<(input|select|textarea)[^>]*\srequired/);
+		}
+	);
+
+	it('does not nest labels around a Checkbox inside a Field', () => {
+		const out = html(FieldHarness, { control: 'checkbox', hint: 'Ayuda' });
+		expect(out.match(/<label/g)).toHaveLength(1);
+		expect(out).toContain('type="checkbox"');
 	});
 
 	it('generates an id when none is given', () => {
