@@ -3,6 +3,7 @@ import { statusWord } from '$lib/domain/status-word';
 import { BOND_COMMERCIAL_STATUSES } from '$lib/domain/bonds';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Bond delivery use cases (SAN-54). Each one calls an audited SQL function with the USER-SCOPED
@@ -47,7 +48,7 @@ export const DELIVERY_MESSAGES = {
 	collectorNotFound: 'Cobrador no encontrado.',
 	campaignLocked:
 		'Los bonos solo se pueden entregar o cambiar mientras la campaña está en borrador o activa.',
-	internal: 'Algo salió mal. Volver a intentar.',
+	internal: GENERIC_ERROR_MESSAGE,
 	invalid: 'Hay valores inválidos. Revisarlos.'
 } as const;
 

@@ -290,7 +290,7 @@ const NOT_SELLABLE: Record<string, string> = {
 	created: 'Todavía no se entregó a un cobrador: primero hay que entregarlo.',
 	returned: 'Fue devuelto y no está en poder de un cobrador.',
 	sold: 'Ya está vendido.',
-	lost: 'Se marcó como perdido.',
+	lost: 'Se marcó como extraviado.',
 	annulled: 'Fue anulado.',
 	closed: 'Está cerrado.'
 };

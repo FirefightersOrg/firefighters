@@ -225,7 +225,7 @@ describe('requirePermission', () => {
 		await expect(requirePermission(client, 'user.manage')).rejects.toMatchObject({
 			status: 500,
 			body: {
-				message: 'Permission check failed',
+				message: 'No se pudo verificar el permiso. Volver a intentar.',
 				code: 'permission_check_failed',
 				permission: 'user.manage'
 			}
@@ -311,7 +311,7 @@ describe('request-scoped checks (hasPermissionIn / requirePermissionIn)', () => 
 			expect(err).toMatchObject({
 				status: 500,
 				body: {
-					message: 'Permission check failed',
+					message: 'No se pudo verificar el permiso. Volver a intentar.',
 					code: 'permission_check_failed',
 					permission: 'campaign.view'
 				}

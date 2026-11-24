@@ -29,6 +29,7 @@ import { correctSettlement } from '$lib/server/services/sale-corrections';
 import { PAYMENT_ANNULMENT_REASON_MAX } from '$lib/domain/payments';
 import { centsToDecimalString, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 const uuid = z.guid();
 const field = (f: FormData, n: string) => String(f.get(n) ?? '').trim();
 const denied = (locals: App.Locals, permission: PermissionCode) =>
@@ -104,7 +105,7 @@ function serviceFailure(err: unknown, form: string, values: Record<string, strin
 		form,
 		values,
 		errors: {},
-		message: e?.message ?? 'Algo salió mal. Volver a intentar.'
+		message: e?.message ?? GENERIC_ERROR_MESSAGE
 	});
 }
 async function settlementForPaymentCorrection(

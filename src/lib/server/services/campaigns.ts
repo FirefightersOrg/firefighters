@@ -9,6 +9,7 @@ import type {
 	CampaignTransitionInput
 } from '$lib/schemas/campaign';
 import { CAMPAIGN_NAME_MAX_LENGTH } from '$lib/schemas/campaign';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Campaign use cases. Every write calls one audited SQL function with the USER-SCOPED client
@@ -62,7 +63,7 @@ interface PostgrestLikeError {
 export const CAMPAIGN_MESSAGES = {
 	permission: 'No hay permiso para esta acción.',
 	notFound: 'Campaña no encontrada.',
-	internal: 'Something went wrong. Please try again.',
+	internal: GENERIC_ERROR_MESSAGE,
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
 	activationNeedsDates: 'Definir las fechas de inicio y de fin antes de activar la campaña.',
 	datesCannotBeCleared:
