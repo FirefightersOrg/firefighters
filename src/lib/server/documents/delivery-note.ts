@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/public';
+import { formatDateTime } from '$lib/format';
 import { deliveryNoteLabel, type DeliveryNote } from '$lib/domain/deliveries';
 import { formatCampaignNumber } from '$lib/domain/numbering';
 import { campaignNumberingConfig } from '$lib/domain/campaigns';
@@ -81,11 +82,7 @@ export function buildPrintableDeliveryNote(
 		reason: note.reason,
 		status: note.status,
 		// The institution works in Argentina: print the local date of the delivery.
-		date: new Intl.DateTimeFormat('es-AR', {
-			dateStyle: 'short',
-			timeStyle: 'short',
-			timeZone: 'America/Argentina/Buenos_Aires'
-		}).format(new Date(note.issuedAt)),
+		date: formatDateTime(note.issuedAt),
 		collector: note.collectorName ?? 'Collector',
 		registeredBy: note.createdByName ?? 'User',
 		deliveredBonds,

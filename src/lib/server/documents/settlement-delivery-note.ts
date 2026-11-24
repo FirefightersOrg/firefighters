@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import { formatMoney } from '$lib/domain/money';
+import { formatDateTime, formatMoney, formatPaddedNumber } from '$lib/format';
 import { formatCampaignNumber } from '$lib/domain/numbering';
 import { campaignNumberingConfig } from '$lib/domain/campaigns';
 import type { Campaign } from '$lib/domain/campaigns';
@@ -41,14 +41,8 @@ export interface PrintableSettlementDeliveryNote extends SettlementPrintSource {
 	collectorSignature: string;
 	administrationSignature: string;
 }
-const date = (value: string | null) =>
-	value
-		? new Intl.DateTimeFormat('es-AR', {
-				dateStyle: 'short',
-				timeStyle: 'short',
-				timeZone: 'America/Argentina/Buenos_Aires'
-			}).format(new Date(value))
-		: '—';
+const date = (value: string | null) => formatDateTime(value);
+const money = (value: string) => formatMoney(value, { decimals: 'always' });
 /** Builds all 20 fields mandated for a settlement delivery note. Open settlements are explicitly preliminary. */
 export function buildPrintableSettlementDeliveryNote(
 	campaign: Campaign,
@@ -59,7 +53,7 @@ export function buildPrintableSettlementDeliveryNote(
 		...source,
 		institutionName,
 		campaign: campaign.name,
-		settlementNumberLabel: `Settlement ${String(source.settlementNumber).padStart(4, '0')}`,
+		settlementNumberLabel: `Settlement ${formatPaddedNumber(source.settlementNumber, 4)}`,
 		openingDate: date(source.openedAt),
 		closingDate: date(source.closedAt),
 		preliminary: source.status === 'open',
@@ -67,7 +61,7 @@ export function buildPrintableSettlementDeliveryNote(
 		collectorSignature: 'Collector signature',
 		administrationSignature: 'Administration signature',
 		totals: Object.fromEntries(
-			Object.entries(source.totals).map(([key, value]) => [key, formatMoney(value)])
+			Object.entries(source.totals).map(([key, value]) => [key, money(value)])
 		) as SettlementPrintSource['totals'],
 		payments: source.payments.map((payment) => ({
 			...payment,
@@ -79,7 +73,7 @@ export function buildPrintableSettlementDeliveryNote(
 						: number
 				)
 				.join(', '),
-			amount: formatMoney(payment.amount)
+			amount: money(payment.amount)
 		}))
 	};
 }
