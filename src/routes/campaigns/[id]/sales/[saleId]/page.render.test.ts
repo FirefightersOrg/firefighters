@@ -47,15 +47,15 @@ describe('sale detail', () => {
 		});
 		expect(body).toContain('?/correctBuyer');
 		expect(body).toContain('?/correctCollector');
-		expect(body).toContain('compensate historical commission');
-		expect(body).toContain('database');
+		expect(body).toContain('compensa la comisión histórica');
+		expect(body).toContain('base de datos');
 		expect(body).not.toContain('maxlength=');
 	});
 	it('warns when the buyer selector shows only part of the buyers', () => {
 		const buyers = [{ id: 'b1', firstName: 'Bea', lastName: 'Buyer', businessName: null }];
 		const truncated = page({ buyers, buyersTotal: 750, collectors: [] });
 		expect(truncated).toContain('data-testid="buyers-truncated"');
-		expect(truncated).toContain('Showing the first 1 of 750 buyers');
+		expect(truncated).toContain('Se muestran los primeros 1 de 750');
 		expect(page({ buyers, buyersTotal: 1, collectors: [] })).not.toContain('buyers-truncated');
 	});
 });

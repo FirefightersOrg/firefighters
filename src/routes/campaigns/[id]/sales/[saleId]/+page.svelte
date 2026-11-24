@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
-	import { PAYMENT_MODE_LABELS, INSTALLMENT_STATUS_LABELS } from '$lib/domain/sales';
-	import { formatMoney } from '$lib/domain/money';
+		Alert,
+		Button,
+		Card,
+		Field,
+		PageHeader,
+		Select,
+		StatusBadge,
+		Table,
+		Textarea
+	} from '$lib/components/ui';
+	import type { TableColumn } from '$lib/components/ui';
+	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
+	import type { BondFinancialStatus } from '$lib/domain/bonds';
+	import { formatDate, formatMoney } from '$lib/format';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
@@ -24,26 +30,63 @@
 			)
 			.join(', ')
 	);
+	const installments = $derived(
+		data.sale.installments.map((i) => ({
+			id: i.id,
+			installmentNumber: i.installmentNumber,
+			dueDate: i.dueDate,
+			amount: i.amount,
+			status: i.status
+		}))
+	);
+	type Installment = (typeof installments)[number];
+	const columns: TableColumn<Installment>[] = [
+		{ key: 'installmentNumber', header: 'N.º', align: 'right' },
+		{ key: 'dueDate', header: 'Vencimiento' },
+		{ key: 'amount', header: 'Importe', align: 'right' },
+		{ key: 'status', header: 'Estado' }
+	];
+	const buyerOptions = $derived([
+		{ value: '', label: 'Elegir…' },
+		...(data.correction?.buyers ?? []).map((buyer) => ({
+			value: buyer.id,
+			label: buyer.businessName ?? [buyer.firstName, buyer.lastName].filter(Boolean).join(' ')
+		}))
+	]);
+	const collectorOptions = $derived([
+		{ value: '', label: 'Elegir…' },
+		...(data.correction?.collectors ?? []).map((c) => ({ value: c.id, label: c.displayName }))
+	]);
+	const link = 'rounded-sm text-primary-text underline-offset-2 hover:underline';
 </script>
 
-<svelte:head><title>Sale - {data.campaign.name}</title></svelte:head>
+<svelte:head><title>Venta - {data.campaign.name}</title></svelte:head>
+
+<PageHeader
+	title="Venta del bono {bondLabel}"
+	description="{PAYMENT_MODE_LABELS[data.sale.sale.paymentMode]} · {formatMoney(
+		data.sale.sale.totalAmount,
+		{ decimals: 'always' }
+	)}"
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
+		{ label: 'Ventas', href: resolve('/campaigns/[id]/sales', { id: data.campaign.id }) },
+		{ label: bondLabel }
+	]}
+/>
+
 <div class="space-y-6">
-	<a
-		class="text-sm text-blue-700 hover:underline"
-		href={resolve('/campaigns/[id]/sales', { id: data.campaign.id })}>← Sales</a
-	>
-	<h1 class="text-2xl font-bold">Sale</h1>
-	{#if form?.message}<FormAlert
-			kind={form.success ? 'success' : 'error'}
-			message={form.message}
-		/>{/if}
-	<section class={cardClass}>
-		<dl class="grid gap-3 text-sm sm:grid-cols-3">
+	{#if form?.message}
+		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
+	{/if}
+	<Card title="Datos de la venta">
+		<dl class="grid gap-3 text-body sm:grid-cols-3">
 			<div>
-				<dt>Bond</dt>
+				<dt class="text-muted">Bono</dt>
 				<dd>
 					<a
-						class="text-blue-700 underline"
+						class={link}
 						href={resolve('/campaigns/[id]/bonds/[bondId]', {
 							id: data.campaign.id,
 							bondId: data.sale.bondId
@@ -52,10 +95,10 @@
 				</dd>
 			</div>
 			<div>
-				<dt>Buyer</dt>
+				<dt class="text-muted">Comprador</dt>
 				<dd>
 					<a
-						class="text-blue-700 underline"
+						class={link}
 						href={resolve('/campaigns/[id]/buyers/[buyerId]', {
 							id: data.campaign.id,
 							buyerId: data.sale.sale.buyerId
@@ -64,10 +107,10 @@
 				</dd>
 			</div>
 			<div>
-				<dt>Collector</dt>
+				<dt class="text-muted">Cobrador</dt>
 				<dd>
 					<a
-						class="text-blue-700 underline"
+						class={link}
 						href={resolve('/campaigns/[id]/collectors/[collectorId]', {
 							id: data.campaign.id,
 							collectorId: data.sale.sale.collectorId
@@ -76,79 +119,75 @@
 				</dd>
 			</div>
 			<div>
-				<dt>Modality</dt>
+				<dt class="text-muted">Modalidad</dt>
 				<dd>{PAYMENT_MODE_LABELS[data.sale.sale.paymentMode]}</dd>
 			</div>
 			<div>
-				<dt>Total</dt>
-				<dd>{formatMoney(data.sale.sale.totalAmount)}</dd>
+				<dt class="text-muted">Total</dt>
+				<dd class="tabular-nums">
+					{formatMoney(data.sale.sale.totalAmount, { decimals: 'always' })}
+				</dd>
 			</div>
 			<div>
-				<dt>Financial status snapshot</dt>
-				<dd>{data.financialStatusSnapshot.replaceAll('_', ' ')}</dd>
+				<dt class="text-muted">Estado financiero</dt>
+				<dd>
+					<StatusBadge
+						kind="bondFinancial"
+						status={data.financialStatusSnapshot as BondFinancialStatus}
+					/>
+				</dd>
 			</div>
 		</dl>
-	</section>
-	{#if data.correction}<section class={cardClass}>
-			<h2 class="font-semibold">Audited corrections</h2>
-			<p class="mt-1 text-xs text-amber-800">
-				<strong>Indicative preview:</strong> buyer changes do not move ledger entries. Collector changes
-				compensate historical commission between collectors using current rule precedence; persisted database
-				calculations are authoritative.
-			</p>
-			<div class="mt-3 grid gap-4 sm:grid-cols-2">
-				<form method="POST" action="?/correctBuyer" class="space-y-2">
-					<label class={labelClass} for="newBuyerId">Correct buyer</label>
-					<select class={inputClass} id="newBuyerId" name="newBuyerId" required
-						><option value="">Choose…</option
-						>{#each data.correction.buyers as buyer (buyer.id)}<option value={buyer.id}
-								>{buyer.businessName ??
-									[buyer.firstName, buyer.lastName].filter(Boolean).join(' ')}</option
-							>{/each}</select
-					>
-					{#if (data.correction.buyersTotal ?? 0) > data.correction.buyers.length}<p
-							class="text-xs text-amber-800"
-							data-testid="buyers-truncated"
-						>
-							Showing the first {data.correction.buyers.length} of {data.correction.buyersTotal} buyers.
-							If the right buyer is missing, open their record from the buyers list.
-						</p>{/if}
-					<label class={labelClass} for="buyer-reason">Reason (max. 1000 Unicode characters)</label>
-					<textarea class={inputClass} id="buyer-reason" name="reason" required></textarea>
-					<button class={secondaryButtonClass}>Confirm buyer correction</button>
+	</Card>
+
+	{#if data.correction}
+		<Card title="Correcciones auditadas">
+			<Alert tone="info">
+				<strong>Vista indicativa:</strong> cambiar el comprador no mueve la cuenta corriente. Cambiar
+				el cobrador compensa la comisión histórica entre cobradores según la prioridad de reglas vigente;
+				los cálculos guardados en la base de datos son los que valen.
+			</Alert>
+			<div class="mt-4 grid gap-6 sm:grid-cols-2">
+				<form method="POST" action="?/correctBuyer" class="space-y-3">
+					<Field label="Comprador correcto" id="newBuyerId" required>
+						<Select name="newBuyerId" options={buyerOptions} value="" />
+					</Field>
+					{#if (data.correction.buyersTotal ?? 0) > data.correction.buyers.length}
+						<p class="text-body-sm text-muted" data-testid="buyers-truncated">
+							Se muestran los primeros {data.correction.buyers.length} de {data.correction
+								.buyersTotal}
+							compradores. Si falta el correcto, abrí su ficha desde el listado de compradores.
+						</p>
+					{/if}
+					<Field label="Motivo" id="buyer-reason" required hint="Hasta 1000 caracteres.">
+						<Textarea name="reason" />
+					</Field>
+					<Button type="submit">Confirmar corrección del comprador</Button>
 				</form>
-				<form method="POST" action="?/correctCollector" class="space-y-2">
-					<label class={labelClass} for="newCollectorId">Correct collector</label>
-					<select class={inputClass} id="newCollectorId" name="newCollectorId" required
-						><option value="">Choose…</option
-						>{#each data.correction.collectors as collector (collector.id)}<option
-								value={collector.id}>{collector.displayName}</option
-							>{/each}</select
-					>
-					<label class={labelClass} for="collector-reason"
-						>Reason (max. 1000 Unicode characters)</label
-					>
-					<textarea class={inputClass} id="collector-reason" name="reason" required></textarea>
-					<button class={secondaryButtonClass}>Confirm collector correction</button>
+				<form method="POST" action="?/correctCollector" class="space-y-3">
+					<Field label="Cobrador correcto" id="newCollectorId" required>
+						<Select name="newCollectorId" options={collectorOptions} value="" />
+					</Field>
+					<Field label="Motivo" id="collector-reason" required hint="Hasta 1000 caracteres.">
+						<Textarea name="reason" />
+					</Field>
+					<Button type="submit">Confirmar corrección del cobrador</Button>
 				</form>
 			</div>
-		</section>{/if}
-	<section class={cardClass}>
-		<h2 class="mb-3 font-semibold">Installment schedule</h2>
-		<table class="min-w-full text-sm">
-			<thead
-				><tr
-					><th class="text-left">#</th><th class="text-left">Due date</th><th class="text-left"
-						>Amount</th
-					><th class="text-left">Status</th></tr
-				></thead
-			><tbody
-				>{#each data.sale.installments as installment (installment.id)}<tr
-						><td>{installment.installmentNumber}</td><td>{installment.dueDate}</td><td
-							>{formatMoney(installment.amount)}</td
-						><td>{INSTALLMENT_STATUS_LABELS[installment.status]}</td></tr
-					>{/each}</tbody
-			>
-		</table>
-	</section>
+		</Card>
+	{/if}
+
+	<Table {columns} rows={installments} caption="Plan de cuotas">
+		{#snippet cell({ row, column })}
+			{#if column.key === 'installmentNumber'}
+				<span class="tabular-nums">{row.installmentNumber}</span>
+			{:else if column.key === 'dueDate'}
+				{formatDate(row.dueDate)}
+			{:else if column.key === 'amount'}
+				<span class="tabular-nums">{formatMoney(row.amount, { decimals: 'always' })}</span>
+			{:else}
+				<StatusBadge kind="installment" status={row.status} />
+			{/if}
+		{/snippet}
+	</Table>
 </div>
