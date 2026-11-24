@@ -27,6 +27,11 @@
 				{:else if doc.status === 'corrected'}
 					<p class="doc-legend">CORREGIDA — RENDICIÓN SIN VALIDEZ</p>
 				{/if}
+				{#if doc.balanceSnapshotMissing}
+					<p class="doc-legend doc-legend-draft">
+						Saldo al cierre no registrado — documento histórico
+					</p>
+				{/if}
 			</div>
 			<div class="doc-meta">
 				<p class="doc-copy">{copy}</p>

@@ -22,6 +22,7 @@ describe('printable payments repository', () => {
 		const result = await getPaymentCertificate(supabase, 'campaign', 'payment');
 		expect(result.data?.payment.paymentDate).toBe('2026-11-18');
 		expect(result.data?.payment.createdAt).toBe('2026-11-18T15:30:00Z');
+		expect(result.data?.payment.legend).toBeNull();
 	});
 
 	it.each(['closed', 'annulled', 'corrected'])(
@@ -40,7 +41,8 @@ describe('printable payments repository', () => {
 							total_amount: '150.00',
 							commission_amount: '10.00',
 							commission_paid_amount: '10.00',
-							net_to_firefighters: '140.00'
+							net_to_firefighters: '140.00',
+							collector_balance_at_close: '23.45'
 						},
 						error: null
 					},
@@ -52,13 +54,12 @@ describe('printable payments repository', () => {
 			});
 			const result = await getSettlementPrint(supabase, 'campaign', 'settlement');
 			expect(result.error).toBeNull();
-			expect(result.data?.totals).toMatchObject({ amount: '150.00', balance: '0.00' });
+			expect(result.data?.totals).toMatchObject({ amount: '150.00', balance: '23.45' });
+			expect(result.data?.balanceSnapshotMissing).toBe(false);
 			expect(result.data?.payments).toHaveLength(1);
 			expect(result.data?.payments[0].amount).toBe('100.00');
 			expect(chains.payments[0].in).toHaveBeenCalledWith('status', ['confirmed']);
-			expect(rpc).toHaveBeenCalledWith('settlement_totals', {
-				p_settlement_id: 'settlement'
-			});
+			expect(rpc).not.toHaveBeenCalled();
 		}
 	);
 });

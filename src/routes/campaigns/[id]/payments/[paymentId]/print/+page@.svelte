@@ -22,6 +22,13 @@
 			<p class="doc-number">{doc.receiptNumber}</p>
 		</div>
 	</header>
+	{#if doc.legend}
+		<section class="doc-legend" aria-label="Estado del comprobante">
+			<strong>{doc.legend.label}</strong>
+			<p>{doc.legend.detail}</p>
+			{#if doc.legend.reference}<p>{doc.legend.reference}</p>{/if}
+		</section>
+	{/if}
 	<dl class="doc-fields doc-fields-2">
 		<div>
 			<dt>Bono</dt>
