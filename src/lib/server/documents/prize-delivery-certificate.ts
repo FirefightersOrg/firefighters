@@ -1,21 +1,13 @@
 import { env } from '$env/dynamic/public';
+import { formatDate, formatDateTime } from '$lib/format';
 import { campaignNumberingConfig, type Campaign } from '$lib/domain/campaigns';
 import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
 import { formatCampaignNumber } from '$lib/domain/numbering';
 import type { PrizeCertificateSource } from '$lib/server/repositories/printable-prizes';
 
-const instant = (value: string) =>
-	new Intl.DateTimeFormat('es-AR', {
-		dateStyle: 'short',
-		timeStyle: 'short',
-		timeZone: 'America/Argentina/Buenos_Aires'
-	}).format(new Date(value));
-const calendarDate = (value: string) => {
-	const [year, month, day] = value.split('-').map(Number);
-	return new Intl.DateTimeFormat('es-AR', { dateStyle: 'short' }).format(
-		new Date(year, month - 1, day)
-	);
-};
+/** Instant in Buenos Aires, 24 h (docs/copy.md): `31/12/2026, 23:30`. */
+const instant = (value: string) => formatDateTime(value);
+const calendarDate = (value: string) => formatDate(value);
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 export const frozenBuyerLabel = (snapshot: Record<string, unknown> | null) =>
 	text(snapshot?.business_name) ||
@@ -52,17 +44,17 @@ export function buildPrintablePrizeDeliveryCertificate(
 		prize: `#${source.prizePosition} — ${source.prizeName}`,
 		winningNumber:
 			source.winningNumber === null
-				? 'Not loaded'
+				? 'Sin cargar'
 				: formatCampaignNumber(source.winningNumber, campaignNumberingConfig(campaign)),
 		associatedBond: source.bondLabel || source.bondId || '—',
 		buyer: frozenBuyerLabel(source.buyerSnapshot),
 		collector: text(source.collectorSnapshot?.display_name) || '—',
-		rosterStatus: source.rosterEligible ? 'Eligible' : 'Not eligible',
+		rosterStatus: source.rosterEligible ? 'Habilitado' : 'No habilitado',
 		deliveryDate: instant(source.deliveredAt!),
 		registeredBy: source.deliveredByName || '—',
 		notes: source.deliveryNotes || '—',
-		recipientSignature: 'Recipient signature',
-		recipientName: 'Name / clarification',
+		recipientSignature: 'Firma de quien recibe',
+		recipientName: 'Aclaración',
 		recipientDocument: 'DNI'
 	};
 }

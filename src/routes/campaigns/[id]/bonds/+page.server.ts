@@ -12,7 +12,7 @@ import {
 	type BondListEntry
 } from '$lib/server/repositories/bonds';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
+import { BOND_MESSAGES } from '$lib/server/services/bonds';
 
 const isUuid = (value: string) => z.guid().safeParse(value).success;
 
@@ -26,7 +26,7 @@ const isUuid = (value: string) => z.guid().safeParse(value).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'bond.view');
-	if (!isUuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!isUuid(params.id)) error(404, { message: BOND_MESSAGES.campaignNotFound });
 
 	const fail500 = (cause: unknown): never => {
 		console.error('[bonds] bonds list load failed', {
@@ -34,13 +34,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: params.id,
 			error: cause
 		});
-		error(500, { message: 'Could not load the bonds. Please try again.' });
+		error(500, { message: 'No se pudieron cargar los bonos. Volver a intentar.' });
 	};
 
 	const campaignResult = await getCampaignById(locals.supabase, params.id);
 	if (campaignResult.error) fail500(campaignResult.error);
 	const campaign = campaignResult.data;
-	if (!campaign) error(404, { message: CAMPAIGN_MESSAGES.notFound });
+	if (!campaign) error(404, { message: BOND_MESSAGES.campaignNotFound });
 
 	const query = parseBondListQuery(url.searchParams, campaign);
 	const valid = Object.keys(query.errors).length === 0;

@@ -1,20 +1,24 @@
 <script lang="ts">
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
-	import FieldError from '$lib/components/campaigns/FieldError.svelte';
-	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
-	import {
-		cardClass,
-		dangerButtonClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
+	import {
+		Alert,
+		Button,
+		Card,
+		Dialog,
+		EmptyState,
+		Field,
+		PageHeader,
+		Select,
+		StatusBadge,
+		Table,
+		TextInput,
+		type TableColumn
+	} from '$lib/components/ui';
+	import { translateImportMessage } from '$lib/domain/import-messages';
 	import {
 		IMPORT_ITEM_FILTERS,
 		IMPORT_SOURCE_LABELS,
@@ -23,8 +27,8 @@
 		formatImportNumber,
 		type ImportItemFilter
 	} from '$lib/domain/import-preview';
+	import { formatDateTime, formatNumber } from '$lib/format';
 	import type { ImportItem } from '$lib/server/repositories/imports';
-	import { formatInteger } from '$lib/domain/money';
 	import type { PageProps } from './$types';
 
 	/**
@@ -51,10 +55,10 @@
 		resolve('/campaigns/[id]/bonds/[bondId]', { id: campaign.id, bondId });
 
 	const FILTER_LABELS: Record<ImportItemFilter, string> = {
-		all: 'All rows',
-		valid: 'Valid',
-		warning: 'Warnings',
-		error: 'Errors'
+		all: 'Todas las filas',
+		valid: 'Válidas',
+		warning: 'Con observaciones',
+		error: 'Con errores'
 	};
 	const previewHref = $derived(
 		resolve('/campaigns/[id]/bonds/import/[sessionId]', { id: campaign.id, sessionId: session.id })
@@ -80,14 +84,25 @@
 
 	let editing = $state<string | null>(null);
 	let busy = $state<string | null>(null);
+	let removing = $state<ImportItem | null>(null);
+	let cancelling = $state(false);
+	let rollingBack = $state(false);
 	const canConfirm = $derived(data.canEdit && canConfirmImport(summary));
 	const canValidate = $derived(data.canEdit && canValidateImport(summary));
 	const justConfirmed = $derived(data.justConfirmed);
-	const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+	const bondCount = $derived(summary.simpleItems + summary.pataGroups);
 
 	/** The failed edit of this row, to keep its form open with the typed values. */
 	const editFailure = (item: ImportItem) =>
 		form && !form.success && form.form === 'update' && form.itemId === item.id ? form : null;
+	const editItem = $derived(
+		data.canEdit
+			? (data.items.find(
+					(item) => item.removedAt === null && (editing === item.id || !!editFailure(item))
+				) ?? null)
+			: null
+	);
+	const failure = $derived(editItem ? editFailure(editItem) : null);
 
 	function submitting(key: string) {
 		return () => {
@@ -98,183 +113,158 @@
 			};
 		};
 	}
+
+	type ItemRow = ImportItem & Record<string, unknown>;
+	const columns: TableColumn<ItemRow>[] = $derived([
+		{ key: 'rowNumber', header: 'Fila', align: 'right' },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'type', header: 'Tipo' },
+		{ key: 'pata', header: 'Pata' },
+		{ key: 'numbers', header: 'Base / asociado' },
+		{ key: 'barcode', header: 'Código de barras' },
+		{ key: 'problem', header: 'Problema' },
+		...(data.canEdit ? [{ key: 'actions', header: 'Acciones', align: 'right' as const }] : [])
+	]);
+	const rows = $derived(data.items as ItemRow[]);
+	const TYPE_LABELS = { simple: 'Bono simple', pata: 'Pata' } as const;
 </script>
 
 <svelte:head>
-	<title>Import preview - {campaign.name} - Firefighters</title>
+	<title>Revisión de importación - {campaign.name} - Firefighters</title>
 </svelte:head>
 
-<div class="space-y-6">
-	<div>
-		<a href={backHref} class="text-sm text-blue-700 hover:underline"
-			>← {isScan ? 'Barcode scanner' : 'File imports'}</a
-		>
-		<div class="mt-2 flex flex-wrap items-center gap-3">
-			<h1 class="text-2xl font-bold tracking-tight">
-				{isScan ? 'Scan batch' : session.fileName}
-			</h1>
-			<StatusBadge
-				kind="importSession"
-				status={session.rolledBackAt !== null ? 'rolled_back' : session.status}
-			/>
-		</div>
-		<p class="text-sm text-slate-500">
-			{IMPORT_SOURCE_LABELS[session.sourceType]} · {campaign.name} · started {dateTime.format(
-				new Date(session.createdAt)
-			)}
-			{#if session.notes}· {session.notes}{/if}
-		</p>
-	</div>
+<PageHeader
+	title={isScan ? 'Lote de escaneo' : (session.fileName ?? 'Importación')}
+	description={`${IMPORT_SOURCE_LABELS[session.sourceType]} · ${campaign.name} · iniciada el ${formatDateTime(session.createdAt)}${session.notes ? ` · ${session.notes}` : ''}`}
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
+		{ label: isScan ? 'Escaneo de bonos' : 'Importaciones', href: backHref },
+		{ label: isScan ? 'Lote de escaneo' : (session.fileName ?? 'Importación') }
+	]}
+>
+	{#snippet actions()}
+		<StatusBadge
+			kind="importSession"
+			status={session.rolledBackAt !== null ? 'rolled_back' : session.status}
+		/>
+	{/snippet}
+</PageHeader>
 
+<div class="flex flex-col gap-6">
 	{#if justConfirmed && session.status === 'confirmed'}
-		<FormAlert kind="success">
-			<p>
-				Import confirmed: the bonds were created and are available.
-				<a href={bondsHref} class="font-medium underline">View the bonds</a>
-			</p>
-		</FormAlert>
+		<Alert tone="success">
+			Importación confirmada: los bonos se crearon y están disponibles.
+			<a href={bondsHref} class="font-medium underline">Ver los bonos</a>
+		</Alert>
 	{:else if form?.message}
-		<FormAlert kind={form.success ? 'success' : 'error'} message={form.message} />
+		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
 	{/if}
 
 	{#if session.status === 'cancelled'}
-		<FormAlert kind="warning">
-			<p>
-				This import was cancelled{session.cancelReason ? `: ${session.cancelReason}` : ''}. No bond
-				was created.
-			</p>
-		</FormAlert>
+		<Alert tone="warning">
+			Esta importación se canceló{session.cancelReason ? `: ${session.cancelReason}` : ''}. No se
+			creó ningún bono.
+		</Alert>
 	{:else if session.rolledBackAt}
-		<FormAlert kind="warning">
-			<p>
-				This import was rolled back on {dateTime.format(new Date(session.rolledBackAt))}: its bonds
-				were annulled ({session.rollbackReason}).
-			</p>
-		</FormAlert>
+		<Alert tone="warning">
+			Esta importación se revirtió el {formatDateTime(session.rolledBackAt)}: sus bonos se anularon
+			({session.rollbackReason}).
+		</Alert>
 	{:else if data.lockedMessage}
-		<FormAlert kind="warning"><p>{data.lockedMessage}</p></FormAlert>
+		<Alert tone="warning">{data.lockedMessage}</Alert>
 	{/if}
 
-	<section class="space-y-3" aria-labelledby="summary-title">
-		<h2 id="summary-title" class="sr-only">Summary</h2>
+	<section class="flex flex-col gap-3" aria-labelledby="summary-title">
+		<h2 id="summary-title" class="sr-only">Resumen</h2>
 		<ImportSummaryPanel {summary} />
 	</section>
 
 	{#if data.canEdit}
 		<RiskyOperationChecklist
 			campaignId={data.campaign.id}
-			operation="confirming a bulk import"
+			operation="confirmar una importación masiva"
 			canExport={data.canExport}
 		/>
-		<section class="{cardClass} flex flex-wrap items-center gap-3" aria-label="Import actions">
-			<form method="POST" action="?/validate" use:enhance={submitting('validate')}>
-				<button
-					type="submit"
-					class={secondaryButtonClass}
-					disabled={!canValidate || busy !== null}
-					title={summary.status === 'validated' ? 'Already validated' : undefined}
-				>
-					{busy === 'validate' ? 'Validating…' : 'Validate'}
-				</button>
-			</form>
-			<form method="POST" action="?/confirm" use:enhance={submitting('confirm')}>
-				<button
-					type="submit"
-					class={primaryButtonClass}
-					disabled={!canConfirm || busy !== null}
-					aria-describedby="confirm-hint"
-				>
-					{busy === 'confirm'
-						? 'Creating bonds…'
-						: `Confirm and create ${formatInteger(summary.simpleItems + summary.pataGroups)} bonds`}
-				</button>
-			</form>
-			{#if isScan}
-				<a href={scanHref} class={secondaryButtonClass}>Keep scanning</a>
-			{/if}
-			<form
-				method="POST"
-				action="?/cancel"
-				class="ml-auto"
-				use:enhance={({ cancel }) => {
-					if (
-						!confirm('Cancel this import? Its rows are kept as history and no bond is created.')
-					) {
-						cancel();
-						return;
-					}
-					return submitting('cancel')();
-				}}
-			>
-				<button type="submit" class={secondaryButtonClass} disabled={busy !== null}>
-					Cancel import
-				</button>
-			</form>
-			<p id="confirm-hint" class="w-full text-xs text-slate-500">
-				{#if summary.errors > 0}
-					Confirm is disabled: correct or remove the {formatInteger(summary.errors)} rows with errors.
-				{:else if summary.status !== 'validated'}
-					Validate the import to enable Confirm.
-				{:else}
-					Confirming creates every bond in one step. A mistaken import can be rolled back later by
-					an administrator.
+		<Card title="Acciones de la importación" id="actions">
+			<div class="flex flex-wrap items-center gap-3">
+				<form method="POST" action="?/confirm" use:enhance={submitting('confirm')}>
+					<Button
+						type="submit"
+						variant="primary"
+						disabled={!canConfirm || (busy !== null && busy !== 'confirm')}
+						loading={busy === 'confirm'}
+						aria-describedby="confirm-hint"
+					>
+						{busy === 'confirm'
+							? 'Creando bonos…'
+							: `Confirmar y crear ${formatNumber(bondCount)} ${bondCount === 1 ? 'bono' : 'bonos'}`}
+					</Button>
+				</form>
+				<form method="POST" action="?/validate" use:enhance={submitting('validate')}>
+					<Button
+						type="submit"
+						disabled={!canValidate || (busy !== null && busy !== 'validate')}
+						loading={busy === 'validate'}
+						title={summary.status === 'validated' ? 'Ya está validada' : undefined}
+					>
+						{busy === 'validate' ? 'Validando…' : 'Validar'}
+					</Button>
+				</form>
+				{#if isScan}
+					<Button href={scanHref}>Seguir escaneando</Button>
 				{/if}
-			</p>
-		</section>
+				<div class="ml-auto">
+					<Button disabled={busy !== null} onclick={() => (cancelling = true)}>
+						Cancelar importación
+					</Button>
+				</div>
+				<p id="confirm-hint" class="m-0 w-full text-body-sm text-muted">
+					{#if summary.errors > 0}
+						Confirmar está deshabilitado: corregir o quitar {summary.errors === 1
+							? 'la fila con error'
+							: `las ${formatNumber(summary.errors)} filas con errores`}.
+					{:else if summary.status !== 'validated'}
+						Validar la importación para habilitar Confirmar.
+					{:else}
+						Confirmar crea todos los bonos de una vez. Una persona administradora puede revertir más
+						tarde una importación hecha por error.
+					{/if}
+				</p>
+			</div>
+		</Card>
 	{/if}
 
 	{#if data.canRollBack}
-		<section class="{cardClass} space-y-3" aria-labelledby="rollback-title">
-			<h2 id="rollback-title" class="text-base font-semibold">Roll back this import</h2>
-			<p class="text-sm text-slate-600">
-				Annuls the available bonds of this import and releases their numbers and codes. Bonds
-				already annulled by hand are left as they are. Only possible while none of them was
-				delivered, sold or grouped into a pata.
-			</p>
-			<form
-				method="POST"
-				action="?/rollback"
-				class="space-y-3"
-				use:enhance={submitting('rollback')}
-			>
-				<div>
-					<label for="rollback-reason" class={labelClass}>Reason</label>
-					<input
-						id="rollback-reason"
-						name="reason"
-						required
-						maxlength="2000"
-						class={inputClass}
-						value={form?.form === 'rollback' ? (form.values?.reason ?? '') : ''}
-						aria-invalid={form?.form === 'rollback' && form.errors?.reason ? 'true' : undefined}
-					/>
-					<FieldError
-						id="rollback-reason-error"
-						errors={form?.form === 'rollback' ? form.errors?.reason : undefined}
-					/>
-				</div>
-				<button type="submit" class={dangerButtonClass} disabled={busy !== null}>
-					{busy === 'rollback' ? 'Rolling back…' : 'Roll back import'}
-				</button>
-			</form>
-		</section>
+		<Card
+			title="Revertir esta importación"
+			description="Anula los bonos disponibles de esta importación y libera sus números y códigos. Los bonos ya anulados a mano quedan como están. Solo es posible mientras ninguno se haya entregado, vendido o agrupado en una pata."
+			id="rollback"
+		>
+			<Button variant="danger" disabled={busy !== null} onclick={() => (rollingBack = true)}>
+				Revertir importación
+			</Button>
+			{#if form?.form === 'rollback' && form.errors?.reason}
+				<p class="m-0 mt-2 text-body-sm text-danger-text">{form.errors.reason[0]}</p>
+			{/if}
+		</Card>
 	{/if}
 
-	<section class="{cardClass} space-y-4" aria-labelledby="rows-title">
+	<section class="flex flex-col gap-3" aria-labelledby="rows-title">
 		<div class="flex flex-wrap items-center justify-between gap-3">
-			<h2 id="rows-title" class="text-base font-semibold">Rows</h2>
-			<nav aria-label="Filter rows by status" class="flex flex-wrap gap-1">
+			<h2 id="rows-title" class="m-0 text-heading-3">Filas</h2>
+			<nav aria-label="Filtrar filas por estado" class="flex flex-wrap gap-1">
 				{#each IMPORT_ITEM_FILTERS as filter (filter)}
 					<a
 						href={previewLink(filter)}
 						aria-current={data.filter === filter ? 'page' : undefined}
-						class="rounded-full px-3 py-1 text-sm {data.filter === filter
-							? 'bg-blue-600 text-white'
-							: 'bg-slate-100 text-slate-700 hover:bg-slate-200'}"
+						class="rounded-full px-3 py-1 text-body-sm {data.filter === filter
+							? 'bg-primary text-on-primary'
+							: 'bg-surface-sunken text-text hover:bg-surface-hover'}"
 					>
 						{FILTER_LABELS[filter]}
-						{#if filter === 'error' && summary.errors > 0}({formatInteger(summary.errors)}){/if}
-						{#if filter === 'warning' && summary.warnings > 0}({formatInteger(
+						{#if filter === 'error' && summary.errors > 0}({formatNumber(summary.errors)}){/if}
+						{#if filter === 'warning' && summary.warnings > 0}({formatNumber(
 								summary.warnings
 							)}){/if}
 					</a>
@@ -283,190 +273,160 @@
 		</div>
 
 		{#if data.items.length === 0}
-			<p class="text-sm text-slate-500">No rows match this filter.</p>
+			<EmptyState title="Ninguna fila coincide con este filtro" icon="search" />
 		{:else}
-			<div class="overflow-x-auto">
-				<table class="min-w-full text-sm">
-					<thead class="text-left text-xs text-slate-500 uppercase">
-						<tr>
-							<th class="py-2 pr-3 font-medium">Row</th>
-							<th class="py-2 pr-3 font-medium">Status</th>
-							<th class="py-2 pr-3 font-medium">Type</th>
-							<th class="py-2 pr-3 font-medium">Pata</th>
-							<th class="py-2 pr-3 font-medium">Base / associated</th>
-							<th class="py-2 pr-3 font-medium">Barcode</th>
-							<th class="py-2 pr-3 font-medium">Problem</th>
-							<th class="py-2 font-medium"><span class="sr-only">Actions</span></th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100">
-						{#each data.items as item (item.id)}
-							{@const removed = item.removedAt !== null}
-							{@const failure = editFailure(item)}
-							<tr class={removed ? 'text-slate-400' : ''}>
-								<td class="py-2 pr-3 tabular-nums">{item.rowNumber}</td>
-								<td class="py-2 pr-3"
-									><StatusBadge kind="importItem" status={removed ? 'removed' : item.status} /></td
+			<Table {columns} {rows} caption="Filas de la importación" density="compact">
+				{#snippet cell({ row, column })}
+					{@const removed = row.removedAt !== null}
+					{#if column.key === 'rowNumber'}
+						<span class="tabular-nums {removed ? 'text-muted' : ''}">{row.rowNumber}</span>
+					{:else if column.key === 'status'}
+						<StatusBadge kind="importItem" status={removed ? 'removed' : row.status} />
+					{:else if column.key === 'type'}
+						{row.itemType ? TYPE_LABELS[row.itemType] : '—'}
+					{:else if column.key === 'pata'}
+						<span class="font-mono">{row.groupKey ?? '—'}</span>
+					{:else if column.key === 'numbers'}
+						<span class="font-mono tabular-nums"
+							>{number(row.baseNumber)} / {associated(row.baseNumber)}</span
+						>
+					{:else if column.key === 'barcode'}
+						<span class="font-mono">{row.barcode ?? '—'}</span>
+					{:else if column.key === 'problem'}
+						<span class="text-caption">
+							{#if removed}
+								Quitada{row.removeReason ? `: ${row.removeReason}` : ''}
+							{:else if row.errorMessage}
+								<span class={row.status === 'error' ? 'text-danger-text' : 'text-warning-text'}
+									>{translateImportMessage(row.errorMessage)}</span
 								>
-								<td class="py-2 pr-3">{item.itemType ?? '—'}</td>
-								<td class="py-2 pr-3">{item.groupKey ?? '—'}</td>
-								<td class="py-2 pr-3 font-mono tabular-nums">
-									{number(item.baseNumber)} / {associated(item.baseNumber)}
-								</td>
-								<td class="py-2 pr-3 font-mono">{item.barcode ?? '—'}</td>
-								<td class="py-2 pr-3 text-xs">
-									{#if removed}
-										Removed{item.removeReason ? `: ${item.removeReason}` : ''}
-									{:else if item.errorMessage}
-										<span class={item.status === 'error' ? 'text-red-700' : 'text-amber-800'}
-											>{item.errorMessage}</span
-										>
-									{/if}
-									{#if item.createdBondId}
-										<a href={bondHref(item.createdBondId)} class="text-blue-700 hover:underline"
-											>View bond →</a
-										>
-									{/if}
-								</td>
-								<td class="py-2 text-right whitespace-nowrap">
-									{#if data.canEdit && !removed}
-										<button
-											type="button"
-											class="text-sm text-blue-700 hover:underline"
-											aria-expanded={editing === item.id || !!failure}
-											onclick={() => (editing = editing === item.id ? null : item.id)}
-										>
-											Edit
-										</button>
-										<form
-											method="POST"
-											action="?/remove"
-											class="ml-3 inline"
-											use:enhance={({ cancel }) => {
-												if (!confirm(`Remove row ${item.rowNumber} from this import?`)) {
-													cancel();
-													return;
-												}
-												return submitting(`remove-${item.id}`)();
-											}}
-										>
-											<input type="hidden" name="itemId" value={item.id} />
-											<button
-												type="submit"
-												class="text-sm text-red-700 hover:underline"
-												disabled={busy !== null}
-											>
-												Remove
-											</button>
-										</form>
-									{/if}
-								</td>
-							</tr>
-							{#if data.canEdit && !removed && (editing === item.id || failure)}
-								<tr>
-									<td colspan="8" class="bg-slate-50 px-3 py-3">
-										<form
-											method="POST"
-											action="?/update"
-											class="grid gap-3 sm:grid-cols-5 sm:items-end"
-											use:enhance={() => {
-												busy = `update-${item.id}`;
-												return async ({ result, update }) => {
-													await update({ reset: false });
-													busy = null;
-													if (result.type === 'success') editing = null;
-												};
-											}}
-										>
-											<input type="hidden" name="itemId" value={item.id} />
-											<div>
-												<label for="type-{item.id}" class={labelClass}>Type</label>
-												<select
-													id="type-{item.id}"
-													name="itemType"
-													class={inputClass}
-													value={failure?.values?.itemType ?? item.itemType ?? 'simple'}
-												>
-													<option value="simple">simple</option>
-													<option value="pata">pata</option>
-												</select>
-												<FieldError id="type-{item.id}-error" errors={failure?.errors?.itemType} />
-											</div>
-											<div>
-												<label for="group-{item.id}" class={labelClass}>grupo_pata</label>
-												<input
-													id="group-{item.id}"
-													name="groupKey"
-													maxlength="200"
-													class={inputClass}
-													value={failure?.values?.groupKey ?? item.groupKey ?? ''}
-												/>
-												<FieldError id="group-{item.id}-error" errors={failure?.errors?.groupKey} />
-											</div>
-											<div>
-												<label for="base-{item.id}" class={labelClass}>Base number</label>
-												<input
-													id="base-{item.id}"
-													name="baseNumber"
-													inputmode="numeric"
-													required
-													class="{inputClass} font-mono"
-													value={failure?.values?.baseNumber ??
-														(item.baseNumber === null ? '' : number(item.baseNumber))}
-												/>
-												<FieldError
-													id="base-{item.id}-error"
-													errors={failure?.errors?.baseNumber}
-												/>
-											</div>
-											<div>
-												<label for="barcode-{item.id}" class={labelClass}>Barcode</label>
-												<input
-													id="barcode-{item.id}"
-													name="barcode"
-													maxlength="200"
-													class="{inputClass} font-mono"
-													value={failure?.values?.barcode ?? item.barcode ?? ''}
-												/>
-												<FieldError
-													id="barcode-{item.id}-error"
-													errors={failure?.errors?.barcode}
-												/>
-											</div>
-											<div class="flex gap-2">
-												<button type="submit" class={primaryButtonClass} disabled={busy !== null}>
-													{busy === `update-${item.id}` ? 'Saving…' : 'Save'}
-												</button>
-												<button
-													type="button"
-													class={secondaryButtonClass}
-													onclick={() => (editing = null)}>Close</button
-												>
-											</div>
-											<p class="text-xs text-slate-500 sm:col-span-5">
-												Source row: <code class="font-mono">{item.rawValue}</code>
-											</p>
-										</form>
-									</td>
-								</tr>
 							{/if}
-						{/each}
-					</tbody>
-				</table>
-			</div>
+							{#if row.createdBondId}
+								<a
+									href={bondHref(row.createdBondId)}
+									class="text-primary-text underline-offset-2 hover:underline">Ver bono →</a
+								>
+							{/if}
+						</span>
+					{:else if column.key === 'actions'}
+						{#if !removed}
+							<div class="flex justify-end gap-1">
+								<Button
+									size="sm"
+									variant="ghost"
+									aria-expanded={editing === row.id || editItem?.id === row.id}
+									aria-label={`Editar la fila ${row.rowNumber}`}
+									onclick={() => (editing = editing === row.id ? null : row.id)}>Editar</Button
+								>
+								<Button
+									size="sm"
+									variant="ghost"
+									disabled={busy !== null}
+									aria-label={`Quitar la fila ${row.rowNumber}`}
+									onclick={() => (removing = rows.find((r) => r.id === row.id) ?? null)}
+									>Quitar</Button
+								>
+							</div>
+						{/if}
+					{/if}
+				{/snippet}
+			</Table>
+
+			{#if editItem}
+				<Card title={`Editar la fila ${editItem.rowNumber}`} id="edit-row">
+					<form
+						method="POST"
+						action="?/update"
+						class="grid gap-4 sm:grid-cols-4 sm:items-start"
+						use:enhance={() => {
+							busy = `update-${editItem.id}`;
+							return async ({ result, update }) => {
+								await update({ reset: false });
+								busy = null;
+								if (result.type === 'success') editing = null;
+							};
+						}}
+					>
+						<input type="hidden" name="itemId" value={editItem.id} />
+						<Field label="Tipo" id="type-{editItem.id}" error={failure?.errors?.itemType?.[0]}>
+							<Select
+								name="itemType"
+								value={failure?.values?.itemType ?? editItem.itemType ?? 'simple'}
+								options={[
+									{ value: 'simple', label: 'Bono simple' },
+									{ value: 'pata', label: 'Pata' }
+								]}
+							/>
+						</Field>
+						<Field
+							label="grupo_pata"
+							id="group-{editItem.id}"
+							error={failure?.errors?.groupKey?.[0]}
+						>
+							<TextInput
+								name="groupKey"
+								maxlength={200}
+								mono
+								value={failure?.values?.groupKey ?? editItem.groupKey ?? ''}
+							/>
+						</Field>
+						<Field
+							label="Número base"
+							id="base-{editItem.id}"
+							required
+							error={failure?.errors?.baseNumber?.[0]}
+						>
+							<TextInput
+								name="baseNumber"
+								inputmode="numeric"
+								mono
+								value={failure?.values?.baseNumber ??
+									(editItem.baseNumber === null ? '' : number(editItem.baseNumber))}
+							/>
+						</Field>
+						<Field
+							label="Código de barras"
+							id="barcode-{editItem.id}"
+							error={failure?.errors?.barcode?.[0]}
+						>
+							<TextInput
+								name="barcode"
+								maxlength={200}
+								mono
+								value={failure?.values?.barcode ?? editItem.barcode ?? ''}
+							/>
+						</Field>
+						<div class="flex gap-2 sm:col-span-4">
+							<Button
+								type="submit"
+								variant="primary"
+								loading={busy === `update-${editItem.id}`}
+								disabled={busy !== null && busy !== `update-${editItem.id}`}
+							>
+								{busy === `update-${editItem.id}` ? 'Guardando…' : 'Guardar'}
+							</Button>
+							<Button onclick={() => (editing = null)}>Cerrar</Button>
+						</div>
+						<p class="m-0 text-body-sm text-muted sm:col-span-4">
+							Fila de origen: <code class="font-mono">{editItem.rawValue}</code>
+						</p>
+					</form>
+				</Card>
+			{/if}
+
 			{#if pageCount > 1}
-				<nav aria-label="Pages" class="flex items-center justify-between text-sm">
-					<span class="text-slate-500"
-						>Page {data.page} of {pageCount} · {formatInteger(data.total)} rows</span
+				<nav aria-label="Páginas" class="flex items-center justify-between text-body-sm">
+					<span class="text-muted tabular-nums"
+						>Página {formatNumber(data.page)} de {formatNumber(pageCount)} · {formatNumber(
+							data.total
+						)} filas</span
 					>
 					<span class="flex gap-2">
-						{#if data.page > 1}<a
-								href={previewLink(data.filter, data.page - 1)}
-								class={secondaryButtonClass}>Previous</a
+						{#if data.page > 1}<Button href={previewLink(data.filter, data.page - 1)}
+								>Anterior</Button
 							>{/if}
-						{#if data.page < pageCount}<a
-								href={previewLink(data.filter, data.page + 1)}
-								class={secondaryButtonClass}>Next</a
+						{#if data.page < pageCount}<Button href={previewLink(data.filter, data.page + 1)}
+								>Siguiente</Button
 							>{/if}
 					</span>
 				</nav>
@@ -474,3 +434,92 @@
 		{/if}
 	</section>
 </div>
+
+<Dialog
+	open={cancelling}
+	onClose={() => (cancelling = false)}
+	title="¿Cancelar esta importación?"
+	description="Sus filas se conservan como historial y no se crea ningún bono. No se puede deshacer."
+	confirmLabel="Cancelar importación"
+	cancelLabel="Volver"
+	tone="danger"
+	loading={busy === 'cancel'}
+	action="?/cancel"
+	enhance={(f) =>
+		enhance(f, () => {
+			busy = 'cancel';
+			return async ({ update }) => {
+				try {
+					cancelling = false;
+					await update({ reset: false });
+				} finally {
+					busy = null;
+				}
+			};
+		})}
+>
+	<Field label="Motivo" id="cancel-reason" optional>
+		<TextInput name="reason" maxlength={500} />
+	</Field>
+</Dialog>
+
+<Dialog
+	open={removing !== null}
+	onClose={() => (removing = null)}
+	title={removing ? `¿Quitar la fila ${removing.rowNumber} de la importación?` : ''}
+	description="La fila se conserva como historial y deja de contar en el resumen."
+	confirmLabel="Quitar fila"
+	cancelLabel="Volver"
+	tone="danger"
+	loading={busy?.startsWith('remove') ?? false}
+	action="?/remove"
+	enhance={(f) =>
+		enhance(f, () => {
+			busy = 'remove';
+			return async ({ update }) => {
+				try {
+					removing = null;
+					await update({ reset: false });
+				} finally {
+					busy = null;
+				}
+			};
+		})}
+>
+	<input type="hidden" name="itemId" value={removing?.id ?? ''} />
+	<Field label="Motivo" id="remove-reason" optional>
+		<TextInput name="reason" maxlength={500} />
+	</Field>
+</Dialog>
+
+<Dialog
+	open={rollingBack}
+	onClose={() => (rollingBack = false)}
+	title="¿Revertir esta importación?"
+	description="Los bonos disponibles de esta importación se anulan y sus números y códigos quedan libres."
+	confirmLabel="Revertir importación"
+	cancelLabel="Volver"
+	tone="danger"
+	loading={busy === 'rollback'}
+	action="?/rollback"
+	enhance={(f) =>
+		enhance(f, () => {
+			busy = 'rollback';
+			return async ({ update }) => {
+				try {
+					rollingBack = false;
+					await update({ reset: false });
+				} finally {
+					busy = null;
+				}
+			};
+		})}
+>
+	<Field label="Motivo" id="rollback-reason" required>
+		<TextInput
+			name="reason"
+			maxlength={500}
+			value={form?.form === 'rollback' ? (form.values?.reason ?? '') : ''}
+		/>
+	</Field>
+</Dialog>

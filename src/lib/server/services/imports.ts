@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { statusWord } from '$lib/domain/status-word';
+import { campaignStatusLabel } from '$lib/server/services/bonds';
+import { translateImportMessage } from '$lib/domain/import-messages';
 import { compileBarcodePattern } from '$lib/domain/barcodes';
 import {
 	IMPORT_BATCH_MAX_ROWS,
@@ -77,22 +78,25 @@ interface PostgrestLikeError {
 }
 
 export const IMPORT_MESSAGES = {
-	permission: 'You do not have permission to perform this action.',
-	campaignNotFound: 'Campaign not found.',
-	sessionNotFound: 'Import session not found.',
-	itemNotFound: 'Import row not found.',
-	internal: 'Something went wrong. Please try again.',
-	invalid: 'Some values are invalid. Please review them.',
-	campaignLocked: 'Bonds can only be imported while the campaign is a draft or active.',
-	sessionClosed: 'This import session is closed and can no longer be changed.',
-	itemRemoved: 'This row was already removed.',
-	itemLinked: 'This row already created a bond and cannot be changed.',
-	notScanSession: 'Scans can only be added to a barcode scan session.',
-	duplicateRow: 'A row number of the file is already staged in this session.'
+	permission: 'No hay permiso para realizar esta acción.',
+	campaignNotFound: 'No se encontró la campaña.',
+	sessionNotFound: 'No se encontró la sesión de importación.',
+	itemNotFound: 'No se encontró la fila de la importación.',
+	internal: 'Algo salió mal. Volver a intentar.',
+	invalid: 'Hay valores no válidos. Revisarlos.',
+	campaignLocked:
+		'Los bonos solo se pueden importar mientras la campaña es un borrador o está activa.',
+	sessionClosed: 'Esta sesión de importación está cerrada y ya no se puede modificar.',
+	itemRemoved: 'Esta fila ya se quitó.',
+	itemLinked: 'Esta fila ya creó un bono y no se puede modificar.',
+	notScanSession:
+		'Los escaneos solo se pueden agregar a una sesión de escaneo de códigos de barras.',
+	duplicateRow: 'Un número de fila del archivo ya está cargado en esta sesión.'
 } as const;
 
 function sentence(message: string): string {
-	const text = message.charAt(0).toUpperCase() + message.slice(1);
+	const translated = translateImportMessage(message);
+	const text = translated.charAt(0).toUpperCase() + translated.slice(1);
 	return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
@@ -118,8 +122,8 @@ export function mapImportRpcError(rpcError: PostgrestLikeError): ImportServiceEr
 		case '55000': {
 			const window = /while the campaign is draft or active \(status: (\w+)\)/.exec(message);
 			if (window) {
-				const label = statusWord(window[1]);
-				return err('conflict', `${IMPORT_MESSAGES.campaignLocked} This campaign is ${label}.`);
+				const label = campaignStatusLabel(window[1]);
+				return err('conflict', `${IMPORT_MESSAGES.campaignLocked} La campaña está ${label}.`);
 			}
 			if (
 				/^import session \S+ is \w+ and cannot be changed/.test(message) ||
@@ -506,12 +510,12 @@ export async function stageImportFile(
 // ---------------------------------------------------------------------------
 
 export const IMPORT_CONFIRM_MESSAGES = {
-	notValidated: 'Validate the import before confirming it.',
+	notValidated: 'Validar la importación antes de confirmarla.',
 	stale:
-		'Some rows are no longer valid (a number or code was taken after validation). Review the errors and validate again.',
+		'Algunas filas ya no son válidas (un número o código se ocupó después de la validación). Revisar los errores y volver a validar.',
 	notRollbackable:
-		'This import cannot be rolled back: some of its bonds were delivered, sold or grouped into a pata (bonds annulled by hand are skipped).',
-	notConfirmed: 'Only a confirmed import that was not rolled back yet can be rolled back.'
+		'Esta importación no se puede revertir: algunos de sus bonos se entregaron, se vendieron o se agruparon en una pata (los bonos anulados a mano se omiten).',
+	notConfirmed: 'Solo se puede revertir una importación confirmada que todavía no se revirtió.'
 } as const;
 
 /** Friendlier texts for the confirmation/rollback refusals (the generic mapping keeps ids). */

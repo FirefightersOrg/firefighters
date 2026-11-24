@@ -93,7 +93,10 @@ export function parseCsv(input: string, delimiter?: CsvDelimiter): CsvRecord[] {
 		}
 	}
 	if (inQuotes) {
-		throw new CsvError('unterminated_quote', `Line ${quoteLine}: a quoted value is never closed`);
+		throw new CsvError(
+			'unterminated_quote',
+			`Línea ${quoteLine}: un valor entre comillas no se cierra`
+		);
 	}
 	if (cell !== '' || cells.length > 0) endRecord();
 

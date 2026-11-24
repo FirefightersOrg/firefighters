@@ -35,7 +35,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			requestId: locals.requestId,
 			error: collectors.error
 		});
-		error(500, { message: 'Could not load the collectors. Please try again.' });
+		error(500, { message: 'No se pudieron cargar los cobradores. Volver a intentar.' });
 	}
 	return {
 		campaign,
@@ -111,8 +111,8 @@ export const actions: Actions = {
 			const from = tryNumber(fromText, config);
 			const to = tryNumber(toText, config);
 			if (from === null || to === null || from > to) {
-				return deliveryFailure(400, 'Type a valid range of base numbers (from ≤ to).', {
-					errors: { range: ['Type a valid range of base numbers (from ≤ to).'] },
+				return deliveryFailure(400, 'Ingresar un rango válido de números base (desde ≤ hasta).', {
+					errors: { range: ['Ingresar un rango válido de números base (desde ≤ hasta).'] },
 					values
 				});
 			}
@@ -121,8 +121,8 @@ export const actions: Actions = {
 			const number = tryNumber(query, config);
 			options = number !== null ? { number } : { code: query.slice(0, 200) };
 		} else {
-			return deliveryFailure(400, 'Type a number, a code or a range.', {
-				errors: { query: ['Type a number, a code or a range.'] },
+			return deliveryFailure(400, 'Ingresar un número, un código o un rango.', {
+				errors: { query: ['Ingresar un número, un código o un rango.'] },
 				values
 			});
 		}
@@ -156,8 +156,8 @@ export const actions: Actions = {
 		const bondIds = formData.getAll('bondIds').filter((v): v is string => typeof v === 'string');
 		const values = { collectorId, notes };
 		const errors: Record<string, string[]> = {};
-		if (!isUuid(collectorId)) errors.collectorId = ['Choose the collector.'];
-		if (bondIds.length === 0) errors.bondIds = ['Add at least one bond.'];
+		if (!isUuid(collectorId)) errors.collectorId = ['Elegir el cobrador.'];
+		if (bondIds.length === 0) errors.bondIds = ['Agregar al menos un bono.'];
 		else if (bondIds.length > DELIVERY_MAX_BONDS || !bondIds.every(isUuid)) {
 			errors.bondIds = [`At most ${DELIVERY_MAX_BONDS} bonds per delivery.`];
 		}
@@ -165,7 +165,7 @@ export const actions: Actions = {
 			errors.notes = [`Notes are limited to ${DELIVERY_NOTES_MAX_LENGTH} characters.`];
 		}
 		if (Object.keys(errors).length) {
-			return deliveryFailure(400, 'Please correct the highlighted fields.', { errors, values });
+			return deliveryFailure(400, 'Revisar los campos marcados.', { errors, values });
 		}
 
 		let noteId: string;

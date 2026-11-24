@@ -77,7 +77,7 @@ export const BOND_FINANCIAL_STATUS_LABELS: Record<BondFinancialStatus, string> =
 };
 
 export const BOND_KIND_LABELS: Record<BondKind, string> = {
-	simple: 'Simple bond',
+	simple: 'Bono simple',
 	pata: 'Pata'
 };
 
@@ -162,14 +162,14 @@ function pairFor(base: number, config: CampaignNumberingConfig): BaseNumberPair 
 	if (!Number.isSafeInteger(base) || base < 0) {
 		throw new BondError(
 			'invalid_number',
-			`Base number ${String(base)} must be a whole number of 0 or more`,
+			`El número base ${String(base)} debe ser un número entero de 0 o más`,
 			{ number: String(base) }
 		);
 	}
 	if (base > config.maxNumber) {
 		throw new BondError(
 			'out_of_range',
-			`Number ${show(base, config)} exceeds the campaign maximum number ${show(config.maxNumber, config)}`,
+			`El número ${show(base, config)} supera el número máximo de la campaña ${show(config.maxNumber, config)}`,
 			{ number: show(base, config) }
 		);
 	}
@@ -177,9 +177,9 @@ function pairFor(base: number, config: CampaignNumberingConfig): BaseNumberPair 
 	if (associated > config.maxNumber) {
 		throw new BondError(
 			'overflow',
-			`Base number ${show(base, config)} overflows: its associated number ${show(associated, config)} ` +
-				`exceeds the campaign maximum number ${show(config.maxNumber, config)} ` +
-				`(the highest allowed base number is ${show(config.maxNumber - config.associatedNumberOffset, config)})`,
+			`El número base ${show(base, config)} desborda: su número asociado ${show(associated, config)} ` +
+				`supera el número máximo de la campaña ${show(config.maxNumber, config)} ` +
+				`(el número base más alto permitido es ${show(config.maxNumber - config.associatedNumberOffset, config)})`,
 			{ number: show(base, config) }
 		);
 	}
@@ -198,7 +198,7 @@ export function participatingNumberPairs(
 ): BaseNumberPair[] {
 	assertConfig(config);
 	if (baseNumbers.length === 0) {
-		throw new BondError('no_base_numbers', 'At least one base number is required');
+		throw new BondError('no_base_numbers', 'Se requiere al menos un número base');
 	}
 	return baseNumbers.map((base) => pairFor(base, config));
 }
@@ -260,8 +260,8 @@ export function validateBondNumbers(
 	if (first) {
 		throw new BondError(
 			'duplicate_in_bond',
-			`Number ${first.formatted} appears more than once in this bond ` +
-				`(${first.baseCount} as base, ${first.associatedCount} as associated)`,
+			`El número ${first.formatted} aparece más de una vez en este bono ` +
+				`(${first.baseCount} como base, ${first.associatedCount} como asociado)`,
 			{ number: first.formatted }
 		);
 	}
@@ -321,7 +321,7 @@ export function findCampaignConflicts(
 export function campaignConflictMessage(
 	conflict: Pick<CampaignNumberConflict, 'formatted' | 'bondId'>
 ): string {
-	return `Number ${conflict.formatted} is already used by bond ${conflict.bondId}`;
+	return `El número ${conflict.formatted} ya está en uso en el bono ${conflict.bondId}`;
 }
 
 /** @throws BondError `duplicate_in_campaign` naming the first conflicting number and its bond. */
@@ -351,14 +351,17 @@ export function assertNoCampaignConflicts(
 export function bondTotalValueCents(simpleBondValue: string, units: number): number {
 	const cents = parseMoneyToCents(simpleBondValue);
 	if (cents === null || cents <= 0) {
-		throw new BondError('invalid_value', `Invalid simple bond value: ${simpleBondValue}`);
+		throw new BondError('invalid_value', `Valor de bono simple no válido: ${simpleBondValue}`);
 	}
 	if (!Number.isSafeInteger(units) || units < 1) {
-		throw new BondError('invalid_value', `Invalid commercial unit count: ${String(units)}`);
+		throw new BondError(
+			'invalid_value',
+			`Cantidad de unidades comerciales no válida: ${String(units)}`
+		);
 	}
 	const total = cents * units;
 	if (!Number.isSafeInteger(total) || total > MAX_MONEY_CENTS) {
-		throw new BondError('invalid_value', 'The bond total value is too large');
+		throw new BondError('invalid_value', 'El valor total del bono es demasiado grande');
 	}
 	return total;
 }
@@ -433,12 +436,15 @@ export function validateManualGrouping(
 	config?: CampaignNumberingConfig
 ): BondComposition {
 	if (members.length < MIN_PATA_SIZE) {
-		throw new BondError('group_too_small', `A pata needs at least ${MIN_PATA_SIZE} simple bonds`);
+		throw new BondError(
+			'group_too_small',
+			`Una pata necesita al menos ${MIN_PATA_SIZE} bonos simples`
+		);
 	}
 	const seen = new Set<string>();
 	for (const member of members) {
 		if (seen.has(member.id)) {
-			throw new BondError('group_duplicate_member', `Bond ${member.id} is listed more than once`, {
+			throw new BondError('group_duplicate_member', `El bono ${member.id} figura más de una vez`, {
 				bondId: member.id
 			});
 		}
@@ -447,28 +453,28 @@ export function validateManualGrouping(
 	for (const member of members) {
 		const label = memberLabel(member, config);
 		if (member.campaignId !== campaignId) {
-			throw new BondError('group_other_campaign', `Bond ${label} belongs to another campaign`, {
+			throw new BondError('group_other_campaign', `El bono ${label} pertenece a otra campaña`, {
 				bondId: member.id
 			});
 		}
 		if (member.kind !== 'simple') {
 			throw new BondError(
 				'group_member_not_simple',
-				`Only simple bonds can be grouped into a pata (bond ${label} is a ${member.kind})`,
+				`Solo se pueden agrupar bonos simples en una pata (el bono ${label} es una pata)`,
 				{ bondId: member.id }
 			);
 		}
 		if (member.commercialStatus !== 'available') {
 			throw new BondError(
 				'group_member_not_available',
-				`Only available bonds can be grouped (bond ${label} is ${BOND_COMMERCIAL_STATUS_LABELS[member.commercialStatus].toLowerCase()})`,
+				`Solo se pueden agrupar bonos disponibles (el bono ${label} está en estado ${BOND_COMMERCIAL_STATUS_LABELS[member.commercialStatus].toLowerCase()})`,
 				{ bondId: member.id }
 			);
 		}
 		if (member.activeGroupPataId) {
 			throw new BondError(
 				'group_member_already_grouped',
-				`Bond ${label} already belongs to manually grouped pata ${member.activeGroupPataId}`,
+				`El bono ${label} ya pertenece a la pata manual ${member.activeGroupPataId}`,
 				{ bondId: member.id, pataId: member.activeGroupPataId }
 			);
 		}

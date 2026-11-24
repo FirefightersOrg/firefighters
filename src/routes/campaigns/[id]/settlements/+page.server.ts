@@ -15,7 +15,7 @@ import type { PermissionCode } from '$lib/server/auth/permission-codes';
 const uuid = (value: string) => /^[0-9a-f-]{36}$/i.test(value);
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	const canRead = (
 		[
@@ -44,8 +44,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		})
 	]);
 	if (campaign.error || collectors.error || settlements.error)
-		error(500, { message: 'Could not load settlements.' });
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+		error(500, { message: 'No se pudieron cargar las rendiciones.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	return {
 		campaign: campaign.data,
 		collectors: collectors.data ?? [],

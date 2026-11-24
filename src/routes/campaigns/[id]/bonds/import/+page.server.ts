@@ -16,7 +16,6 @@ import {
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listImportSessions } from '$lib/server/repositories/imports';
 import { IMPORT_FILE_NAME_MAX_LENGTH, IMPORT_NOTES_MAX_LENGTH } from '$lib/schemas/import';
-import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { IMPORT_MESSAGES, stageImportFile } from '$lib/server/services/imports';
 
 /**
@@ -41,7 +40,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: campaign.id,
 			error: sessions.error
 		});
-		error(500, { message: 'Could not load the imports. Please try again.' });
+		error(500, { message: 'No se pudieron cargar las importaciones. Volver a intentar.' });
 	}
 
 	return {
@@ -56,7 +55,8 @@ export const actions: Actions = {
 	upload: async ({ request, locals, params, url }) => {
 		const denied = checkImportActionPermission(locals, url, 'upload', 'bond.import');
 		if (denied) return denied;
-		if (!isUuid(params.id)) return importFormFailure('upload', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!isUuid(params.id))
+			return importFormFailure('upload', 404, IMPORT_MESSAGES.campaignNotFound);
 
 		const formData = await request.formData();
 		const file = formData.get('file');
@@ -66,18 +66,20 @@ export const actions: Actions = {
 			importFormFailure('upload', 400, message, { errors: { file: [message] }, values });
 
 		if (!(file instanceof File) || file.size === 0 || file.name.trim() === '') {
-			return fileFailure('Choose a CSV or Excel file to upload.');
+			return fileFailure('Elegir un archivo CSV o de Excel para subir.');
 		}
 		const fileName = file.name.trim();
 		if (!/\.(csv|xlsx)$/i.test(fileName)) {
-			return fileFailure('Only .csv and .xlsx files can be imported.');
+			return fileFailure('Solo se pueden importar archivos .csv y .xlsx.');
 		}
-		if (file.size > IMPORT_MAX_FILE_BYTES) return fileFailure('The file is larger than 5 MB.');
+		if (file.size > IMPORT_MAX_FILE_BYTES) return fileFailure('El archivo supera los 5 MB.');
 		if (fileName.length > IMPORT_FILE_NAME_MAX_LENGTH) {
-			return fileFailure(`The file name is longer than ${IMPORT_FILE_NAME_MAX_LENGTH} characters.`);
+			return fileFailure(
+				`El nombre del archivo supera los ${IMPORT_FILE_NAME_MAX_LENGTH} caracteres.`
+			);
 		}
 		if (notes && notes.length > IMPORT_NOTES_MAX_LENGTH) {
-			const message = `Notes are limited to ${IMPORT_NOTES_MAX_LENGTH} characters.`;
+			const message = `Las notas admiten hasta ${IMPORT_NOTES_MAX_LENGTH} caracteres.`;
 			return importFormFailure('upload', 400, message, { errors: { notes: [message] }, values });
 		}
 
@@ -91,7 +93,7 @@ export const actions: Actions = {
 			return importFormFailure('upload', 500, IMPORT_MESSAGES.internal, { values });
 		}
 		const campaign = campaignResult.data;
-		if (!campaign) return importFormFailure('upload', 404, CAMPAIGN_MESSAGES.notFound);
+		if (!campaign) return importFormFailure('upload', 404, IMPORT_MESSAGES.campaignNotFound);
 		if (!canLoadBonds(campaign.status)) {
 			return importFormFailure('upload', 409, campaignLockedMessage(campaign.status), { values });
 		}

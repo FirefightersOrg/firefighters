@@ -5,7 +5,7 @@ const text = (max: number) =>
 	z
 		.string()
 		.trim()
-		.max(max)
+		.max(max, `Debe tener como máximo ${max} caracteres.`)
 		.optional()
 		.transform((v) => v || null);
 
@@ -32,14 +32,22 @@ export const buyerSchema = z
 		taxId: text(PARTY_LIMITS.taxId),
 		phone: text(PARTY_LIMITS.phone),
 		address: text(PARTY_LIMITS.address),
-		usualCollectorId: z.string().uuid().nullable(),
+		usualCollectorId: z.string().uuid('Elegir un cobrador válido.').nullable(),
 		notes: text(PARTY_LIMITS.notes)
 	})
 	.superRefine((data, ctx) => {
 		if (data.type === 'individual' && !data.firstName && !data.lastName)
-			ctx.addIssue({ code: 'custom', path: ['firstName'], message: 'Enter a first or last name.' });
+			ctx.addIssue({
+				code: 'custom',
+				path: ['firstName'],
+				message: 'Ingresar el nombre o el apellido.'
+			});
 		if (data.type === 'business' && !data.businessName)
-			ctx.addIssue({ code: 'custom', path: ['businessName'], message: 'Enter a business name.' });
+			ctx.addIssue({
+				code: 'custom',
+				path: ['businessName'],
+				message: 'Ingresar la razón social.'
+			});
 	})
 	.transform((data) =>
 		data.type === 'individual'

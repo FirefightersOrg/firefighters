@@ -41,9 +41,9 @@ describe('unawarded prize certificate', () => {
 			associatedBond: 'B-7',
 			buyer: 'Ada Lovelace',
 			reason: 'Winner declined',
-			rosterStatus: 'Eligible',
+			rosterStatus: 'Habilitado',
 			registeredBy: 'Resolver & One',
-			date: '31/12/26, 11:30 p. m.',
+			date: '31/12/2026, 23:30',
 			notes: 'Original <note>'
 		});
 	});
@@ -61,11 +61,11 @@ describe('unawarded prize certificate', () => {
 				winnerNotes: null
 			})
 		).toMatchObject({
-			winningNumber: 'Not loaded',
+			winningNumber: 'Sin cargar',
 			associatedBond: '—',
 			buyer: '—',
-			reason: 'Number not in the roster',
-			rosterStatus: 'Not in roster'
+			reason: 'El número no está en el padrón',
+			rosterStatus: 'No está en el padrón'
 		});
 		expect(
 			buildPrintableUnawardedPrizeCertificate(campaign, {
@@ -75,8 +75,8 @@ describe('unawarded prize certificate', () => {
 				ineligibilityReason: 'not_fully_paid'
 			})
 		).toMatchObject({
-			reason: 'Bond not fully paid',
-			rosterStatus: 'Not eligible — Bond not fully paid'
+			reason: 'Bono sin pago total',
+			rosterStatus: 'No habilitado — Bono sin pago total'
 		});
 	});
 });

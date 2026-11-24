@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!z.guid().safeParse(params.id).success) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	const campaignResult = await getCampaignById(locals.supabase, params.id);
 	if (campaignResult.error)
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	const page = Math.max(1, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
 	const type = url.searchParams.get('type');
@@ -24,13 +24,15 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		type: typeFilter,
 		page
 	});
-	if (result.error) error(500, { message: 'Could not load buyers. Please try again.' });
+	if (result.error)
+		error(500, { message: 'No se pudieron cargar los compradores. Volver a intentar.' });
 	const buyers = result.data?.items ?? [];
 	const collectors = await getCollectorsByIds(
 		locals.supabase,
 		buyers.flatMap((b) => (b.usualCollectorId ? [b.usualCollectorId] : []))
 	);
-	if (collectors.error) error(500, { message: 'Could not load buyers. Please try again.' });
+	if (collectors.error)
+		error(500, { message: 'No se pudieron cargar los compradores. Volver a intentar.' });
 	const total = result.data?.total ?? 0;
 	return {
 		campaign: campaignResult.data,

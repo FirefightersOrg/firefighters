@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-	import { formatInteger, formatMoney } from '$lib/domain/money';
+	import { formatMoney, formatNumber } from '$lib/format';
 
 	/**
 	 * Preview of a pata (printed or manually grouped): every base → associated pair (2N numbers),
@@ -43,34 +43,32 @@
 <div
 	{id}
 	aria-live="polite"
-	class="rounded-lg border p-4 text-sm {problems.length > 0 && rows.length > 0
-		? 'border-red-200 bg-red-50'
-		: 'border-slate-200 bg-slate-50'} text-slate-700"
+	class="rounded-lg border p-4 text-body-sm text-text {problems.length > 0 && rows.length > 0
+		? 'border-danger bg-danger-soft'
+		: 'border-border bg-surface-sunken'}"
 >
-	<h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-		Numbers of this pata
-	</h3>
+	<h3 class="m-0 text-label text-muted">Números de esta pata</h3>
 	{#if rows.length === 0}
-		<p class="mt-2 text-slate-500">{emptyText}</p>
+		<p class="m-0 mt-2 text-muted">{emptyText}</p>
 	{:else}
 		<ul
-			class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2"
-			aria-label="Base and associated numbers"
+			class="m-0 mt-2 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 sm:grid-cols-2"
+			aria-label="Números base y asociados"
 		>
 			{#each rows as row (row.key)}
 				<li class="font-mono tabular-nums">
 					{#if row.problem}
-						<span class="text-red-800"
+						<span class="text-danger-text"
 							>{row.baseFormatted ?? ''}<span class="font-sans"
 								>{row.baseFormatted ? ': ' : ''}{row.problem}</span
 							></span
 						>
 					{:else}
-						<span class="font-semibold text-slate-900">{row.baseFormatted}</span>
-						<span aria-hidden="true" class="text-slate-400">→</span><span class="sr-only"
-							>associated</span
+						<span class="font-semibold">{row.baseFormatted}</span>
+						<span aria-hidden="true" class="text-subtle">→</span><span class="sr-only"
+							>asociado</span
 						>
-						<span class="font-semibold text-slate-900">{row.associatedFormatted}</span>
+						<span class="font-semibold">{row.associatedFormatted}</span>
 					{/if}
 				</li>
 			{/each}
@@ -78,31 +76,29 @@
 	{/if}
 
 	{#if rows.length > 0 && problems.length > 0}
-		<ul class="mt-3 list-disc space-y-1 pl-5 font-medium text-red-800">
+		<ul class="m-0 mt-3 list-disc space-y-1 pl-5 font-medium text-danger-text">
 			{#each problems as problem, i (i)}
 				<li>{problem}.</li>
 			{/each}
 		</ul>
 	{/if}
 
-	<dl class="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-slate-200 pt-3">
+	<dl class="m-0 mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-3">
 		<div>
-			<dt class="text-xs text-slate-500">Units (N)</dt>
-			<dd class="text-lg font-semibold tabular-nums text-slate-900">{formatInteger(unitCount)}</dd>
+			<dt class="text-caption text-muted">Unidades (N)</dt>
+			<dd class="m-0 text-heading-3 tabular-nums">{formatNumber(unitCount)}</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-slate-500">Participating numbers</dt>
-			<dd class="text-lg font-semibold tabular-nums text-slate-900">
-				{formatInteger(numberCount)}
-			</dd>
+			<dt class="text-caption text-muted">Números participantes</dt>
+			<dd class="m-0 text-heading-3 tabular-nums">{formatNumber(numberCount)}</dd>
 		</div>
 		<div>
-			<dt class="text-xs text-slate-500">Total value</dt>
-			<dd class="text-lg font-semibold tabular-nums text-slate-900">
+			<dt class="text-caption text-muted">Valor total</dt>
+			<dd class="m-0 text-heading-3 tabular-nums">
 				{totalValue ? formatMoney(totalValue) : '—'}
 			</dd>
-			<dd class="text-xs text-slate-500">
-				{formatMoney(simpleBondValue)} × {formatInteger(unitCount)}
+			<dd class="m-0 text-caption text-muted tabular-nums">
+				{formatMoney(simpleBondValue)} × {formatNumber(unitCount)}
 			</dd>
 		</div>
 	</dl>

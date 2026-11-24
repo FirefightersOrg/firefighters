@@ -45,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			requestId: locals.requestId,
 			error: notes.error ?? collectors.error
 		});
-		error(500, { message: 'Could not load the delivery notes. Please try again.' });
+		error(500, { message: 'No se pudieron cargar los remitos. Volver a intentar.' });
 	}
 
 	return {

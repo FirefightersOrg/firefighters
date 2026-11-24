@@ -37,18 +37,16 @@ describe('grouping helpers', () => {
 
 	it('explains why a bond cannot be grouped', () => {
 		expect(groupingProblem(member(), CAMPAIGN)).toBeNull();
-		expect(groupingProblem(undefined, CAMPAIGN)).toBe('Bond not found.');
-		expect(groupingProblem(member({ campaignId: B }), CAMPAIGN)).toBe(
-			'It belongs to another campaign.'
-		);
+		expect(groupingProblem(undefined, CAMPAIGN)).toBe('No se encontró el bono.');
+		expect(groupingProblem(member({ campaignId: B }), CAMPAIGN)).toBe('Pertenece a otra campaña.');
 		expect(groupingProblem(member({ kind: 'pata' }), CAMPAIGN)).toBe(
-			'It is a pata: only simple bonds can be grouped.'
+			'Es una pata: solo se pueden agrupar bonos simples.'
 		);
 		expect(groupingProblem(member({ commercialStatus: 'annulled' }), CAMPAIGN)).toBe(
-			'It is annulled: only available bonds can be grouped.'
+			'Está anulado: solo se pueden agrupar bonos disponibles.'
 		);
 		expect(groupingProblem(member({ activeGroupPataId: B }), CAMPAIGN)).toBe(
-			'It already belongs to a pata. Ungroup that pata first.'
+			'Ya pertenece a una pata. Desagrupar esa pata primero.'
 		);
 	});
 
@@ -68,11 +66,11 @@ describe('grouping helpers', () => {
 				baseFormatted: null,
 				associatedFormatted: null,
 				internalCode: null,
-				problem: 'Bond not found.',
+				problem: 'No se encontró el bono.',
 				pataId: null
 			}
 		]);
-		expect(groupingProblemMessage(views[1])).toBe('A selected bond: Bond not found.');
+		expect(groupingProblemMessage(views[1])).toBe('Un bono seleccionado: No se encontró el bono.');
 	});
 
 	it('computes N and the total value', () => {

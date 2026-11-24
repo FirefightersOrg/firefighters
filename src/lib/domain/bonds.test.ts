@@ -58,7 +58,7 @@ describe('participating numbers', () => {
 	it('rejects numbers above max_number, formatted with the campaign digits', () => {
 		const err = bondError(() => participatingNumberPairs([10000], FOUR));
 		expect(err.code).toBe('out_of_range');
-		expect(err.message).toBe('Number 10000 exceeds the campaign maximum number 9999');
+		expect(err.message).toBe('El número 10000 supera el número máximo de la campaña 9999');
 	});
 
 	it('accepts the highest base number and rejects the first overflowing one (4 digits)', () => {
@@ -66,8 +66,8 @@ describe('participating numbers', () => {
 		const err = bondError(() => participatingNumberPairs([5129], FOUR));
 		expect(err.code).toBe('overflow');
 		expect(err.message).toBe(
-			'Base number 5129 overflows: its associated number 10000 exceeds the campaign maximum ' +
-				'number 9999 (the highest allowed base number is 5128)'
+			'El número base 5129 desborda: su número asociado 10000 supera el número máximo de la campaña ' +
+				'9999 (el número base más alto permitido es 5128)'
 		);
 		expect(err.details.number).toBe('5129');
 	});
@@ -80,7 +80,7 @@ describe('participating numbers', () => {
 		const err = bondError(() => participatingNumberPairs([95129], FIVE));
 		expect(err.code).toBe('overflow');
 		expect(err.message).toContain(
-			'associated number 100000 exceeds the campaign maximum number 99999'
+			'su número asociado 100000 supera el número máximo de la campaña 99999'
 		);
 		expect(bondError(() => participatingNumberPairs([5], { ...FIVE, maxNumber: 4 })).code).toBe(
 			'invalid_config'
@@ -97,7 +97,7 @@ describe('intra-bond collisions', () => {
 		const err = bondError(() => validateBondNumbers([5, 7, 5], FOUR));
 		expect(err.code).toBe('duplicate_in_bond');
 		expect(err.message).toBe(
-			'Number 0005 appears more than once in this bond (2 as base, 0 as associated)'
+			'El número 0005 aparece más de una vez en este bono (2 como base, 0 como asociado)'
 		);
 		expect(err.details.number).toBe('0005');
 	});
@@ -111,7 +111,7 @@ describe('intra-bond collisions', () => {
 	it('finds a base equal to its own associated number with offset 0', () => {
 		const err = bondError(() => validateBondNumbers([7], ZERO_OFFSET));
 		expect(err.message).toBe(
-			'Number 0007 appears more than once in this bond (1 as base, 1 as associated)'
+			'El número 0007 aparece más de una vez en este bono (1 como base, 1 como asociado)'
 		);
 	});
 });
@@ -143,7 +143,7 @@ describe('campaign-wide conflicts', () => {
 			assertNoCampaignConflicts(participatingNumberPairs([4939], FOUR), existing, FOUR)
 		);
 		expect(err.code).toBe('duplicate_in_campaign');
-		expect(err.message).toBe('Number 4939 is already used by bond bond-a');
+		expect(err.message).toBe('El número 4939 ya está en uso en el bono bond-a');
 		expect(err.details).toEqual({ number: '4939', bondId: 'bond-a' });
 	});
 
@@ -155,7 +155,7 @@ describe('campaign-wide conflicts', () => {
 				FIVE
 			)
 		);
-		expect(err.message).toBe('Number 00068 is already used by bond x');
+		expect(err.message).toBe('El número 00068 ya está en uso en el bono x');
 	});
 
 	it('passes when nothing is used', () => {
@@ -259,7 +259,7 @@ describe('manual grouping', () => {
 				FOUR
 			)
 		);
-		expect(err.message).toBe('Bond 0068 (s68) already belongs to manually grouped pata p9');
+		expect(err.message).toBe('El bono 0068 (s68) ya pertenece a la pata manual p9');
 		expect(err.details).toEqual({ bondId: 's68', pataId: 'p9' });
 	});
 });

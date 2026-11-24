@@ -172,7 +172,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const data = (await load(loadEvent(locals, '?mode=grouping')))!;
 			expect(data.canLoad).toBe(false);
 			expect(data.grouping).toBeNull();
-			expect(data.lockedMessage).toMatch(/This campaign is closed\.$/);
+			expect(data.lockedMessage).toMatch(/La campaña está cerrada\.$/);
 			expect(chains.bond_numbers).toBeUndefined();
 		});
 
@@ -223,16 +223,16 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			expect(data.grouping?.selected).toEqual([
 				expect.objectContaining({
 					id: A,
-					problem: 'It is sold: only available bonds can be grouped.'
+					problem: 'Está vendido: solo se pueden agrupar bonos disponibles.'
 				}),
 				expect.objectContaining({
 					id: B,
 					pataId: OTHER_PATA,
-					problem: 'It already belongs to a pata. Ungroup that pata first.'
+					problem: 'Ya pertenece a una pata. Desagrupar esa pata primero.'
 				}),
 				expect.objectContaining({
 					id: C,
-					problem: 'It is a pata: only simple bonds can be grouped.'
+					problem: 'Es una pata: solo se pueden agrupar bonos simples.'
 				})
 			]);
 			expect(data.grouping).toMatchObject({ unitCount: 3, totalValue: '180000.00' });
@@ -242,7 +242,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const { locals, chains } = setup();
 			const data = (await load(loadEvent(locals, '?mode=grouping&q=12345')))!;
 			expect(data.grouping?.searchError).toBe(
-				'"12345" is not a valid base number (use up to 4 digits).'
+				'«12345» no es un número base válido (usar hasta 4 dígitos).'
 			);
 			expect(chains.bond_numbers).toBeUndefined();
 		});
@@ -292,7 +292,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const result = await run('printed', locals, printed({ baseNumbers: '68' }));
 			expect(result.status).toBe(400);
 			expect(result.data.errors).toEqual({
-				baseNumbers: ['A pata needs at least 2 base numbers']
+				baseNumbers: ['Una pata necesita al menos 2 números base']
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -302,13 +302,13 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const overflow = await run('printed', locals, printed({ baseNumbers: '68 5129' }));
 			expect(overflow.status).toBe(400);
 			expect((overflow.data.errors as Record<string, string[]>).baseNumbers[0]).toContain(
-				'the highest allowed base number is 5128'
+				'el número base más alto permitido es 5128'
 			);
 			// 4939 is 0068's associated number.
 			const repeated = await run('printed', locals, printed({ baseNumbers: '68, 4939' }));
 			expect(repeated.status).toBe(400);
 			expect((repeated.data.errors as Record<string, string[]>).baseNumbers[0]).toBe(
-				'Number 4939 appears more than once in this bond (1 as base, 1 as associated)'
+				'El número 4939 aparece más de una vez en este bono (1 como base, 1 como asociado)'
 			);
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -336,7 +336,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 				form: 'pata',
 				errors: {
 					baseNumbers: [
-						'Numbers 0068, 0069, 4939 are already used by other bonds in this campaign.'
+						'Los números 0068, 0069, 4939 ya están en uso en otros bonos de esta campaña.'
 					]
 				},
 				conflicts: [
@@ -353,7 +353,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			});
 			const result = await run('printed', locals, printed());
 			expect(result.status).toBe(409);
-			expect(result.data.message).toMatch(/This campaign is closing\.$/);
+			expect(result.data.message).toMatch(/La campaña está en cierre\.$/);
 			expect(rpc).not.toHaveBeenCalled();
 		});
 	});
@@ -390,10 +390,10 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const one = await run('group', locals, group([A]));
 			expect(one.status).toBe(400);
 			expect(one.data.errors).toEqual({
-				memberBondIds: ['A pata needs at least 2 simple bonds']
+				memberBondIds: ['Una pata necesita al menos 2 bonos simples']
 			});
 			const twice = await run('group', locals, group([A, A]));
-			expect(twice.data.errors).toEqual({ memberBondIds: ['A bond is listed more than once'] });
+			expect(twice.data.errors).toEqual({ memberBondIds: ['Un bono figura más de una vez'] });
 			expect(rpc).not.toHaveBeenCalled();
 		});
 
@@ -414,9 +414,9 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 				form: 'group',
 				errors: {
 					memberBondIds: [
-						'Bond 0010: It already belongs to a pata. Ungroup that pata first.',
-						'Bond 0011: It already belongs to a pata. Ungroup that pata first.',
-						'Bond 0012: It is delivered to collector: only available bonds can be grouped.'
+						'Bono 0010: Ya pertenece a una pata. Desagrupar esa pata primero.',
+						'Bono 0011: Ya pertenece a una pata. Desagrupar esa pata primero.',
+						'Bono 0012: Está entregado al cobrador: solo se pueden agrupar bonos disponibles.'
 					]
 				},
 				conflicts: [{ field: 'memberBondIds', bondId: OTHER_PATA, numbers: ['0010', '0011'] }]
@@ -432,8 +432,8 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const missing = await run('group', foreign.locals, group([A, B]));
 			expect(missing.data.errors).toEqual({
 				memberBondIds: [
-					'Bond 0010: It belongs to another campaign.',
-					'A selected bond: Bond not found.'
+					'Bono 0010: Pertenece a otra campaña.',
+					'Un bono seleccionado: No se encontró el bono.'
 				]
 			});
 		});
@@ -451,9 +451,7 @@ describe('/campaigns/[id]/bonds/pata/new', () => {
 			const result = await run('group', locals, group());
 			expect(result.status).toBe(409);
 			expect(result.data.errors).toEqual({
-				memberBondIds: [
-					'Bond 0010 already belongs to a manually grouped pata. Ungroup the pata first.'
-				]
+				memberBondIds: ['El bono 0010 ya pertenece a una pata manual. Desagrupar la pata primero.']
 			});
 		});
 

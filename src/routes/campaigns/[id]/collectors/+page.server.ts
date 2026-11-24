@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!uuid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	const campaignResult = await getCampaignById(locals.supabase, params.id);
 	if (campaignResult.error)
-		error(500, { message: 'Could not load the campaign. Please try again.' });
+		error(500, { message: 'No se pudo cargar la campaña. Volver a intentar.' });
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	const pageValue = Number(url.searchParams.get('page'));
 	const result = await listCollectors(locals.supabase, {
@@ -30,13 +30,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		page: Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1
 	});
 	if (result.error || !result.data)
-		error(500, { message: 'Could not load collectors. Please try again.' });
+		error(500, { message: 'No se pudieron cargar los cobradores. Volver a intentar.' });
 	const counts = await countAssignedBondsByCollector(
 		locals.supabase,
 		params.id,
 		result.data.items.map((item) => item.id)
 	);
-	if (counts.error) error(500, { message: 'Could not load collectors. Please try again.' });
+	if (counts.error)
+		error(500, { message: 'No se pudieron cargar los cobradores. Volver a intentar.' });
 	return {
 		campaign: campaignResult.data,
 		collectors: result.data.items.map((collector) => ({

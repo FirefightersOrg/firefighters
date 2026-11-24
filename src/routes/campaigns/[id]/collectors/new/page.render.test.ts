@@ -15,9 +15,12 @@ describe('/campaigns/[id]/collectors/new page', () => {
 				params: { id: CAMPAIGN_ID }
 			} as never
 		}).body;
-		expect(body).toContain('New collector');
-		expect(body).toContain('Display name');
-		expect(body).toContain('Linked user (optional)');
-		expect(body).toContain('<option value="">None</option>');
+		expect(body).toContain('Nuevo cobrador');
+		expect(body).toContain('Nombre');
+		expect(body).toContain('Usuario vinculado');
+		expect(body).toContain('(opcional)');
+		expect(body).toContain('>Ninguno</option>');
+		expect(body).toContain('autocomplete="email"');
+		expect(body).toContain('Guardar cobrador');
 	});
 });

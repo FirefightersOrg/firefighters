@@ -29,28 +29,55 @@ export class CommissionLedgerServiceError extends Error {
 }
 
 type RpcError = { code?: string; message?: string };
+
+/** Spanish copy for the messages the SQL functions raise (English, internal). */
+const DB_MESSAGES_ES: [RegExp, string][] = [
+	[
+		/closed-settlement entries must be corrected/,
+		'Los movimientos de una rendición cerrada se corrigen desde la rendición.'
+	],
+	[
+		/only recorded ledger entries can be annulled/,
+		'Solo se pueden anular movimientos registrados.'
+	],
+	[
+		/amount cannot exceed current collector balance/,
+		'El monto no puede superar el saldo actual del cobrador.'
+	],
+	[/amount must be a positive amount/, 'Ingresar un monto positivo con hasta 2 decimales.'],
+	[/reason of at most/, 'Ingresar un motivo de hasta 1000 caracteres.'],
+	[
+		/invalid adjustment direction|invalid ledger direction/,
+		'Elegir a favor de quién es el ajuste.'
+	],
+	[/settlement must be open|settlement has no pending/, 'La rendición no admite esta operación.']
+];
+function dbMessage(message: string | undefined, fallback: string) {
+	return DB_MESSAGES_ES.find(([re]) => re.test(message ?? ''))?.[1] ?? fallback;
+}
+
 function mapError(error: RpcError) {
 	if (error.code === '42501')
 		return new CommissionLedgerServiceError(
 			'permission',
-			'You do not have permission to access the collector ledger.'
+			'No hay permiso para acceder a la cuenta corriente del cobrador.'
 		);
 	if (error.code === 'P0002')
 		return new CommissionLedgerServiceError(
 			'not_found',
-			'The requested campaign or collector was not found.'
+			'No se encontró la campaña, el cobrador o el movimiento.'
 		);
 	if (['22023', '23514', '22003'].includes(error.code ?? ''))
 		return new CommissionLedgerServiceError(
 			'validation',
-			error.message || 'Invalid commission settlement.'
+			dbMessage(error.message, 'Los valores ingresados no son válidos. Revisar el formulario.')
 		);
 	if (error.code === '55000')
 		return new CommissionLedgerServiceError(
 			'conflict',
-			error.message || 'The commission cannot be settled.'
+			dbMessage(error.message, 'No se puede realizar esta operación en el estado actual.')
 		);
-	return new CommissionLedgerServiceError('internal', 'Something went wrong. Please try again.', {
+	return new CommissionLedgerServiceError('internal', 'Algo salió mal. Volver a intentar.', {
 		cause: error
 	});
 }
@@ -63,7 +90,7 @@ async function rpc<T>(
 	try {
 		result = await client.rpc(name, args);
 	} catch (cause) {
-		throw new CommissionLedgerServiceError('internal', 'Something went wrong. Please try again.', {
+		throw new CommissionLedgerServiceError('internal', 'Algo salió mal. Volver a intentar.', {
 			cause
 		});
 	}
@@ -79,9 +106,13 @@ export async function settleCommission(
 ): Promise<string> {
 	const parsed = commissionSettleSchema.safeParse(input);
 	if (!parsed.success)
-		throw new CommissionLedgerServiceError('validation', 'Invalid commission settlement.', {
-			cause: parsed.error
-		});
+		throw new CommissionLedgerServiceError(
+			'validation',
+			'La liquidación de comisión no es válida.',
+			{
+				cause: parsed.error
+			}
+		);
 	return rpc<string>(client, 'commission_settle', {
 		p_campaign_id: parsed.data.campaignId,
 		p_collector_id: parsed.data.collectorId,
@@ -98,9 +129,13 @@ export async function getCollectorLedgerBalance(
 ): Promise<number> {
 	const parsed = collectorLedgerBalanceSchema.safeParse(input);
 	if (!parsed.success)
-		throw new CommissionLedgerServiceError('validation', 'Invalid collector ledger request.', {
-			cause: parsed.error
-		});
+		throw new CommissionLedgerServiceError(
+			'validation',
+			'La consulta de la cuenta corriente no es válida.',
+			{
+				cause: parsed.error
+			}
+		);
 	return rpc<number>(client, 'collector_ledger_balance', {
 		p_campaign_id: parsed.data.campaignId,
 		p_collector_id: parsed.data.collectorId
@@ -140,7 +175,7 @@ export async function adjustCommission(
 	input: z.input<typeof commissionAdjustSchema>,
 	ctx: { requestId?: string | null } = {}
 ): Promise<string> {
-	const d = parse(commissionAdjustSchema, input, 'Invalid commission adjustment.');
+	const d = parse(commissionAdjustSchema, input, 'El ajuste de comisión no es válido.');
 	return rpc<string>(client, 'commission_adjust', {
 		p_campaign_id: d.campaignId,
 		p_collector_id: d.collectorId,
@@ -159,7 +194,7 @@ export async function adjustCollectorLedger(
 	input: z.input<typeof ledgerAdjustSchema>,
 	ctx: { requestId?: string | null } = {}
 ): Promise<string> {
-	const d = parse(ledgerAdjustSchema, input, 'Invalid ledger adjustment.');
+	const d = parse(ledgerAdjustSchema, input, 'El ajuste de la cuenta corriente no es válido.');
 	return rpc<string>(client, 'collector_ledger_adjust', {
 		p_campaign_id: d.campaignId,
 		p_collector_id: d.collectorId,
@@ -176,7 +211,7 @@ export async function annulCollectorLedgerEntry(
 	input: z.input<typeof ledgerAnnulSchema>,
 	ctx: { requestId?: string | null } = {}
 ): Promise<void> {
-	const d = parse(ledgerAnnulSchema, input, 'Invalid ledger annulment.');
+	const d = parse(ledgerAnnulSchema, input, 'La anulación del movimiento no es válida.');
 	await rpc<null>(client, 'collector_ledger_annul_entry', {
 		p_entry_id: d.entryId,
 		p_reason: d.reason,
@@ -203,7 +238,11 @@ export async function listCollectorLedger(
 	client: SupabaseClient,
 	input: z.input<typeof collectorLedgerBalanceSchema>
 ): Promise<LedgerEntryView[]> {
-	const d = parse(collectorLedgerBalanceSchema, input, 'Invalid collector ledger request.');
+	const d = parse(
+		collectorLedgerBalanceSchema,
+		input,
+		'La consulta de la cuenta corriente no es válida.'
+	);
 	const rows = await rpc<Record<string, unknown>[] | null>(
 		client,
 		'collector_ledger_entries_with_balance',

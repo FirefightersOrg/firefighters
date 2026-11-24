@@ -35,21 +35,21 @@ import { listBuyerPrizes } from '$lib/server/repositories/prizes';
 const valid = (id: string) => z.guid().safeParse(id).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
-		error(500, { message: 'Could not load permissions.' });
+		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!hasPermissionIn(locals.permissions, 'buyer.view'))
 		requirePermissionIn(locals.permissions, 'buyer.manage');
 	if (!valid(params.id)) error(404, { message: CAMPAIGN_MESSAGES.notFound });
-	if (!valid(params.buyerId)) error(404, { message: 'Buyer not found.' });
+	if (!valid(params.buyerId)) error(404, { message: 'No se encontró el comprador.' });
 	const [campaignResult, buyerResult, optionsResult] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getBuyer(locals.supabase, params.buyerId),
 		listActiveCollectorOptions(locals.supabase)
 	]);
 	if (campaignResult.error || buyerResult.error || optionsResult.error)
-		error(500, { message: 'Could not load the buyer. Please try again.' });
+		error(500, { message: 'No se pudo cargar el comprador. Volver a intentar.' });
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
-	if (!buyerResult.data) error(404, { message: 'Buyer not found.' });
+	if (!buyerResult.data) error(404, { message: 'No se encontró el comprador.' });
 	const buyer = buyerResult.data;
 	const canViewPrizes = (
 		['draw.view', 'draw.load_winner', 'prize.resolve', 'prize.deliver', 'prize.annul'] as const
@@ -85,7 +85,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		salesResult.error ||
 		prizesResult.error
 	)
-		error(500, { message: 'Could not load the buyer. Please try again.' });
+		error(500, { message: 'No se pudo cargar el comprador. Volver a intentar.' });
 	return {
 		campaign: campaignResult.data,
 		buyer,
@@ -97,7 +97,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				? [
 						{
 							id: collectorResult.data.id,
-							displayName: `${collectorResult.data.displayName}${collectorResult.data.status === 'inactive' ? ' (inactive)' : ''}`
+							displayName: `${collectorResult.data.displayName}${collectorResult.data.status === 'inactive' ? ' (inactivo)' : ''}`
 						}
 					]
 				: [])
@@ -130,7 +130,7 @@ export const actions: Actions = {
 				success: false,
 				values: {},
 				errors: {},
-				message: 'Could not load permissions.'
+				message: 'No se pudieron cargar los permisos.'
 			});
 		const denied = requireBuyerManage(locals, url);
 		if (denied) return denied;
@@ -142,20 +142,30 @@ export const actions: Actions = {
 				message: CAMPAIGN_MESSAGES.notFound
 			});
 		if (!valid(params.buyerId))
-			return fail(404, { success: false, values: {}, errors: {}, message: 'Buyer not found.' });
+			return fail(404, {
+				success: false,
+				values: {},
+				errors: {},
+				message: 'No se encontró el comprador.'
+			});
 		const formData = await request.formData();
 		const values = buyerValues(formData);
 		const current = await getBuyer(locals.supabase, params.buyerId);
 		if (current.error) return partyFailure(current.error, values);
 		if (!current.data)
-			return fail(404, { success: false, values, errors: {}, message: 'Buyer not found.' });
+			return fail(404, {
+				success: false,
+				values,
+				errors: {},
+				message: 'No se encontró el comprador.'
+			});
 		const keepCollector = values.usualCollectorId === '__keep__';
 		if (keepCollector && !current.data.usualCollectorId)
 			return fail(400, {
 				success: false,
 				values,
-				errors: { usualCollectorId: ['There is no usual collector to keep.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: { usualCollectorId: ['No hay un cobrador habitual para conservar.'] },
+				message: 'Revisar los campos marcados.'
 			});
 		const valuesToValidate = keepCollector
 			? { ...values, usualCollectorId: current.data.usualCollectorId }
@@ -174,8 +184,12 @@ export const actions: Actions = {
 			return fail(400, {
 				success: false,
 				values,
-				errors: { updatedAt: ['Invalid update version. Refresh the page and try again.'] },
-				message: 'Please correct the highlighted fields.'
+				errors: {
+					updatedAt: [
+						'La versión del registro no es válida. Recargar la página y volver a intentar.'
+					]
+				},
+				message: 'Revisar los campos marcados.'
 			});
 		const checked = formData.get('createAnyway') === 'on';
 		const parsed = validateBuyer(valuesToValidate);
@@ -200,7 +214,7 @@ export const actions: Actions = {
 				requestId: locals.requestId,
 				permissions: locals.permissions
 			});
-			return { success: true, message: 'Buyer updated.', errors: {}, values };
+			return { success: true, message: 'Comprador actualizado.', errors: {}, values };
 		} catch (err) {
 			return partyFailure(err, values);
 		}

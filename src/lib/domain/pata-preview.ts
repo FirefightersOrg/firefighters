@@ -78,15 +78,15 @@ export function previewPata(
 
 	const problems: string[] = [];
 	if (unitCount < MIN_PATA_SIZE) {
-		problems.push(`A pata needs at least ${MIN_PATA_SIZE} base numbers`);
+		problems.push(`Una pata necesita al menos ${MIN_PATA_SIZE} números base`);
 	}
 	for (const { preview } of entries) {
 		if (preview.state === 'invalid') problems.push(preview.message);
 	}
 	for (const collision of collisions) {
 		problems.push(
-			`Number ${collision.formatted} appears more than once in this pata ` +
-				`(${collision.baseCount} as base, ${collision.associatedCount} as associated)`
+			`El número ${collision.formatted} aparece más de una vez en esta pata ` +
+				`(${collision.baseCount} como base, ${collision.associatedCount} como asociado)`
 		);
 	}
 

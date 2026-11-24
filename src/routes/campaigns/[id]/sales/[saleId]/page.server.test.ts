@@ -120,7 +120,7 @@ describe('sale correction actions', () => {
 			vi.mocked(service).mockImplementation(async (_client, input) => {
 				const parsed = schema.safeParse(input);
 				if (!parsed.success)
-					throw new SaleCorrectionServiceError('validation', 'Invalid correction.');
+					throw new SaleCorrectionServiceError('validation', 'Corrección inválida.');
 				return null;
 			});
 			for (const fields of [

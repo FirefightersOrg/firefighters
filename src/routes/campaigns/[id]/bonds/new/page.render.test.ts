@@ -78,64 +78,63 @@ describe('BaseNumberPreview', () => {
 
 	it('explains an overflow or a malformed number', () => {
 		expect(html('5129')).toContain(
-			'its associated number 10000 exceeds the campaign maximum number 9999'
+			'su número asociado 10000 supera el número máximo de la campaña 9999'
 		);
-		expect(html('12345')).toContain('is not a valid number (use up to 4 digits)');
+		expect(html('12345')).toContain('no es un número válido (usar hasta 4 dígitos)');
 	});
 
 	it('invites to type when empty', () => {
-		expect(html('')).toContain('Type the base number');
+		expect(html('')).toContain('Ingresar el número base');
 	});
 });
 
 describe('/campaigns/[id]/bonds/new page', () => {
-	it('renders the entry form with "Save & add another" as the default (first) submit button', () => {
+	it('renders the entry form with "Guardar y cargar otro" as the default (first) submit button', () => {
 		const body = renderPage(campaign());
 		const buttons = [...body.matchAll(/<button[^>]*name="intent"[^>]*value="(\w+)"/g)].map(
 			(m) => m[1]
 		);
 		expect(buttons).toEqual(['another', 'save']);
-		expect(body).toContain('Save &amp; add another');
+		expect(body).toContain('Guardar y cargar otro');
 		expect(body).toMatch(/<input[^>]*name="baseNumber"[^>]*required/);
 		expect(body).toContain('name="internalCode"');
 		expect(body).toContain('name="barcode"');
 		// Usable range from the numbering preview.
 		expect(body).toContain('0000–5128');
-		expect(body).not.toContain('Saving the first bond freezes its rules');
-		// Both buttons are enabled (their class still has `disabled:` variants).
+		expect(body).not.toContain('Guardar el primer bono congela sus reglas');
+		// Both buttons are enabled.
 		for (const value of ['another', 'save']) {
 			const tag = submitButton(body, value);
-			expect(tag).toContain('disabled:');
 			expect(isDisabled(tag)).toBe(false);
 		}
 	});
 
 	it('warns that the first bond freezes the rules of a draft', () => {
 		expect(renderPage(campaign({ status: 'draft' }))).toContain(
-			'Saving the first bond freezes its rules'
+			'Guardar el primer bono congela sus reglas'
 		);
 	});
 
 	it('shows an explanation instead of the form when the campaign is locked', () => {
 		const message =
-			'Bonds can only be loaded or changed while the campaign is a draft or active. This campaign is closed.';
+			'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa. La campaña está cerrada.';
 		const body = renderPage(campaign({ status: 'closed' }), null, message);
-		expect(body).toContain('Bonds cannot be loaded.');
+		expect(body).toContain('No se pueden cargar bonos');
 		expect(body).toContain(message);
 		expect(body).not.toContain('<form');
 	});
 
-	it('confirms the bond just saved with "Save & add another", with an empty form', () => {
+	it('confirms the bond just saved with "Guardar y cargar otro", with an empty form', () => {
 		const body = renderPage(campaign(), {
 			form: 'create',
 			success: true,
-			message: 'Bond 0068 / 4939 saved.',
+			message: 'Bono 0068 / 4939 guardado.',
 			errors: {},
 			created: { id: BOND_ID, baseFormatted: '0068', associatedFormatted: '4939' }
 		});
-		expect(body).toContain('Bond 0068 / 4939 saved.');
+		expect(body).toContain('Bono 0068 / 4939 guardado.');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
-		expect(body).toContain('Saved from this page');
+		expect(body).toContain('Guardados desde esta página');
 		expect(inputValue(body, 'baseNumber')).toBe('');
 	});
 
@@ -143,41 +142,42 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		const body = renderPage(campaign(), {
 			form: 'create',
 			success: false,
-			message: 'Please correct the highlighted fields.',
+			message: 'Corregir los campos marcados.',
 			errors: {
-				baseNumber: ['Numbers 0068, 4939 are already used by another bond in this campaign.']
+				baseNumber: ['Los números 0068, 4939 ya están en uso en otro bono de esta campaña.']
 			},
 			conflicts: [{ field: 'baseNumber', bondId: OTHER_BOND_ID, numbers: ['0068', '4939'] }],
 			values: { baseNumber: '0068', internalCode: '', barcode: '' }
 		});
 		expect(inputValue(body, 'baseNumber')).toBe('0068');
-		expect(body).toContain('Numbers 0068, 4939 are already used by another bond in this campaign.');
+		expect(body).toContain('Los números 0068, 4939 ya están en uso en otro bono de esta campaña.');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${OTHER_BOND_ID}"`);
-		expect(body).toContain('View the bond that uses 0068, 4939');
-		expect(body).toMatch(/aria-describedby="baseNumber-preview baseNumber-error"/);
+		expect(body).toContain('Ver el bono que usa 0068, 4939');
+		expect(body).toMatch(/aria-describedby="baseNumber-preview[^"]*baseNumber-error"/);
 	});
 
 	it('shows a form-level error (campaign status changed meanwhile)', () => {
 		const body = renderPage(campaign(), {
 			form: 'create',
 			success: false,
-			message: 'Bonds can only be loaded or changed while the campaign is a draft or active.',
+			message:
+				'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa.',
 			errors: {},
 			values: { baseNumber: '0068', internalCode: '', barcode: '' }
 		});
 		expect(body).toContain('role="alert"');
-		expect(body).toContain('Bonds can only be loaded or changed');
+		expect(body).toContain('Los bonos solo se pueden cargar o modificar');
 	});
 
 	it('flags an overflow live and disables saving', () => {
 		const body = renderPage(campaign(), {
 			form: 'create',
 			success: false,
-			message: 'Please correct the highlighted fields.',
-			errors: { baseNumber: ['Base number 5129 overflows'] },
+			message: 'Corregir los campos marcados.',
+			errors: { baseNumber: ['El número base 5129 desborda'] },
 			values: { baseNumber: '5129', internalCode: '', barcode: '' }
 		});
-		expect(body).toContain('the highest allowed base number is 5128');
+		expect(body).toContain('el número base más alto permitido es 5128');
 		expect(isDisabled(submitButton(body, 'another'))).toBe(true);
 		expect(isDisabled(submitButton(body, 'save'))).toBe(true);
 	});

@@ -15,7 +15,9 @@ describe('new buyer page', () => {
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
 			} as any
 		}).body;
-		expect(body).toContain('New buyer');
+		expect(body).toContain('Nuevo comprador');
 		expect(body).toContain('name="firstName"');
+		expect(body).toContain('autocomplete="given-name"');
+		expect(body).toContain('Crear comprador');
 	});
 });
