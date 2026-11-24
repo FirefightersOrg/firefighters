@@ -261,7 +261,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe('Phase 11: draw roster generation and frozen roster immutability', () => {
-	it('C1 evaluates monthly, final and extraordinary coverage by the Buenos Aires cutoff; consolation fails closed and requires an installment', async () => {
+	it('C1 evaluates monthly, final and extraordinary coverage by the Buenos Aires cutoff; consolation requires an installment and generates once enabled (SAN-81)', async () => {
 		const monthly = await draw('monthly');
 		const final = await draw('final');
 		const extraordinary = await draw('extraordinary_full_payment');
@@ -350,7 +350,7 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 						if (error) throw Object.assign(new Error(error.message), { code: error.code });
 					})
 			)
-		).toBe('55000');
+		).toBe('ok'); // SAN-81 enabled consolation: with no prior prizes there is nothing to exclude.
 	});
 
 	it('C2 allocates and reuses extraordinary numbers per base without campaign collisions', async () => {

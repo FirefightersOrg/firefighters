@@ -15,6 +15,8 @@
 	import FormAlert from '$lib/components/campaigns/FormAlert.svelte';
 	import { inputClass, labelClass, secondaryButtonClass } from '$lib/components/campaigns/styles';
 	import type { PageProps } from './$types';
+	import { PRIZE_STATUS_LABELS, wonPrizeCount as wonCount } from '$lib/domain/prizes';
+	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 
 	/**
 	 * Bond record: the 14 sections of docs/screens.md "Bond record", one component each, with an
@@ -44,6 +46,8 @@
 				: undefined
 	});
 	const formErrors = $derived((form?.errors ?? {}) as Record<string, string[]>);
+	const deliveredAt = (value: string | null) =>
+		value ? `${buenosAiresDateTimeLocal(value).replace('T', ' ')} (Buenos Aires)` : '—';
 </script>
 
 <svelte:head>
@@ -241,6 +245,51 @@
 			</table>
 		{:else}<p class="mt-2 text-sm text-slate-500">Not included in any draw roster.</p>{/if}
 	</section>
-	<BondPendingSection id="prizes" />
+	<section
+		id="prizes"
+		aria-labelledby="prizes-title"
+		class="rounded-lg border border-slate-200 bg-white p-5"
+	>
+		<h2 id="prizes-title" class="text-base font-semibold">
+			<span class="text-slate-400 tabular-nums">13.</span> Prizes won ({wonCount(data.prizes)})
+		</h2>
+		{#if data.canViewPrizes === false}<p class="mt-2 text-sm text-slate-500">
+				You do not have permission to view prizes.
+			</p>
+		{:else if (data.prizes ?? []).length}
+			<table class="mt-3 min-w-full text-sm">
+				<thead
+					><tr class="text-left"><th>Draw</th><th>Prize</th><th>Status</th><th>Delivered at</th></tr
+					></thead
+				>
+				<tbody>
+					{#each data.prizes as prize (prize.id)}
+						<tr
+							class="border-t border-slate-100"
+							class:text-slate-400={prize.status === 'annulled'}
+						>
+							<td class="py-2">
+								<a
+									class="text-blue-700 underline"
+									href={resolve('/campaigns/[id]/draws/[drawId]/winners', {
+										id: campaign.id,
+										drawId: prize.drawId
+									})}>{prize.drawName}</a
+								>
+							</td>
+							<td>#{prize.position} — {prize.name}</td>
+							<td>
+								{#if prize.status === 'annulled'}<span
+										class="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700"
+										>Annulled — does not count as won</span
+									>{:else}{PRIZE_STATUS_LABELS[prize.status]}{/if}
+							</td>
+							<td>{deliveredAt(prize.deliveredAt)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{:else}<p class="mt-2 text-sm text-slate-500">No prizes.</p>{/if}
+	</section>
 	<BondAuditSection campaignId={campaign.id} audit={record.audit} />
 </div>

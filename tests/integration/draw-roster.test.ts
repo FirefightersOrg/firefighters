@@ -237,7 +237,7 @@ describe('transactional draw roster services with real users', () => {
 		if (auditError) throw auditError;
 		expect(audits?.map((a) => a.action)).toEqual(['draw.annul', 'draw.create', 'draw.update']);
 	});
-	it.each(['monthly', 'final', 'extraordinary_full_payment'] as const)(
+	it.each(['monthly', 'final', 'extraordinary_full_payment', 'consolation'] as const)(
 		'%s matches TS eligibility on the same persisted fixtures, then freezes',
 		async (type) => {
 			const drawId = draws.get(type)!;
@@ -334,13 +334,20 @@ describe('transactional draw roster services with real users', () => {
 			).rejects.toMatchObject({ status: 409 });
 		}
 	);
-	it('fails consolation closed until persisted draw results exist', async () => {
-		await expect(
-			generateDrawRoster(admin, { drawId: draws.get('consolation')! }, ctx('consolation'))
-		).rejects.toMatchObject({ status: 409 });
-	});
 	it('denies a real read-only caller even if TS permissions are forged', async () => {
-		const drawId = draws.get('consolation')!;
+		const drawId = await createDraw(
+			admin,
+			{
+				campaignId,
+				drawType: 'consolation',
+				name: 'Denial fixture',
+				drawDate: today,
+				paymentCutoffAt: cutoff,
+				requiredInstallmentNumber: 1,
+				eligibilityRule: {}
+			},
+			ctx('denial-fixture')
+		);
 		for (const [action, fn] of [
 			['generate', generateDrawRoster],
 			['freeze', freezeDrawRoster]

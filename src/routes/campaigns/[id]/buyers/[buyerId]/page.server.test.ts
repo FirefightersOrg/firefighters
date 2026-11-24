@@ -47,18 +47,26 @@ function setup(
 	rpc: { data: unknown; error: unknown } = { data: false, error: null },
 	currentBuyer:
 		| typeof buyer
-		| (Omit<typeof buyer, 'usual_collector_id'> & { usual_collector_id: string | null }) = buyer
+		| (Omit<typeof buyer, 'usual_collector_id'> & { usual_collector_id: string | null }) = buyer,
+	options: { permissions?: string[] | null; prizes?: { data: unknown; error: unknown } } = {}
 ) {
 	const mock = mockSupabase({
 		tables: {
 			campaigns: { data: campaignRow(), error: null },
 			buyers: { data: currentBuyer, error: null },
 			collectors: { data: [], error: null },
-			bonds: { data: [], error: null }
+			bonds: { data: [], error: null },
+			prize_awards: options.prizes ?? { data: [], error: null }
 		},
 		rpc
 	});
-	return { ...mock, locals: makeLocals({ supabase: mock.supabase, permissions: MANAGER }) };
+	return {
+		...mock,
+		locals: makeLocals({
+			supabase: mock.supabase,
+			permissions: options.permissions === undefined ? MANAGER : options.permissions
+		})
+	};
 }
 function event(locals: App.Locals, form = fields()) {
 	return {
@@ -96,6 +104,50 @@ describe('/campaigns/[id]/buyers/[buyerId]', () => {
 		} as never);
 		expect(data?.campaignBonds).toEqual([]);
 		expect(data?.historicalBonds).toEqual([]);
+	});
+
+	it('fails closed before load or update database calls when permissions are unavailable', async () => {
+		const unavailable = setup(undefined, buyer, { permissions: null });
+		await expect(load(event(unavailable.locals) as never)).rejects.toMatchObject({ status: 500 });
+		const result = (await actions.update(event(unavailable.locals))) as ActionFailure;
+		expect(result.status).toBe(500);
+		expect(unavailable.from).not.toHaveBeenCalled();
+		expect(unavailable.rpc).not.toHaveBeenCalled();
+	});
+
+	it('loads prizes through the award buyer id', async () => {
+		const configured = setup(undefined, buyer, {
+			permissions: [...MANAGER, 'draw.view'],
+			prizes: {
+				data: [
+					{
+						id: 'award',
+						delivered_at: null,
+						prizes: {
+							id: 'prize',
+							name: 'Bike',
+							position: 1,
+							status: 'pending_delivery',
+							draws: { id: 'draw', name: 'December', campaign_id: CAMPAIGN_ID }
+						}
+					}
+				],
+				error: null
+			}
+		});
+		const data = await load(event(configured.locals) as never);
+		expect(data?.prizes).toEqual([
+			{
+				id: 'prize',
+				drawId: 'draw',
+				drawName: 'December',
+				name: 'Bike',
+				position: 1,
+				status: 'pending_delivery',
+				deliveredAt: null
+			}
+		]);
+		expect(configured.chains.prize_awards[0].eq).toHaveBeenCalledWith('buyer_id', BUYER_ID);
 	});
 
 	it('updates after discarding individual fields, handles stale conflicts and no-ops', async () => {

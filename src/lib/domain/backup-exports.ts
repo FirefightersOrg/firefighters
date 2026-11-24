@@ -11,14 +11,15 @@ export const BACKUP_EXPORT_KINDS = [
 	'payments',
 	'settlements',
 	'collector-ledger',
-	'settlement-corrections'
+	'settlement-corrections',
+	'frozen-rosters'
 ] as const;
 export type BackupExportKind = (typeof BACKUP_EXPORT_KINDS)[number];
 
-/** Exports of the six in docs/backup-operations.md that need Phase 11/12 tables. */
-// TODO(SAN-90 follow-up): 'frozen-rosters' (Phase 11 roster tables) and 'winners-prizes'
-// (Phase 12 winner/prize tables). Add them here once the tables exist.
-export const PENDING_BACKUP_EXPORTS = ['frozen-rosters', 'winners-prizes'] as const;
+/** Exports of the six in docs/backup-operations.md that need Phase 12 tables. */
+// TODO(SAN-113): 'winners-prizes' (Phase 12 winner/prize tables). Add it to BACKUP_EXPORTS once
+// the tables exist (permission: report.export plus the prize view permission).
+export const PENDING_BACKUP_EXPORTS = ['winners-prizes'] as const;
 
 export function isBackupExportKind(value: string): value is BackupExportKind {
 	return (BACKUP_EXPORT_KINDS as readonly string[]).includes(value);
@@ -37,10 +38,15 @@ export interface BackupExportDefinition {
 	order: readonly string[];
 	/** Permissions required besides `report.export` (all of them). */
 	permissions: readonly (
-		'bond.view' | 'payment.view' | 'settlement.view' | 'collector.ledger.view'
+		'bond.view' | 'payment.view' | 'settlement.view' | 'collector.ledger.view' | 'draw.view'
 	)[];
-	/** Column holding the campaign id; embedded path when the table has none. Default `campaign_id`. */
+	/**
+	 * Campaign filter column when the table has no `campaign_id` of its own (a dotted PostgREST
+	 * path through `!inner` embeds in `select`). Defaults to `campaign_id`.
+	 */
 	campaignColumn?: string;
+	/** Extra equality filters (column path -> value), e.g. only frozen rosters. */
+	filters?: Readonly<Record<string, string>>;
 	/** Column filtered by the optional `from`/`to` period (date or timestamp). */
 	periodColumn?: string;
 	columns: readonly CsvColumn<ExportRow>[];
@@ -51,6 +57,33 @@ const col = (header: string, key: string, text = false): CsvColumn<ExportRow> =>
 	text,
 	value: (r) => r[key]
 });
+/** Buenos Aires wall-clock `YYYY-MM-DD HH:mm:ss` of a timestamptz (Argentina has no DST). */
+const BA_FORMAT = new Intl.DateTimeFormat('en-CA', {
+	timeZone: 'America/Argentina/Buenos_Aires',
+	year: 'numeric',
+	month: '2-digit',
+	day: '2-digit',
+	hour: '2-digit',
+	minute: '2-digit',
+	second: '2-digit',
+	hourCycle: 'h23'
+});
+export function buenosAiresDateTime(value: unknown): string | null {
+	if (typeof value !== 'string' || value === '') return null;
+	const d = new Date(value);
+	if (Number.isNaN(d.getTime())) return null;
+	const p = Object.fromEntries(BA_FORMAT.formatToParts(d).map((x) => [x.type, x.value]));
+	return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}
+
+/** Buyer display name from a roster snapshot: business name, else "last, first". */
+export function snapshotBuyerName(buyer: ExportRow | null | undefined): string | null {
+	if (!buyer) return null;
+	if (buyer.business_name) return String(buyer.business_name);
+	const name = [buyer.last_name, buyer.first_name].filter(Boolean).join(', ');
+	return name || null;
+}
+
 const nested = (header: string, a: string, b: string, text = true): CsvColumn<ExportRow> => ({
 	header,
 	text,
@@ -165,6 +198,37 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			col('reason', 'reason', true),
 			col('annulled_at', 'annulled_at'),
 			col('annul_reason', 'annul_reason', true)
+		]
+	},
+	'frozen-rosters': {
+		kind: 'frozen-rosters',
+		label: 'Frozen rosters',
+		table: 'draw_roster_entries',
+		// Only frozen rosters (never generated/superseded). The campaign hangs off the draw.
+		select:
+			'id, draw_roster_id, bond_id, number_value, eligible, ineligibility_reason, buyer_snapshot, collector_snapshot, draw_rosters!inner(id, status, frozen_at, draws!inner(id, campaign_id, name, draw_type, draw_date))',
+		// (draw_roster_id, number_value) is unique, so the order is total.
+		order: ['draw_roster_id', 'number_value'],
+		permissions: ['draw.view'],
+		campaignColumn: 'draw_rosters.draws.campaign_id',
+		filters: { 'draw_rosters.status': 'frozen' },
+		columns: [
+			{ header: 'draw_id', value: (r) => r.draw_rosters?.draws?.id },
+			{ header: 'draw_name', text: true, value: (r) => r.draw_rosters?.draws?.name },
+			{ header: 'draw_type', value: (r) => r.draw_rosters?.draws?.draw_type },
+			{ header: 'draw_date', value: (r) => r.draw_rosters?.draws?.draw_date },
+			col('roster_id', 'draw_roster_id'),
+			{ header: 'frozen_at', value: (r) => buenosAiresDateTime(r.draw_rosters?.frozen_at) },
+			col('number', 'number_value'),
+			col('bond_id', 'bond_id'),
+			col('eligible', 'eligible'),
+			col('ineligibility_reason', 'ineligibility_reason', true),
+			{ header: 'buyer_id', value: (r) => r.buyer_snapshot?.id },
+			{ header: 'buyer', text: true, value: (r) => snapshotBuyerName(r.buyer_snapshot) },
+			{ header: 'buyer_document', text: true, value: (r) => r.buyer_snapshot?.document_number },
+			{ header: 'buyer_tax_id', text: true, value: (r) => r.buyer_snapshot?.tax_id },
+			{ header: 'collector_id', value: (r) => r.collector_snapshot?.id },
+			{ header: 'collector', text: true, value: (r) => r.collector_snapshot?.display_name }
 		]
 	},
 	'settlement-corrections': {
