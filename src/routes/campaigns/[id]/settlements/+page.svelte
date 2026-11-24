@@ -1,107 +1,119 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
-	import { formatMoney } from '$lib/domain/money';
-	import { formatCampaignDate } from '$lib/domain/campaigns';
+		Button,
+		Card,
+		EmptyState,
+		Field,
+		PageHeader,
+		Select,
+		StatusBadge,
+		Table,
+		TextInput
+	} from '$lib/components/ui';
+	import type { TableColumn } from '$lib/components/ui';
+	import { formatDate, formatMoney } from '$lib/format';
 	import { SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUSES } from '$lib/domain/payments';
 	import type { PageProps } from './$types';
+
 	let { data }: PageProps = $props();
+	type Row = (typeof data.settlements)[number];
+	const columns: TableColumn<Row>[] = [
+		{ key: 'number', header: 'Número' },
+		{ key: 'collectorName', header: 'Cobrador' },
+		{ key: 'status', header: 'Estado' },
+		{ key: 'total', header: 'Total', align: 'right' },
+		{ key: 'openedAt', header: 'Apertura' }
+	];
+	const collectorOptions = $derived([
+		{ value: '', label: 'Todos' },
+		...data.collectors.map((c) => ({ value: c.id, label: c.displayName }))
+	]);
+	const statusOptions = [
+		{ value: '', label: 'Todos' },
+		...SETTLEMENT_STATUSES.map((s) => ({ value: s, label: SETTLEMENT_STATUS_LABELS[s] }))
+	];
+	const filtered = $derived(
+		Boolean(data.filters.collector || data.filters.status || data.filters.from || data.filters.to)
+	);
 </script>
 
-<svelte:head><title>Settlements - {data.campaign.name}</title></svelte:head>
-<div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<div>
-			<a
-				class="text-sm text-blue-700 hover:underline"
-				href={resolve('/campaigns/[id]', { id: data.campaign.id })}>← {data.campaign.name}</a
-			>
-			<h1 class="mt-2 text-2xl font-bold">Settlements</h1>
-		</div>
-		{#if data.can.create}<a
-				class={primaryButtonClass}
+<svelte:head><title>Rendiciones - {data.campaign.name}</title></svelte:head>
+
+<PageHeader
+	title="Rendiciones"
+	description="Rendiciones de los cobradores, con su estado y total."
+	breadcrumbs={[
+		{ label: 'Campañas', href: resolve('/campaigns') },
+		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
+		{ label: 'Rendiciones' }
+	]}
+>
+	{#snippet actions()}
+		{#if data.can.create}
+			<Button
+				variant="primary"
+				icon="plus"
 				href={resolve('/campaigns/[id]/settlements/new', { id: data.campaign.id })}
-				>Open settlement</a
-			>{/if}
-	</div>
-	<form method="GET" class="{cardClass} grid gap-3 sm:grid-cols-5 sm:items-end">
-		<div>
-			<label class={labelClass} for="collector">Collector</label><select
-				class={inputClass}
-				id="collector"
-				name="collector"
-				><option value="">All</option>{#each data.collectors as c (c.id)}<option
-						value={c.id}
-						selected={data.filters.collector === c.id}>{c.displayName}</option
-					>{/each}</select
+				>Abrir rendición</Button
 			>
-		</div>
-		<div>
-			<label class={labelClass} for="status">Status</label><select
-				class={inputClass}
-				id="status"
-				name="status"
-				><option value="">All</option>{#each SETTLEMENT_STATUSES as s (s)}<option
-						value={s}
-						selected={data.filters.status === s}>{SETTLEMENT_STATUS_LABELS[s]}</option
-					>{/each}</select
-			>
-		</div>
-		<div>
-			<label class={labelClass} for="from">From</label><input
-				class={inputClass}
-				id="from"
-				type="date"
-				name="from"
-				value={data.filters.from}
+		{/if}
+	{/snippet}
+</PageHeader>
+
+<div class="space-y-6">
+	<Card>
+		<form method="GET" class="grid gap-4 sm:grid-cols-5 sm:items-end">
+			<Field label="Cobrador">
+				<Select name="collector" options={collectorOptions} value={data.filters.collector ?? ''} />
+			</Field>
+			<Field label="Estado">
+				<Select name="status" options={statusOptions} value={data.filters.status ?? ''} />
+			</Field>
+			<Field label="Desde">
+				<TextInput type="date" name="from" value={data.filters.from ?? ''} />
+			</Field>
+			<Field label="Hasta">
+				<TextInput type="date" name="to" value={data.filters.to ?? ''} />
+			</Field>
+			<div class="flex gap-2">
+				<Button type="submit" variant="primary">Filtrar</Button>
+				{#if filtered}
+					<Button
+						variant="ghost"
+						href={resolve('/campaigns/[id]/settlements', { id: data.campaign.id })}>Limpiar</Button
+					>
+				{/if}
+			</div>
+		</form>
+	</Card>
+
+	<Table {columns} rows={data.settlements} caption="Rendiciones de la campaña">
+		{#snippet cell({ row, column })}
+			{#if column.key === 'number'}
+				<a
+					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+					href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+						id: data.campaign.id,
+						settlementId: row.id
+					})}>#{row.settlementNumber}</a
+				>
+			{:else if column.key === 'status'}
+				<StatusBadge kind="settlement" status={row.status} />
+			{:else if column.key === 'total'}
+				<span class="tabular-nums"
+					>{formatMoney(row.totals.totalAmount, { decimals: 'always' })}</span
+				>
+			{:else if column.key === 'openedAt'}
+				{formatDate(row.openedAt)}
+			{:else}
+				{row.collectorName}
+			{/if}
+		{/snippet}
+		{#snippet empty()}
+			<EmptyState
+				title={filtered ? 'Ninguna rendición coincide con el filtro' : 'Todavía no hay rendiciones'}
 			/>
-		</div>
-		<div>
-			<label class={labelClass} for="to">To</label><input
-				class={inputClass}
-				id="to"
-				type="date"
-				name="to"
-				value={data.filters.to}
-			/>
-		</div>
-		<div class="flex gap-2">
-			<button class={primaryButtonClass}>Filter</button><a
-				class={secondaryButtonClass}
-				href={resolve('/campaigns/[id]/settlements', { id: data.campaign.id })}>Clear</a
-			>
-		</div>
-	</form>
-	<section class={cardClass}>
-		<table class="min-w-full text-sm">
-			<thead class="text-left text-xs uppercase text-slate-500"
-				><tr
-					><th class="py-2 pr-3">Number</th><th class="py-2 pr-3">Collector</th><th
-						class="py-2 pr-3">Status</th
-					><th class="py-2 pr-3">Total</th><th class="py-2">Opened</th></tr
-				></thead
-			><tbody class="divide-y divide-slate-100"
-				>{#each data.settlements as s (s.id)}<tr
-						><td class="py-2 pr-3"
-							><a
-								class="text-blue-700 hover:underline"
-								href={resolve('/campaigns/[id]/settlements/[settlementId]', {
-									id: data.campaign.id,
-									settlementId: s.id
-								})}>#{s.settlementNumber}</a
-							></td
-						><td>{s.collectorName}</td><td>{SETTLEMENT_STATUS_LABELS[s.status]}</td><td
-							>{formatMoney(s.totals.totalAmount)}</td
-						><td>{formatCampaignDate(s.openedAt)}</td></tr
-					>{:else}<tr><td colspan="5" class="py-3 text-slate-500">No settlements match.</td></tr
-					>{/each}</tbody
-			>
-		</table>
-	</section>
+		{/snippet}
+	</Table>
 </div>
