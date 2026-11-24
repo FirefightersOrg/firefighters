@@ -201,6 +201,6 @@ describe('/campaigns/[id]/collectors/[collectorId]/ledger actions', () => {
 		});
 		const result = await act('annul', locals, { entryId: ENTRY_ID, reason: 'x' });
 		expect(result.status).toBe(409);
-		expect(result.data.message).toContain('closed-settlement');
+		expect(result.data.message).toContain('rendición cerrada');
 	});
 });

@@ -19,6 +19,17 @@ export const LEDGER_ENTRY_TYPE_LABELS: Record<LedgerEntryType, string> = {
 	annulment: 'Annulment'
 };
 
+/** Spanish UI labels (docs/copy.md). */
+export const LEDGER_ENTRY_TYPE_LABELS_ES: Record<LedgerEntryType, string> = {
+	commission_generated: 'Comisión generada',
+	commission_settled: 'Comisión liquidada',
+	cash_settled: 'Efectivo rendido',
+	transfer_received_by_firefighters: 'Transferencia recibida por Firefighters',
+	adjustment_in_favor_of_collector: 'Ajuste a favor del cobrador',
+	adjustment_in_favor_of_firefighters: 'Ajuste a favor de Firefighters',
+	annulment: 'Anulación'
+};
+
 export const LEDGER_DIRECTIONS = ['collector_credit', 'collector_debit'] as const;
 export type LedgerDirection = (typeof LEDGER_DIRECTIONS)[number];
 export const LEDGER_DIRECTION_LABELS: Record<LedgerDirection, string> = {
