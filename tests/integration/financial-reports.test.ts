@@ -11,7 +11,7 @@ import { load } from '../../src/routes/campaigns/[id]/reports/financial/+page.se
 import { GET as exportReport } from '../../src/routes/campaigns/[id]/reports/export/[report]/+server';
 import ExcelJS from 'exceljs';
 
-const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
+const { supabaseUrl, anonKey, seedEnv } = inject('integrationEnv');
 const seed = resolveSeedConfig(seedEnv);
 const options = { auth: { autoRefreshToken: false, persistSession: false } };
 const RUN_ID = randomUUID().slice(0, 8);
@@ -26,7 +26,6 @@ interface Caller {
 }
 type Role = 'admin' | 'operator' | 'treasurer' | 'read-only' | 'collector';
 
-let service: SupabaseClient;
 const users = {} as Record<Role, Caller>;
 let campaignId: string;
 let emptyCampaignId: string;
@@ -42,7 +41,7 @@ async function signIn(role: Role, email: string, password: string): Promise<Call
 		...options,
 		global: { headers: { Authorization: `Bearer ${data.session.access_token}` } }
 	});
-	const { data: profile, error: profileError } = await service
+	const { data: profile, error: profileError } = await client
 		.from('profiles')
 		.select('*')
 		.eq('auth_user_id', data.user.id)
@@ -146,7 +145,6 @@ async function newBond(label: string) {
 }
 
 beforeAll(async () => {
-	service = createClient(supabaseUrl, serviceRoleKey, options);
 	users.admin = await signIn('admin', seed.admin.email, seed.admin.password);
 	for (const role of ['operator', 'treasurer', 'read-only', 'collector'] as const) {
 		const fixture = seed.fixtures.find((item) => item.roleNames.includes(role))!;
@@ -202,18 +200,20 @@ beforeAll(async () => {
 		p_first_due_date: todayInBuenosAires(),
 		p_request_id: rid('sale')
 	});
-	const { data: plan } = await service
+	const { data: plan, error: planError } = await users.admin.client
 		.from('payment_plans')
 		.select('id')
 		.eq('sale_id', saleId)
 		.single();
-	const { data: installments } = await service
+	if (planError || !plan) throw new Error(`Unable to read the payment plan: ${planError?.message}`);
+	const { data: installment, error: installmentError } = await users.admin.client
 		.from('installments')
 		.select('id')
-		.eq('payment_plan_id', plan!.id)
+		.eq('payment_plan_id', plan.id)
 		.eq('installment_number', 1)
-		.single()
-		.then((r) => ({ data: r.data ? [r.data] : [] }));
+		.single();
+	if (installmentError || !installment)
+		throw new Error(`Unable to read the installment: ${installmentError?.message}`);
 	const settlementId = await rpcId(users.admin.client, 'settlement_open', {
 		p_campaign_id: campaignId,
 		p_collector_id: collectorId,
@@ -225,7 +225,7 @@ beforeAll(async () => {
 		p_sale_id: saleId,
 		p_amount: 100,
 		p_payment_method: 'cash',
-		p_applications: [{ installment_id: installments![0]!.id, amount_applied: 100 }],
+		p_applications: [{ installment_id: installment.id, amount_applied: 100 }],
 		p_request_id: rid('payment')
 	});
 	await rpc(users.admin.client, 'settlement_close', {
