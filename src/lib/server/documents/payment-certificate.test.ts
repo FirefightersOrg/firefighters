@@ -42,8 +42,8 @@ describe('buildPrintablePaymentCertificate', () =>
 			campaign: 'Bono 2027',
 			bond: '00068',
 			amount: '$ 100,00',
-			paymentDate: '18/11/26',
-			createdAt: expect.stringContaining('18/11/26, 12:30'),
+			paymentDate: '18/11/2026',
+			createdAt: expect.stringContaining('18/11/2026, 12:30'),
 			receiptNumber: 'SET-0007-12345678'
 		});
 		expect(doc.paymentDate).not.toMatch(/\d{1,2}:\d{2}/);
