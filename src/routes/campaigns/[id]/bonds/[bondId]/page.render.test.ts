@@ -133,9 +133,20 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 					position: 1,
 					status: 'delivered',
 					deliveredAt: '2026-11-20T02:30:00+00:00'
+				},
+				{
+					id: 'annulled-prize',
+					drawId: 'draw',
+					drawName: 'December',
+					name: 'Wrong bike',
+					position: 1,
+					status: 'annulled',
+					deliveredAt: null
 				}
 			]
 		});
+		expect(body).toContain('Prizes won (1)');
+		expect(body).toContain('Annulled — does not count as won');
 		expect(body).toContain('December');
 		expect(body).toContain('#1 — Bike');
 		expect(body).toContain('Delivered');
