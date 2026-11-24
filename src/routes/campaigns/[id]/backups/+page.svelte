@@ -67,8 +67,8 @@
 			{/each}
 			{#each data.pending as p (p)}
 				<li class="flex items-center justify-between gap-3 text-slate-500">
-					<span>{p === 'frozen-rosters' ? 'Frozen rosters' : 'Winners and prizes'}</span>
-					<span class="text-xs">Pending (Phase 11/12)</span>
+					<span>{p === 'winners-prizes' ? 'Winners and prizes' : p}</span>
+					<span class="text-xs">Pending (Phase 12)</span>
 				</li>
 			{/each}
 		</ul>
