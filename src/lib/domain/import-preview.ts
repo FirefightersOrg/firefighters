@@ -17,18 +17,18 @@ export const IMPORT_SOURCE_LABELS: Record<ImportSourceType, string> = {
 };
 
 export const IMPORT_SESSION_STATUS_LABELS: Record<ImportSessionStatus, string> = {
-	draft: 'Draft',
-	validated: 'Validated',
-	confirmed: 'Confirmed',
-	cancelled: 'Cancelled',
-	failed: 'Failed'
+	draft: 'Borrador',
+	validated: 'Validada',
+	confirmed: 'Confirmada',
+	cancelled: 'Cancelada',
+	failed: 'Fallida'
 };
 
 export const IMPORT_ITEM_STATUS_LABELS: Record<ImportItemStatus, string> = {
-	pending: 'Pending',
-	valid: 'Valid',
-	warning: 'Warning',
-	error: 'Error'
+	pending: 'Pendiente',
+	valid: 'Válido',
+	warning: 'Con observaciones',
+	error: 'Con error'
 };
 
 /** Statuses the preview table can be filtered by (`?status=`). */

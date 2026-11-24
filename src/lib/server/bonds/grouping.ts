@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { BOND_COMMERCIAL_STATUS_LABELS, bondTotalValueCents, BondError } from '$lib/domain/bonds';
+import { statusWord } from '$lib/domain/status-word';
+import { bondTotalValueCents, BondError } from '$lib/domain/bonds';
 import { centsToDecimalString } from '$lib/domain/money';
 import {
 	calculateAssociatedNumber,
@@ -54,7 +55,7 @@ export function groupingProblem(member: GroupingMember | undefined, campaignId: 
 	if (member.campaignId !== campaignId) return 'It belongs to another campaign.';
 	if (member.kind !== 'simple') return 'It is a pata: only simple bonds can be grouped.';
 	if (member.commercialStatus !== 'available') {
-		const status = BOND_COMMERCIAL_STATUS_LABELS[member.commercialStatus].toLowerCase();
+		const status = statusWord(member.commercialStatus);
 		return `It is ${status}: only available bonds can be grouped.`;
 	}
 	if (member.activeGroupPataId) return 'It already belongs to a pata. Ungroup that pata first.';

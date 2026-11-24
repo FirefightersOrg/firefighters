@@ -1,6 +1,6 @@
 <script lang="ts">
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { resolve } from '$app/paths';
-	import CampaignStatusBadge from '$lib/components/campaigns/CampaignStatusBadge.svelte';
 	import { cardClass, primaryButtonClass } from '$lib/components/campaigns/styles';
 	import { formatCampaignDate } from '$lib/domain/campaigns';
 	import { formatMoney } from '$lib/domain/money';
@@ -55,7 +55,7 @@
 									{campaign.name}
 								</a>
 							</td>
-							<td class="px-4 py-3"><CampaignStatusBadge status={campaign.status} /></td>
+							<td class="px-4 py-3"><StatusBadge kind="campaign" status={campaign.status} /></td>
 							<td class="whitespace-nowrap px-4 py-3 text-slate-600">
 								{formatCampaignDate(campaign.startsAt)} – {formatCampaignDate(campaign.endsAt)}
 							</td>

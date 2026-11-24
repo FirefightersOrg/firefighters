@@ -12,6 +12,9 @@
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+	const submittedValues = $derived(
+		form && 'values' in form ? (form.values as Record<string, string>) : {}
+	);
 	const immediateResult = $derived(
 		form?.form === 'loadWinner' && form.success ? form.result : null
 	);
@@ -245,6 +248,25 @@
 					{/if}
 
 					{#if prize.status === 'delivered'}
+						{#if data.can.reverseDelivery}
+							<details class="rounded border border-red-200 p-3">
+								<summary class="cursor-pointer text-sm font-medium text-red-700"
+									>Reverse delivery</summary
+								>
+								<form method="POST" action="?/reverseDelivery" class="mt-3">
+									<input type="hidden" name="prizeId" value={prize.id} />
+									<label class={labelClass} for="reverse-reason-{prize.id}"
+										>Reason (max. {data.reasonMax} Unicode characters)</label
+									>
+									<textarea class={inputClass} id="reverse-reason-{prize.id}" name="reason" required
+										>{form?.form === 'reverseDelivery' && submittedValues.prizeId === prize.id
+											? submittedValues.reason
+											: ''}</textarea
+									>
+									<button class="{secondaryButtonClass} mt-2">Confirm delivery reversal</button>
+								</form>
+							</details>
+						{/if}
 						<div class="flex flex-wrap items-center gap-3 rounded bg-slate-50 p-2 text-sm">
 							<p class="text-slate-600">Delivered prizes cannot be annulled.</p>
 							<a

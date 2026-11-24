@@ -14,6 +14,7 @@ vi.mock('$lib/server/services/prizes', async (original) => ({
 	loadWinningNumber: vi.fn(),
 	resolvePrize: vi.fn(),
 	deliverPrize: vi.fn(),
+	reversePrizeDelivery: vi.fn(),
 	annulPrize: vi.fn()
 }));
 
@@ -28,6 +29,7 @@ import {
 	loadWinningNumber,
 	PrizeServiceError,
 	resolvePrize,
+	reversePrizeDelivery,
 	updatePrize
 } from '$lib/server/services/prizes';
 import { CAMPAIGN_ID, campaignRow, makeLocals } from '../../../../test-helpers';
@@ -64,7 +66,8 @@ const writeMocks = [
 	loadWinningNumber,
 	resolvePrize,
 	deliverPrize,
-	annulPrize
+	annulPrize,
+	reversePrizeDelivery
 ] as const;
 
 const run = async (
@@ -101,6 +104,52 @@ beforeEach(() => {
 });
 
 describe('winner loading and prize management server', () => {
+	it('exposes the reversal capability only with its dedicated permission', async () => {
+		for (const allowed of [true, false]) {
+			const result = await load({
+				locals: makeLocals({
+					permissions: [
+						'campaign.view',
+						'draw.view',
+						...(allowed ? ['prize.reverse_delivery'] : [])
+					]
+				}),
+				params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+				url: new URL(PAGE_URL)
+			} as never);
+			expect(result).toMatchObject({ can: { reverseDelivery: allowed } });
+		}
+	});
+	it('scopes, validates, calls and maps reversal failures', async () => {
+		const permissions = ['campaign.view', 'prize.reverse_delivery'];
+		for (const reason of ['', ' ', '🧯'.repeat(1001)]) {
+			expect(
+				await run('reverseDelivery', permissions, { prizeId: PRIZE_ID, reason })
+			).toMatchObject({ status: 400 });
+		}
+		expect(reversePrizeDelivery).not.toHaveBeenCalled();
+		vi.mocked(getPrizeInDraw).mockResolvedValueOnce({ data: null, error: null });
+		expect(
+			await run('reverseDelivery', permissions, { prizeId: PRIZE_ID, reason: 'Mistake' })
+		).toMatchObject({ status: 404 });
+		expect(reversePrizeDelivery).not.toHaveBeenCalled();
+		for (const kind of ['conflict', 'permission', 'validation', 'not_found', 'internal'] as const) {
+			const cause = new PrizeServiceError(kind, 'Reversal failed');
+			vi.mocked(reversePrizeDelivery).mockRejectedValueOnce(cause);
+			expect(
+				await run('reverseDelivery', permissions, { prizeId: PRIZE_ID, reason: 'Mistake' })
+			).toMatchObject({ status: cause.status });
+		}
+		vi.mocked(reversePrizeDelivery).mockResolvedValueOnce(undefined);
+		expect(
+			await run('reverseDelivery', permissions, { prizeId: PRIZE_ID, reason: ' Mistake ' })
+		).toMatchObject({ success: true, form: 'reverseDelivery' });
+		expect(reversePrizeDelivery).toHaveBeenLastCalledWith(
+			expect.anything(),
+			{ prizeId: PRIZE_ID, reason: 'Mistake' },
+			{ permissions, requestId: 'req-test' }
+		);
+	});
 	it('fails closed and denies the load', async () => {
 		await expect(
 			load({
@@ -125,6 +174,7 @@ describe('winner loading and prize management server', () => {
 		['loadWinner', 'draw.load_winner'],
 		['resolve', 'prize.resolve'],
 		['deliver', 'prize.deliver'],
+		['reverseDelivery', 'prize.reverse_delivery'],
 		['annul', 'prize.annul']
 	] as const)('denies %s without %s before reads or writes', async (action, permission) => {
 		expect(permission).toMatch(/^(draw|prize)\./);
@@ -133,13 +183,18 @@ describe('winner loading and prize management server', () => {
 		for (const write of writeMocks) expect(write).not.toHaveBeenCalled();
 	});
 
-	it.each(['create', 'update', 'loadWinner', 'resolve', 'deliver', 'annul'] as const)(
-		'fails closed on %s when permissions are unavailable',
-		async (action) => {
-			expect(await run(action, null)).toMatchObject({ status: 500 });
-			for (const write of writeMocks) expect(write).not.toHaveBeenCalled();
-		}
-	);
+	it.each([
+		'create',
+		'update',
+		'loadWinner',
+		'resolve',
+		'deliver',
+		'annul',
+		'reverseDelivery'
+	] as const)('fails closed on %s when permissions are unavailable', async (action) => {
+		expect(await run(action, null)).toMatchObject({ status: 500 });
+		for (const write of writeMocks) expect(write).not.toHaveBeenCalled();
+	});
 
 	it('validates 1001 Unicode code points and required delivery notes without writing', async () => {
 		expect(

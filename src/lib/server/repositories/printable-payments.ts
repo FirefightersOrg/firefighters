@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatMoney } from '$lib/format';
 import type { RepositoryResult } from './campaigns';
 import type { SettlementPrintSource } from '$lib/server/documents/settlement-delivery-note';
 import type { PaymentCertificateSource } from '$lib/server/documents/payment-certificate';
 
 const paymentRows =
-	'id,amount::text,payment_method,payment_date,status,created_at,settlement_id,collectors(display_name),profiles!payments_created_by_fkey(full_name),settlements(settlement_number),sales!inner(buyers(first_name,last_name,business_name),bonds!inner(bond_numbers(number_value,number_kind,source_base_number_id))),payment_installments(amount_applied::text,installments(installment_number))';
+	'id,amount::text,payment_method,payment_date,status,created_at,settlement_id,collectors(display_name),settlements(settlement_number),sales!inner(buyers(first_name,last_name,business_name),bonds!inner(bond_numbers(number_value,number_kind,source_base_number_id))),payment_installments(amount_applied::text,installments(installment_number))';
 const buyer = (
 	value: { first_name: string; last_name: string; business_name: string | null } | null
 ) => value?.business_name || [value?.first_name, value?.last_name].filter(Boolean).join(' ') || '—';
@@ -22,15 +23,18 @@ const payment = (row: any): PaymentCertificateSource => ({
 	installments:
 		(row.payment_installments ?? [])
 			.map(
-				(x: any) => `Installment ${x.installments?.installment_number ?? '—'} (${x.amount_applied})`
+				(x: any) =>
+					`Cuota ${x.installments?.installment_number ?? '—'} (${formatMoney(x.amount_applied, { decimals: 'always' })})`
 			)
 			.join(', ') || '—',
 	amount: row.amount,
-	method: row.payment_method === 'cash' ? 'Cash' : 'Transfer',
+	method: row.payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
 	paymentDate: row.payment_date,
 	createdAt: row.created_at,
-	registeredBy: row.profiles?.full_name ?? '—',
-	settlementNumber: row.settlements?.settlement_number ?? null
+	// SAN-122: filled by the print route through document_actor_name (profiles is not readable).
+	registeredBy: '—',
+	settlementNumber: row.settlements?.settlement_number ?? null,
+	legend: null
 });
 export async function getSettlementPrint(
 	supabase: SupabaseClient,
@@ -40,7 +44,7 @@ export async function getSettlementPrint(
 	const { data: settlement, error } = await supabase
 		.from('settlements')
 		.select(
-			'settlement_number,status,opened_at,closed_at,notes,collectors(display_name),profiles!settlements_closed_by_fkey(full_name),total_cash::text,total_transfer::text,total_amount::text,commission_amount::text,commission_paid_amount::text,net_to_firefighters::text'
+			'settlement_number,status,opened_at,closed_at,notes,collectors(display_name),total_cash::text,total_transfer::text,total_amount::text,commission_amount::text,commission_paid_amount::text,net_to_firefighters::text,collector_balance_at_close::text'
 		)
 		.eq('id', settlementId)
 		.eq('campaign_id', campaignId)
@@ -65,16 +69,14 @@ export async function getSettlementPrint(
 		commission: settlement.commission_amount,
 		commissionPaid: settlement.commission_paid_amount,
 		net: settlement.net_to_firefighters,
-		balance: '0.00'
+		balance: null as string | null
 	};
-	// Balance is deliberately live (there is no historical balance snapshot). The RPC returns
-	// the real campaign/collector ledger balance for both open and closed settlements.
-	const { data, error: totalsError } = await supabase.rpc('settlement_totals', {
-		p_settlement_id: settlementId
-	});
-	if (totalsError) return { data: null, error: totalsError };
-	const t = Array.isArray(data) ? data[0] : data;
 	if (settlement.status === 'open') {
+		const { data, error: totalsError } = await supabase.rpc('settlement_totals', {
+			p_settlement_id: settlementId
+		});
+		if (totalsError) return { data: null, error: totalsError };
+		const t: any = Array.isArray(data) ? data[0] : data;
 		totals = {
 			cash: String(t.total_cash),
 			transfer: String(t.total_transfer),
@@ -85,8 +87,12 @@ export async function getSettlementPrint(
 			balance: String(t?.collector_credit_balance ?? 0)
 		};
 	} else {
+		// SAN-111: the balance stored at close (Santi's decision). Settlements closed before the
+		// snapshot existed keep NULL and print '—' with a legend, never today's live balance.
 		totals.balance =
-			t?.collector_credit_balance == null ? '0.00' : String(t.collector_credit_balance);
+			settlement.collector_balance_at_close == null
+				? null
+				: String(settlement.collector_balance_at_close);
 	}
 	return {
 		data: {
@@ -95,9 +101,12 @@ export async function getSettlementPrint(
 			openedAt: settlement.opened_at,
 			closedAt: settlement.closed_at,
 			collector: settlement.collectors?.display_name ?? '—',
-			closedBy: settlement.profiles?.full_name ?? null,
+			// SAN-122: filled by the print route through document_actor_name.
+			closedBy: null,
 			notes: settlement.notes,
 			totals,
+			balanceSnapshotMissing:
+				settlement.status !== 'open' && settlement.collector_balance_at_close == null,
 			payments: (rows ?? []).map((row) => {
 				const p = payment(row);
 				return {
@@ -117,14 +126,29 @@ export async function getPaymentCertificate(
 	campaignId: string,
 	paymentId: string
 ): Promise<RepositoryResult<{ status: string; payment: PaymentCertificateSource } | null>> {
-	const { data, error } = await supabase
-		.from('payments')
-		.select(paymentRows)
-		.eq('id', paymentId)
-		.eq('campaign_id', campaignId)
-		.maybeSingle()
-		.overrideTypes<any, { merge: false }>();
-	return error
-		? { data: null, error }
-		: { data: data ? { status: data.status, payment: payment(data) } : null, error: null };
+	const [{ data, error }, legendResult] = await Promise.all([
+		supabase
+			.from('payments')
+			.select(paymentRows)
+			.eq('id', paymentId)
+			.eq('campaign_id', campaignId)
+			.maybeSingle()
+			.overrideTypes<any, { merge: false }>(),
+		supabase.rpc('payment_certificate_legend', { p_payment_id: paymentId })
+	]);
+	if (error || legendResult.error) return { data: null, error: error ?? legendResult.error };
+	if (!data) return { data: null, error: null };
+	const printable = payment(data);
+	const raw = Array.isArray(legendResult.data) ? legendResult.data[0] : legendResult.data;
+	printable.legend = raw
+		? {
+				kind: raw.legend_kind,
+				eventAt: raw.event_at,
+				actor: raw.actor_name,
+				reason: raw.reason,
+				relatedPaymentId: raw.related_payment_id,
+				correctionType: raw.correction_type
+			}
+		: null;
+	return { data: { status: data.status, payment: printable }, error: null };
 }

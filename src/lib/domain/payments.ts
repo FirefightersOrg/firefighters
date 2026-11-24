@@ -17,11 +17,11 @@ export const PAYMENT_STATUSES = [
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-	draft: 'Draft',
-	pending_in_settlement: 'Pending settlement',
-	confirmed: 'Confirmed',
-	annulled: 'Annulled',
-	adjusted: 'Adjusted'
+	draft: 'Borrador',
+	pending_in_settlement: 'Pendiente de rendición',
+	confirmed: 'Confirmado',
+	annulled: 'Anulado',
+	adjusted: 'Ajustado'
 };
 export const PAYMENT_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[]> = {
 	draft: ['pending_in_settlement'],
@@ -36,10 +36,10 @@ export const canTransitionPayment = (from: PaymentStatus, to: PaymentStatus) =>
 export const SETTLEMENT_STATUSES = ['open', 'closed', 'annulled', 'corrected'] as const;
 export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
-	open: 'Open',
-	closed: 'Closed',
-	annulled: 'Annulled',
-	corrected: 'Corrected'
+	open: 'Abierta',
+	closed: 'Cerrada',
+	annulled: 'Anulada',
+	corrected: 'Corregida'
 };
 export const SETTLEMENT_TRANSITIONS: Record<SettlementStatus, readonly SettlementStatus[]> = {
 	open: ['closed', 'annulled'],

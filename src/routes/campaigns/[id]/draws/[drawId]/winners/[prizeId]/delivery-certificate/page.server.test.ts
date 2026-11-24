@@ -76,6 +76,7 @@ describe('delivery prize certificate load', () => {
 			{ campaignId: 'other' },
 			{ drawId: 'other' },
 			{ prizeStatus: 'unawarded' },
+			{ prizeStatus: 'pending_delivery', awardStatus: 'awarded', deliveredAt: null },
 			{ awardStatus: 'annulled' }
 		]) {
 			vi.mocked(getPrizeCertificateData).mockResolvedValue({

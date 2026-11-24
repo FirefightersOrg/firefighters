@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	AUDIT_ENTRIES_LIMIT,
 	AUDIT_PAGE_SIZE,
+	getCampaignAuditEntry,
 	listAuditEntriesForEntities,
 	listCampaignAuditEntries
 } from './audit-log';
@@ -10,7 +11,18 @@ import {
 function queryMock(result: { data: unknown; error: unknown; count?: number }) {
 	const calls: Array<[string, unknown[]]> = [];
 	const builder: Record<string, unknown> = {};
-	for (const method of ['select', 'eq', 'in', 'or', 'gte', 'lte', 'order', 'limit', 'range']) {
+	for (const method of [
+		'select',
+		'eq',
+		'in',
+		'or',
+		'gte',
+		'lte',
+		'order',
+		'limit',
+		'range',
+		'maybeSingle'
+	]) {
 		builder[method] = (...args: unknown[]) => {
 			calls.push([method, args]);
 			return builder;
@@ -111,5 +123,18 @@ describe('audit log repository', () => {
 		expect(calls).toContainEqual(['order', ['created_at', { ascending: false }]]);
 		expect(calls).toContainEqual(['order', ['id', { ascending: false }]]);
 		expect(calls).toContainEqual(['range', [1000, 1049]]);
+		expect(calls).toContainEqual(['eq', ['campaign_id', 'f0000000-0000-4000-8000-000000000001']]);
+		expect(calls.some(([method]) => method === 'or')).toBe(false);
+	});
+
+	it('scopes details by frozen campaign membership and returns null for a missing row', async () => {
+		const { supabase, calls } = queryMock({ data: null, error: null });
+		await expect(getCampaignAuditEntry(supabase, 'campaign-1', 'entry-1')).resolves.toEqual({
+			data: null,
+			error: null
+		});
+		expect(calls).toContainEqual(['eq', ['campaign_id', 'campaign-1']]);
+		expect(calls).toContainEqual(['eq', ['id', 'entry-1']]);
+		expect(calls.some(([method]) => method === 'or')).toBe(false);
 	});
 });
