@@ -190,9 +190,9 @@ Product decisions (SAN-93): the three new `.view` permissions are implied by any
 
 ### Operational reports (SAN-86)
 
-`20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions.
+`20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions (known gap, SAN-140).
 
-The four reports (`report_bonds_by_status`, `report_bonds_by_collector`, `report_installments`, `report_collector_monthly`) are read-only `SECURITY DEFINER` functions that check `report.view_operational` and `campaign.view` themselves and return aggregates only (no buyer data). They are definers on purpose: a read-only user holds `report.view_operational` but not `sale.view` or `payment.view`, whose RLS would otherwise hide the data.
+The four reports (`report_bonds_by_status`, `report_bonds_by_collector`, `report_installments`, `report_collector_monthly`) are read-only `SECURITY DEFINER` functions that check `report.view_operational` and `campaign.view` themselves and return aggregates only (no buyer data). They are definers on purpose: a read-only user holds `report.view_operational` but not `sale.view` or `payment.view`, whose RLS would otherwise hide the data. The functions and the helper are revoked from `public`, `anon` and `service_role` and granted to `authenticated` only.
 
 ## Technical rules
 
