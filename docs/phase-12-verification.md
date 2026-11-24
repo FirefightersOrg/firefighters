@@ -33,8 +33,8 @@ test order and can run alone or shuffled.
   write.
 - **SAN-117:** extraordinary numbers are not released on draw annulment.
 - **SAN-118:** `draw.annul` follow-up remains open.
-- **SAN-122 (in progress, #94):** payment/delivery documents can show `—` as registering user for
-  non-admin readers.
+- **SAN-122 (resolved, #94 merged):** payment/delivery/settlement documents now show the registering
+  user to non-admin readers through `document_actor_name`; no longer a gap.
 
 ## Validation
 
