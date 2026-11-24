@@ -4,8 +4,8 @@ export const SETTLEMENT_NOTES_MAX = 2000;
 export const PAYMENT_ANNULMENT_REASON_MAX = 1000; // matches audit_log.reason (SAN-97)
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-	cash: 'Cash',
-	transfer: 'Transfer'
+	cash: 'Efectivo',
+	transfer: 'Transferencia'
 };
 
 export const PAYMENT_STATUSES = [

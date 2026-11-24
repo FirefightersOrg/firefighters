@@ -12,7 +12,7 @@ export function mapPaymentCorrectionRpcError(error: { code?: string; message?: s
 	)
 		return new SettlementServiceError(
 			'conflict',
-			'La venta de este pago fue reasignada a otro cobrador. Primero devolvé la venta al cobrador original para anular o corregir el pago.'
+			'La venta de este pago fue reasignada a otro cobrador. Primero hay que devolver la venta al cobrador original para anular o corregir el pago.'
 		);
 	return mapSettlementRpcError(error);
 }
@@ -21,7 +21,7 @@ const reason = z
 	.string()
 	.trim()
 	.min(1)
-	.refine((value) => Array.from(value).length <= 1000, 'Reason exceeds 1000 code points.');
+	.refine((value) => Array.from(value).length <= 1000, 'El motivo supera los 1000 caracteres.');
 const money = z.coerce.number().positive().max(9_999_999_999.99).multipleOf(0.01);
 export const annulPaymentSchema = z.object({ paymentId: uuid, reason });
 export const correctPaymentMethodSchema = annulPaymentSchema.extend({
@@ -34,7 +34,7 @@ export const reassociateTransferSchema = annulPaymentSchema.extend({
 		.min(1)
 		.refine(
 			(values) => new Set(values.map((value) => value.installmentId)).size === values.length,
-			'Duplicate installment.'
+			'Cuota repetida.'
 		)
 });
 export interface PaymentCorrectionRequestContext {
@@ -51,12 +51,15 @@ async function correct<T extends z.ZodType>(
 	extra: (value: z.output<T>) => Record<string, unknown>
 ) {
 	if (ctx?.permissions == null)
-		throw new SettlementServiceError('internal', 'Could not load correction permissions.');
+		throw new SettlementServiceError(
+			'internal',
+			'No se pudieron cargar los permisos de corrección.'
+		);
 	if (!hasPermissionIn(ctx.permissions, 'payment.annul'))
-		throw new SettlementServiceError('permission', 'Payment correction permission is required.');
+		throw new SettlementServiceError('permission', 'Hace falta el permiso de corrección de pagos.');
 	const parsed = schema.safeParse(input);
 	if (!parsed.success)
-		throw new SettlementServiceError('validation', 'Invalid payment correction.', {
+		throw new SettlementServiceError('validation', 'Corrección de pago inválida.', {
 			cause: parsed.error
 		});
 	const value = parsed.data as z.output<T> & { paymentId: string; reason: string };
@@ -71,7 +74,7 @@ async function correct<T extends z.ZodType>(
 		return data as string | null;
 	} catch (cause) {
 		if (cause instanceof SettlementServiceError) throw cause;
-		throw new SettlementServiceError('internal', 'Payment correction failed.', { cause });
+		throw new SettlementServiceError('internal', 'No se pudo corregir el pago.', { cause });
 	}
 }
 export function annulPayment(
