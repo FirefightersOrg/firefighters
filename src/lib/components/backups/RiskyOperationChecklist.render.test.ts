@@ -27,6 +27,7 @@ describe('RiskyOperationChecklist (SAN-136)', () => {
 		}).body;
 		expect(confirmable).toContain('Cerrar campaña');
 		const confirm = confirmable.match(/<button[^>]*data-dialog-confirm[^>]*>/)?.[0];
-		if (confirm) expect(confirm).toContain('disabled');
+		expect(confirm).toBeDefined();
+		expect(confirm).toContain('disabled');
 	});
 });

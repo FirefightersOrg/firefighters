@@ -224,6 +224,38 @@ describe('winner loading and prize management server', () => {
 		expect(resolvePrize).not.toHaveBeenCalled();
 	});
 
+	it('returns the Spanish no-match explanation computed by the server', async () => {
+		const loadedPrize = {
+			...prize,
+			winningNumber: {
+				id: 'w',
+				numberValue: 9999,
+				resultStatus: 'no_match',
+				notes: null,
+				loadedAt: '2026-11-20T02:30:00+00:00',
+				matchedRosterEntryId: null,
+				eligible: null,
+				ineligibilityReason: null,
+				bondId: null,
+				bondLabel: null,
+				buyerLabel: null,
+				collectorLabel: null
+			}
+		};
+		vi.mocked(getPrizeInDraw)
+			.mockResolvedValueOnce({ data: prize, error: null } as never)
+			.mockResolvedValueOnce({ data: loadedPrize, error: null } as never);
+		const result = await run('loadWinner', ['campaign.view', 'draw.load_winner'], {
+			prizeId: PRIZE_ID,
+			numberValue: '9999',
+			notes: ''
+		});
+		expect(result).toMatchObject({
+			success: true,
+			result: { resultStatus: 'no_match', reasonLabel: 'El número no está en el padrón' }
+		});
+	});
+
 	it('returns the real-shaped frozen result immediately after loading', async () => {
 		const loadedPrize = {
 			...prize,
@@ -256,7 +288,7 @@ describe('winner loading and prize management server', () => {
 				formattedNumber: '0007',
 				buyerLabel: 'Fire Supplies SA',
 				collectorLabel: 'Central station',
-				reasonLabel: 'Bond not fully paid'
+				reasonLabel: 'Bono sin pago total'
 			}
 		});
 		expect(loadWinningNumber).toHaveBeenCalledWith(
@@ -267,7 +299,7 @@ describe('winner loading and prize management server', () => {
 	});
 
 	it.each([
-		['loadWinner', loadWinningNumber, 'This prize already has a loaded winning number.'],
+		['loadWinner', loadWinningNumber, 'Este premio ya tiene un número ganador cargado.'],
 		['annul', annulPrize, 'A delivered prize cannot be annulled.'],
 		['create', createPrize, 'Previous prizes must be resolved before consolation.']
 	] as const)('maps the %s conflict to 409', async (action, service, message) => {

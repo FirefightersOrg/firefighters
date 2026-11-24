@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Button, Card, Checkbox, Dialog } from '$lib/components/ui';
+	import { Button, Card, Checkbox, Dialog, Disclosure } from '$lib/components/ui';
 	import { RISKY_OPERATION_STEPS } from '$lib/domain/backup-exports';
 
 	/**
@@ -31,10 +31,7 @@
 	const complete = $derived(done === RISKY_OPERATION_STEPS.length);
 </script>
 
-<Card
-	title="Antes de {operation}: lista de 6 pasos"
-	description="{done} de {RISKY_OPERATION_STEPS.length} pasos marcados."
->
+{#snippet steps()}
 	<fieldset class="space-y-2">
 		<legend class="sr-only">Pasos antes de {operation}</legend>
 		{#each RISKY_OPERATION_STEPS as step, i (step)}
@@ -69,14 +66,14 @@
 					}}
 			action={confirmAction}
 			title={confirmLabel}
-			description="Esta operación es riesgosa. Confirmá solo después de completar la lista."
+			description="Esta operación es riesgosa. Confirmar solo después de completar la lista."
 			{confirmLabel}
 			tone="danger"
 			confirmDisabled={!complete}
 		>
 			{#if !complete}
 				<p class="text-body-sm text-muted" id="risky-hint">
-					Marcá los {RISKY_OPERATION_STEPS.length} pasos de la lista para habilitar la confirmación (faltan
+					Marcar los {RISKY_OPERATION_STEPS.length} pasos de la lista para habilitar la confirmación (faltan
 					{RISKY_OPERATION_STEPS.length - done}).
 				</p>
 			{:else}
@@ -84,4 +81,20 @@
 			{/if}
 		</Dialog>
 	{/if}
-</Card>
+{/snippet}
+
+{#if confirmLabel}
+	<Card
+		title="Antes de {operation}: lista de 6 pasos"
+		description="{done} de {RISKY_OPERATION_STEPS.length} pasos marcados."
+	>
+		{@render steps()}
+	</Card>
+{:else}
+	<Disclosure
+		summary="Antes de {operation}: lista de 6 pasos"
+		meta="{done} de {RISKY_OPERATION_STEPS.length} pasos marcados."
+	>
+		{@render steps()}
+	</Disclosure>
+{/if}

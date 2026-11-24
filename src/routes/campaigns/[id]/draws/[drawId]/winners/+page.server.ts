@@ -87,7 +87,7 @@ const guard = (
 		return fail(403, {
 			form,
 			errors: {},
-			message: 'No tenés permiso para hacer esta acción.'
+			message: 'No hay permiso para esta acción.'
 		});
 	return null;
 };
@@ -138,7 +138,7 @@ const presentPrize = (
 				formattedNumber: formatCampaignNumber(prize.winningNumber.numberValue, config),
 				reasonLabel:
 					prize.winningNumber.resultStatus === 'no_match'
-						? 'Number not in the roster'
+						? 'El número no está en el padrón'
 						: prize.winningNumber.ineligibilityReason
 							? (DRAW_INELIGIBILITY_REASON_LABELS[
 									prize.winningNumber

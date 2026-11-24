@@ -72,7 +72,7 @@ describe('unawarded prize certificate load', () => {
 			winningNumber: '0008',
 			reason: 'Declined',
 			registeredBy: 'Resolver',
-			date: '31/12/26, 11:30 p. m.',
+			date: '31/12/2026, 23:30',
 			notes: 'Original note'
 		});
 	});

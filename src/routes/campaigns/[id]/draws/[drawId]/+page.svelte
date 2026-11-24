@@ -14,12 +14,12 @@
 	} from '$lib/components/ui';
 	import { DRAW_TYPE_LABELS } from '$lib/domain/draws';
 	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
-	import { formatDate } from '$lib/format';
+	import { formatDate, formatDateTime } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 	const localCutoff = $derived(buenosAiresDateTimeLocal(data.draw.paymentCutoffAt));
-	const cutoffDisplay = $derived(localCutoff.replace('T', ' '));
+	const cutoffDisplay = $derived(formatDateTime(data.draw.paymentCutoffAt));
 	const errors = $derived(
 		(form && 'errors' in form ? form.errors : {}) as Record<string, string[] | undefined>
 	);
@@ -139,8 +139,8 @@
 		{/if}
 		{#if data.can.generate || data.can.regenerate}
 			<form method="POST" action="?/generate" class="mt-4">
-				<Button type="submit" variant={data.can.generate ? 'primary' : 'secondary'}>
-					{data.can.generate ? 'Generar padrón' : 'Regenerar padrón'}
+				<Button type="submit" variant={data.roster ? 'secondary' : 'primary'}>
+					{data.roster ? 'Regenerar padrón' : 'Generar padrón'}
 				</Button>
 			</form>
 		{/if}

@@ -21,7 +21,7 @@ describe('roster render', () => {
 							buyerName: 'Ana',
 							collectorName: 'Luis',
 							eligible: false,
-							reasonLabel: 'Bond not fully paid'
+							reasonLabel: 'Bono sin pago total'
 						}
 					]
 				}
@@ -29,7 +29,7 @@ describe('roster render', () => {
 		}).body;
 		expect(body).toContain('Padrón congelado');
 		expect(body).toContain('Extra');
-		expect(body).toContain('Bond not fully paid');
+		expect(body).toContain('Bono sin pago total');
 		expect(body).toContain('Siguiente');
 	});
 });

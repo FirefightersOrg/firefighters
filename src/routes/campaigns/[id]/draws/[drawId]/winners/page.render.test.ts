@@ -126,7 +126,7 @@ describe('winners and prizes render', () => {
 			...result,
 			resultStatus: 'not_eligible',
 			eligible: false,
-			reasonLabel: 'Bond not fully paid'
+			reasonLabel: 'Bono sin pago total'
 		};
 		const body = render(Page, {
 			props: {
@@ -143,7 +143,7 @@ describe('winners and prizes render', () => {
 		expect(body).toContain('B-7');
 		expect(body).toContain('Fire Supplies SA');
 		expect(body).toContain('Central station');
-		expect(body).toContain('Bond not fully paid');
+		expect(body).toContain('Bono sin pago total');
 		expect(body).toContain('El premio queda no adjudicado.');
 	});
 

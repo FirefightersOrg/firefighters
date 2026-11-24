@@ -23,7 +23,7 @@
 
 <PageHeader
 	title="Exportaciones de respaldo"
-	description="Archivos CSV generados en el momento con los datos actuales. Descargalos antes de cualquier operación riesgosa."
+	description="Archivos CSV generados en el momento con los datos actuales. Descargarlos antes de cualquier operación riesgosa."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
@@ -60,7 +60,7 @@
 					{#if e.allowed}
 						<Button href={href(e.kind, e.hasPeriod)} download icon="download">Descargar CSV</Button>
 					{:else}
-						<span class="text-body-sm text-muted">Tu rol no tiene permiso</span>
+						<span class="text-body-sm text-muted">Sin permiso de exportación</span>
 					{/if}
 				</li>
 			{/each}

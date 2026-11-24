@@ -55,7 +55,7 @@ function guard(
 		return fail(403, {
 			form,
 			errors: {},
-			message: 'No tenés permiso para hacer esta acción.'
+			message: 'No hay permiso para esta acción.'
 		});
 	return null;
 }

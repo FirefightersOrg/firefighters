@@ -62,7 +62,7 @@ describe('draw detail render', () => {
 		const value = data('scheduled');
 		value.draw.paymentCutoffAt = '2026-11-20T02:30:00+00:00';
 		const body = render(Page, { props: { data: value, form: null } as any }).body;
-		expect(body).toContain('2026-11-19 23:30 (hora de Buenos Aires)');
+		expect(body).toContain('19/11/2026, 23:30 (hora de Buenos Aires)');
 		expect(body).toContain('value="2026-11-19T23:30"');
 	});
 	it('renders generated actions and consolation warning', () => {

@@ -73,7 +73,7 @@ describe('delivery prize certificate load', () => {
 		}).toMatchObject({
 			prize: '#1 — Bike',
 			winningNumber: '0007',
-			deliveryDate: '31/12/26, 11:30 p. m.',
+			deliveryDate: '31/12/2026, 23:30',
 			registeredBy: 'Operator'
 		});
 	});
