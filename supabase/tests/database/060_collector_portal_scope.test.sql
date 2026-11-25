@@ -86,9 +86,10 @@ insert into public.settlements(id, campaign_id, settlement_number, collector_id,
 insert into public.payments(id, campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount, payment_method, status, created_by) values
   (pg_temp.id('pay_a'), pg_temp.id('camp'), pg_temp.id('sale_a'), pg_temp.id('ca'), pg_temp.id('buyer_a'), pg_temp.id('set_a'), 100, 'cash', 'pending_in_settlement', pg_temp.actor()),
   (pg_temp.id('pay_b'), pg_temp.id('camp'), pg_temp.id('sale_b'), pg_temp.id('cb'), pg_temp.id('buyer_b'), pg_temp.id('set_b'), 100, 'cash', 'pending_in_settlement', pg_temp.actor());
-insert into public.collector_ledger_entries(id, campaign_id, collector_id, entry_type, direction, amount, created_by) values
-  (pg_temp.id('ledger_a'), pg_temp.id('camp'), pg_temp.id('ca'), 'cash_settled', 'collector_credit', 10, pg_temp.actor()),
-  (pg_temp.id('ledger_b'), pg_temp.id('camp'), pg_temp.id('cb'), 'cash_settled', 'collector_credit', 20, pg_temp.actor());
+-- cash_settled is a reference entry since SAN-107 (#130): it never affects the balance.
+insert into public.collector_ledger_entries(id, campaign_id, collector_id, entry_type, direction, amount, created_by, affects_balance) values
+  (pg_temp.id('ledger_a'), pg_temp.id('camp'), pg_temp.id('ca'), 'cash_settled', 'collector_credit', 10, pg_temp.actor(), false),
+  (pg_temp.id('ledger_b'), pg_temp.id('camp'), pg_temp.id('cb'), 'cash_settled', 'collector_credit', 20, pg_temp.actor(), false);
 insert into public.commission_adjustments(id, campaign_id, collector_id, amount, direction, reason, created_by) values
   (pg_temp.id('adj_a'), pg_temp.id('camp'), pg_temp.id('ca'), 5, 'in_favor_of_collector', 'A adjustment', pg_temp.actor()),
   (pg_temp.id('adj_b'), pg_temp.id('camp'), pg_temp.id('cb'), 6, 'in_favor_of_collector', 'B adjustment', pg_temp.actor());

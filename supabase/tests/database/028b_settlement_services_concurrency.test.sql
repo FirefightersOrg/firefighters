@@ -120,7 +120,9 @@ select lives_ok(format($t$select pg_temp.exec('race_setup', %L)$t$, format($sql$
   alter table public.campaigns disable trigger campaigns_forbid_delete;
   alter table public.collectors disable trigger collectors_forbid_delete;
   alter table public.buyers disable trigger buyers_forbid_delete;
+  alter table public.collector_ledger_entries disable trigger collector_ledger_entries_forbid_delete;
   delete from public.audit_log where request_id like 'race63-%%';
+  delete from public.collector_ledger_entries where campaign_id = %1$L;
   delete from public.payments where campaign_id = %1$L;
   delete from public.settlements where campaign_id = %1$L;
   delete from public.sales where campaign_id = %1$L;
@@ -139,6 +141,7 @@ select lives_ok(format($t$select pg_temp.exec('race_setup', %L)$t$, format($sql$
   alter table public.campaigns enable trigger campaigns_forbid_delete;
   alter table public.collectors enable trigger collectors_forbid_delete;
   alter table public.buyers enable trigger buyers_forbid_delete;
+  alter table public.collector_ledger_entries enable trigger collector_ledger_entries_forbid_delete;
   commit;
   $sql$, pg_temp.v('campaign'), pg_temp.v('collector'), pg_temp.v('buyer'), pg_temp.v('profile'), pg_temp.v('user'))),
   'cleanup: the committed race fixtures and audit rows are removed') where pg_temp.v('connected')::boolean;

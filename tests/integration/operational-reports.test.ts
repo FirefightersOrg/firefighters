@@ -7,7 +7,7 @@ import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
-import { load } from '../../src/routes/campaigns/[id]/reports/+page.server';
+import { actions, load } from '../../src/routes/campaigns/[id]/reports/+page.server';
 
 const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
 const seed = resolveSeedConfig(seedEnv);
@@ -314,5 +314,45 @@ describe('operational reports route (local Supabase)', () => {
 			p_campaign_id: campaignId
 		});
 		expect(denied.error?.code).toBe('42501');
+	});
+});
+
+describe('overdue warning, SAN-142 (local Supabase)', () => {
+	const setThreshold = (caller: Caller, threshold: string, permissions?: string[]) => {
+		const body = new FormData();
+		body.set('threshold', threshold);
+		return actions.setOverdueThreshold({
+			...event(caller, permissions ? { permissions } : {}),
+			request: new Request('http://localhost', { method: 'POST', body })
+		} as never);
+	};
+
+	it('starts at N = 3 with nothing to warn about (no installment is overdue)', async () => {
+		const data = (await load(event(users.admin)))!;
+		expect(data.overdueWarning).toMatchObject({ threshold: 3, sales: [], canEdit: true });
+		const readOnly = (await load(event(users['read-only'])))!;
+		expect(readOnly.overdueWarning).toMatchObject({ threshold: 3, canEdit: false });
+	});
+
+	it('lets the admin change N, audited, and the database refuses anyone else', async () => {
+		expect(await setThreshold(users.admin, '5')).toMatchObject({ success: true });
+		expect((await load(event(users.operator)))!.overdueWarning.threshold).toBe(5);
+		const forged = await setThreshold(users.operator, '2', [
+			...users.operator.permissions,
+			'campaign.update_rules'
+		]);
+		expect(forged).toMatchObject({ status: 403 });
+		expect((await load(event(users.admin)))!.overdueWarning.threshold).toBe(5);
+		const { data: audit } = await users.admin.client
+			.from('audit_log')
+			.select('old_value, new_value')
+			.eq('action', 'campaign.update_overdue_warning')
+			.eq('entity_id', campaignId);
+		expect(audit).toEqual([
+			{
+				old_value: { campaign_id: campaignId, overdue_warning_threshold: 3 },
+				new_value: { campaign_id: campaignId, overdue_warning_threshold: 5 }
+			}
+		]);
 	});
 });

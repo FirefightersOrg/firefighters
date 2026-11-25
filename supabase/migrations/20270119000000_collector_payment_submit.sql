@@ -48,7 +48,9 @@ begin
     raise exception 'payment amount, method, date and parties are immutable' using errcode = 'restrict_violation';
   end if;
   if new.status is distinct from old.status and not (
-    (old.status = 'draft' and new.status in ('pending_in_settlement', 'annulled')) or
+    (old.status = 'draft' and new.status = 'pending_in_settlement') or
+    -- rejecting a collector submission is the only draft -> annulled path (least privilege)
+    (old.status = 'draft' and new.status = 'annulled' and old.submitted_by_collector) or
     (old.status = 'pending_in_settlement' and new.status in ('confirmed', 'annulled')) or
     (old.status = 'confirmed' and new.status in ('annulled', 'adjusted'))
   ) then raise exception 'payment status cannot go from % to %', old.status, new.status using errcode = 'check_violation'; end if;
@@ -128,6 +130,9 @@ begin
   end if;
   if p_payment_date > v_today then
     raise exception 'payment date cannot be in the future' using errcode = 'invalid_parameter_value';
+  end if;
+  if p_payment_date < (v_sale.sold_at at time zone 'America/Argentina/Buenos_Aires')::date then
+    raise exception 'payment date cannot be before the sale date' using errcode = 'invalid_parameter_value';
   end if;
   insert into public.payments (
     campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount, payment_method, payment_date,

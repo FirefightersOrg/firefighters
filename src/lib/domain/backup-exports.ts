@@ -12,14 +12,10 @@ export const BACKUP_EXPORT_KINDS = [
 	'settlements',
 	'collector-ledger',
 	'settlement-corrections',
-	'frozen-rosters'
+	'frozen-rosters',
+	'winners-prizes'
 ] as const;
 export type BackupExportKind = (typeof BACKUP_EXPORT_KINDS)[number];
-
-/** Exports of the six in docs/backup-operations.md that need Phase 12 tables. */
-// TODO(SAN-113): 'winners-prizes' (Phase 12 winner/prize tables). Add it to BACKUP_EXPORTS once
-// the tables exist (permission: report.export plus the prize view permission).
-export const PENDING_BACKUP_EXPORTS = ['winners-prizes'] as const;
 
 export function isBackupExportKind(value: string): value is BackupExportKind {
 	return (BACKUP_EXPORT_KINDS as readonly string[]).includes(value);
@@ -82,6 +78,25 @@ export function snapshotBuyerName(buyer: ExportRow | null | undefined): string |
 	if (buyer.business_name) return String(buyer.business_name);
 	const name = [buyer.last_name, buyer.first_name].filter(Boolean).join(', ');
 	return name || null;
+}
+
+/** A to-one embed may come back as an object or a one-element array, depending on the FK. */
+const one = (value: unknown): ExportRow | null =>
+	Array.isArray(value)
+		? ((value[0] as ExportRow | undefined) ?? null)
+		: ((value as ExportRow) ?? null);
+
+/**
+ * The award a prize resolved to: its live (awarded/delivered) award, else the most recent one
+ * (annulled), else none. A prize has at most one live award.
+ */
+export function currentAward(awards: unknown): ExportRow | null {
+	const list = (Array.isArray(awards) ? awards : awards ? [awards] : []) as ExportRow[];
+	const live = list.find((a) => a.status !== 'annulled');
+	if (live) return live;
+	return (
+		[...list].sort((a, b) => String(b.awarded_at).localeCompare(String(a.awarded_at)))[0] ?? null
+	);
 }
 
 const nested = (header: string, a: string, b: string, text = true): CsvColumn<ExportRow> => ({
@@ -179,7 +194,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 		label: 'Cuentas corrientes de cobradores',
 		table: 'collector_ledger_entries',
 		select:
-			'id, collector_id, settlement_id, payment_id, corrects_sale_id, entry_type, direction, amount::text, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
+			'id, collector_id, settlement_id, payment_id, corrects_sale_id, original_entry_id, entry_type, direction, amount::text, affects_balance, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
 		order: ['collector_id', 'occurred_at', 'id'],
 		permissions: ['collector.ledger.view'],
 		periodColumn: 'occurred_at',
@@ -191,10 +206,12 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			col('entry_type', 'entry_type'),
 			col('direction', 'direction'),
 			col('amount', 'amount'),
+			col('affects_balance', 'affects_balance'),
 			col('status', 'status'),
 			col('settlement_id', 'settlement_id'),
 			col('payment_id', 'payment_id'),
 			col('corrects_sale_id', 'corrects_sale_id'),
+			col('original_entry_id', 'original_entry_id'),
 			col('reason', 'reason', true),
 			col('annulled_at', 'annulled_at'),
 			col('annul_reason', 'annul_reason', true)
@@ -232,6 +249,74 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			{ header: 'buyer_tax_id', text: true, value: (r) => r.buyer_snapshot?.tax_id },
 			{ header: 'collector_id', value: (r) => r.collector_snapshot?.id },
 			{ header: 'collector', text: true, value: (r) => r.collector_snapshot?.display_name }
+		]
+	},
+	'winners-prizes': {
+		kind: 'winners-prizes',
+		label: 'Ganadores y premios',
+		table: 'prizes',
+		// One row per prize of the campaign (annulled ones too), with its winning number and the award
+		// it resolved to. The campaign hangs off the draw.
+		select:
+			'id, draw_id, position, name, description, status, excludes_from_consolation, annulled_at, annul_reason, created_at, draws!inner(id, campaign_id, name, draw_type, draw_date, status), winning_numbers(number_value, result_status, matched_roster_entry_id, loaded_at, notes), prize_awards(id, status, bond_id, buyer_id, collector_id, awarded_at, delivered_at, notes, annulled_at, annul_reason), prize_delivery_reversals(id)',
+		// (draw_id, position, id): id makes it total even if two prizes ever share a position.
+		order: ['draw_id', 'position', 'id'],
+		permissions: ['draw.view'],
+		campaignColumn: 'draws.campaign_id',
+		columns: [
+			{ header: 'draw_id', value: (r) => r.draws?.id },
+			{ header: 'draw_name', text: true, value: (r) => r.draws?.name },
+			{ header: 'draw_type', value: (r) => r.draws?.draw_type },
+			{ header: 'draw_date', value: (r) => r.draws?.draw_date },
+			{ header: 'draw_status', value: (r) => r.draws?.status },
+			col('prize_id', 'id'),
+			col('position', 'position'),
+			col('prize', 'name', true),
+			col('description', 'description', true),
+			col('prize_status', 'status'),
+			col('excludes_from_consolation', 'excludes_from_consolation'),
+			{ header: 'prize_annulled_at', value: (r) => buenosAiresDateTime(r.annulled_at) },
+			col('prize_annul_reason', 'annul_reason', true),
+			{ header: 'winning_number', value: (r) => one(r.winning_numbers)?.number_value },
+			{ header: 'result_status', value: (r) => one(r.winning_numbers)?.result_status },
+			{
+				header: 'matched_roster_entry_id',
+				value: (r) => one(r.winning_numbers)?.matched_roster_entry_id
+			},
+			{
+				header: 'winner_loaded_at',
+				value: (r) => buenosAiresDateTime(one(r.winning_numbers)?.loaded_at)
+			},
+			{ header: 'winner_notes', text: true, value: (r) => one(r.winning_numbers)?.notes },
+			{ header: 'award_id', value: (r) => currentAward(r.prize_awards)?.id },
+			{ header: 'award_status', value: (r) => currentAward(r.prize_awards)?.status },
+			{ header: 'bond_id', value: (r) => currentAward(r.prize_awards)?.bond_id },
+			{ header: 'buyer_id', value: (r) => currentAward(r.prize_awards)?.buyer_id },
+			{ header: 'collector_id', value: (r) => currentAward(r.prize_awards)?.collector_id },
+			{
+				header: 'awarded_at',
+				value: (r) => buenosAiresDateTime(currentAward(r.prize_awards)?.awarded_at)
+			},
+			{
+				header: 'delivered_at',
+				value: (r) => buenosAiresDateTime(currentAward(r.prize_awards)?.delivered_at)
+			},
+			{ header: 'delivery_notes', text: true, value: (r) => currentAward(r.prize_awards)?.notes },
+			{
+				header: 'award_annul_reason',
+				text: true,
+				value: (r) => currentAward(r.prize_awards)?.annul_reason
+			},
+			{
+				header: 'awards_count',
+				value: (r) =>
+					Array.isArray(r.prize_awards) ? r.prize_awards.length : r.prize_awards ? 1 : 0
+			},
+			{
+				header: 'delivery_reversals_count',
+				value: (r) =>
+					Array.isArray(r.prize_delivery_reversals) ? r.prize_delivery_reversals.length : 0
+			}
 		]
 	},
 	'settlement-corrections': {

@@ -113,7 +113,11 @@ export function mockSupabase(
 		(chains[table] ??= []).push(chain);
 		return chain;
 	});
-	const rpc = vi.fn().mockResolvedValue(options.rpc ?? { data: null, error: null });
+	// Like PostgREST's builder, the rpc result is awaitable and also accepts `.range()` (paged reads).
+	const rpc = vi.fn().mockImplementation(() => {
+		const result = Promise.resolve(options.rpc ?? { data: null, error: null });
+		return Object.assign(result, { range: vi.fn(() => result) });
+	});
 	return {
 		supabase: { from, rpc } as unknown as SupabaseClient,
 		from,

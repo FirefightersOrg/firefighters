@@ -86,6 +86,12 @@ beforeAll(async () => {
 	}
 });
 
+/**
+ * The frozen draw of the frozen-rosters test, reused by the winners-prizes test: run the file whole
+ * (the tests are sequential), not the winners-prizes test alone with `-t`.
+ */
+let frozenDrawId: string;
+
 describe('backup export route (local Supabase)', () => {
 	it('exports the campaign bonds as CSV for an administrator', async () => {
 		const { response } = await call(admin, 'bonds');
@@ -131,6 +137,7 @@ describe('backup export route (local Supabase)', () => {
 
 		const frozen = await admin.client.rpc('draw_freeze_roster', { p_draw_id: draw.data });
 		expect(frozen.error).toBeNull();
+		frozenDrawId = draw.data as string;
 		res = await call(admin, 'frozen-rosters');
 		expect(res.response?.headers.get('content-disposition')).toContain('frozen-rosters-');
 		const rows = parseCsv(await res.response!.text()).map((r) => r.cells);
@@ -157,6 +164,55 @@ describe('backup export route (local Supabase)', () => {
 		expect(get(rows[1]!, 'ineligibility_reason')).toBe('not_sold');
 	});
 
+	it('exports winners and prizes: winning number, result and award (SAN-92)', async () => {
+		// Header only while the campaign has no prizes.
+		let res = await call(admin, 'winners-prizes');
+		expect(res.response?.status).toBe(200);
+		expect(parseCsv(await res.response!.text())).toHaveLength(1);
+
+		const first = await admin.client.rpc('prize_create', {
+			p_draw_id: frozenDrawId,
+			p_name: '=Primer premio',
+			p_description: null,
+			p_position: 1
+		});
+		expect(first.error).toBeNull();
+		const second = await admin.client.rpc('prize_create', {
+			p_draw_id: frozenDrawId,
+			p_name: 'Segundo premio',
+			p_description: 'Sin cargar',
+			p_position: 2
+		});
+		expect(second.error).toBeNull();
+		// Number 1 is in the frozen roster but its bond was never sold: not eligible, no award.
+		const loaded = await admin.client.rpc('draw_load_winning_number', {
+			p_prize_id: first.data,
+			p_number_value: 1,
+			p_notes: null
+		});
+		expect(loaded.error).toBeNull();
+
+		res = await call(admin, 'winners-prizes');
+		expect(res.response?.headers.get('content-disposition')).toContain('winners-prizes-');
+		const rows = parseCsv(await res.response!.text()).map((r) => r.cells);
+		const header = rows[0]!;
+		const get = (r: string[], h: string) => r[header.indexOf(h)];
+		expect(rows).toHaveLength(3);
+		// Ordered by draw, then position.
+		expect(rows.slice(1).map((r) => get(r!, 'position'))).toEqual(['1', '2']);
+		expect(get(rows[1]!, 'prize_id')).toBe(first.data);
+		expect(get(rows[1]!, 'prize')).toBe("'=Primer premio");
+		expect(get(rows[1]!, 'draw_id')).toBe(frozenDrawId);
+		expect(get(rows[1]!, 'winning_number')).toBe('1');
+		expect(get(rows[1]!, 'result_status')).toBe('not_eligible');
+		expect(get(rows[1]!, 'matched_roster_entry_id')).toMatch(/^[0-9a-f-]{36}$/);
+		expect(get(rows[1]!, 'winner_loaded_at')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+		expect(get(rows[1]!, 'award_id')).toBe('');
+		expect(get(rows[1]!, 'awards_count')).toBe('0');
+		expect(get(rows[2]!, 'winning_number')).toBe('');
+		expect(get(rows[2]!, 'prize_status')).toBe('pending_validation');
+	});
+
 	it('requires draw.view for frozen rosters and 404s for a missing campaign', async () => {
 		const { thrown } = await call(admin, 'frozen-rosters', { permissions: ['report.export'] });
 		expect(thrown?.status).toBe(403);
@@ -180,7 +236,7 @@ describe('backup export route (local Supabase)', () => {
 	});
 
 	it('rejects unknown kinds, bad campaign ids and malformed periods', async () => {
-		expect((await call(admin, 'winners-prizes')).thrown?.status).toBe(404);
+		expect((await call(admin, 'prizes')).thrown?.status).toBe(404);
 		expect((await call(admin, 'bonds', { id: 'nope' })).thrown?.status).toBe(404);
 		expect((await call(admin, 'bonds', { id: randomUUID() })).thrown?.status).toBe(404);
 		expect(

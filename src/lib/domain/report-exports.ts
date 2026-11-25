@@ -197,7 +197,8 @@ const collectorLedger: ReportExportDefinition<CollectorLedgerRow> = {
 		{ header: 'Status', value: (r) => label<LedgerStatus>(LEDGER_STATUS_LABELS, r.status) },
 		{ header: 'Settlement', numeric: true, value: (r) => r.settlementNumber },
 		{ header: 'Reason', text: true, value: (r) => r.reason },
-		{ header: 'Running balance', numeric: true, value: (r) => r.runningBalance }
+		{ header: 'Running balance', numeric: true, value: (r) => r.runningBalance },
+		{ header: 'Affects balance', value: (r) => (r.affectsBalance ? 'Sí' : 'No') }
 	]
 };
 
