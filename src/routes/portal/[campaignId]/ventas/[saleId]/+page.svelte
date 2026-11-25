@@ -86,7 +86,7 @@
 <div class="space-y-6">
 	{#if data.submitted && !form?.message}
 		<Alert tone="success" title="Cobro enviado">
-			Quedó pendiente de rendición. Se confirma cuando el operador lo incluye en tu rendición y la
+			Quedó pendiente de rendición. Se confirma cuando el operador lo incluye en la rendición y la
 			cierra.
 		</Alert>
 	{/if}

@@ -69,7 +69,7 @@
 		{#snippet empty()}
 			<EmptyState title={data.collector ? 'Todavía no hay ventas' : 'Sin cobrador vinculado'}>
 				{data.collector
-					? 'Las ventas de los bonos entregados aparecen acá cuando se registran.'
+					? 'Las ventas de los bonos entregados aparecen aquí cuando se registran.'
 					: 'El usuario no está vinculado a un cobrador. Pedir a un administrador que lo vincule.'}
 			</EmptyState>
 		{/snippet}

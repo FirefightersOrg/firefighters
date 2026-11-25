@@ -49,7 +49,7 @@
 		{#snippet empty()}
 			<EmptyState title={data.collector ? 'Todavía no hay compradores' : 'Sin cobrador vinculado'}>
 				{data.collector
-					? 'Los compradores aparecen acá cuando se registra una venta propia.'
+					? 'Los compradores aparecen aquí cuando se registra una venta propia.'
 					: 'El usuario no está vinculado a un cobrador. Pedir a un administrador que lo vincule.'}
 			</EmptyState>
 		{/snippet}

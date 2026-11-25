@@ -94,7 +94,7 @@ export const actions: Actions = {
 				message
 			});
 		if (!collector || collector.status !== 'active')
-			return failure(403, 'Tu cuenta de cobrador no está activa.');
+			return failure(403, 'La cuenta de cobrador no está activa.');
 		const errors: Record<string, string[]> = {};
 		const cents = parseMoneyInput(values.amount);
 		if (cents === null || cents <= 0) errors.amount = ['Ingresar un importe mayor que cero.'];

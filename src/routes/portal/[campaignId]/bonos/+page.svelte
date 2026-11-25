@@ -69,7 +69,7 @@
 />
 
 {#if !data.collector}
-	<EmptyState title="Tu usuario todavía no está vinculado a un cobrador">
+	<EmptyState title="El usuario todavía no está vinculado a un cobrador">
 		Pedir a un administrador que vincule el usuario con la ficha de cobrador.
 	</EmptyState>
 {:else}
@@ -123,7 +123,7 @@
 				>
 					{filtered
 						? 'Probar con otros estados o quitar los filtros.'
-						: 'Cuando se entreguen bonos a este cobrador, van a aparecer acá.'}
+						: 'Cuando se entreguen bonos a este cobrador, van a aparecer aquí.'}
 				</EmptyState>
 			{/snippet}
 		</Table>

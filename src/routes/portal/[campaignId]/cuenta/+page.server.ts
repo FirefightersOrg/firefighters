@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	const campaign = await getCampaignById(locals.supabase, params.campaignId);
 	if (campaign.error)
-		error(500, { message: 'No se pudo cargar tu cuenta corriente. Volver a intentar.' });
+		error(500, { message: 'No se pudo cargar la cuenta corriente. Volver a intentar.' });
 	if (!campaign.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collector) return { collector, campaign: campaign.data, ledger: null };
 
@@ -60,7 +60,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			error(err.status, {
 				message:
 					err.kind === 'internal'
-						? 'No se pudo cargar tu cuenta corriente. Volver a intentar.'
+						? 'No se pudo cargar la cuenta corriente. Volver a intentar.'
 						: err.message
 			});
 		throw err;
