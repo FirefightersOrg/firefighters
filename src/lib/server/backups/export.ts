@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { BACKUP_EXPORTS, type BackupExportKind, type ExportRow } from '$lib/domain/backup-exports';
 import { CSV_BOM, csvHeaderLine, csvRowLines } from '$lib/domain/csv-export';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
-/** Must not exceed PostgREST `max_rows` (1000 in supabase/config.toml). */
-export const EXPORT_PAGE_SIZE = 1000;
+/** PostgREST `max_rows`, see `$lib/postgrest`. */
+export const EXPORT_PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 /** Reads one page of rows strictly after `after` (null = from the start), in the total order. */
 export type FetchPage = (

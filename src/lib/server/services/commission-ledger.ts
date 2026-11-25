@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { LEDGER_REASON_MAX } from '$lib/domain/ledger';
 import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
 const uuid = z.guid();
 export const commissionSettleSchema = z.object({
@@ -263,8 +264,8 @@ export interface LedgerEntryView {
 	originalEntryId: string | null;
 }
 
-/** PostgREST caps a response at `max_rows` (1000), so the ledger is read in pages of this size. */
-export const LEDGER_PAGE_SIZE = 1000;
+/** PostgREST caps a response at `max_rows` (see `$lib/postgrest`), so the ledger is read in pages of this size. */
+export const LEDGER_PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 /**
  * Ledger entries in order with the running balance (annulled and reference entries add 0).
