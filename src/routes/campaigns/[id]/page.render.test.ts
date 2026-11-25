@@ -47,10 +47,11 @@ const can = {
 function renderPage(
 	loaded: Campaign,
 	form: Record<string, unknown> | null = null,
-	extra: { hasBonds?: boolean; can?: Partial<typeof can> } = {}
+	extra: { hasBonds?: boolean; can?: Partial<typeof can>; dashboard?: unknown } = {}
 ) {
 	const data = {
 		campaign: loaded,
+		dashboard: extra.dashboard ?? { operational: null, financial: null },
 		hasBonds: extra.hasBonds ?? false,
 		can: { ...can, ...extra.can }
 	};
@@ -188,5 +189,138 @@ describe('campaign page: bonds', () => {
 		const both = renderPage(campaign(), null, { can: { viewCollectors: true, viewBuyers: true } });
 		expect(both).toContain(collectors);
 		expect(both).toContain(buyers);
+	});
+});
+
+const operational = {
+	bonds: { total: 20, sold: 6, available: 10, delivered: 4, returned: 0, annulled: 0 },
+	revenue: {
+		expected: '3000.00',
+		collected: '1500.00',
+		pending: '1500.00',
+		overdue: '300.00',
+		collectedPercent: 50
+	},
+	nextDraw: {
+		id: 'd1',
+		name: 'Sorteo de diciembre',
+		type: 'monthly',
+		drawDate: '2026-12-20',
+		paymentCutoffAt: '2026-12-15T12:00:00-03:00',
+		requiredInstallmentNumber: 3,
+		status: 'scheduled',
+		atRiskCount: 2
+	},
+	atRisk: [
+		{
+			bondId: 'b0000000-0000-0000-0000-000000000001',
+			kind: 'simple',
+			baseNumber: 7,
+			collectorId: 'c1',
+			collectorName: 'Ana',
+			missingInstallments: 2,
+			requiredInstallments: 3,
+			totalCount: 2
+		},
+		{
+			bondId: 'b0000000-0000-0000-0000-000000000002',
+			kind: 'simple',
+			baseNumber: null,
+			collectorId: null,
+			collectorName: null,
+			missingInstallments: 1,
+			requiredInstallments: 3,
+			totalCount: 2
+		}
+	]
+};
+
+const financial = {
+	cash: { cash: '1000.00', transfer: '500.00', total: '1500.00' },
+	commissions: {
+		generated: '150.00',
+		settled: '100.00',
+		pending: '50.00',
+		closedSettlements: 3,
+		openSettlements: 1,
+		settledCash: '900.00',
+		settledTransfer: '400.00'
+	},
+	balances: {
+		creditors: 1,
+		net: '-20.00',
+		top: [
+			{
+				collectorId: 'c1',
+				collectorName: 'Ana',
+				entryCount: 2,
+				creditTotal: '0.00',
+				debitTotal: '20.00',
+				balance: '-20.00',
+				lastEntryOn: null
+			}
+		]
+	}
+};
+
+describe('campaign dashboard', () => {
+	it('shows no dashboard to a viewer without report permissions', () => {
+		expect(renderPage(campaign())).not.toContain('Tablero');
+	});
+
+	it('shows the operational groups with links to the Bond Record', () => {
+		const body = renderPage(campaign(), null, { dashboard: { operational, financial: null } });
+		for (const text of [
+			'Tablero',
+			'Vendidos',
+			'Disponibles',
+			'Entregados',
+			'Esperada',
+			'Cobrada',
+			'Pendiente',
+			'Próximo sorteo',
+			'Sorteo de diciembre',
+			'Cuota requerida: 3',
+			'Bonos en riesgo',
+			'0007',
+			'Ana',
+			'Sin cobrador',
+			'Sin número'
+		]) {
+			expect(body).toContain(text);
+		}
+		expect(body).toContain('/bonds/b0000000-0000-0000-0000-000000000001');
+		expect(body).not.toContain('Efectivo y transferencias');
+	});
+
+	it('shows the financial groups, with a signed balance', () => {
+		const body = renderPage(campaign(), null, { dashboard: { operational: null, financial } });
+		for (const text of [
+			'Efectivo y transferencias',
+			'Comisiones',
+			'Generadas',
+			'Liquidadas',
+			'Saldos de cobradores',
+			'Saldo neto'
+		]) {
+			expect(body).toContain(text);
+		}
+		expect(body).toMatch(/-\$[\s\u00a0]20,00/);
+		expect(body).not.toContain('Próximo sorteo');
+	});
+
+	it('says so when there is no draw to come', () => {
+		const body = renderPage(campaign(), null, {
+			dashboard: { operational: { ...operational, nextDraw: null, atRisk: [] }, financial: null }
+		});
+		expect(body).toContain('No hay sorteos programados.');
+		expect(body).not.toContain('Ningún bono vendido está en riesgo');
+	});
+
+	it('says no sold bond is at risk when the list is empty', () => {
+		const body = renderPage(campaign(), null, {
+			dashboard: { operational: { ...operational, atRisk: [] }, financial: null }
+		});
+		expect(body).toContain('Ningún bono vendido está en riesgo para este sorteo.');
 	});
 });

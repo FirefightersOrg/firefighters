@@ -217,3 +217,14 @@ Exports (`/campaigns/[id]/reports/export/[report]?format=csv|xlsx`) need `report
 - The catalog (`roles`, `permissions`, `role_permissions`) is read-only at runtime; it changes only through migrations. `user.manage` covers profiles and role assignments (`user_roles`).
 - At least one active profile must keep `user.manage`: the database rejects removing the last holder's role, deactivating them, or removing `user.manage` from their role.
 - If collector access is enabled, their queries must be limited to their own portfolio.
+
+## Campaign dashboard (SAN-85)
+
+`/campaigns/[id]` shows a dashboard to users who may read the reports. Each group depends on one permission, so a user sees only what the report functions already allow:
+
+| Group                                                   | Permission                |
+| ------------------------------------------------------- | ------------------------- |
+| Bonds, revenue (installments), next draw, bonds at risk | `report.view_operational` |
+| Cash and transfers, commissions, collector balances     | `report.view_financial`   |
+
+Users with `campaign.view` only (for example collectors) see the campaign summary without the dashboard. `20270110000000_campaign_dashboard.sql` adds two read-only `SECURITY DEFINER` functions, `dashboard_next_draw` and `dashboard_at_risk_bonds`, that check `report.view_operational` and `campaign.view` themselves; they are revoked from `public`, `anon` and `service_role` and granted to `authenticated` only. A bond is at risk when it is sold, has an active sale and its required installments (monthly: 1..N; consolation: 1..N; final and extraordinary: all) are not covered by confirmed payments dated on or before the cutoff day (the same payment-before-cutoff test as `draw_generate_roster`). It is an estimate of who may miss the draw, not the roster: it does not apply the roster's other exclusions (for example a consolation bond that already won an excluding prize), a consolation draw without a required installment shows no bonds at risk, and a sold bond with no active payment plan is not listed. Once the roster is frozen, the dashboard labels the same figure "not enabled".
