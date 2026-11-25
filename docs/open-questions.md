@@ -191,7 +191,8 @@ stays.
 
 Decided (SAN-106): marking a sale `uncollectible` is manual only, by an admin or the treasurer
 (`sale.mark_uncollectible`), with a mandatory audited reason. Nothing marks it automatically; the
-overdue warning in reports (SAN-142) is informative only. The mark is final: there is no unmark.
+overdue warning in reports (SAN-142: N overdue installments, set per campaign, default 3) is
+informative only. The mark is final: there is no unmark.
 
 ### Definitive pata value
 
