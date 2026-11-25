@@ -1,0 +1,13 @@
+-- SAN-141: `bond_numbers_guard_write` runs for every bond_numbers write, including direct
+-- service_role writes (bond annul/release). Its release branch checks whether the number sits in
+-- an annulled extraordinary draw by reading draw_roster_entries, draw_rosters and draws. Those
+-- tables revoke all privileges from anon, authenticated and service_role, so the check ran with the
+-- caller's rights and failed with 42501 (permission denied) whenever the planner evaluated the
+-- `exists` before the `number_kind = 'extraordinary'` condition. That made the failure intermittent
+-- and hid the intended 55000 "released only when annulled from available" rule.
+--
+-- Fix: run the guard as its owner (SECURITY DEFINER; it already pins an empty search_path and
+-- schema-qualifies every object), like the other audited draw functions. The guard only reads data
+-- and raises or adjusts NEW; it does not use the caller's identity, so behaviour is otherwise
+-- unchanged.
+alter function public.bond_numbers_guard_write() security definer;

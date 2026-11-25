@@ -1195,8 +1195,8 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					viewSettlements: role !== 'read-only',
 					// SAN-78: operator and treasurer hold draw.* permissions; read-only does not.
 					viewDraws: role !== 'read-only',
-					// SAN-90: only the administrator holds report.export.
-					exportBackups: false,
+					// SAN-87: operator, treasurer and read-only hold report.export.
+					exportBackups: true,
 					// SAN-86: operator, treasurer and read-only hold report.view_operational.
 					viewReports: true
 				});

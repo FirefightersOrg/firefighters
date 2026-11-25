@@ -162,12 +162,14 @@ describe('backup export route (local Supabase)', () => {
 		expect(thrown?.status).toBe(403);
 		expect((await call(admin, 'frozen-rosters', { permissions: null })).thrown?.status).toBe(500);
 		expect((await call(admin, 'frozen-rosters', { id: randomUUID() })).thrown?.status).toBe(404);
-		expect((await call(operator, 'frozen-rosters')).thrown?.status).toBe(403);
+		expect(
+			(await call(operator, 'frozen-rosters', { permissions: ['report.export'] })).thrown?.status
+		).toBe(403);
 	});
 
 	it('denies a user without report.export with 403', async () => {
-		expect(operator.permissions).not.toContain('report.export');
-		const { thrown, response } = await call(operator, 'bonds');
+		// SAN-87 grants report.export to the operator, so drop it to test the denial.
+		const { thrown, response } = await call(operator, 'bonds', { permissions: ['campaign.view'] });
 		expect(response).toBeUndefined();
 		expect(thrown?.status).toBe(403);
 	});

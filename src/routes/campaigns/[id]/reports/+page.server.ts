@@ -9,7 +9,7 @@ import {
 	totalBondsByCollector,
 	totalCollectorMonthly
 } from '$lib/domain/reports';
-import { requirePermissionIn } from '$lib/server/auth/permissions';
+import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
@@ -73,6 +73,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		campaign: campaign.data,
 		filters,
 		collectors: collectors.data ?? [],
+		canExport: hasPermissionIn(locals.permissions, 'report.export'),
+		canViewFinancial: hasPermissionIn(locals.permissions, 'report.view_financial'),
 		bondsByStatus: buildStatusMatrix(byStatus.data!),
 		bondsByCollector: { rows: byCollector.data!, totals: totalBondsByCollector(byCollector.data!) },
 		installments: pivotInstallments(installments.data!),

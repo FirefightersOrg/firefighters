@@ -15,6 +15,7 @@
 		type BondCommercialStatus,
 		type BondFinancialStatus
 	} from '$lib/domain/bonds';
+	import ExportLinks from '$lib/components/reports/ExportLinks.svelte';
 	import { formatInteger, formatMoney } from '$lib/domain/money';
 	import {
 		formatMonthLabel,
@@ -26,6 +27,15 @@
 	let { data }: PageProps = $props();
 	const campaign = $derived(data.campaign);
 	const filters = $derived(data.filters);
+	const exportParams = $derived({
+		collector: filters.collectorId,
+		kind: filters.kind,
+		status: filters.commercialStatus,
+		financial: filters.financialStatus,
+		month: filters.month,
+		from: filters.from,
+		to: filters.to
+	});
 	const matrix = $derived(data.bondsByStatus);
 	const commercialLabel = (s: string) =>
 		BOND_COMMERCIAL_STATUS_LABELS[s as BondCommercialStatus] ?? s;
@@ -65,6 +75,13 @@
 			class="text-body-sm text-primary-text hover:underline">← {campaign.name}</a
 		>
 		<h1 class="mt-2 text-heading-1">Reportes operativos</h1>
+		{#if data.canViewFinancial}
+			<a
+				href={resolve('/campaigns/[id]/reports/financial', { id: campaign.id })}
+				class="mt-1 inline-block text-body-sm text-primary-text hover:underline"
+				>Reportes financieros y de sorteos →</a
+			>
+		{/if}
 		<p class="mt-1 text-body-sm text-muted">
 			Vistas de solo lectura de los datos actuales. El estado financiero es el último estado
 			recalculado del bono (se actualiza al cerrar una liquidación). Las fechas son de Buenos Aires.
@@ -103,6 +120,14 @@
 	</form>
 
 	<Section id="by-status" title="Bonos por estado comercial y financiero">
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="bonds-by-status"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		{#if matrix.bondCount === 0}
 			<p class="text-body-sm text-muted">Ningún bono coincide con los filtros.</p>
 		{:else}
@@ -146,6 +171,14 @@
 	</Section>
 
 	<Section id="by-collector" title="Bonos por cobrador">
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="bonds-by-collector"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		{#if data.bondsByCollector.rows.length === 0}
 			<p class="text-body-sm text-muted">Ningún bono coincide con los filtros.</p>
 		{:else}
@@ -204,6 +237,14 @@
 	</Section>
 
 	<Section id="installments" title="Cuotas: pendientes, pagadas, adelantadas y vencidas">
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="installments"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		<p class="mb-3 text-body-sm text-muted">
 			Solo ventas activas. Las vencidas incluyen cuotas pendientes con fecha de vencimiento pasada.
 			Cada celda muestra cantidad e importe.
@@ -251,6 +292,14 @@
 	</Section>
 
 	<Section id="monthly" title={`Resumen mensual por cobrador: ${formatMonthLabel(filters.month)}`}>
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="collector-monthly"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		<p class="mb-3 text-body-sm text-muted">
 			Los bonos asignados son los que se tienen hoy. Vendidos son las ventas registradas en el mes.
 			Las cuotas son las que vencen en el mes y siguen impagas. Los pagos excluyen borradores y

@@ -96,14 +96,16 @@ insert into expected_matrix values
 ('operator', array[
   'campaign.view','bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return',
   'buyer.view','buyer.manage','collector.view','sale.view','sale.create','payment.view','payment.create',
-  'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner']),
+  'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner',
+  'report.view_operational','report.export']),
 ('treasurer', array[
   'campaign.view','bond.view','collector.ledger.view','payment.view','payment.create','payment.annul',
   'settlement.view','settlement.create','settlement.close','settlement.correct',
   'commission.view','commission.adjust','draw.view','draw.freeze_roster','draw.load_winner',
-  'report.view_financial','audit.view']),
+  'report.view_operational','report.view_financial','report.export','audit.view']),
 ('collector', array['campaign.view']),
-('read-only', array['campaign.view','bond.view','commission.view','report.view_financial']);
+('read-only', array['campaign.view','bond.view','commission.view','report.view_operational',
+  'report.view_financial','report.export']);
 update expected_matrix set codes = (select array_agg(c order by c) from unnest(codes) c);
 create function pg_temp.granted(role_name text) returns text[] language sql stable as $$
   select codes from expected_matrix where expected_matrix.role_name = granted.role_name $$;
