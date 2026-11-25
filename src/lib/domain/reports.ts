@@ -176,6 +176,20 @@ export function sumAmounts(values: readonly string[]): string {
 	return centsToDecimalString(cents);
 }
 
+/** SAN-142: an active, unmarked sale with at least the campaign's N overdue installments. */
+export interface OverdueSaleRow {
+	saleId: string;
+	bondId: string;
+	bondLabel: string;
+	collectorId: string;
+	collectorName: string;
+	overdueCount: number;
+	overdueAmount: string;
+	oldestDueDate: string;
+}
+/** Default N, the same as the SQL column default. */
+export const DEFAULT_OVERDUE_WARNING_THRESHOLD = 3;
+
 export interface StatusMatrix {
 	commercialStatuses: string[];
 	financialStatuses: string[];

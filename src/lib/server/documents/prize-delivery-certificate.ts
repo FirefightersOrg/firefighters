@@ -46,7 +46,7 @@ export function buildPrintablePrizeDeliveryCertificate(
 			source.winningNumber === null
 				? 'Sin cargar'
 				: formatCampaignNumber(source.winningNumber, campaignNumberingConfig(campaign)),
-		associatedBond: source.bondLabel || source.bondId || '—',
+		associatedBond: source.bondLabel || '—',
 		buyer: frozenBuyerLabel(source.buyerSnapshot),
 		collector: text(source.collectorSnapshot?.display_name) || '—',
 		rosterStatus: source.rosterEligible ? 'Habilitado' : 'No habilitado',

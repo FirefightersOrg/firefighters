@@ -254,7 +254,10 @@ annulment
 
 Rules:
 
-- Balance is calculated from non-annulled entries.
+- Balance is calculated from non-annulled entries that affect the balance; `cash_settled` and
+  `transfer_received_by_firefighters` are reference entries and never do (SAN-107).
+- `recorded -> compensated` happens only when the entries that reference it (`original_entry_id`)
+  add up to its amount (SAN-108). Compensated and compensating entries cannot be annulled.
 - Historical amounts must not be edited directly.
 
 ## Draw

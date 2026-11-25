@@ -136,7 +136,8 @@ const mapLedger = (r: Raw): CollectorLedgerRow => ({
 	status: String(r.status),
 	settlementNumber: r.settlement_number === null ? null : num(r.settlement_number),
 	reason: optStr(r.reason),
-	runningBalance: str(r.running_balance)
+	runningBalance: str(r.running_balance),
+	affectsBalance: r.affects_balance !== false
 });
 
 export async function getCollectorLedger(

@@ -209,6 +209,8 @@ Product decisions (SAN-93): the three new `.view` permissions are implied by any
 
 `20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions (known gap, SAN-140).
 
+Overdue warning (SAN-142, `20270116000000_overdue_warning.sql`): `report_overdue_sales` follows the same rule (`report.view_operational` + `campaign.view`, definer, no buyer data) and lists active, unmarked sales with at least the campaign's N overdue installments. It only informs and never marks a sale `uncollectible`. N (`campaigns.overdue_warning_threshold`, default 3, 1..120) is changed with `campaign_set_overdue_warning_threshold`, which needs `campaign.update_rules`, is audited as `campaign.update_overdue_warning`, and is refused on closed or annulled campaigns.
+
 The four reports (`report_bonds_by_status`, `report_bonds_by_collector`, `report_installments`, `report_collector_monthly`) are read-only `SECURITY DEFINER` functions that check `report.view_operational` and `campaign.view` themselves and return aggregates only (no buyer data). They are definers on purpose: a read-only user holds `report.view_operational` but not `sale.view` or `payment.view`, whose RLS would otherwise hide the data. The functions and the helper are revoked from `public`, `anon` and `service_role` and granted to `authenticated` only.
 
 ### Financial and draw reports and exports (SAN-87)

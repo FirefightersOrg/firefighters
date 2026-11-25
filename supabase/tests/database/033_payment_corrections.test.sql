@@ -53,7 +53,7 @@ select public.settlement_close(pg_temp.id('settlement'));
 insert into snapshots select 'closed',to_jsonb(s) from public.settlements s where id=pg_temp.id('settlement');
 create function pg_temp.balance() returns numeric language sql as $$
  select coalesce(sum(case when direction='collector_credit' then amount else -amount end),0)
- from public.collector_ledger_entries where collector_id=pg_temp.id('collector') and status<>'annulled'
+ from public.collector_ledger_entries where collector_id=pg_temp.id('collector') and status<>'annulled' and affects_balance
 $$;
 select is(pg_temp.balance(),40::numeric,'initial transfer commission balance');
 
@@ -128,7 +128,7 @@ select ok((select status='confirmed' and payment_method='transfer' and replaces_
 select results_eq($$select installment_id,amount_applied from public.payment_installments where payment_id=pg_temp.id('method_replacement')$$,
  $$select installment_id,amount_applied from public.payment_installments where payment_id=pg_temp.id('method_payment')$$,'method applications copied');
 select is((select to_jsonb(i) from public.installments i where id=pg_temp.id('method_installment')),(select value from snapshots where k='method_installment'),'method installment fully unchanged');
-select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('method_payment')$$,
+select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('method_payment') and affects_balance$$,
  $$values ('collector_credit'::text,10::numeric)$$,'cash to transfer restores retained commission');
 select is(pg_temp.balance(),40::numeric,'cash to transfer balance');
 select is((select to_jsonb(s) from public.settlements s where id=pg_temp.id('settlement')),
@@ -136,7 +136,7 @@ select is((select to_jsonb(s) from public.settlements s where id=pg_temp.id('set
  'commission_paid_amount',20,'net_to_firefighters',680) from snapshots where k='closed'),
  'method correction updates only method totals, retention and net (SAN-110)');
 insert into ids values('reverse_replacement',public.payment_correct_method(pg_temp.id('reverse_payment'),'cash','reverse mistake','reverse-correction'));
-select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('reverse_replacement')$$,
+select results_eq($$select direction,amount from public.collector_ledger_entries where payment_id=pg_temp.id('reverse_replacement') and affects_balance$$,
  $$values ('collector_debit'::text,10::numeric)$$,'transfer to cash posts retained commission debit');
 select is(pg_temp.balance(),30::numeric,'transfer to cash balance');
 select throws_ok($$select public.payment_correct_method(pg_temp.id('method_payment'),'cash','again')$$,'55000',null,'adjusted cannot correct twice');
@@ -180,7 +180,7 @@ select ok((select bool_and(new_value ?& array['correction_type','affected_entity
 select is((select reason from public.audit_log where request_id='cash-annul'),'cash mistake','reason trimmed in audit');
 select ok(not exists(select 1 from public.audit_log a cross join lateral jsonb_array_elements_text(a.new_value->'generated_compensatory_movements') m(id)
  where a.request_id in ('cash-annul','transfer-annul','method-correction','reverse-correction','reassociate','pending-annul','advance-annul')
- and not exists(select 1 from public.collector_ledger_entries e where e.id=m.id::uuid and e.entry_type='annulment' and e.reason=a.reason)),'audit ledger ids resolve to compensatory rows');
+ and not exists(select 1 from public.collector_ledger_entries e where e.id=m.id::uuid and (e.entry_type='annulment' or not e.affects_balance) and e.reason=a.reason)),'audit ledger ids resolve to compensatory rows');
 
 -- Narrow guard path is closed after RPC, including privileged DML.
 select throws_ok($$update public.payments set status='adjusted' where id=pg_temp.id('partial_payment')$$,'23001',null,'direct confirmed adjustment blocked');

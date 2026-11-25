@@ -7,7 +7,8 @@ import {
 	LEDGER_ENTRY_TYPE_LABELS,
 	LEDGER_REASON_MAX,
 	LEDGER_STATUSES,
-	LEDGER_STATUS_LABELS
+	LEDGER_STATUS_LABELS,
+	ledgerUncompensated
 } from './ledger';
 
 describe('ledger domain', () => {
@@ -50,5 +51,31 @@ describe('ledger domain', () => {
 				{ direction: 'collector_debit', amount: 99, status: 'annulled' }
 			])
 		).toBe(12);
+	});
+
+	it('leaves reference entries out of the balance (SAN-107)', () => {
+		expect(
+			calculateLedgerBalance([
+				{ direction: 'collector_credit', amount: '40.00', status: 'recorded' },
+				{ direction: 'collector_debit', amount: '20.00', status: 'recorded' },
+				{
+					direction: 'collector_credit',
+					amount: '200.00',
+					status: 'recorded',
+					affectsBalance: false
+				}
+			])
+		).toBe(20);
+	});
+
+	it('computes what is left of each entry after its compensations (SAN-108)', () => {
+		const left = ledgerUncompensated([
+			{ id: 'a', amount: '30.00', status: 'recorded', originalEntryId: null },
+			{ id: 'b', amount: '10.10', status: 'recorded', originalEntryId: 'a' },
+			{ id: 'c', amount: '9.90', status: 'recorded', originalEntryId: 'a' },
+			{ id: 'd', amount: '5.00', status: 'annulled', originalEntryId: 'a' }
+		]);
+		expect(left.get('a')).toBe(10);
+		expect(left.get('b')).toBe(10.1);
 	});
 });

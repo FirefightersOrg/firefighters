@@ -215,11 +215,16 @@
 						<Stat label="Total cobrado" value={formatMoney(financial.cash.total)} />
 					</div>
 					<p class="m-0 mt-4 text-body-sm text-muted">
-						Rendido en {formatNumber(financial.commissions.closedSettlements)} rendiciones cerradas:
+						Rendido en {formatNumber(financial.commissions.closedSettlements)}
+						{financial.commissions.closedSettlements === 1
+							? 'rendición cerrada'
+							: 'rendiciones cerradas'}:
 						{formatMoney(financial.commissions.settledCash)} en efectivo y
 						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
 						{#if financial.commissions.openSettlements > 0}
-							Hay {formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.
+							{financial.commissions.openSettlements === 1
+								? 'Hay 1 rendición abierta.'
+								: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
 						{/if}
 					</p>
 				</Card>

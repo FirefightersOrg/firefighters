@@ -10,12 +10,12 @@ const buyerSnapshotName = (value: unknown) => {
 	return (
 		snapshotText(row.business_name) ||
 		[snapshotText(row.first_name), snapshotText(row.last_name)].filter(Boolean).join(' ') ||
-		'No buyer'
+		'Sin comprador'
 	);
 };
 const collectorSnapshotName = (value: unknown) => {
 	const row = (value ?? {}) as Record<string, unknown>;
-	return snapshotText(row.display_name) || 'No collector';
+	return snapshotText(row.display_name) || 'Sin cobrador';
 };
 export interface DrawRosterListEntry extends DrawRosterEntry {
 	numberKind: 'base' | 'associated' | 'extraordinary';
@@ -131,7 +131,7 @@ const mapEntry = (row: Row): DrawRosterListEntry => {
 		updatedAt: row.updated_at as string,
 		numberKind: (number.number_kind ?? 'base') as DrawRosterListEntry['numberKind'],
 		bondKind: (bond.kind ?? 'simple') as DrawRosterListEntry['bondKind'],
-		bondLabel: String(bond.internal_code ?? row.bond_id),
+		bondLabel: String(bond.internal_code ?? '—'),
 		buyerName: buyerSnapshotName(row.buyer_snapshot),
 		collectorName: collectorSnapshotName(row.collector_snapshot)
 	};

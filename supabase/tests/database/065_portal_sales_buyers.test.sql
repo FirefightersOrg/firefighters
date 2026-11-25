@@ -129,8 +129,8 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and p.proname like 'portal\_my\_%'
              and has_function_privilege('authenticated', p.oid, 'execute')
-             and not has_function_privilege('anon', p.oid, 'execute') and not has_function_privilege('service_role', p.oid, 'execute')), 10,
-  'the ten portal_my functions are granted to authenticated only (portal_my_collector from SAN-143 included)');
+             and not has_function_privilege('anon', p.oid, 'execute') and not has_function_privilege('service_role', p.oid, 'execute')), 12,
+  'the twelve portal_my functions are granted to authenticated only (portal_my_collector from SAN-143 and the two SAN-146 ledger reads included)');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and p.proname in ('portal_own_installments', 'portal_require_sale_view_own')
              and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')
