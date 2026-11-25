@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BuyerType, CollectorStatus } from '$lib/domain/parties';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Collector and buyer writes (SAN-49). Each one calls an audited SQL function with the
@@ -50,7 +51,7 @@ export const PARTY_MESSAGES = {
 	profileLinked: 'Ese usuario ya está vinculado a otro cobrador.',
 	stale: 'Otra persona modificó este registro. Recargar la página y volver a aplicar el cambio.',
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
-	internal: 'Algo salió mal. Volver a intentar.'
+	internal: GENERIC_ERROR_MESSAGE
 } as const;
 
 interface PostgrestLikeError {
@@ -76,7 +77,7 @@ const FIELD_BY_MESSAGE: [RegExp, string][] = [
 ];
 
 /** Spanish copy for the validation messages raised by the SQL functions (English, internal). */
-const FIELD_LABELS_ES: Record<string, string> = {
+const FIELD_LABELS: Record<string, string> = {
 	displayName: 'El nombre',
 	email: 'El correo electrónico',
 	phone: 'El teléfono',
@@ -98,7 +99,7 @@ function validationMessage(message: string, field: string | undefined): string {
 	if (/business name/.test(message) && /needs/.test(message)) return 'Ingresar la razón social.';
 	const max = /must be at most (\d+) characters/.exec(message);
 	if (max) {
-		const label = (field && FIELD_LABELS_ES[field]) || 'El valor';
+		const label = (field && FIELD_LABELS[field]) || 'El valor';
 		return `${label} debe tener como máximo ${max[1]} caracteres.`;
 	}
 	return PARTY_MESSAGES.invalid;

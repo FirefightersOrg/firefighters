@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import { saleRegisterSchema, type SaleRegisterInput } from '$lib/schemas/sale';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 export type SaleErrorKind = 'permission' | 'validation' | 'not_found' | 'conflict' | 'internal';
 const STATUS: Record<SaleErrorKind, number> = {
@@ -63,7 +64,7 @@ export function mapSaleRpcError(error: RpcError): SaleServiceError {
 				field: /campaign/.test(message) ? 'campaignId' : 'bondId'
 			}
 		);
-	return new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.', {
+	return new SaleServiceError('internal', GENERIC_ERROR_MESSAGE, {
 		cause: error
 	});
 }
@@ -79,7 +80,7 @@ export async function registerSale(
 		});
 	}
 	if (ctx.permissions === null) {
-		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.');
+		throw new SaleServiceError('internal', GENERIC_ERROR_MESSAGE);
 	}
 	if (ctx.permissions != null && !hasPermissionIn(ctx.permissions, 'sale.create')) {
 		throw new SaleServiceError('permission', 'No hay permiso para esta acción.');
@@ -95,11 +96,11 @@ export async function registerSale(
 			p_request_id: ctx.requestId ?? null
 		});
 	} catch (cause) {
-		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.', { cause });
+		throw new SaleServiceError('internal', GENERIC_ERROR_MESSAGE, { cause });
 	}
 	if (result.error) throw mapSaleRpcError(result.error);
 	if (typeof result.data !== 'string' || result.data === '') {
-		throw new SaleServiceError('internal', 'Algo salió mal. Volver a intentar.');
+		throw new SaleServiceError('internal', GENERIC_ERROR_MESSAGE);
 	}
 	return result.data;
 }

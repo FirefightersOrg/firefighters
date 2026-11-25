@@ -9,13 +9,6 @@ export type AssignmentType = (typeof ASSIGNMENT_TYPES)[number];
 export const ASSIGNMENT_STATUSES = ['active', 'returned', 'reassigned', 'lost'] as const;
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 
-export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
-	delivery: 'Delivered',
-	return: 'Returned',
-	reassignment: 'Reassigned',
-	lost: 'Lost'
-};
-
 export const DELIVERY_NOTE_REASONS = ['delivery', 'reassignment', 'return'] as const;
 export type DeliveryNoteReason = (typeof DELIVERY_NOTE_REASONS)[number];
 

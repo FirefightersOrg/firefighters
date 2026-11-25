@@ -42,7 +42,7 @@ Same RPC as `hasPermission`, but tells a denial apart from an RPC/infrastructure
 Asserts that the current authenticated caller has the specified permission code:
 
 - denied: throws SvelteKit `HttpError` **403** `{ message: 'Forbidden', code: 'permission_denied', permission }`
-- RPC failure: throws `HttpError` **500** `{ message: 'Permission check failed', code: 'permission_check_failed', permission }` (error logged, not exposed)
+- RPC failure: throws `HttpError` **500** `{ message: 'No se pudo verificar el permiso. Volver a intentar.', code: 'permission_check_failed', permission }` (error logged, not exposed)
 
 ```typescript
 import { requirePermission } from '$lib/server/auth';

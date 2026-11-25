@@ -33,6 +33,7 @@ import {
 	reassignBondsToCollector,
 	returnBondsFromCollector
 } from '$lib/server/services/deliveries';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 const uuid = (value: string) => z.guid().safeParse(value).success;
 const notFound = 'No se encontró el cobrador.';
 /** Usual buyers listed on the record; the rest are counted ("and N more"). */
@@ -191,7 +192,7 @@ export const actions: Actions = {
 			return fail(party?.status ?? 500, {
 				values,
 				errors: party?.field ? { [party.field]: [party.message] } : {},
-				message: party?.message ?? 'Algo salió mal. Volver a intentar.'
+				message: party?.message ?? GENERIC_ERROR_MESSAGE
 			});
 		}
 	},

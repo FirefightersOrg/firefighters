@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	if (!READ_PERMISSIONS.some((permission) => hasPermissionIn(locals.permissions, permission)))
-		error(403, { message: 'You do not have permission to view this certificate.' });
+		error(403, { message: 'No hay permiso para ver este certificado.' });
 	if (!uuid(params.id) || !uuid(params.drawId) || !uuid(params.prizeId))
 		error(404, { message: 'Premio no encontrado.' });
 	const [campaign, found] = await Promise.all([
@@ -35,12 +35,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (campaign.error || found.error) {
 		if ((found.error as { code?: string } | null)?.code === 'P0002')
 			error(404, { message: 'Premio no encontrado.' });
-		error(500, { message: 'Could not load the prize certificate.' });
+		error(500, { message: 'No se pudo cargar el certificado del premio.' });
 	}
 	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	if (!found.data || found.data.campaignId !== params.id || found.data.drawId !== params.drawId)
 		error(404, { message: 'Premio no encontrado.' });
 	if (found.data.prizeStatus !== 'delivered' || found.data.awardStatus !== 'delivered')
-		error(404, { message: 'Delivery certificate is only available for delivered prizes.' });
+		error(404, {
+			message: 'El certificado de entrega solo está disponible para premios entregados.'
+		});
 	return { document: buildPrintablePrizeDeliveryCertificate(campaign.data, found.data) };
 };

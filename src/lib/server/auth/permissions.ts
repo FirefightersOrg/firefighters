@@ -144,7 +144,7 @@ export async function getUserPermissions(supabase: SupabaseClient): Promise<stri
 /** HttpError 500 for a permission check that could not be performed (the cause is logged). */
 function permissionCheckFailed(permissionCode: PermissionCode): never {
 	error(500, {
-		message: 'Permission check failed',
+		message: 'No se pudo verificar el permiso. Volver a intentar.',
 		code: 'permission_check_failed',
 		permission: permissionCode
 	});
@@ -163,7 +163,7 @@ function forbidden(permissionCode: PermissionCode): never {
  *
  * - Denied → throws SvelteKit `HttpError` 403 `{ message: 'Forbidden', code: 'permission_denied', permission }`.
  * - RPC/infrastructure failure → throws `HttpError` 500
- *   `{ message: 'Permission check failed', code: 'permission_check_failed', permission }`
+ *   `{ message: 'No se pudo verificar el permiso. Volver a intentar.', code: 'permission_check_failed', permission }`
  *   (still fails closed; the underlying error is logged, not exposed).
  *
  * @param supabase User-scoped Supabase client (anon key + user session cookies)
@@ -212,7 +212,7 @@ export function permissionsUnavailable(
  * (the result of `getUserPermissions`, e.g. `locals.permissions`). No database round-trip.
  *
  * - List could not be loaded (`null`) → throws `HttpError` 500
- *   `{ message: 'Permission check failed', code: 'permission_check_failed', permission }`.
+ *   `{ message: 'No se pudo verificar el permiso. Volver a intentar.', code: 'permission_check_failed', permission }`.
  * - Permission absent → throws `HttpError` 403
  *   `{ message: 'Forbidden', code: 'permission_denied', permission }`.
  */

@@ -6,7 +6,7 @@ import type {
 	BondRecordPastPata
 } from '$lib/components/bonds/record/types';
 import {
-	BARCODE_MODE_LABELS_ES,
+	BARCODE_MODE_LABELS,
 	campaignNumberingConfig,
 	canLoadBonds,
 	type Campaign
@@ -184,7 +184,7 @@ export function buildBondRecord(input: BondRecordInput): BondRecord {
 		barcode: {
 			barcode: bond.barcode,
 			internalCode: bond.internalCode,
-			modeLabel: BARCODE_MODE_LABELS_ES[campaign.barcodeMode]
+			modeLabel: BARCODE_MODE_LABELS[campaign.barcodeMode]
 		},
 		collector: { id: bond.currentCollectorId },
 		buyer: { id: bond.currentBuyerId },

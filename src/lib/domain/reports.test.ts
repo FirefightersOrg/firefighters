@@ -83,7 +83,7 @@ describe('dates', () => {
 		expect(isValidDate('2027-2-1')).toBe(false);
 	});
 	it('labels a month', () => {
-		expect(formatMonthLabel('2026-03')).toBe('March 2026');
+		expect(formatMonthLabel('2026-03')).toBe('marzo de 2026');
 	});
 });
 

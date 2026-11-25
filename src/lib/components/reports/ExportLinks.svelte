@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { secondaryButtonClass } from '$lib/components/campaigns/styles';
+	import Button from '$lib/components/ui/Button.svelte';
 	import type { ReportExportKey } from '$lib/domain/report-exports';
 
 	/**
@@ -29,10 +29,8 @@
 </script>
 
 {#if show}
-	<div class="flex gap-2 text-sm">
-		<!-- eslint-disable svelte/no-navigation-without-resolve -- the href is built from the resolved export path -->
-		<a class={secondaryButtonClass} href={href('csv')} data-sveltekit-reload>Export CSV</a>
-		<a class={secondaryButtonClass} href={href('xlsx')} data-sveltekit-reload>Export Excel</a>
-		<!-- eslint-enable svelte/no-navigation-without-resolve -->
+	<div class="flex gap-2">
+		<Button size="sm" href={href('csv')} data-sveltekit-reload>Exportar CSV</Button>
+		<Button size="sm" href={href('xlsx')} data-sveltekit-reload>Exportar Excel</Button>
 	</div>
 {/if}

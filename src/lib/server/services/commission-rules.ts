@@ -6,6 +6,7 @@ import type {
 	CommissionRuleUpdateInput
 } from '$lib/schemas/commission-rule';
 import { COMMISSION_REASON_MAX_LENGTH } from '$lib/schemas/commission-rule';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Commission rule use cases. Every write calls one audited SQL function with the USER-SCOPED
@@ -61,7 +62,7 @@ export const COMMISSION_RULE_MESSAGES = {
 	permission: 'No hay permiso para gestionar reglas de comisión.',
 	ruleNotFound: 'No se encontró la regla de comisión. Puede haberse quitado de esta campaña.',
 	campaignNotFound: 'No se encontró la campaña.',
-	internal: 'Algo salió mal. Volver a intentar.',
+	internal: GENERIC_ERROR_MESSAGE,
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
 	overlap:
 		'Esta regla se superpone con una regla activa del mismo tipo en esta campaña. ' +
