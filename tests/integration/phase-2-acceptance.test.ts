@@ -523,7 +523,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				viewSettlements: true,
 				// SAN-78: any draw.* permission exposes the draws link.
 				viewDraws: true,
-				exportBackups: true
+				exportBackups: true,
+				// SAN-86: report.view_operational.
+				viewReports: true
 			});
 
 			const audit = await expectOneAudit(requestId, {
@@ -1194,7 +1196,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					// SAN-78: operator and treasurer hold draw.* permissions; read-only does not.
 					viewDraws: role !== 'read-only',
 					// SAN-90: only the administrator holds report.export.
-					exportBackups: false
+					exportBackups: false,
+					// SAN-86: operator, treasurer and read-only hold report.view_operational.
+					viewReports: true
 				});
 
 				await expect(

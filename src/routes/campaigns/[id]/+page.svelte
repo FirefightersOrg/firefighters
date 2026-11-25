@@ -63,6 +63,7 @@
 				resolve('/campaigns/[id]/settlements', { id: campaign.id })
 			],
 			[data.can.viewDraws, 'Sorteos', resolve('/campaigns/[id]/draws', { id: campaign.id })],
+			[data.can.viewReports, 'Reportes', resolve('/campaigns/[id]/reports', { id: campaign.id })],
 			[
 				data.can.exportBackups,
 				'Copias de seguridad',

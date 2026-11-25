@@ -148,6 +148,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		can: {
 			manage: hasPermissionIn(locals.permissions, 'collector.manage'),
 			audit: auditAllowed,
+			viewReports: hasPermissionIn(locals.permissions, 'report.view_operational'),
 			viewRules: rulesAllowed,
 			manageRules: hasPermissionIn(locals.permissions, 'commission.rule_manage')
 		},

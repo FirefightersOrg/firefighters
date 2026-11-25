@@ -151,6 +151,16 @@
 	{/snippet}
 </PageHeader>
 
+{#if data.can.viewReports}
+	<p class="mb-4 text-body-sm">
+		<a
+			href="{resolve('/campaigns/[id]/reports', { id: data.campaign.id })}?collector={data.collector
+				.id}#monthly-title"
+			class="text-primary-text underline-offset-2 hover:underline">Resumen operativo mensual →</a
+		>
+	</p>
+{/if}
+
 <nav aria-label="Secciones del registro" class="mb-6">
 	<ol class="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-body-sm">
 		{#each sections as section, i (section)}
