@@ -6,7 +6,24 @@ import { CAMPAIGN_ID, campaignRow } from '../../../../test-helpers';
 
 const COLLECTOR_ID = 'c0000000-0000-0000-0000-000000000001';
 
-const entries = [
+interface Entry {
+	id: string;
+	occurredAt: string;
+	entryType: string;
+	direction: string;
+	amount: number;
+	status: string;
+	settlementId: string | null;
+	paymentId: string | null;
+	reason: string | null;
+	annulReason?: string;
+	runningBalance: number;
+	affectsBalance?: boolean;
+	originalEntryId?: string | null;
+	hasCompensations?: boolean;
+}
+
+const entries: Entry[] = [
 	{
 		id: 'e1',
 		occurredAt: '2026-11-19T10:00:00Z',
@@ -46,13 +63,24 @@ const entries = [
 	}
 ];
 
-function page(can = { adjustCommission: false, adjustLedger: false }, list = entries) {
+function page(
+	can = { adjustCommission: false, adjustLedger: false },
+	list: Entry[] = entries,
+	compensable: { id: string; direction: string; label: string }[] = []
+) {
 	return render(Page, {
 		props: {
 			data: {
 				campaign: mapCampaignRow(campaignRow()),
 				collector: { id: COLLECTOR_ID, displayName: 'Ada Collector' },
-				entries: list,
+				entries: list.map((e) => ({
+					affectsBalance: true,
+					originalEntryId: null,
+					hasCompensations: false,
+					remaining: e.amount,
+					...e
+				})),
+				compensable,
 				balance: list.length ? list[list.length - 1].runningBalance : 0,
 				reasonMax: 1000,
 				can
@@ -114,5 +142,52 @@ describe('collector current account page', () => {
 
 	it('renders an empty state', () => {
 		expect(page(undefined, [])).toContain('Todavía no hay movimientos');
+	});
+
+	// SAN-107 / SAN-108
+	it('marks reference entries, shows what an adjustment compensates and offers compensable entries', () => {
+		const list: Entry[] = [
+			entries[0],
+			{
+				...entries[0],
+				id: 'memo',
+				entryType: 'cash_settled',
+				amount: 200,
+				affectsBalance: false,
+				runningBalance: 15
+			},
+			{ ...entries[2], hasCompensations: true },
+			{
+				...entries[2],
+				id: 'e4',
+				entryType: 'adjustment_in_favor_of_firefighters',
+				direction: 'collector_debit',
+				amount: 1,
+				reason: 'Bonus was lower',
+				originalEntryId: 'e3',
+				runningBalance: 16.5
+			}
+		];
+		const body = page({ adjustCommission: false, adjustLedger: true }, list, [
+			{
+				id: 'e3',
+				direction: 'collector_credit',
+				label: '19/11/2026 · Ajuste a favor del cobrador (queda $ 1,50)'
+			},
+			{
+				id: 'e5',
+				direction: 'collector_debit',
+				label: '20/11/2026 · Ajuste a favor de Firefighters (queda $ 2,00)'
+			}
+		]);
+		expect(body).toContain('Efectivo rendido');
+		expect(body).toContain('Referencia: no cambia el saldo.');
+		expect(body).toMatch(/Compensa: Ajuste a favor del cobrador del 19\/11\/2026/);
+		expect(body).toContain('name="originalEntryId"');
+		// The default adjustment is a credit, so only debits are offered to compensate (#130).
+		expect(body).toContain('(queda $ 2,00)');
+		expect(body).not.toContain('(queda $ 1,50)');
+		// Entries linked to a compensation are corrected with another adjustment, never annulled.
+		expect(body.match(/data-annul=/g)).toBeNull();
 	});
 });

@@ -13,7 +13,14 @@ import {
 	annulCollectorLedgerEntry,
 	listCollectorLedger
 } from '$lib/server/services/commission-ledger';
-import { LEDGER_REASON_MAX } from '$lib/domain/ledger';
+import {
+	LEDGER_ENTRY_TYPE_LABELS,
+	LEDGER_REASON_MAX,
+	ledgerUncompensated,
+	type LedgerEntryType,
+	type LedgerStatus
+} from '$lib/domain/ledger';
+import { formatDate, formatMoney } from '$lib/format';
 
 /**
  * /campaigns/[id]/collectors/[collectorId]/ledger: the Collector Current Account (SAN-69).
@@ -81,10 +88,30 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			error(403, { message: err.message });
 		error(500, { message: 'No se pudo cargar la cuenta corriente. Volver a intentar.' });
 	}
+	// SAN-108: what is left of each entry after its compensations, and the entries a manual
+	// adjustment can still compensate (recorded balance entries with something left).
+	const remaining = ledgerUncompensated(
+		entries.map((e) => ({ ...e, status: e.status as LedgerStatus }))
+	);
+	const compensated = new Set(
+		entries.flatMap((e) => (e.originalEntryId ? [e.originalEntryId] : []))
+	);
+	const compensable = entries
+		.filter((e) => e.status === 'recorded' && e.affectsBalance && (remaining.get(e.id) ?? 0) > 0)
+		.map((e) => ({
+			id: e.id,
+			direction: e.direction,
+			label: `${formatDate(e.occurredAt)} · ${LEDGER_ENTRY_TYPE_LABELS[e.entryType as LedgerEntryType] ?? e.entryType} · ${formatMoney(e.amount, { decimals: 'always' })} (queda ${formatMoney(remaining.get(e.id) ?? 0, { decimals: 'always' })})`
+		}));
 	return {
 		campaign: campaign.data,
 		collector: collector.data,
-		entries,
+		entries: entries.map((e) => ({
+			...e,
+			hasCompensations: compensated.has(e.id),
+			remaining: remaining.get(e.id) ?? 0
+		})),
+		compensable,
 		balance: entries.length ? entries[entries.length - 1].runningBalance : 0,
 		reasonMax: LEDGER_REASON_MAX,
 		can: {
@@ -140,6 +167,9 @@ export const actions: Actions = {
 		const direction = readText(data, 'direction');
 		if (direction !== 'collector_credit' && direction !== 'collector_debit')
 			errors.direction = ['Elegir crédito o débito.'];
+		const originalEntryId = readText(data, 'originalEntryId');
+		if (originalEntryId && !isUuid(originalEntryId))
+			errors.originalEntryId = ['Elegir un movimiento de la lista.'];
 		if (Object.keys(errors).length) return failure('ledger', 400, 'Revisar el ajuste.', errors);
 		try {
 			await adjustCollectorLedger(
@@ -149,7 +179,8 @@ export const actions: Actions = {
 					collectorId: params.collectorId,
 					amount,
 					direction: direction as 'collector_credit' | 'collector_debit',
-					reason
+					reason,
+					originalEntryId: originalEntryId || null
 				},
 				{ requestId: locals.requestId }
 			);

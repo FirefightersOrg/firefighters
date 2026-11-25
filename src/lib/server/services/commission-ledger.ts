@@ -51,7 +51,29 @@ const DB_MESSAGES: [RegExp, string][] = [
 		/invalid adjustment direction|invalid ledger direction/,
 		'Elegir a favor de quién es el ajuste.'
 	],
-	[/settlement must be open|settlement has no pending/, 'La rendición no admite esta operación.']
+	[/settlement must be open|settlement has no pending/, 'La rendición no admite esta operación.'],
+	// SAN-108: compensations that reference the entry they offset.
+	[
+		/compensation exceeds what is left/,
+		'El monto supera lo que queda sin compensar del movimiento elegido.'
+	],
+	[
+		/compensation must have the opposite direction/,
+		'La compensación tiene que ir en sentido contrario al movimiento elegido.'
+	],
+	[
+		/compensated entry must belong to the same campaign and collector/,
+		'El movimiento elegido no es de este cobrador en esta campaña.'
+	],
+	[/only a recorded entry can be compensated/, 'El movimiento elegido ya no se puede compensar.'],
+	[
+		/reference entry is only compensated by a reference entry/,
+		'Un movimiento de referencia no se compensa con un ajuste del saldo.'
+	],
+	[
+		/compensating or compensated entry cannot be annulled/,
+		'Este movimiento está vinculado a una compensación: corregirlo con otro ajuste.'
+	]
 ];
 function dbMessage(message: string | undefined, fallback: string) {
 	return DB_MESSAGES.find(([re]) => re.test(message ?? ''))?.[1] ?? fallback;
@@ -159,7 +181,9 @@ export const ledgerAdjustSchema = z.object({
 	collectorId: uuid,
 	amount,
 	direction: z.enum(['collector_credit', 'collector_debit']),
-	reason
+	reason,
+	/** The entry this adjustment compensates (SAN-108), if any. */
+	originalEntryId: uuid.nullish()
 });
 export const ledgerAnnulSchema = z.object({ entryId: uuid, reason });
 
@@ -202,7 +226,8 @@ export async function adjustCollectorLedger(
 		p_amount: d.amount,
 		p_direction: d.direction,
 		p_reason: d.reason,
-		p_request_id: ctx.requestId ?? null
+		p_request_id: ctx.requestId ?? null,
+		p_original_entry_id: d.originalEntryId ?? null
 	});
 }
 
@@ -232,9 +257,19 @@ export interface LedgerEntryView {
 	reason: string | null;
 	annulReason: string | null;
 	runningBalance: number;
+	/** False for reference entries (SAN-107): shown, never counted in the balance. */
+	affectsBalance: boolean;
+	/** The entry this one compensates (SAN-108). */
+	originalEntryId: string | null;
 }
 
-/** Ledger entries in order with the running balance (annulled entries add 0). */
+/** PostgREST caps a response at `max_rows` (1000), so the ledger is read in pages of this size. */
+export const LEDGER_PAGE_SIZE = 1000;
+
+/**
+ * Ledger entries in order with the running balance (annulled and reference entries add 0).
+ * Reads every page: the page uses the last row's balance, so a truncated read would be wrong.
+ */
 export async function listCollectorLedger(
 	client: SupabaseClient,
 	input: z.input<typeof collectorLedgerBalanceSchema>
@@ -244,12 +279,27 @@ export async function listCollectorLedger(
 		input,
 		'La consulta de la cuenta corriente no es válida.'
 	);
-	const rows = await rpc<Record<string, unknown>[] | null>(
-		client,
-		'collector_ledger_entries_with_balance',
-		{ p_campaign_id: d.campaignId, p_collector_id: d.collectorId }
-	);
-	return (rows ?? []).map((r) => ({
+	const rows: Record<string, unknown>[] = [];
+	for (let offset = 0; ; offset += LEDGER_PAGE_SIZE) {
+		let result: { data: Record<string, unknown>[] | null; error: RpcError | null };
+		try {
+			// The function orders its rows (and computes the running balance over all of them), so
+			// offset pages are stable and concatenate in order.
+			result = await client
+				.rpc('collector_ledger_entries_with_balance', {
+					p_campaign_id: d.campaignId,
+					p_collector_id: d.collectorId
+				})
+				.range(offset, offset + LEDGER_PAGE_SIZE - 1);
+		} catch (cause) {
+			throw new CommissionLedgerServiceError('internal', GENERIC_ERROR_MESSAGE, { cause });
+		}
+		if (result.error) throw mapError(result.error);
+		const page = result.data ?? [];
+		rows.push(...page);
+		if (page.length < LEDGER_PAGE_SIZE) break;
+	}
+	return rows.map((r) => ({
 		id: String(r.id),
 		occurredAt: String(r.occurred_at),
 		entryType: String(r.entry_type),
@@ -260,6 +310,8 @@ export async function listCollectorLedger(
 		paymentId: (r.payment_id as string | null) ?? null,
 		reason: (r.reason as string | null) ?? null,
 		annulReason: (r.annul_reason as string | null) ?? null,
-		runningBalance: Number(r.running_balance)
+		runningBalance: Number(r.running_balance),
+		affectsBalance: r.affects_balance !== false,
+		originalEntryId: (r.original_entry_id as string | null) ?? null
 	}));
 }

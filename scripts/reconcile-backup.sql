@@ -36,9 +36,9 @@ from public.settlements
 group by campaign_id, status
 order by campaign_id, status;
 
-\echo '== 4. collector balances per campaign (credits - debits, annulled entries excluded)'
+\echo '== 4. collector balances per campaign (credits - debits; annulled and reference entries excluded, SAN-107)'
 select campaign_id, collector_id, count(*) as entries,
-  coalesce(sum(case when direction = 'collector_credit' then amount else -amount end), 0)::text as balance
+  coalesce(sum(case when not affects_balance then 0 when direction = 'collector_credit' then amount else -amount end), 0)::text as balance
 from public.collector_ledger_entries
 where status <> 'annulled'
 group by campaign_id, collector_id

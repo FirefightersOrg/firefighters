@@ -129,7 +129,10 @@ Generated on demand as CSV (UTF-8 with BOM, CRLF, formula-safe text cells) at
 Correction links (SAN-114): `payments` includes `replaces_payment_id` (links an `adjusted` payment to
 its replacement), `collector-ledger` includes `corrects_sale_id` (links cross-collector
 compensation to the corrected sale) and `settlement-corrections` carries `commission_delta` and
-`cash_retained_delta`.
+`cash_retained_delta`. Since SAN-107/108, `collector-ledger` also carries `affects_balance` (false for
+the `cash_settled` / `transfer_received_by_firefighters` reference entries and their annulments, which
+never count in a balance) and `original_entry_id` (the entry a compensation offsets). A restored
+balance must add only `affects_balance = true` rows (`scripts/reconcile-backup.sql`, section 4).
 
 Rules: `report.export` is required (only the administrator holds it today) together with the view
 permission of the exported data; RLS still applies. Exports are read-only, paginated in 1000-row
