@@ -120,8 +120,11 @@ Key fields:
 number_digits
 max_number
 associated_number_offset
+associated_number_mode   -- linear (default) | circular (SAN-151)
 overflow_policy
 ```
+
+The associated number formula lives in one SQL function, `public.bond_associated_number(base, offset, max_number, mode)` (immutable), used by every bond and import write path; `src/lib/domain/numbering.ts` (`associatedNumberFor`) is its TypeScript twin for previews and the instant import validation.
 
 Expected domain function:
 

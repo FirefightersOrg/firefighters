@@ -14,6 +14,7 @@ describe('sale detail', () => {
 						numberDigits: 4,
 						maxNumber: 9999,
 						associatedNumberOffset: 4871,
+						associatedNumberMode: 'linear',
 						overflowPolicy: 'reject'
 					},
 					sale: {

@@ -52,6 +52,14 @@ associated_number = base_number + associated_number_offset
 
 For the MVP, if `associated_number > max_number`, loading is blocked.
 
+SAN-151 adds a per-campaign mode, `associated_number_mode`. `linear` is the rule above (the default). `circular` always uses 2 numbers per bond and `B = (max_number + 1) / 2` bonds (bases `0..B-1`):
+
+```txt
+associated_number = B + ((base_number + associated_number_offset) mod B)   with 0 <= offset < B
+```
+
+The associated numbers cover `B..2B-1` exactly once for any offset, so bases and associated numbers cover `0..2B-1` without collisions or gaps. Example (B = 5000, offset 4871): 0129 -> 5000, 0436 -> 5307, 0000 -> 9871, 0068 -> 9939, 0128 -> 9999. In circular mode a base number must be below B and `max_number + 1` must be even. The mode is chosen or changed only in draft and without bonds, like the other rules.
+
 ### Leading zeros
 
 Leading zeros must be preserved visually.
