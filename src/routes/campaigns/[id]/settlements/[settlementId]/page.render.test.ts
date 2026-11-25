@@ -41,7 +41,7 @@ describe('settlement workspace render', () => {
 	it('renders seven metrics and open forms', () => {
 		const body = page();
 		// Every Stat value is tabular (acceptance: amounts right-aligned and tabular).
-		expect(body.match(/text-number-lg tabular-nums/g)).toHaveLength(7);
+		expect(body.match(/text-number-lg[^"]*tabular-nums/g)).toHaveLength(7);
 		expect(body).toContain('?/add');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');

@@ -10,3 +10,6 @@
 @import '@fontsource/ibm-plex-mono/latin-500.css';
 @import '@fontsource/ibm-plex-mono/latin-ext-400.css';
 @import '@fontsource/ibm-plex-mono/latin-ext-500.css';
+/* Redesign: Plex Sans Condensed 700 only for bond numbers and lead figures (`font-figure`). */
+@import '@fontsource/ibm-plex-sans-condensed/latin-700.css';
+@import '@fontsource/ibm-plex-sans-condensed/latin-ext-700.css';
