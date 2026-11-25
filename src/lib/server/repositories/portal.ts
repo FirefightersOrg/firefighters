@@ -46,7 +46,10 @@ export interface PortalSaleSummary {
 	soldAt: string;
 }
 
-export interface PortalSaleDetail extends Omit<PortalSaleSummary, 'overdueCount' | 'nextDueDate' | 'buyerPhone'> {
+export interface PortalSaleDetail extends Omit<
+	PortalSaleSummary,
+	'overdueCount' | 'nextDueDate' | 'buyerPhone'
+> {
 	buyerPhone: string | null;
 	buyerAddress: string | null;
 }
@@ -144,7 +147,11 @@ function mapSale(row: SaleRow): PortalSaleSummary {
 
 const offsetOf = (page: number) => (Math.max(1, page) - 1) * PORTAL_PAGE_SIZE;
 
-function paged<T>(rows: { total_count?: number | string }[], items: T[], page: number): PortalPage<T> {
+function paged<T>(
+	rows: { total_count?: number | string }[],
+	items: T[],
+	page: number
+): PortalPage<T> {
 	return { items, total: Number(rows[0]?.total_count ?? 0), page, pageSize: PORTAL_PAGE_SIZE };
 }
 
@@ -280,12 +287,14 @@ export async function getMyBuyer(
 > {
 	const { data, error } = await supabase.rpc('portal_my_buyer', { p_buyer_id: buyerId });
 	if (error) return { data: null, error };
-	const row = ((data ?? []) as {
-		buyer_id: string;
-		display_name: string;
-		phone: string | null;
-		address: string | null;
-	}[])[0];
+	const row = (
+		(data ?? []) as {
+			buyer_id: string;
+			display_name: string;
+			phone: string | null;
+			address: string | null;
+		}[]
+	)[0];
 	if (!row) return { data: null, error: null };
 	const ids = await supabase.rpc('portal_my_buyer_sales', { p_buyer_id: buyerId });
 	if (ids.error) return { data: null, error: ids.error };
@@ -297,7 +306,12 @@ export async function getMyBuyer(
 	}
 	return {
 		data: {
-			buyer: { id: row.buyer_id, displayName: row.display_name, phone: row.phone, address: row.address },
+			buyer: {
+				id: row.buyer_id,
+				displayName: row.display_name,
+				phone: row.phone,
+				address: row.address
+			},
 			sales
 		},
 		error: null
