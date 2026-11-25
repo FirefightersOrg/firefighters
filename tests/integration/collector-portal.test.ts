@@ -210,8 +210,14 @@ describe('collector portal own scope (local Supabase)', () => {
 	});
 
 	it('a linked collector reaches /portal and is resolved from the session', async () => {
-		const result = (await portalLoad(portalEvent(linked)))!;
-		expect(result.collector).toMatchObject({ id: collectorA, status: 'active' });
+		// With exactly one campaign the landing goes straight to it; otherwise it lists them.
+		try {
+			const result = (await portalLoad(portalEvent(linked)))!;
+			expect(result.collector).toMatchObject({ id: collectorA, status: 'active' });
+			expect(result.campaigns.map((c: { id: string }) => c.id)).toContain(campaignId);
+		} catch (err) {
+			expect(err).toMatchObject({ status: 303, location: `/portal/${campaignId}/bonos` });
+		}
 	});
 
 	it('a collector without a link reaches /portal with an empty state and no data', async () => {

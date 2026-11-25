@@ -70,11 +70,8 @@ export async function createBond(page: Page, campaignId: string, base: number) {
 	await expect(page).toHaveURL(/\/bonds\/[0-9a-f-]{36}$/);
 }
 
-/**
- * Delivers bond `base` to `collector`, sells it (full payment) to a buyer created inline, records the
- * cash payment in a new settlement and closes it. Shared by both critical flows.
- */
-export async function deliverSellAndSettle(
+/** Delivers bond `base` to `collector` and sells it (full payment) to a buyer created inline. */
+export async function deliverAndSell(
 	page: Page,
 	campaignId: string,
 	collector: string,
@@ -105,6 +102,21 @@ export async function deliverSellAndSettle(
 	await expect(page).toHaveURL(/\/sales\/[0-9a-f-]{36}$/);
 	const saleId = page.url().split('/').pop()!;
 	await expect(page.getByText('Pago total').first()).toBeVisible();
+
+	return { noteId, saleId };
+}
+
+/**
+ * Delivers bond `base` to `collector`, sells it (full payment) to a buyer created inline, records the
+ * cash payment in a new settlement and closes it. Shared by both critical flows.
+ */
+export async function deliverSellAndSettle(
+	page: Page,
+	campaignId: string,
+	collector: string,
+	base: number
+) {
+	const { noteId, saleId } = await deliverAndSell(page, campaignId, collector, base);
 
 	// Open a settlement, add the cash payment and close it.
 	await open(page, `/campaigns/${campaignId}/settlements/new`);

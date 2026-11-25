@@ -81,12 +81,12 @@ const pageEvent = (
 	label: string,
 	body?: Record<string, string>
 ) => {
-	const path = `/portal/ventas/${saleId}`;
+	const path = `/portal/${campaignId}/ventas/${saleId}`;
 	const form = new FormData();
 	for (const [k, v] of Object.entries(body ?? {})) form.append(k, v);
 	return {
 		locals: locals(caller, label),
-		params: { saleId },
+		params: { campaignId, saleId },
 		url: new URL(`http://localhost${path}`),
 		request: new Request(`http://localhost${path}`, { method: 'POST', body: form })
 	} as never;
@@ -276,7 +276,7 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 
 	it('collector A submits: a draft that counts for nothing yet', async () => {
 		const result = await register(collectorA, saleA, formFields(installmentsA[0], '100,00'));
-		expect(result).toEqual({ redirect: `/portal/ventas/${saleA}?enviado=1` });
+		expect(result).toEqual({ redirect: `/portal/${campaignId}/ventas/${saleA}?enviado=1` });
 		includedId = await latestDraftId(saleA, 100);
 		expect(await paymentRow(includedId)).toMatchObject({
 			status: 'draft',
@@ -445,7 +445,7 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		});
 		expect(data.reserved[installmentsA[1]]).toBeUndefined();
 		const retry = await register(collectorA, saleA, formFields(installmentsA[1], '100,00'));
-		expect(retry).toEqual({ redirect: `/portal/ventas/${saleA}?enviado=1` });
+		expect(retry).toEqual({ redirect: `/portal/${campaignId}/ventas/${saleA}?enviado=1` });
 		await expect(
 			rejectCollectorPayment(
 				admin.client,
@@ -469,7 +469,7 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 
 	it('B only sees its own submissions', async () => {
 		const own = await register(collectorB, saleB, formFields(await firstInstallment(saleB), '20'));
-		expect(own).toMatchObject({ redirect: `/portal/ventas/${saleB}?enviado=1` });
+		expect(own).toMatchObject({ redirect: `/portal/${campaignId}/ventas/${saleB}?enviado=1` });
 		const data = await load(pageEvent(collectorB, saleB, 'load'));
 		expect(data.submissions).toHaveLength(1);
 		const { data: foreign } = await collectorB.client.rpc('portal_my_sale_submissions', {
