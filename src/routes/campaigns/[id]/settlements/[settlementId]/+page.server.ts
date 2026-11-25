@@ -12,8 +12,13 @@ import {
 	getSettlement,
 	getSettlementTotals,
 	listCollectorPaymentCandidates,
+	listCollectorSubmittedPayments,
 	listSettlementPayments
 } from '$lib/server/repositories/settlements';
+import {
+	attachCollectorPayment,
+	rejectCollectorPayment
+} from '$lib/server/services/collector-payments';
 import {
 	addPaymentToSettlement,
 	closeSettlement,
@@ -65,14 +70,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const canCorrectSettlement =
 		settlement.data.status === 'closed' &&
 		hasPermissionIn(locals.permissions, 'settlement.correct');
-	const [totals, payments, candidates] = await Promise.all([
+	const [totals, payments, candidates, submitted] = await Promise.all([
 		getSettlementTotals(locals.supabase, params.settlementId),
 		listSettlementPayments(locals.supabase, params.settlementId),
 		open || canCorrectPayment
 			? listCollectorPaymentCandidates(locals.supabase, params.id, settlement.data.collectorId)
+			: Promise.resolve({ data: [], error: null }),
+		open
+			? listCollectorSubmittedPayments(locals.supabase, params.id, settlement.data.collectorId)
 			: Promise.resolve({ data: [], error: null })
 	]);
-	if (totals.error || payments.error || candidates.error)
+	if (totals.error || payments.error || candidates.error || submitted.error)
 		error(500, { message: 'No se pudo cargar la rendición.' });
 	return {
 		campaign: campaign.data,
@@ -86,6 +94,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				},
 		payments: payments.data ?? [],
 		candidates: candidates.data ?? [],
+		/** Collections the collector registered from the portal, waiting to be included or rejected (SAN-147). */
+		submitted: submitted.data ?? [],
 		reasonMax: PAYMENT_ANNULMENT_REASON_MAX,
 		can: {
 			add:
@@ -93,6 +103,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				hasPermissionIn(locals.permissions, 'settlement.update_open') &&
 				hasPermissionIn(locals.permissions, 'payment.create'),
 			remove: open && hasPermissionIn(locals.permissions, 'settlement.update_open'),
+			reviewSubmitted:
+				open &&
+				hasPermissionIn(locals.permissions, 'settlement.update_open') &&
+				hasPermissionIn(locals.permissions, 'payment.create'),
 			close: open && hasPermissionIn(locals.permissions, 'settlement.close'),
 			correctPayment: canCorrectPayment,
 			correctSettlement: canCorrectSettlement
@@ -122,7 +136,91 @@ async function settlementForPaymentCorrection(
 		return fail(404, { form, values, errors: {}, message: 'Rendición no encontrada.' });
 	return null;
 }
+const reviewDenied = (locals: App.Locals) =>
+	denied(locals, 'settlement.update_open') || denied(locals, 'payment.create');
 export const actions: Actions = {
+	/** Include a collector-submitted collection in this (open) settlement. */
+	includeSubmitted: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'includeSubmitted',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
+		requireCampaignViewer(locals, url);
+		if (reviewDenied(locals))
+			return fail(403, {
+				form: 'includeSubmitted',
+				errors: {},
+				message: 'No hay permiso para esta acción.'
+			});
+		const paymentId = field(await request.formData(), 'paymentId');
+		if (!uuid.safeParse(paymentId).success)
+			return fail(400, { form: 'includeSubmitted', errors: {}, message: 'Cobro no encontrado.' });
+		const missing = await settlementForPaymentCorrection(locals, params, 'includeSubmitted', {});
+		if (missing) return missing;
+		try {
+			await attachCollectorPayment(
+				locals.supabase,
+				{ settlementId: params.settlementId, paymentId },
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'includeSubmitted',
+				success: true,
+				message: 'Cobro incluido en la rendición.',
+				errors: {}
+			};
+		} catch (e) {
+			return serviceFailure(e, 'includeSubmitted');
+		}
+	},
+	/** Reject a collector-submitted collection with a reason the collector will see. */
+	rejectSubmitted: async ({ request, locals, params, url }) => {
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, {
+				form: 'rejectSubmitted',
+				errors: {},
+				message: 'No se pudieron cargar los permisos.'
+			});
+		requireCampaignViewer(locals, url);
+		if (reviewDenied(locals))
+			return fail(403, {
+				form: 'rejectSubmitted',
+				errors: {},
+				message: 'No hay permiso para esta acción.'
+			});
+		const f = await request.formData();
+		const paymentId = field(f, 'paymentId');
+		const reason = field(f, 'reason');
+		if (!uuid.safeParse(paymentId).success)
+			return fail(400, { form: 'rejectSubmitted', errors: {}, message: 'Cobro no encontrado.' });
+		if (!reason || [...reason].length > PAYMENT_ANNULMENT_REASON_MAX)
+			return fail(400, {
+				form: 'rejectSubmitted',
+				errors: { reason: ['Ingresar un motivo del rechazo dentro del largo máximo.'] },
+				message: 'Revisar los campos marcados.'
+			});
+		const missing = await settlementForPaymentCorrection(locals, params, 'rejectSubmitted', {
+			paymentId
+		});
+		if (missing) return missing;
+		try {
+			await rejectCollectorPayment(
+				locals.supabase,
+				{ paymentId, reason },
+				{ requestId: locals.requestId, permissions: locals.permissions ?? null }
+			);
+			return {
+				form: 'rejectSubmitted',
+				success: true,
+				message: 'Cobro rechazado. El cobrador verá el motivo.',
+				errors: {}
+			};
+		} catch (e) {
+			return serviceFailure(e, 'rejectSubmitted');
+		}
+	},
 	add: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, { form: 'add', errors: {}, message: 'No se pudieron cargar los permisos.' });

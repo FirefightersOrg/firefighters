@@ -68,6 +68,16 @@
 		...(open ? [] : [{ key: 'document', header: 'Comprobante' }]),
 		...(data.can.remove || data.can.correctPayment ? [{ key: 'actions', header: 'Acciones' }] : [])
 	]);
+	type Submitted = (typeof data.submitted)[number];
+	const submittedColumns = $derived<TableColumn<Submitted>[]>([
+		{ key: 'date', header: 'Fecha' },
+		{ key: 'sale', header: 'Venta' },
+		{ key: 'installments', header: 'Cuotas' },
+		{ key: 'amount', header: 'Importe', align: 'right' },
+		{ key: 'method', header: 'Método' },
+		{ key: 'note', header: 'Nota' },
+		...(data.can.reviewSubmitted ? [{ key: 'actions', header: 'Acciones' }] : [])
+	]);
 	const reasonHint = $derived(`Hasta ${data.reasonMax} caracteres.`);
 	const ledgerPreview = $derived(
 		`Comisión: ${Number(commissionDelta) >= 0 ? 'crédito' : 'débito'} de ${money(
@@ -121,7 +131,64 @@
 				>Imprimir remito de rendición</Button
 			>
 		</Card>
-	{:else if data.can.add}
+	{/if}
+	{#if open && (data.submitted.length || data.can.reviewSubmitted)}
+		<Card title="Cobros enviados por el cobrador" flush>
+			<p class="m-0 px-4 pt-3 text-body-sm text-muted">
+				Los cobros que el cobrador registró desde su portal no cuentan en los totales hasta que los
+				incluyas en esta rendición y la cierres.
+			</p>
+			<Table
+				columns={submittedColumns}
+				rows={data.submitted}
+				caption="Cobros enviados por el cobrador"
+			>
+				{#snippet cell({ row, column })}
+					{#if column.key === 'date'}
+						{formatDate(row.date)}
+					{:else if column.key === 'sale'}
+						Bono {row.bond || '—'} · {row.buyer}
+					{:else if column.key === 'installments'}
+						{row.installments.join(', ') || '—'}
+					{:else if column.key === 'amount'}
+						<span class="tabular-nums">{money(row.amount)}</span>
+					{:else if column.key === 'method'}
+						{PAYMENT_METHOD_LABELS[row.method as PaymentMethod] ?? row.method}
+					{:else if column.key === 'note'}
+						{row.note ?? '—'}
+					{:else if column.key === 'actions'}
+						{#if data.can.reviewSubmitted}
+							<div class="space-y-2">
+								<form method="POST" action="?/includeSubmitted" use:enhance>
+									<input type="hidden" name="paymentId" value={row.id} />
+									<Button type="submit" variant="primary">Incluir en la rendición</Button>
+								</form>
+								<form
+									method="POST"
+									action="?/rejectSubmitted"
+									use:enhance
+									class="flex items-end gap-2"
+								>
+									<input type="hidden" name="paymentId" value={row.id} />
+									<TextInput
+										name="reason"
+										required
+										aria-label="Motivo del rechazo (obligatorio, hasta {data.reasonMax} caracteres)"
+										placeholder="Motivo del rechazo"
+									/>
+									<Button type="submit">Rechazar</Button>
+								</form>
+							</div>
+						{/if}
+					{/if}
+				{/snippet}
+				{#snippet empty()}
+					<EmptyState title="No hay cobros enviados por el cobrador" />
+				{/snippet}
+			</Table>
+		</Card>
+	{/if}
+	{#if open && data.can.add}
 		<Card title="Carga rápida de pagos">
 			<form method="POST" action="?/add" use:enhance class="space-y-4">
 				<Field label="Bono / comprador" id="sale" required>

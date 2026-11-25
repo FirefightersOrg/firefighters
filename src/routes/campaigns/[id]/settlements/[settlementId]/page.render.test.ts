@@ -30,6 +30,7 @@ const page = (status = 'open') =>
 					{ id: 'p', date: '2026-01-01', amount: '3.00', method: 'cash', status: 'confirmed' }
 				],
 				candidates: [],
+				submitted: [],
 				reasonMax: 2000,
 				can: { add: status === 'open', remove: status === 'open', close: status === 'open' }
 			},
@@ -82,6 +83,60 @@ describe('settlement workspace render', () => {
 	});
 });
 
+describe('collector submissions (SAN-147)', () => {
+	const row = {
+		id: 'pay-1',
+		date: '2026-11-20',
+		amount: '70.00',
+		method: 'transfer',
+		note: 'Pagó el vecino',
+		submittedAt: '2026-11-20T10:00:00Z',
+		bond: '0068',
+		buyer: 'Ada Lovelace',
+		installments: [1, 2]
+	};
+	const render_ = (can: Record<string, boolean>, submitted: unknown[]) =>
+		render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					settlement,
+					totals,
+					payments: [],
+					candidates: [],
+					submitted,
+					reasonMax: 1000,
+					can
+				},
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+	it('lists the drafts with include and reject (reason required)', () => {
+		const html = render_({ reviewSubmitted: true }, [row]);
+		expect(html).toContain('Cobros enviados por el cobrador');
+		expect(html).toContain('Bono 0068');
+		expect(html).toContain('Ada Lovelace');
+		expect(html).toContain('Pagó el vecino');
+		expect(html).toContain('action="?/includeSubmitted"');
+		expect(html).toContain('action="?/rejectSubmitted"');
+		expect(html).toContain('Incluir en la rendición');
+		expect(html).toContain('Rechazar');
+		expect(html).toContain('name="paymentId" value="pay-1"');
+		expect(html).toMatch(/name="reason"[^>]*required|required[^>]*name="reason"/);
+	});
+	it('is read-only without the settlement permissions', () => {
+		const html = render_({ reviewSubmitted: false }, [row]);
+		expect(html).toContain('Cobros enviados por el cobrador');
+		expect(html).not.toContain('?/includeSubmitted');
+		expect(html).not.toContain('?/rejectSubmitted');
+	});
+	it('is absent when there is nothing to review and no permission, and for closed settlements', () => {
+		expect(render_({ reviewSubmitted: false }, [])).not.toContain(
+			'Cobros enviados por el cobrador'
+		);
+		expect(page('closed')).not.toContain('Cobros enviados por el cobrador');
+	});
+});
 describe('settlement workspace corrections (SAN-73)', () => {
 	const closed = (can: Record<string, boolean>) =>
 		render(Page, {
@@ -94,6 +149,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 						{ id: 'p', date: '2026-01-01', amount: '3.00', method: 'cash', status: 'confirmed' }
 					],
 					candidates: [],
+					submitted: [],
 					reasonMax: 1000,
 					can: { add: false, remove: false, close: false, ...can }
 				},
@@ -156,6 +212,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 							status: 'pending'
 						}
 					],
+					submitted: [],
 					reasonMax: 1000,
 					can: { add: true, remove: false, close: false }
 				},
