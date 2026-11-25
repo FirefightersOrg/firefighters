@@ -112,7 +112,11 @@ export const actions: Actions = {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, { form, message: 'No se pudieron cargar los permisos.' });
 		requireCampaignViewer(locals, url);
-		if (!hasPermissionIn(locals.permissions, 'campaign.update_rules'))
+		// Same gate as the page (report.view_operational) plus the rules permission; SQL rechecks.
+		if (
+			!hasPermissionIn(locals.permissions, 'report.view_operational') ||
+			!hasPermissionIn(locals.permissions, 'campaign.update_rules')
+		)
 			return fail(403, { form, message: 'No hay permiso para esta acción.' });
 		const threshold = String((await request.formData()).get('threshold') ?? '').trim();
 		try {
@@ -128,10 +132,13 @@ export const actions: Actions = {
 			};
 		} catch (cause) {
 			const service = cause instanceof OverdueWarningServiceError ? cause : null;
+			const message = service?.message ?? 'No se pudo actualizar el aviso.';
+			// A validation error belongs to the field (aria-describedby); the rest goes to the alert.
 			return fail(service?.status ?? 500, {
 				form,
 				threshold,
-				message: service?.message ?? 'No se pudo actualizar el aviso.'
+				fieldError: service?.kind === 'validation' ? message : null,
+				message: service?.kind === 'validation' ? null : message
 			});
 		}
 	}

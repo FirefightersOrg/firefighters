@@ -19,6 +19,27 @@ alter table public.campaigns
   add constraint campaigns_overdue_warning_threshold_check
     check (overdue_warning_threshold between 1 and 120);
 
+-- The freeze on closed/annulled campaigns also holds for direct writes (service_role, migrations),
+-- not only through the RPC (#138 review). A separate trigger keeps campaigns_guard_write untouched.
+create function public.campaigns_guard_overdue_warning_threshold()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.overdue_warning_threshold is distinct from old.overdue_warning_threshold
+     and old.status in ('closed', 'annulled') then
+    raise exception 'the overdue warning threshold cannot change once the campaign is %', old.status
+      using errcode = 'object_not_in_prerequisite_state';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.campaigns_guard_overdue_warning_threshold()
+  from public, anon, authenticated, service_role;
+create trigger campaigns_guard_overdue_warning_threshold before update of overdue_warning_threshold
+  on public.campaigns for each row execute function public.campaigns_guard_overdue_warning_threshold();
+
 comment on column public.campaigns.overdue_warning_threshold is
   'SAN-142: reports warn about a sale with this many overdue installments or more. Informative only.';
 

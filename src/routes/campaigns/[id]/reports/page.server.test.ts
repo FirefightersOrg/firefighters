@@ -224,6 +224,9 @@ describe('overdue warning (SAN-142)', () => {
 
 	it('requires campaign.update_rules before any RPC', async () => {
 		expect((await act(null, '2')).result).toMatchObject({ status: 500 });
+		const noReport = await act(['campaign.view', 'campaign.update_rules'], '2');
+		expect(noReport.result).toMatchObject({ status: 403 });
+		expect(noReport.rpc).not.toHaveBeenCalled();
 		const denied = await act(VIEWER, '2');
 		expect(denied.result).toMatchObject({ status: 403 });
 		expect(denied.rpc).not.toHaveBeenCalled();
@@ -232,7 +235,10 @@ describe('overdue warning (SAN-142)', () => {
 	it('validates 1..120 integers, saves, and maps database refusals', async () => {
 		for (const bad of ['0', '121', '2.5', 'x', '']) {
 			const { result, rpc } = await act(EDITOR, bad);
-			expect(result).toMatchObject({ status: 400, data: { threshold: bad } });
+			expect(result).toMatchObject({
+				status: 400,
+				data: { threshold: bad, fieldError: expect.any(String), message: null }
+			});
 			expect(rpc).not.toHaveBeenCalled();
 		}
 		const ok = await act(EDITOR, ' 2 ');

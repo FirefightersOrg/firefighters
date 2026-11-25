@@ -12,7 +12,7 @@ import { CAMPAIGN_ID, campaignRow } from '../../test-helpers';
 
 const COLLECTOR_ID = 'c0000000-0000-0000-0000-000000000001';
 
-function page(overrides: Record<string, unknown> = {}) {
+function page(overrides: Record<string, unknown> = {}, form: unknown = null) {
 	const byCollector = [
 		{
 			collectorId: COLLECTOR_ID,
@@ -94,7 +94,8 @@ function page(overrides: Record<string, unknown> = {}) {
 				},
 				...overrides
 			},
-			params: { id: CAMPAIGN_ID }
+			params: { id: CAMPAIGN_ID },
+			form
 		} as never
 	}).body;
 }
@@ -171,5 +172,29 @@ describe('/campaigns/[id]/reports page', () => {
 		});
 		expect(unlinked).toContain('0068');
 		expect(unlinked).not.toContain('/sales/s1');
+	});
+
+	it('shows a threshold validation error on the field, and other errors in the alert', () => {
+		const editable = {
+			overdueWarning: { threshold: 3, canEdit: true, canViewSales: false, sales: [] }
+		};
+		const invalid = page(editable, {
+			form: 'setOverdueThreshold',
+			threshold: '0',
+			fieldError: 'Ingresar un número entre 1 y 120.',
+			message: null
+		});
+		expect(invalid).toContain('Ingresar un número entre 1 y 120.');
+		expect(invalid).toContain('id="overdue-threshold-error"');
+		expect(invalid).toMatch(/aria-describedby="[^"]*overdue-threshold-error/);
+		expect(invalid).toContain('value="0"');
+		expect(invalid).not.toContain('role="alert"');
+		const conflict = page(editable, {
+			form: 'setOverdueThreshold',
+			threshold: '4',
+			fieldError: null,
+			message: 'No se puede cambiar el aviso de una campaña cerrada o anulada.'
+		});
+		expect(conflict).toContain('role="alert"');
 	});
 });

@@ -1,7 +1,7 @@
 -- SAN-142: reports warn about active, unmarked sales with N or more overdue installments; N is set
 -- per campaign (audited, campaign.update_rules). The warning never marks anything.
 begin;
-select plan(25);
+select plan(30);
 
 insert into auth.users (id, email)
 select ('a6640000-0000-0000-0000-00000000000' || n)::uuid, 'overdue-' || n || '@example.com'
@@ -47,11 +47,13 @@ with x as (insert into public.buyers (type, first_name) values ('individual', 'O
 --   smark  collector A, 3 overdue but marked uncollectible (SAN-106) -> never listed
 --   sann   collector A, 3 overdue but the sale is annulled          -> never listed
 --   sb     collector B, 3 overdue                      -> flagged at N=3
+--   sedge  collector A, Buenos Aires rule edges: one explicit `overdue`, one `annulled` past due,
+--          one due today (not overdue yet) and one future -> 1 overdue
 do $$
 declare k text; b uuid; s uuid; pp uuid; v_first int; v_collector uuid;
 begin
-  foreach k in array array['s3', 's2', 'spaid', 'smark', 'sann', 'sb'] loop
-    v_first := case when k = 's2' then 60 else 90 end;
+  foreach k in array array['s3', 's2', 'spaid', 'smark', 'sann', 'sb', 'sedge'] loop
+    v_first := case when k = 's2' then 60 when k = 'sedge' then 60 else 90 end;
     v_collector := case when k = 'sb' then pg_temp.id('cb') else pg_temp.id('ca') end;
     insert into public.bonds (campaign_id, kind, origin, commercial_unit_count, total_value, commercial_status)
     values (pg_temp.id('campaign'), 'simple', 'printed', 1, 400, 'available') returning id into b;
@@ -60,12 +62,21 @@ begin
       'b6640000-0000-0000-0000-000000000001') returning id into s;
     insert into public.payment_plans (sale_id, installment_count, total_amount) values (s, 4, 400) returning id into pp;
     insert into public.installments (payment_plan_id, installment_number, due_date, amount)
-    select pp, n, current_date - v_first + (n - 1) * 30, 100 from generate_series(1, 4) n;
+    select pp, n, (now() at time zone 'America/Argentina/Buenos_Aires')::date - v_first + (n - 1) * 30, 100
+    from generate_series(1, 4) n;
     insert into ids values (k, s);
   end loop;
 end $$;
 update public.installments i set status = 'paid' from public.payment_plans pp
 where pp.id = i.payment_plan_id and pp.sale_id = pg_temp.id('spaid') and i.installment_number = 1;
+-- sedge: due 60 / 30 days ago, today and in 30 days. #1 explicitly overdue; #2 paid then annulled;
+-- #3 is due today (Buenos Aires), which is not overdue yet.
+update public.installments i set status = 'overdue' from public.payment_plans pp
+where pp.id = i.payment_plan_id and pp.sale_id = pg_temp.id('sedge') and i.installment_number = 1;
+update public.installments i set status = 'paid' from public.payment_plans pp
+where pp.id = i.payment_plan_id and pp.sale_id = pg_temp.id('sedge') and i.installment_number = 2;
+update public.installments i set status = 'annulled' from public.payment_plans pp
+where pp.id = i.payment_plan_id and pp.sale_id = pg_temp.id('sedge') and i.installment_number = 2;
 update public.sales set uncollectible_at = now(), uncollectible_by = 'b6640000-0000-0000-0000-000000000001',
   uncollectible_reason = 'Gone' where id = pg_temp.id('smark');
 update public.sales set status = 'annulled' where id = pg_temp.id('sann');
@@ -78,7 +89,7 @@ select pg_temp.act_as(3);
 select is(pg_temp.flagged(), 's3,sb', 'read-only sees the sales with 3+ overdue installments, not marked or annulled ones');
 select is((select row(overdue_count, overdue_amount, oldest_due_date, threshold, collector_name)::text
   from public.report_overdue_sales(pg_temp.id('campaign')) where sale_id = pg_temp.id('s3')),
-  row(3::bigint, '300.00', current_date - 90, 3, 'Collector A')::text,
+  row(3::bigint, '300.00', (now() at time zone 'America/Argentina/Buenos_Aires')::date - 90, 3, 'Collector A')::text,
   'the row carries the overdue count, amount, oldest due date, threshold and collector');
 select ok((select bond_label is not null from public.report_overdue_sales(pg_temp.id('campaign')) where sale_id = pg_temp.id('s3')),
   'the row carries a bond label');
@@ -112,9 +123,17 @@ select lives_ok($$select public.campaign_set_overdue_warning_threshold(pg_temp.i
   'the admin sets N = 2');
 select is(pg_temp.flagged(), 's2,s3,sb,spaid', 'with N = 2, sales with 2 overdue installments are listed too');
 select is((select threshold from public.report_overdue_sales(pg_temp.id('campaign')) limit 1), 2, 'rows report the current N');
+select lives_ok($$select public.campaign_set_overdue_warning_threshold(pg_temp.id('campaign'), 1)$$, 'the admin sets N = 1');
+select is((select row(overdue_count, overdue_amount, oldest_due_date)::text from public.report_overdue_sales(pg_temp.id('campaign'))
+  where sale_id = pg_temp.id('sedge')),
+  row(1::bigint, '100.00', (now() at time zone 'America/Argentina/Buenos_Aires')::date - 60)::text,
+  'an explicit overdue counts; an annulled past installment and one due today (Buenos Aires) do not');
+select is(pg_temp.flagged(), 's2,s3,sb,sedge,spaid', 'with N = 1 every sale with an overdue installment is listed');
+select lives_ok($$select public.campaign_set_overdue_warning_threshold(pg_temp.id('campaign'), 2, 'req-664b')$$, 'back to N = 2');
 reset role;
 select is((select row(actor_user_id, request_id, old_value ->> 'overdue_warning_threshold', new_value ->> 'overdue_warning_threshold', campaign_scope)::text
-  from public.audit_log where action = 'campaign.update_overdue_warning' and entity_id = pg_temp.id('campaign')::text),
+  from public.audit_log where action = 'campaign.update_overdue_warning' and entity_id = pg_temp.id('campaign')::text
+    and request_id = 'req-664'),
   row('b6640000-0000-0000-0000-000000000001'::uuid, 'req-664', '3', '2', pg_temp.id('campaign')::text)::text,
   'one audit row with the old and new N and the campaign scope');
 set local role authenticated;
@@ -122,7 +141,7 @@ select pg_temp.act_as(1);
 select lives_ok($$select public.campaign_set_overdue_warning_threshold(pg_temp.id('campaign'), 2)$$, 'setting the same N is a no-op');
 reset role;
 select is((select count(*)::int from public.audit_log where action = 'campaign.update_overdue_warning'
-  and entity_id = pg_temp.id('campaign')::text), 1, 'an unchanged N writes no audit row');
+  and entity_id = pg_temp.id('campaign')::text), 3, 'an unchanged N writes no audit row (3 -> 2 -> 1 -> 2 only)');
 
 -- 3. Informative only: nothing about the sales changed.
 select is((select count(*)::int from public.sales where campaign_id = pg_temp.id('campaign') and uncollectible_at is not null), 1,
@@ -136,7 +155,11 @@ select pg_temp.act_as(1);
 select throws_ok($$select public.campaign_set_overdue_warning_threshold(pg_temp.id('campaign'), 4)$$, '55000', null,
   'the threshold cannot change on a closed campaign');
 reset role;
-select throws_ok($$update public.campaigns set overdue_warning_threshold = 0 where id = pg_temp.id('campaign')$$, '23514', null,
+select throws_ok($$update public.campaigns set overdue_warning_threshold = 4 where id = pg_temp.id('campaign')$$, '55000', null,
+  'a direct write cannot change the threshold of a closed campaign either');
+with x as (insert into public.campaigns (name, simple_bond_value, installment_count, installment_value, barcode_mode)
+  values ('Overdue draft', 400, 4, 100, 'base_number') returning id) insert into ids select 'draft', id from x;
+select throws_ok($$update public.campaigns set overdue_warning_threshold = 0 where id = pg_temp.id('draft')$$, '23514', null,
   'the column rejects values outside 1..120');
 
 -- 5. Grants.

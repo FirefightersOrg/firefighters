@@ -30,7 +30,12 @@
 	const overdue = $derived(data.overdueWarning);
 	const thresholdForm = $derived(
 		form?.form === 'setOverdueThreshold'
-			? (form as { success?: boolean; message?: string; threshold?: string })
+			? (form as {
+					success?: boolean;
+					message?: string | null;
+					fieldError?: string | null;
+					threshold?: string;
+				})
 			: null
 	);
 	const cuotas = (n: number) => (n === 1 ? 'cuota vencida' : 'cuotas vencidas');
@@ -323,6 +328,7 @@
 					label="Avisar desde (cuotas vencidas)"
 					id="overdue-threshold"
 					hint="Entre 1 y 120. Vale para toda la campaña."
+					error={thresholdForm?.fieldError ?? undefined}
 				>
 					<TextInput
 						name="threshold"
