@@ -28,6 +28,7 @@ import { loadPermissions } from './permissions';
 import type { BondFormResult } from '$lib/server/bonds/route-helpers';
 import type { BondListItem } from '$lib/server/bonds/list';
 import { BOND_MESSAGES } from '$lib/server/services/bonds';
+import { createAdminManagedUser } from '$lib/server/services/user-admin';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -57,6 +58,8 @@ const NAME_PREFIX = `[it-p3 ${RUN_ID}]`;
 const REQUEST_PREFIX = `it-p3-${RUN_ID}-`;
 let requestSeq = 0;
 const rid = (label: string) => `${REQUEST_PREFIX}${String(++requestSeq).padStart(4, '0')}-${label}`;
+
+let unlinkedCollector: SignedInUser;
 
 type RoleName = 'admin' | 'operator' | 'treasurer' | 'collector' | 'read-only';
 
@@ -603,6 +606,18 @@ beforeAll(async () => {
 		if (!fixture) throw new Error(`resolveSeedConfig returned no ${role} fixture`);
 		users[role] = await signIn(role, fixture.email, fixture.password);
 	}
+	// A dedicated collector login that is never linked to a collector. The seeded collector fixture
+	// cannot be used for "sees nothing": other suites link it to a collector permanently.
+	const unlinkedEmail = `p3_unlinked_${RUN_ID}@firefighters.local`;
+	const unlinkedPassword = 'Phase3Unlinked123!';
+	await createAdminManagedUser(serviceClient, {
+		email: unlinkedEmail,
+		password: unlinkedPassword,
+		fullName: `P3 unlinked ${RUN_ID}`,
+		roleNames: ['collector'],
+		requestId: `it-p3-fixture-${RUN_ID}-unlinked-collector`
+	});
+	unlinkedCollector = await signIn('collector', unlinkedEmail, unlinkedPassword);
 	console.log(
 		`[integration] Phase 3 run id: ${RUN_ID} (campaign names start with "${NAME_PREFIX}")`
 	);
@@ -1630,9 +1645,23 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 				const del = await serviceClient.from(table).delete().eq(column, a.m1);
 				expect(del.error?.code, table).toBe('42501');
 			}
-			// The collector sees no bonds at all (RLS).
+			// No collector has global bond visibility (RLS). A collector with no link sees no bonds at
+			// all; the seeded collector fixture may be linked by other suites, so it only has to miss
+			// this suite's bonds, which belong to no collector.
 			for (const table of ['bonds', 'bond_numbers', 'bond_groups', 'bond_list']) {
-				const { data, error } = await users.collector.client.from(table).select('*').limit(5);
+				const { data, error } = await unlinkedCollector.client.from(table).select('*').limit(5);
+				expect(error, table).toBeNull();
+				expect(data, table).toEqual([]);
+			}
+			for (const [table, column] of [
+				['bonds', 'id'],
+				['bond_numbers', 'bond_id'],
+				['bond_list', 'id']
+			] as const) {
+				const { data, error } = await users.collector.client
+					.from(table)
+					.select('*')
+					.eq(column, a.s5000);
 				expect(error, table).toBeNull();
 				expect(data, table).toEqual([]);
 			}
