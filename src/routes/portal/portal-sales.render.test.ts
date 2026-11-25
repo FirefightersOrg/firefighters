@@ -171,10 +171,12 @@ describe('portal sales and buyers pages', () => {
 	});
 
 	it('links the portal home to the new sections only with sale.view_own', () => {
-		expect(body(HomePage, { collector, canViewSales: true })).toContain(
+		expect(body(HomePage, { collector, canViewSales: true, campaigns: [] })).toContain(
 			'href="/portal/por-cobrar"'
 		);
-		expect(body(HomePage, { collector, canViewSales: false })).not.toContain('/portal/ventas');
+		expect(body(HomePage, { collector, canViewSales: false, campaigns: [] })).not.toContain(
+			'/portal/ventas'
+		);
 	});
 
 	describe('Registrar cobro (SAN-147)', () => {
