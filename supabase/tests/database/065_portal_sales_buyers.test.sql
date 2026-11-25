@@ -1,7 +1,7 @@
 -- SAN-145: collector portal read functions (sales, installments, payments, buyers, due list).
 -- Two collectors are isolated; operator (no sale.view_own) and anon are denied; grants and definer settings are checked.
 begin;
-select plan(28);
+select plan(31);
 
 insert into auth.users(id, email)
 select ('a6610000-0000-0000-0000-00000000000' || n)::uuid, 'san145-' || n || '@example.com' from generate_series(1, 3) n;
@@ -19,7 +19,7 @@ grant execute on function pg_temp.act(int) to authenticated, anon;
 
 create temp table ids(k text primary key, id uuid not null default gen_random_uuid());
 grant select on ids to authenticated, anon;
-insert into ids(k) select unnest(array['camp', 'ca', 'cb', 'buyer_a', 'buyer_b', 'buyer_shared', 'bond_a', 'bond_a2', 'bond_b',
+insert into ids(k) select unnest(array['camp', 'ca', 'cb', 'buyer_a', 'buyer_b', 'buyer_shared', 'buyer_annulled', 'bond_a3', 'sale_a3', 'bond_a', 'bond_a2', 'bond_b',
   'sale_a', 'sale_a2', 'sale_b', 'plan_a', 'plan_a2', 'plan_b', 'i_a1', 'i_a2', 'i_a3', 'i_a21', 'i_b1', 'set_a', 'pay_a', 'pay_a_draft']);
 create function pg_temp.id(k text) returns uuid language sql stable as $$ select id from ids where ids.k = $1 $$;
 grant execute on function pg_temp.id(text) to authenticated, anon;
@@ -33,22 +33,29 @@ insert into public.collectors(id, display_name, user_profile_id, status) values
 insert into public.buyers(id, type, first_name, last_name, business_name, document_number, tax_id, phone, address, notes) values
   (pg_temp.id('buyer_a'), 'individual', 'Ana', 'Compradora', null, '30111222', '20301112224', '111', 'Calle A 1', 'secret note'),
   (pg_temp.id('buyer_b'), 'individual', 'Beto', 'Comprador', null, '30333444', null, '222', 'Calle B 2', null),
-  (pg_temp.id('buyer_shared'), 'business', null, null, 'Comercio Compartido', null, null, '333', 'Calle C 3', null);
+  (pg_temp.id('buyer_shared'), 'business', null, null, 'Comercio Compartido', null, null, '333', 'Calle C 3', null),
+  (pg_temp.id('buyer_annulled'), 'individual', 'Ines', 'Anulada', null, '30555666', null, '444', 'Calle D 4', null);
 
 insert into public.bonds(id, campaign_id, kind, origin, commercial_unit_count, total_value, commercial_status, current_collector_id) values
   (pg_temp.id('bond_a'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca')),
   (pg_temp.id('bond_a2'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca')),
-  (pg_temp.id('bond_b'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('cb'));
+  (pg_temp.id('bond_b'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('cb')),
+  (pg_temp.id('bond_a3'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca'));
 insert into public.bond_numbers(campaign_id, bond_id, number_value, number_kind) values
   (pg_temp.id('camp'), pg_temp.id('bond_a'), 11, 'base'),
   (pg_temp.id('camp'), pg_temp.id('bond_a2'), 12, 'base'),
-  (pg_temp.id('camp'), pg_temp.id('bond_b'), 13, 'base');
+  (pg_temp.id('camp'), pg_temp.id('bond_b'), 13, 'base'),
+  (pg_temp.id('camp'), pg_temp.id('bond_a3'), 14, 'base');
 
 -- A sells bond_a to buyer_a and bond_a2 to the shared buyer; B sells bond_b to the shared buyer too.
 insert into public.sales(id, campaign_id, bond_id, buyer_id, collector_id, sold_at, payment_mode, total_amount, created_by) values
   (pg_temp.id('sale_a'), pg_temp.id('camp'), pg_temp.id('bond_a'), pg_temp.id('buyer_a'), pg_temp.id('ca'), now() - interval '2 days', 'installments', 300, pg_temp.actor()),
   (pg_temp.id('sale_a2'), pg_temp.id('camp'), pg_temp.id('bond_a2'), pg_temp.id('buyer_shared'), pg_temp.id('ca'), now() - interval '1 day', 'full_payment', 100, pg_temp.actor()),
   (pg_temp.id('sale_b'), pg_temp.id('camp'), pg_temp.id('bond_b'), pg_temp.id('buyer_b'), pg_temp.id('cb'), now(), 'full_payment', 100, pg_temp.actor());
+-- A third own sale, to a buyer whose ONLY own sale ends up annulled.
+insert into public.sales(id, campaign_id, bond_id, buyer_id, collector_id, sold_at, payment_mode, total_amount, created_by)
+values (pg_temp.id('sale_a3'), pg_temp.id('camp'), pg_temp.id('bond_a3'), pg_temp.id('buyer_annulled'), pg_temp.id('ca'), now() - interval '3 days', 'full_payment', 100, pg_temp.actor());
+update public.sales set status = 'annulled' where id = pg_temp.id('sale_a3');
 insert into public.payment_plans(id, sale_id, installment_count, total_amount) values
   (pg_temp.id('plan_a'), pg_temp.id('sale_a'), 3, 300),
   (pg_temp.id('plan_a2'), pg_temp.id('sale_a2'), 1, 100),
@@ -70,9 +77,9 @@ insert into public.payment_installments(payment_id, installment_id, amount_appli
 -- 1. Collector A ---------------------------------------------------------------------------------------
 select pg_temp.act(1);
 set local role authenticated;
-select is((select count(*)::int from public.portal_my_sales()), 2, 'A lists its two sales');
-select is((select array_agg(sale_id order by sold_at desc) from public.portal_my_sales()), array[pg_temp.id('sale_a2'), pg_temp.id('sale_a')], 'newest sale first');
-select is((select total_count from public.portal_my_sales(null, 1, 0)), 2::bigint, 'total_count ignores the page size');
+select is((select count(*)::int from public.portal_my_sales()), 3, 'A lists its three sales (the annulled one included)');
+select is((select array_agg(sale_id order by sold_at desc) from public.portal_my_sales()), array[pg_temp.id('sale_a2'), pg_temp.id('sale_a'), pg_temp.id('sale_a3')], 'newest sale first');
+select is((select total_count from public.portal_my_sales(null, 1, 0)), 3::bigint, 'total_count ignores the page size');
 select is((select sale_id from public.portal_my_sales(null, 1, 1)), pg_temp.id('sale_a'), 'offset gives the second page');
 select is((select array[paid_amount, pending_amount, balance] from public.portal_my_sales() where sale_id = pg_temp.id('sale_a')),
   array[0::numeric, 40, 160], 'sale totals: pending in settlement counted apart, balance excludes paid and pending');
@@ -88,6 +95,9 @@ select is((select count(*)::int from public.portal_my_sale_payments(pg_temp.id('
 select is((select count(*)::int from public.portal_my_buyers_page()), 2, 'A has two buyers');
 select is((select count(*)::int from public.portal_my_buyer(pg_temp.id('buyer_b'))), 0, 'buyer of B is invisible to A');
 select is((select count(*)::int from public.portal_my_buyer(pg_temp.id('buyer_shared'))), 1, 'a shared buyer is visible through the own sale');
+select is((select count(*)::int from public.portal_my_buyer(pg_temp.id('buyer_annulled'))), 0, 'a buyer whose own sale is annulled is not reachable by id (same as the list)');
+select is((select count(*)::int from public.portal_my_buyers_page() where buyer_id = pg_temp.id('buyer_annulled')), 0, 'and is not in the list either');
+select is((select count(*)::int from public.portal_my_buyers_page(20, 100)) + (select count(*)::int from public.portal_my_sales(null, 20, 100)), 0, 'a page past the end is empty (no unfiltered installments scan)');
 select is((select count(*)::int from public.portal_my_buyer_sales(pg_temp.id('buyer_shared'))), 1, 'only the own sale of a shared buyer');
 select is((select array_agg(installment_number order by due_date) from public.portal_my_due_installments(7)), array[2, 1], 'due list: overdue then due within 7 days');
 select is((select count(*)::int from public.portal_my_due_installments(7) where status = 'overdue' and balance = 60), 1, 'due balance deducts the pending payment');
