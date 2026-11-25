@@ -166,7 +166,7 @@ async function newBuyer(first: string, phone: string) {
 	);
 }
 
-let nextBase = 100 + Math.floor(Math.random() * 2000) * 8;
+let nextBase = 100 + Math.floor(Math.random() * 1000) * 8;
 async function sell(
 	collectorId: string,
 	buyerId: string,

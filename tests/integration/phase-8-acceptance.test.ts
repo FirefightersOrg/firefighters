@@ -894,6 +894,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		expect(closedWorkspace.can).toEqual({
 			add: false,
 			remove: false,
+			reviewSubmitted: false,
 			close: false,
 			correctPayment: true,
 			correctSettlement: true

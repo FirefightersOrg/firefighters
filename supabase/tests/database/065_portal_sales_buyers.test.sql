@@ -117,7 +117,9 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
              'portal_my_due_installments', 'portal_own_installments', 'portal_require_sale_view_own')
              and p.prosecdef and p.proconfig @> array['search_path=""']), 10, 'all ten functions are SECURITY DEFINER with an empty search_path');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and p.proname like 'portal\_my\_%'
+           where n.nspname = 'public' and p.proname in ('portal_my_collector', 'portal_my_sales', 'portal_my_sale', 'portal_my_sale_installments',
+               'portal_my_sale_payments', 'portal_my_buyers_page', 'portal_my_buyer', 'portal_my_buyer_sales', 'portal_my_due_installments',
+               'portal_my_buyers')
              and has_function_privilege('authenticated', p.oid, 'execute')
              and not has_function_privilege('anon', p.oid, 'execute') and not has_function_privilege('service_role', p.oid, 'execute')), 10,
   'the ten portal_my functions are granted to authenticated only (portal_my_collector from SAN-143 included)');
