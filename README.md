@@ -28,6 +28,8 @@ Prefer these over calling `supabase db reset` / `supabase test db` directly. A w
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
+**UI (Cimiento design system):** build screens from the kit in `src/lib/components/ui/`, imported from `$lib/components/ui`: `PageHeader`, `Card`, `Field` with `TextInput`/`Select`/`Textarea`/`Checkbox`, `Table`, `StatusBadge`, `Alert`, `Dialog`, `Disclosure`, `Stat`, `EmptyState`, `Button`, and others. Style app code with the semantic tokens from `src/lib/styles/tokens.css` (`bg-surface`, `text-muted`, `text-danger-text`, `border-border`, …), never raw palette utilities like `bg-slate-100`. `pnpm lint` and the pre-commit hook fail on raw palette utilities outside `ui/` (`scripts/check-palette.ts`). Format money, dates and numbers with `$lib/format`, and write copy in Spanish following `docs/copy.md`. Printable documents use `src/lib/styles/print.css`. Design system: <https://claude.ai/artifact/WPs1jbtm48V6AUL7xjCqfA> (details in `docs/design-system/`).
+
 **Hosted Supabase Auth settings:** `supabase/config.toml` only configures the local stack. In the hosted project (Dashboard → Authentication), set the minimum password length to 8 to match the app's Zod schema and `minimum_password_length` in `config.toml`. Auth enforces it on password updates but not on admin user creation, which relies on the Zod check.
 
 ## 1. System objective

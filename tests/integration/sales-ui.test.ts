@@ -246,7 +246,7 @@ describe('sale screens (local Supabase)', () => {
 			expect.objectContaining({
 				id: bonds.free,
 				sellable: false,
-				reason: expect.stringContaining('deliver it first')
+				reason: expect.stringContaining('primero hay que entregarlo')
 			})
 		]);
 		// Registering it anyway is refused on the bond field, before the database.

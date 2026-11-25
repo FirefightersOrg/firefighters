@@ -3,10 +3,9 @@ import {
 	canManageCommissionRules,
 	commissionRuleTiming,
 	compareCommissionRules,
-	formatCommissionRuleType,
-	formatCommissionValue,
-	formatDay,
-	formatValidity,
+	describeCommissionRuleType,
+	describeCommissionValue,
+	describeValidity,
 	todayInArgentina,
 	calculateApplicationCommission,
 	selectCommissionRule,
@@ -49,29 +48,30 @@ describe('canManageCommissionRules', () => {
 	});
 });
 
-describe('formatting', () => {
+describe('formatting (Spanish, docs/copy.md)', () => {
 	it('formats percentages and fixed amounts in es-AR', () => {
-		expect(formatCommissionValue(rule())).toBe(`25${NBSP}%`);
-		expect(formatCommissionValue(rule({ percentage: '12.50' }))).toBe(`12,5${NBSP}%`);
-		expect(formatCommissionValue(rule({ percentage: null, fixedAmount: '1500.00' }))).toBe(
-			`$${NBSP}1.500,00`
+		expect(describeCommissionValue(rule())).toBe(`25${NBSP}%`);
+		expect(describeCommissionValue(rule({ percentage: '12.50' }))).toBe(`12,5${NBSP}%`);
+		expect(describeCommissionValue(rule({ percentage: null, fixedAmount: '1500.00' }))).toBe(
+			`$${NBSP}1.500`
 		);
-		expect(formatCommissionValue(rule({ percentage: null }))).toBe('—');
+		expect(describeCommissionValue(rule({ percentage: null, fixedAmount: '2000.50' }))).toBe(
+			`$${NBSP}2.000,50`
+		);
+		expect(describeCommissionValue(rule({ percentage: null }))).toBe('—');
 	});
 
 	it('labels the type, with the installment for custom rules', () => {
-		expect(formatCommissionRuleType(rule())).toBe('Cash (full payment)');
-		expect(formatCommissionRuleType(rule({ ruleType: 'custom', installmentNumber: 4 }))).toBe(
-			'Specific installment: #4'
+		expect(describeCommissionRuleType(rule())).toBe('Pago al contado');
+		expect(describeCommissionRuleType(rule({ ruleType: 'custom', installmentNumber: 4 }))).toBe(
+			'Cuota específica: #4'
 		);
 	});
 
-	it('formats days and validity (calendar days, no time zone shift)', () => {
-		expect(formatDay('2026-03-01')).toBe('Mar 1, 2026');
-		expect(formatDay('nope')).toBe('nope');
-		expect(formatValidity(rule({ validFrom: '2026-03-01' }))).toBe('From Mar 1, 2026');
-		expect(formatValidity(rule({ validFrom: '2026-03-01', validTo: '2026-03-31' }))).toBe(
-			'Mar 1, 2026 – Mar 31, 2026'
+	it('formats validity as calendar days, with no time zone shift', () => {
+		expect(describeValidity(rule({ validFrom: '2026-03-01' }))).toBe('Desde el 01/03/2026');
+		expect(describeValidity(rule({ validFrom: '2026-03-01', validTo: '2026-03-31' }))).toBe(
+			'01/03/2026 – 31/03/2026'
 		);
 	});
 });

@@ -11,6 +11,7 @@ import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { openSettlement, SettlementServiceError } from '$lib/server/services/settlements';
 import { SETTLEMENT_NOTES_MAX } from '$lib/domain/payments';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 const uuid = z.guid();
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
@@ -77,7 +78,7 @@ export const actions: Actions = {
 				form: 'create',
 				values,
 				errors: {},
-				message: e?.message ?? 'Algo salió mal. Volver a intentar.'
+				message: e?.message ?? GENERIC_ERROR_MESSAGE
 			});
 		}
 		redirect(303, `/campaigns/${params.id}/settlements/${id}`);
