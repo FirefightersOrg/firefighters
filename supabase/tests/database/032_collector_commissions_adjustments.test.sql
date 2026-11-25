@@ -20,6 +20,7 @@ grant execute on function pg_temp.act_as(int) to authenticated;
 select pg_temp.act_as(1);
 with x as (insert into public.campaigns(name,simple_bond_value,installment_count,installment_value,barcode_mode)
   values('SAN 69',100,2,50,'base_number') returning id) insert into ids select 'campaign',id from x;
+insert into public.user_roles(user_id,role_id) select 'b6320000-0000-0000-0000-000000000003',id from public.roles where name='collector';
 with x as (insert into public.collectors(display_name,user_profile_id) values('Ana','b6320000-0000-0000-0000-000000000003') returning id)
   insert into ids select 'collector',id from x;
 with x as (insert into public.collectors(display_name) values('Other') returning id) insert into ids select 'other',id from x;
