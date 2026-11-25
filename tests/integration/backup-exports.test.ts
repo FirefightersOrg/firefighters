@@ -86,7 +86,10 @@ beforeAll(async () => {
 	}
 });
 
-/** The frozen draw of the frozen-rosters test, reused by the winners-prizes test. */
+/**
+ * The frozen draw of the frozen-rosters test, reused by the winners-prizes test: run the file whole
+ * (the tests are sequential), not the winners-prizes test alone with `-t`.
+ */
 let frozenDrawId: string;
 
 describe('backup export route (local Supabase)', () => {

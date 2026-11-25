@@ -89,6 +89,8 @@ test('offline, any page shows the friendly offline screen and Retry is there', a
 }) => {
 	await controlledLogin(page);
 	await goOffline(browser, context, true);
+	// The sales URL uses a nonexistent campaign on purpose: offline the request never reaches the server, so
+	// any route must get the offline screen, whether or not the data exists.
 	for (const path of [
 		'/login',
 		'/campaigns',
