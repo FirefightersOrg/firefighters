@@ -44,12 +44,17 @@ Tres principios guían cada decisión:
 
 ### Color
 
-El sistema es neutro por diseño: grafito para la estructura y un único azul (`primary`) para la acción. El color de estado está reservado para estados.
+Rediseño (2026-11, aprobado en #50): papel (`bg` `#f7f7f5`) para el fondo, tinta (`text` `#1a1d21`) para el texto y marino (`primary` `#1d3557`) como único color de acción. Dos tokens de identidad se usan con cuentagotas:
+
+- `brand` (rojo autobomba `#b42318`): **solo** la marca de la institución en el `AppHeader` y la franja del talón del bono (`BondStub`). Nunca para acciones ni errores (para eso está `danger`).
+- `accent` (amarillo reflectivo `#f5c518`): subrayado del ítem de navegación activo (junto con peso 600, nunca solo color) y halo decorativo del foco. Nunca como fondo de texto ni como única señal.
+
+El color de estado está reservado para estados.
 
 - Fondo de página `bg`; todo contenido vive sobre `surface` (tarjetas, tablas, formularios).
 - Texto principal en `text`; secundario en `text-muted`; placeholders y numeración en `text-subtle`, solo sobre `surface` y `bg`.
 - `primary` para la acción principal, enlaces y selección. Un solo botón `primary` por vista; el resto `secondary` o `ghost`.
-- `primary-soft` marca lo seleccionado o activo (fila, ítem de navegación).
+- `primary-soft` marca lo seleccionado (fila, hover de navegación). El ítem activo del `AppHeader` usa el subrayado `accent` y peso 600.
 - Estados: cada uno tiene `*-soft` (fondo), `*-text` (texto sobre ese fondo) y el color base (ícono y borde). Éxito `success`, advertencia `warning`, error/destructivo `danger`, informativo `primary`, neutral `neutral-soft` + `text-muted`.
 - Ningún estado se comunica solo por color: siempre ícono y palabra («Activa», «Anulada»).
 - `border` es decorativo (divisores); los controles usan `border-strong`, que cumple 3:1.
@@ -57,16 +62,18 @@ El sistema es neutro por diseño: grafito para la estructura y un único azul (`
 
 ### Tema oscuro
 
+El rediseño todavía no cambió la paleta oscura (sigue el azul claro `#86a6ff` para `primary`); solo `focus` (amarillo), `brand` y `accent` tienen valores nuevos. Alinearla con el marino queda como seguimiento.
+
 Cada token tiene valor para `light` y `dark`. No se invierte el color a mano: siempre se usa el token. En oscuro, `primary` se aclara y su texto (`on-primary`) se oscurece; por eso nunca usar `#fff` literal sobre un color de marca. La sombra pierde fuerza en oscuro, así que `shadow-lg` suma un filete de 1px.
 
 ### Tipografía
 
-**IBM Plex Sans** para la interfaz e **IBM Plex Mono** para códigos, servida desde Google Fonts (pesos 400, 500, 600). Plex cubre todo el español (tildes, ñ, ¿¡) y tiene cifras tabulares.
+**IBM Plex Sans** para la interfaz e **IBM Plex Mono** para códigos, autoalojadas con `@fontsource` (pesos 400, 500, 600; el negrito usa 600). **IBM Plex Sans Condensed 700** (`font-figure`, tamaños `text-figure` 26 px y `text-figure-lg` 34 px) solo para cifras principales y números de bono. Plex cubre todo el español (tildes, ñ, ¿¡) y tiene cifras tabulares.
 
 - Un `heading-1` por vista. `heading-2` para secciones y diálogos, `heading-3` para tarjetas.
 - Cuerpo en `body` (15/24). Campos en `input` (16px: evita el zoom automático en iOS).
 - Etiquetas, botones y encabezados de tabla en `label`. Ayudas y errores en `body-sm`.
-- Cifras: `font-variant-numeric: tabular-nums` en tablas, totales y contadores; `number-lg` para KPIs.
+- Cifras: `font-variant-numeric: tabular-nums` en tablas, totales y contadores; `number-lg` para KPIs (con `font-figure`); el monto principal de una vista en `text-figure-lg`.
 - Códigos de barras, números de serie e identificadores en `code`.
 - Ancho de párrafo máximo `prose-max` (68 caracteres).
 
@@ -84,14 +91,14 @@ Controles de `control-md` (40px) por defecto, `control-sm` en barras de herramie
 
 ### Estados de interacción
 
-| Estado        | Tratamiento                                                                                                                  |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Hover         | Fondo `surface-hover` (filas, ghost) o `*-hover` (botones con relleno).                                                      |
-| Foco          | Anillo `focus` sólido de 2px con 2px de separación, solo con teclado (`:focus-visible`). Nunca quitar el foco sin reemplazo. |
-| Deshabilitado | Fondo `surface-sunken`, texto `text-disabled`, cursor `not-allowed`. Preferir explicar por qué antes que deshabilitar.       |
-| Cargando      | Spinner dentro del botón, el ancho no cambia, `aria-busy`.                                                                   |
-| Inválido      | Borde `danger` + mensaje en `danger-text` debajo del campo, enlazado con `aria-describedby`.                                 |
-| Solo lectura  | Fondo `surface-sunken`, texto `text`, sin borde fuerte. Se puede seleccionar y copiar.                                       |
+| Estado        | Tratamiento                                                                                                                                                                                                                                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hover         | Fondo `surface-hover` (filas, ghost) o `*-hover` (botones con relleno).                                                                                                                                                                                                                                                                                 |
+| Foco          | `outline` de 2px con 2px de separación, solo con teclado (`:focus-visible`): marino en claro (12,4:1) y amarillo en oscuro (11,7:1). En claro se suma un halo `accent` de 6px, decorativo: el contraste lo garantiza el `outline`, que ningún componente pisa (las sombras propias de un control sí tapan el halo). Nunca quitar el foco sin reemplazo. |
+| Deshabilitado | Fondo `surface-sunken`, texto `text-disabled`, cursor `not-allowed`. Preferir explicar por qué antes que deshabilitar.                                                                                                                                                                                                                                  |
+| Cargando      | Spinner dentro del botón, el ancho no cambia, `aria-busy`.                                                                                                                                                                                                                                                                                              |
+| Inválido      | Borde `danger` + mensaje en `danger-text` debajo del campo, enlazado con `aria-describedby`.                                                                                                                                                                                                                                                            |
+| Solo lectura  | Fondo `surface-sunken`, texto `text`, sin borde fuerte. Se puede seleccionar y copiar.                                                                                                                                                                                                                                                                  |
 
 ### Movimiento
 
@@ -119,7 +126,7 @@ Transiciones de 120 ms (hover, color) y 200 ms (diálogos, avisos), curva `cubic
 
 ## Marca
 
-Cimiento no tiene logotipo: el nombre del producto se compone en `heading-3` con IBM Plex Sans 600 dentro del `AppHeader`. Cada producto que adopte el sistema reemplaza ese texto por su propia marca y puede cambiar el tono de `primary`/`primary-hover`/`primary-soft`/`primary-text`/`focus` manteniendo los contrastes.
+La marca es una barra vertical `brand` (10 × 28 px, decorativa, `aria-hidden`) delante del nombre del producto, que se compone en `heading-3` con IBM Plex Sans 600 dentro del `AppHeader`. El único otro uso del rojo `brand` es el talón del bono ganador (`BondStub`). Cada producto que adopte el sistema puede cambiar `brand`, `accent` y el tono de `primary`/`primary-hover`/`primary-soft`/`primary-text`/`focus` manteniendo los contrastes.
 
 ## Accesibilidad (mínimos)
 

@@ -35,9 +35,9 @@
 	let menuOpen = $state(false);
 	const menuId = $props.id();
 
-	// Redesign: the current section is marked by a reflective-yellow underline, not a tinted pill.
+	// Redesign: the current section is marked by a reflective-yellow underline plus weight (not colour alone).
 	const linkClass =
-		'inline-flex min-h-touch items-center rounded-md border-b-[3px] border-transparent px-3 text-label text-muted hover:bg-surface-hover hover:text-text aria-[current=page]:border-accent aria-[current=page]:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
+		'inline-flex min-h-touch items-center rounded-md border-b-[3px] border-transparent px-3 text-label text-muted hover:bg-surface-hover hover:text-text aria-[current=page]:border-accent aria-[current=page]:font-semibold aria-[current=page]:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs are resolved by the caller -->
