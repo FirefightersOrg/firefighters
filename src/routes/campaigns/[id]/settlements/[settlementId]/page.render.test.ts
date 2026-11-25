@@ -57,8 +57,13 @@ describe('settlement workspace render', () => {
 		expect(body).not.toContain('?/close');
 	});
 	it('labels the commission as generated only once the settlement closed', () => {
-		for (const status of ['open', 'annulled'])
-			expect(page(status)).toContain('Comisión preliminar');
+		expect(page('open')).toContain('Comisión preliminar');
+		// An annulled settlement shows no commission at all, and says it is annulled.
+		const annulled = page('annulled');
+		expect(annulled).toContain('Rendición anulada');
+		expect(annulled).toContain('Total registrado');
+		expect(annulled).not.toContain('Comisión');
+		expect(annulled).not.toContain('Neto para Bomberos');
 		for (const status of ['closed', 'corrected']) {
 			expect(page(status)).toContain('Comisión generada');
 			expect(page(status)).not.toContain('Comisión preliminar');
@@ -276,8 +281,10 @@ describe('settlement workspace corrections (SAN-73)', () => {
 		expect(body).toContain('Transferencias (1 pago)');
 		expect(body).toContain('Neto para Bomberos');
 		expect(body).toMatch(/148\.500,00/);
-		// Cash handed over = cash collected − commission kept from it, in cents: 115000 − 11500.
-		expect(body).toMatch(/Se entregan \$[\s\u00a0]103\.500,00 en efectivo/);
+		// No figure is computed on the client: every amount comes from the stored totals.
+		expect(body).not.toContain('Se entregan');
+		expect(body).toContain('<span class="sr-only">menos</span>');
+		expect(body).not.toContain('corrección registrada');
 		expect(body).toContain('Saldo a favor del cobrador');
 		expect(body).toContain('Ana, cerrada el');
 		expect(body).not.toContain('/collectors/col-1/ledger');
@@ -288,5 +295,10 @@ describe('settlement workspace corrections (SAN-73)', () => {
 		expect(allowed).toContain('?/correctSettlement');
 		// The open-workspace metric grid is not shown on the sheet.
 		expect(allowed).not.toContain('Comisión retenida ahora');
+	});
+
+	it('says when a closed settlement was corrected', () => {
+		expect(page('corrected')).toContain('Esta rendición tiene una corrección registrada.');
+		expect(page('closed')).not.toContain('corrección registrada');
 	});
 });

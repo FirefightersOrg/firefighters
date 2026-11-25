@@ -19,7 +19,7 @@
 	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
-	import { centsToDecimalString, parseMoneyToCents } from '$lib/domain/money';
+	import { parseMoneyToCents } from '$lib/domain/money';
 	import {
 		PAYMENT_METHOD_LABELS,
 		type PaymentMethod,
@@ -44,21 +44,30 @@
 		{ value: 'transfer', label: PAYMENT_METHOD_LABELS.transfer }
 	];
 	const money = (value: string | number) => formatMoney(value, { decimals: 'always' });
-	const metrics = $derived([
-		{ label: 'Total en efectivo', value: data.totals.totalCash },
-		{ label: 'Total en transferencias', value: data.totals.totalTransfer },
-		{ label: 'Total general', value: data.totals.totalAmount },
-		{
-			// Closed (or closed and later corrected) settlements generated their commission.
-			label: ['closed', 'corrected'].includes(data.settlement.status)
-				? 'Comisión generada'
-				: 'Comisión preliminar',
-			value: data.totals.commissionAmount
-		},
-		{ label: 'Comisión retenida ahora', value: data.totals.commissionPaidAmount },
-		{ label: 'Neto para Bomberos', value: data.totals.netToFirefighters },
-		{ label: 'Saldo a favor del cobrador', value: data.totals.collectorCreditBalance }
-	]);
+	const annulled = $derived(data.settlement.status === 'annulled');
+	const metrics = $derived(
+		annulled
+			? [
+					{ label: 'Efectivo registrado', value: data.totals.totalCash },
+					{ label: 'Transferencias registradas', value: data.totals.totalTransfer },
+					{ label: 'Total registrado', value: data.totals.totalAmount }
+				]
+			: [
+					{ label: 'Total en efectivo', value: data.totals.totalCash },
+					{ label: 'Total en transferencias', value: data.totals.totalTransfer },
+					{ label: 'Total general', value: data.totals.totalAmount },
+					{
+						// Closed (or closed and later corrected) settlements generated their commission.
+						label: ['closed', 'corrected'].includes(data.settlement.status)
+							? 'Comisión generada'
+							: 'Comisión preliminar',
+						value: data.totals.commissionAmount
+					},
+					{ label: 'Comisión retenida ahora', value: data.totals.commissionPaidAmount },
+					{ label: 'Neto para Bomberos', value: data.totals.netToFirefighters },
+					{ label: 'Saldo a favor del cobrador', value: data.totals.collectorCreditBalance }
+				]
+	);
 	const open = $derived(data.settlement.status === 'open');
 	/** Closed (or closed and corrected) settlements read as a cash sheet (redesign). */
 	const sheet = $derived(['closed', 'corrected'].includes(data.settlement.status));
@@ -66,10 +75,6 @@
 	const confirmedCount = (method: PaymentMethod) =>
 		data.payments.filter((p) => p.method === method && p.status === 'confirmed').length;
 	const pagos = (n: number) => (n === 1 ? '1 pago' : `${n} pagos`);
-	/** Cash that changes hands: cash collected minus the commission the collector kept from it. */
-	const cashToHandOver = $derived(
-		centsToDecimalString(cents(data.totals.totalCash) - cents(data.totals.commissionPaidAmount))
-	);
 	const meta = $derived(
 		sheet && data.settlement.closedAt
 			? `${data.settlement.collectorName}, cerrada el ${formatDateTime(data.settlement.closedAt)}`
@@ -177,7 +182,10 @@
 				</div>
 				<div class="flex justify-between gap-3 py-2.5 text-muted">
 					<dt>Comisión que el cobrador se quedó del efectivo</dt>
-					<dd class="m-0 whitespace-nowrap">− {money(data.totals.commissionPaidAmount)}</dd>
+					<dd class="m-0 whitespace-nowrap">
+						<span aria-hidden="true">−</span><span class="sr-only">menos</span>
+						{money(data.totals.commissionPaidAmount)}
+					</dd>
 				</div>
 				<div
 					class="mt-1 flex items-baseline justify-between gap-3 border-t-[3px] border-double border-text pt-3.5"
@@ -188,9 +196,6 @@
 					</dd>
 				</div>
 			</dl>
-			<p class="m-0 mt-1 text-body-sm text-muted">
-				Se entregan {money(cashToHandOver)} en efectivo; las transferencias ya las recibió Bomberos.
-			</p>
 			<dl class="m-0 mt-3 grid gap-1 text-body-sm text-muted tabular-nums">
 				<div class="flex justify-between gap-3">
 					<dt>Comisión generada</dt>
@@ -203,6 +208,12 @@
 					</div>
 				{/if}
 			</dl>
+			{#if data.settlement.status === 'corrected'}
+				<p class="m-0 mt-3 text-body-sm text-warning-text">
+					Esta rendición tiene una corrección registrada. Los totales de arriba son los del cierre;
+					la corrección y sus movimientos están en la cuenta corriente del cobrador.
+				</p>
+			{/if}
 			<div class="mt-4 flex flex-wrap gap-2">
 				<Button
 					variant="primary"
@@ -231,6 +242,12 @@
 			{/if}
 		</section>
 	{:else}
+		{#if annulled}
+			<Alert tone="warning" title="Rendición anulada">
+				Sus pagos, su comisión y sus movimientos no cuentan. Se muestran solo los importes que se
+				habían registrado.
+			</Alert>
+		{/if}
 		<section aria-label="Totales" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 			{#each metrics as item (item.label)}
 				<Stat label={item.label} value={money(item.value)} />
