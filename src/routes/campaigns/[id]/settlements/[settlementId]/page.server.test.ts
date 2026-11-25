@@ -5,13 +5,19 @@ vi.mock('$lib/server/repositories/settlements', () => ({
 	getSettlement: vi.fn(),
 	getSettlementTotals: vi.fn(),
 	listSettlementPayments: vi.fn(),
-	listCollectorPaymentCandidates: vi.fn()
+	listCollectorPaymentCandidates: vi.fn(),
+	listCollectorSubmittedPayments: vi.fn()
 }));
 vi.mock('$lib/server/services/settlements', async (o) => ({
 	...(await o<any>()),
 	addPaymentToSettlement: vi.fn(),
 	removePaymentFromSettlement: vi.fn(),
 	closeSettlement: vi.fn()
+}));
+vi.mock('$lib/server/services/collector-payments', async (o) => ({
+	...(await o<any>()),
+	attachCollectorPayment: vi.fn(),
+	rejectCollectorPayment: vi.fn()
 }));
 vi.mock('$lib/server/services/payment-corrections', async (o) => ({
 	...(await o<any>()),
@@ -29,6 +35,7 @@ import {
 	getSettlement,
 	getSettlementTotals,
 	listCollectorPaymentCandidates,
+	listCollectorSubmittedPayments,
 	listSettlementPayments
 } from '$lib/server/repositories/settlements';
 import {
@@ -37,6 +44,10 @@ import {
 	removePaymentFromSettlement,
 	SettlementServiceError
 } from '$lib/server/services/settlements';
+import {
+	attachCollectorPayment,
+	rejectCollectorPayment
+} from '$lib/server/services/collector-payments';
 import {
 	annulPayment,
 	annulPaymentSchema,
@@ -90,6 +101,7 @@ beforeEach(() => {
 	vi.mocked(getSettlement).mockResolvedValue({ data: settlement(), error: null } as never);
 	vi.mocked(getSettlementTotals).mockResolvedValue({ data: totals, error: null } as never);
 	vi.mocked(listSettlementPayments).mockResolvedValue({ data: [], error: null } as never);
+	vi.mocked(listCollectorSubmittedPayments).mockResolvedValue({ data: [], error: null } as never);
 	vi.mocked(listCollectorPaymentCandidates).mockResolvedValue({
 		data: [{ id: INSTALLMENT, saleId: SALE, amount: '10.00' }],
 		error: null
@@ -394,5 +406,88 @@ describe('settlement workspace', () => {
 				paymentMethod: 'cash'
 			})
 		).toMatchObject({ status: 409 });
+	});
+});
+
+describe('collector submissions (SAN-147)', () => {
+	const PAYMENT = 'e0000000-0000-0000-0000-000000000001';
+	const VIEWER = ['campaign.view'];
+	const REVIEW = [...VIEWER, 'settlement.update_open', 'payment.create'];
+	beforeEach(() => {
+		vi.mocked(attachCollectorPayment).mockReset();
+		vi.mocked(rejectCollectorPayment).mockReset();
+	});
+	it('loads the drafts only while the settlement is open and flags who can review', async () => {
+		vi.mocked(listCollectorSubmittedPayments).mockResolvedValue({
+			data: [{ id: PAYMENT }],
+			error: null
+		} as never);
+		const data = (await load({
+			locals: makeLocals({ permissions: ['settlement.view', ...REVIEW] }),
+			params: { id: CAMPAIGN_ID, settlementId: SETTLEMENT },
+			url: new URL(url)
+		} as never)) as any;
+		expect(data.submitted).toEqual([{ id: PAYMENT }]);
+		expect(data.can.reviewSubmitted).toBe(true);
+		expect(vi.mocked(listCollectorSubmittedPayments)).toHaveBeenCalledWith(
+			expect.anything(),
+			CAMPAIGN_ID,
+			'c'
+		);
+	});
+	it('includes a draft in this settlement', async () => {
+		vi.mocked(attachCollectorPayment).mockResolvedValue(undefined as never);
+		const result = (await run('includeSubmitted', REVIEW, { paymentId: PAYMENT })) as any;
+		expect(result.success).toBe(true);
+		expect(vi.mocked(attachCollectorPayment)).toHaveBeenCalledWith(
+			expect.anything(),
+			{ settlementId: SETTLEMENT, paymentId: PAYMENT },
+			expect.objectContaining({ permissions: REVIEW })
+		);
+	});
+	it('requires both settlement.update_open and payment.create', async () => {
+		for (const permissions of [
+			[...VIEWER, 'settlement.update_open'],
+			[...VIEWER, 'payment.create'],
+			[...VIEWER, 'settlement.view']
+		]) {
+			expect(
+				(await run('includeSubmitted', permissions, { paymentId: PAYMENT })) as any
+			).toMatchObject({ status: 403 });
+			expect(
+				(await run('rejectSubmitted', permissions, { paymentId: PAYMENT, reason: 'x' })) as any
+			).toMatchObject({ status: 403 });
+		}
+		expect(attachCollectorPayment).not.toHaveBeenCalled();
+		expect(rejectCollectorPayment).not.toHaveBeenCalled();
+	});
+	it('rejects with a mandatory reason, shown back to the operator when missing', async () => {
+		const missing = (await run('rejectSubmitted', REVIEW, {
+			paymentId: PAYMENT,
+			reason: '  '
+		})) as any;
+		expect(missing.status).toBe(400);
+		expect(missing.data.errors.reason).toBeTruthy();
+		expect(rejectCollectorPayment).not.toHaveBeenCalled();
+		vi.mocked(rejectCollectorPayment).mockResolvedValue(undefined as never);
+		const ok = (await run('rejectSubmitted', REVIEW, {
+			paymentId: PAYMENT,
+			reason: 'No llegó'
+		})) as any;
+		expect(ok.success).toBe(true);
+		expect(vi.mocked(rejectCollectorPayment)).toHaveBeenCalledWith(
+			expect.anything(),
+			{ paymentId: PAYMENT, reason: 'No llegó' },
+			expect.anything()
+		);
+	});
+	it('maps service failures without leaking internals', async () => {
+		vi.mocked(attachCollectorPayment).mockRejectedValue(
+			new SettlementServiceError('conflict', 'La rendición ya no está abierta.')
+		);
+		expect((await run('includeSubmitted', REVIEW, { paymentId: PAYMENT })) as any).toMatchObject({
+			status: 409,
+			data: { message: 'La rendición ya no está abierta.' }
+		});
 	});
 });

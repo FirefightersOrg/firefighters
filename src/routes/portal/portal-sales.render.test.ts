@@ -100,7 +100,14 @@ describe('portal sales and buyers pages', () => {
 					method: 'cash',
 					status: 'pending_in_settlement'
 				}
-			]
+			],
+			submissions: [],
+			reserved: {},
+			canRegister: false,
+			today: '2026-11-25',
+			noteMax: 500,
+			requestKey: 'k',
+			submitted: false
 		});
 		expect(html).toContain('Vencida');
 		expect(html).toContain('Pagada por adelantado');
@@ -168,5 +175,117 @@ describe('portal sales and buyers pages', () => {
 			'href="/portal/por-cobrar"'
 		);
 		expect(body(HomePage, { collector, canViewSales: false })).not.toContain('/portal/ventas');
+	});
+
+	describe('Registrar cobro (SAN-147)', () => {
+		const installments = [
+			{
+				id: 'i1',
+				number: 1,
+				dueDate: '2026-11-10',
+				amount: '100.00',
+				status: 'overdue',
+				confirmedAmount: '0.00',
+				pendingAmount: '0.00',
+				balance: '100.00'
+			},
+			{
+				id: 'i2',
+				number: 2,
+				dueDate: '2026-12-10',
+				amount: '100.00',
+				status: 'paid',
+				confirmedAmount: '100.00',
+				pendingAmount: '0.00',
+				balance: '0.00'
+			}
+		];
+		const base = {
+			collector,
+			sale,
+			installments,
+			payments: [],
+			submissions: [],
+			reserved: { i1: '30.00' },
+			canRegister: true,
+			today: '2026-11-25',
+			noteMax: 500,
+			requestKey: 'req-key',
+			submitted: false
+		};
+
+		it('offers the action only on collectable installments, with the balance minus drafts as maximum', () => {
+			const html = body(SalePage, base);
+			expect(html).toContain('Registrar cobro');
+			expect(html).toContain('action="?/registrar"');
+			expect(html).toContain('name="installmentId" value="i1"');
+			expect(html).not.toContain('value="i2"');
+			expect(html).toContain('name="requestKey" value="req-key"');
+			expect(html).toContain('value="70.00"');
+			expect(html).toContain('max="2026-11-25"');
+			expect(html).toContain('Efectivo');
+			expect(html).toContain('Transferencia');
+			expect(html).toContain('Este cobro queda pendiente de rendición');
+			// The collector is never a form field.
+			expect(html).not.toContain('name="collectorId"');
+		});
+
+		it('hides the action without payment.create_own or on an inactive sale', () => {
+			const html = body(SalePage, { ...base, canRegister: false });
+			expect(html).not.toContain('Registrar cobro');
+			expect(html).not.toContain('<form');
+			expect(html).not.toContain('Acciones');
+		});
+
+		it('lists sent collections: pending, confirmed and rejected with the reason', () => {
+			const html = body(SalePage, {
+				...base,
+				submissions: [
+					{
+						id: 'a',
+						paymentDate: '2026-11-20',
+						amount: '30.00',
+						method: 'cash',
+						status: 'draft',
+						rejectionReason: null,
+						note: 'En mano',
+						createdAt: '2026-11-20T10:00:00Z',
+						installmentNumbers: [1]
+					},
+					{
+						id: 'b',
+						paymentDate: '2026-11-19',
+						amount: '20.00',
+						method: 'transfer',
+						status: 'confirmed',
+						rejectionReason: null,
+						note: null,
+						createdAt: '2026-11-19T10:00:00Z',
+						installmentNumbers: [1]
+					},
+					{
+						id: 'c',
+						paymentDate: '2026-11-18',
+						amount: '10.00',
+						method: 'cash',
+						status: 'annulled',
+						rejectionReason: 'No llegó el dinero',
+						note: null,
+						createdAt: '2026-11-18T10:00:00Z',
+						installmentNumbers: [1]
+					}
+				]
+			});
+			expect(html).toContain('Cobros enviados');
+			expect(html).toContain('Pendiente de rendición');
+			expect(html).toContain('Confirmado');
+			expect(html).toContain('Rechazado');
+			expect(html).toContain('Motivo: No llegó el dinero');
+			expect(html).toContain('Nota: En mano');
+		});
+
+		it('shows the confirmation after sending', () => {
+			expect(body(SalePage, { ...base, submitted: true })).toContain('Cobro enviado');
+		});
 	});
 });

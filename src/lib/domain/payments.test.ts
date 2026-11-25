@@ -19,7 +19,7 @@ describe('payments domain', () => {
 		expect(Object.keys(PAYMENT_METHOD_LABELS)).toEqual([...PAYMENT_METHODS]);
 		expect(Object.keys(PAYMENT_STATUS_LABELS)).toEqual([...PAYMENT_STATUSES]);
 		expect(PAYMENT_TRANSITIONS).toEqual({
-			draft: ['pending_in_settlement'],
+			draft: ['pending_in_settlement', 'annulled'],
 			pending_in_settlement: ['confirmed', 'annulled'],
 			confirmed: ['annulled', 'adjusted'],
 			annulled: [],

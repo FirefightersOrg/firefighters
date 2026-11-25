@@ -64,6 +64,22 @@
 	]}
 />
 
+{#snippet registerAction(installment: (typeof data.installments)[number])}
+	{#if ['pending', 'overdue'].includes(installment.status) && Number(availableFor(installment)) > 0}
+		<RegisterPaymentForm
+			installmentId={installment.id}
+			installmentNumber={installment.number}
+			available={availableFor(installment)}
+			today={data.today}
+			noteMax={data.noteMax}
+			requestKey={data.requestKey}
+			result={form?.form === 'registrar' && form.installmentId === installment.id ? form : null}
+		/>
+	{:else}
+		—
+	{/if}
+{/snippet}
+
 <div class="space-y-6">
 	{#if data.submitted && !form?.message}
 		<Alert tone="success" title="Cobro enviado">
@@ -114,25 +130,10 @@
 	</Card>
 
 	<Card title="Cuotas" flush>
-		<InstallmentsTable installments={data.installments}>
-			{#snippet actions(installment)}
-				{#if data.canRegister && ['pending', 'overdue'].includes(installment.status) && Number(availableFor(installment)) > 0}
-					<RegisterPaymentForm
-						installmentId={installment.id}
-						installmentNumber={installment.number}
-						available={availableFor(installment)}
-						today={data.today}
-						noteMax={data.noteMax}
-						requestKey={data.requestKey}
-						result={form?.form === 'registrar' && form.installmentId === installment.id
-							? form
-							: null}
-					/>
-				{:else}
-					—
-				{/if}
-			{/snippet}
-		</InstallmentsTable>
+		<InstallmentsTable
+			installments={data.installments}
+			actions={data.canRegister ? registerAction : undefined}
+		/>
 	</Card>
 
 	{#if data.submissions.length}
