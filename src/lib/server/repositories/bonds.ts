@@ -13,6 +13,7 @@ import {
 } from '$lib/domain/bonds';
 import { toDecimalString } from '$lib/domain/money';
 import type { RepositoryResult } from './campaigns';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
 /**
  * Read access to `public.bonds`, `public.bond_numbers` and `public.bond_groups` under the
@@ -67,8 +68,8 @@ export const BOND_GROUP_COLUMNS = [
 	'reason'
 ].join(', ');
 
-/** PostgREST's default page size (supabase/config.toml `max_rows`). */
-export const BOND_NUMBERS_PAGE_SIZE = 1000;
+/** PostgREST `max_rows`, see `$lib/postgrest`. */
+export const BOND_NUMBERS_PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 export interface BondRow {
 	id: string;

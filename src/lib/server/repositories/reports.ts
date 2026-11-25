@@ -14,6 +14,7 @@ import type {
 } from '$lib/domain/reports';
 import { DEFAULT_OVERDUE_WARNING_THRESHOLD, monthStart } from '$lib/domain/reports';
 import type { RepositoryResult } from './campaigns';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
 type Raw = Record<string, unknown>;
 const num = (v: unknown) => Number(v ?? 0);
@@ -132,7 +133,7 @@ export async function getCollectorMonthly(
 }
 
 /** Rows per call of the paged `report_overdue_sales` (PostgREST caps a response at 1000). */
-export const OVERDUE_PAGE_SIZE = 1000;
+export const OVERDUE_PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 /** SAN-142: sales with N or more overdue installments (informative; it marks nothing). */
 export async function getOverdueSales(

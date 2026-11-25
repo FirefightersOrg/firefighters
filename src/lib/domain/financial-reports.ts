@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { isValidDate } from './reports';
 import { formatMoney, parseMoneyToCents, centsToDecimalString } from './money';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
 export const PAYMENT_METHODS = ['cash', 'transfer'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -30,8 +31,8 @@ export type RosterEligibilityFilter = (typeof ROSTER_ELIGIBILITY_FILTERS)[number
 
 /** Rows of the roster the page shows (the full roster goes to the export). */
 export const ROSTER_PAGE_LIMIT = 500;
-/** Must not exceed PostgREST `max_rows` (1000 in supabase/config.toml). */
-export const REPORT_PAGE_SIZE = 1000;
+/** PostgREST `max_rows`, see `$lib/postgrest`. */
+export const REPORT_PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 export interface FinancialFilters {
 	collectorId: string | null;

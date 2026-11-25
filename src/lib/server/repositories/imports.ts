@@ -13,13 +13,14 @@ import {
 import type { BondKind } from '$lib/domain/bonds';
 import type { RepositoryResult } from './campaigns';
 import { listBondNumbersByCampaign } from './bonds';
+import { POSTGREST_MAX_ROWS } from '$lib/postgrest';
 
 /**
  * Read access to `public.import_sessions` / `public.import_session_items` under the caller's RLS
  * (`bond.import` or `bond.scan`). Writes go through the audited `import_session_*` SQL functions
  * (services/imports.ts).
  */
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = POSTGREST_MAX_ROWS;
 
 export const IMPORT_SESSION_COLUMNS = [
 	'id',
