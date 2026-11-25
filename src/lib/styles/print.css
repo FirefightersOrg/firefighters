@@ -8,12 +8,12 @@
 	color-scheme: light;
 	--bg: #ffffff;
 	--surface: #ffffff;
-	--text: #15181d;
-	--text-muted: #4c5462;
-	--border: #dde1e7;
-	--border-strong: #868e9a;
-	--primary: #2350c4;
-	--primary-hover: #1b3f9e;
+	--text: #1a1d21;
+	--text-muted: #4a5059;
+	--border: #e1e2df;
+	--border-strong: #8a8d87;
+	--primary: #1d3557;
+	--primary-hover: #16294a;
 	--on-primary: #ffffff;
 	--danger: #c22e1c;
 	--danger-text: #a12617;
