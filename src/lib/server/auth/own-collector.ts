@@ -37,7 +37,7 @@ export async function requireOwnCollector(
 			requestId: locals.requestId,
 			error: rpcError
 		});
-		error(500, { message: 'No se pudo cargar tu cuenta de cobrador. Volver a intentar.' });
+		error(500, { message: 'No se pudo cargar la cuenta de cobrador. Volver a intentar.' });
 	}
 
 	const row = (data as { id: string; display_name: string; status: string }[] | null)?.[0];

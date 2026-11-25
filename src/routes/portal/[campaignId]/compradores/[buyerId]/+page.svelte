@@ -25,7 +25,10 @@
 	title={data.buyer.displayName}
 	breadcrumbs={[
 		{ label: 'Mi portal', href: resolve('/portal') },
-		{ label: 'Mis compradores', href: resolve('/portal/compradores') },
+		{
+			label: 'Mis compradores',
+			href: resolve('/portal/[campaignId]/compradores', { campaignId: data.campaign.id })
+		},
 		{ label: data.buyer.displayName }
 	]}
 />
@@ -50,8 +53,10 @@
 				{#if column.key === 'bond'}
 					<a
 						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-						href={resolve('/portal/ventas/[saleId]', { saleId: row.saleId })}
-						>{bondLabel(row.bondNumbers, row.numberDigits)}</a
+						href={resolve('/portal/[campaignId]/ventas/[saleId]', {
+							campaignId: data.campaign.id,
+							saleId: row.saleId
+						})}>{bondLabel(row.bondNumbers, row.numberDigits)}</a
 					>
 				{:else if column.key === 'soldAt'}
 					{formatDate(row.soldAt)}

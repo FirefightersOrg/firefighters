@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			campaignId: params.campaignId,
 			error: cause
 		});
-		error(500, { message: 'No se pudieron cargar tus bonos. Volver a intentar.' });
+		error(500, { message: 'No se pudieron cargar los bonos. Volver a intentar.' });
 	};
 
 	const campaignResult = await getCampaignById(locals.supabase, params.campaignId);

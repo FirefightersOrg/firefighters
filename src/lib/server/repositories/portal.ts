@@ -9,6 +9,8 @@ import type { RepositoryResult } from './campaigns';
  * Read-only access of the collector portal (SAN-145). Everything goes through the narrow SECURITY DEFINER
  * `portal_my_*` functions (20270117000000): they check `sale.view_own`, return only the caller's own rows and
  * expose buyers as name, phone and address. `buyers` itself is never read from here.
+ * SAN-148: the lists take the campaign of the route (`/portal/[campaignId]/...`); buyers and due installments go
+ * through the campaign-filtered variants of 20270120000000.
  */
 
 export const PORTAL_PAGE_SIZE = 20;
@@ -157,10 +159,11 @@ function paged<T>(
 
 export async function listMySales(
 	supabase: SupabaseClient,
-	page: number
+	page: number,
+	campaignId: string | null = null
 ): Promise<RepositoryResult<PortalPage<PortalSaleSummary>>> {
 	const { data, error } = await supabase.rpc('portal_my_sales', {
-		p_campaign_id: null,
+		p_campaign_id: campaignId,
 		p_limit: PORTAL_PAGE_SIZE,
 		p_offset: offsetOf(page)
 	});
@@ -242,9 +245,11 @@ export async function listMySalePayments(
 
 export async function listMyBuyers(
 	supabase: SupabaseClient,
-	page: number
+	page: number,
+	campaignId: string | null = null
 ): Promise<RepositoryResult<PortalPage<PortalBuyer>>> {
-	const { data, error } = await supabase.rpc('portal_my_buyers_page', {
+	const { data, error } = await supabase.rpc('portal_my_campaign_buyers', {
+		p_campaign_id: campaignId,
 		p_limit: PORTAL_PAGE_SIZE,
 		p_offset: offsetOf(page)
 	});
@@ -322,9 +327,11 @@ export async function getMyBuyer(
 export async function listMyDueInstallments(
 	supabase: SupabaseClient,
 	page: number,
+	campaignId: string | null = null,
 	days = 7
 ): Promise<RepositoryResult<PortalPage<PortalDueInstallment>>> {
-	const { data, error } = await supabase.rpc('portal_my_due_installments', {
+	const { data, error } = await supabase.rpc('portal_my_campaign_due_installments', {
+		p_campaign_id: campaignId,
 		p_days: days,
 		p_limit: PORTAL_PAGE_SIZE,
 		p_offset: offsetOf(page)

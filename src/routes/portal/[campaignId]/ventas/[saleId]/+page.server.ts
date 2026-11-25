@@ -23,11 +23,13 @@ import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const collector = await requireSalesViewer(locals, url);
 	if (!collector) error(404, { message: 'Venta no encontrada.' });
+	const campaignId = requireUuid(params.campaignId, 'Campaña no encontrada.');
 	const saleId = requireUuid(params.saleId, 'Venta no encontrada.');
 	const sale = await getMySale(locals.supabase, saleId);
 	if (sale.error) loadFailed(locals, 'la venta', sale.error);
 	// Someone else's sale (or none) answers exactly like a missing one.
-	if (!sale.data) error(404, { message: 'Venta no encontrada.' });
+	if (!sale.data || sale.data.campaignId !== campaignId)
+		error(404, { message: 'Venta no encontrada.' });
 	const [installments, payments, submissions, reserved] = await Promise.all([
 		listMySaleInstallments(locals.supabase, saleId),
 		listMySalePayments(locals.supabase, saleId),
@@ -92,7 +94,7 @@ export const actions: Actions = {
 				message
 			});
 		if (!collector || collector.status !== 'active')
-			return failure(403, 'Tu cuenta de cobrador no está activa.');
+			return failure(403, 'La cuenta de cobrador no está activa.');
 		const errors: Record<string, string[]> = {};
 		const cents = parseMoneyInput(values.amount);
 		if (cents === null || cents <= 0) errors.amount = ['Ingresar un importe mayor que cero.'];
@@ -125,6 +127,6 @@ export const actions: Actions = {
 			return failure(err?.status ?? 500, err?.message ?? GENERIC_ERROR_MESSAGE);
 		}
 		// `redirect` throws: keep it outside the try block.
-		redirect(303, `/portal/ventas/${saleId}?enviado=1`);
+		redirect(303, `/portal/${params.campaignId}/ventas/${saleId}?enviado=1`);
 	}
 };

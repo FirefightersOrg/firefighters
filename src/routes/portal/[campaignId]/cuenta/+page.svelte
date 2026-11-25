@@ -82,8 +82,8 @@
 />
 
 {#if !ledger}
-	<EmptyState title="Tu usuario todavía no está vinculado a un cobrador">
-		Pedile a un administrador que vincule tu usuario con tu ficha de cobrador. Mientras tanto no hay
+	<EmptyState title="El usuario todavía no está vinculado a un cobrador">
+		Pedir a un administrador que vincule el usuario con la ficha de cobrador. Mientras tanto no hay
 		datos para mostrar.
 	</EmptyState>
 {:else}
@@ -93,9 +93,9 @@
 				label="Saldo"
 				value={money(ledger.summary.balance)}
 				detail={ledger.summary.balance > 0
-					? 'A tu favor'
+					? 'A favor del cobrador'
 					: ledger.summary.balance < 0
-						? 'A tu cargo'
+						? 'A cargo del cobrador'
 						: 'Sin saldo'}
 			/>
 		</div>
@@ -181,7 +181,7 @@
 				{/snippet}
 				{#snippet empty()}
 					<EmptyState title="Todavía no hay rendiciones">
-						Tus rendiciones aparecen acá cuando se registran.
+						Las rendiciones aparecen aquí cuando se registran.
 					</EmptyState>
 				{/snippet}
 			</Table>

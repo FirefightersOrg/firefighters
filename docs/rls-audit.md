@@ -73,6 +73,10 @@ The only direct writes, `profiles` and `user_roles`, are intentional and gated b
 
 The collector role reads rows through policies of the form `global permission OR (*_own permission AND is_own_collector(collector_id))`: `bonds`, `bond_numbers`, `bond_groups`, `delivery_notes`, `bond_assignments`, `sales` (plans and installments follow the sale), `payments`, `settlements`, `collector_ledger_entries` and `commission_adjustments`. `buyers_select` stays closed; buyers reach the portal only through `portal_my_buyers`. pgTAP `060_collector_portal_scope` checks two collectors, an unlinked profile, an inactive collector and the unchanged roles; `058_rls_audit` fixes the permission matrix.
 
+## Alcance por campaña del portal (SAN-148)
+
+`portal_my_campaign_buyers(p_campaign_id, ...)` and `portal_my_campaign_due_installments(p_campaign_id, ...)` (SECURITY DEFINER, empty search_path, `authenticated` only) are the campaign-filtered variants of the SAN-145 lists. They check `sale.view_own` and only read the caller's own sales; a `NULL` campaign gives the SAN-145 result, and `portal_my_buyers_page` / `portal_my_due_installments` now delegate to them. pgTAP `068_portal_campaign_scope`; end-to-end isolation and the payment flow are in `tests/integration/phase-16-acceptance.test.ts`.
+
 ## Mi cuenta corriente (SAN-146)
 
 `portal_my_ledger_summary` and `portal_my_ledger` (SECURITY DEFINER, empty search_path, `authenticated` only) read the ledger of the caller's own collector, resolved from the session; they take no collector id, need `collector.ledger.view_own`, and return no reasons or notes. Reference entries (`affects_balance = false`, #130) are listed but never counted; the functions detect the column at run time. pgTAP `066_portal_my_ledger`.

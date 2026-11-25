@@ -102,7 +102,7 @@
 		<input type="hidden" name="requestKey" value={requestKey} />
 		<Alert tone="info">
 			Este cobro queda pendiente de rendición. Recién se confirma cuando el operador lo incluye en
-			tu rendición y la cierra. Una vez enviado, no se puede editar.
+			la rendición y la cierra. Una vez enviado, no se puede editar.
 		</Alert>
 		{#if result?.message}
 			<Alert tone="danger">{result.message}</Alert>
