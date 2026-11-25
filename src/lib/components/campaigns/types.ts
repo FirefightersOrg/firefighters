@@ -18,6 +18,7 @@ export interface CampaignRulesValues {
 	numberDigits: string;
 	maxNumber: string;
 	associatedNumberOffset: string;
+	associatedNumberMode: string;
 	overflowPolicy: string;
 	barcodeMode: string;
 	barcodePattern: string;
@@ -36,6 +37,7 @@ export function defaultRulesValues(): CampaignRulesValues {
 		numberDigits: String(DEFAULT_NUMBERING_CONFIG.numberDigits),
 		maxNumber: String(DEFAULT_NUMBERING_CONFIG.maxNumber),
 		associatedNumberOffset: String(DEFAULT_NUMBERING_CONFIG.associatedNumberOffset),
+		associatedNumberMode: DEFAULT_NUMBERING_CONFIG.associatedNumberMode,
 		overflowPolicy: DEFAULT_NUMBERING_CONFIG.overflowPolicy,
 		barcodeMode: '',
 		barcodePattern: ''
@@ -58,6 +60,7 @@ export function rulesValuesOf(campaign: Campaign): CampaignRulesValues {
 		numberDigits: String(campaign.numberDigits),
 		maxNumber: String(campaign.maxNumber),
 		associatedNumberOffset: String(campaign.associatedNumberOffset),
+		associatedNumberMode: campaign.associatedNumberMode,
 		overflowPolicy: campaign.overflowPolicy,
 		barcodeMode: campaign.barcodeMode,
 		barcodePattern: campaign.barcodePattern ?? ''

@@ -18,6 +18,7 @@
 	} from '$lib/components/ui';
 	import { MIN_PATA_SIZE } from '$lib/domain/bonds';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { associatedNumberRuleText } from '$lib/domain/numbering';
 	import { previewPata } from '$lib/domain/pata-preview';
 	import { formatNumber } from '$lib/format';
 	import { BOND_CODE_MAX_LENGTH } from '$lib/schemas/bond';
@@ -221,7 +222,7 @@
 				<div class="flex flex-col gap-5">
 					<p class="m-0 text-body-sm text-muted">
 						Ingresar los {MIN_PATA_SIZE} o más números base impresos en la pata. Cada uno trae su número
-						asociado (base + <span class="tabular-nums">{campaign.associatedNumberOffset}</span>).
+						asociado (<span class="tabular-nums">{associatedNumberRuleText(campaign)}</span>).
 					</p>
 					{#if campaign.status === 'draft'}
 						<Alert tone="warning">

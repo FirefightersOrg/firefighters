@@ -127,6 +127,18 @@ const CONSTRAINT_MESSAGES: Record<string, { field: CampaignFormField; message: s
 		field: 'associatedNumberOffset',
 		message: 'El desfase del número asociado no puede superar el número máximo.'
 	},
+	campaigns_associated_number_mode_check: {
+		field: 'associatedNumberMode',
+		message: 'Modo del número asociado desconocido.'
+	},
+	campaigns_circular_max_number_even_range: {
+		field: 'maxNumber',
+		message: 'En modo circular, el número máximo más 1 debe ser par (2 × B).'
+	},
+	campaigns_circular_offset_below_block: {
+		field: 'associatedNumberOffset',
+		message: 'En modo circular, el desfase debe ser menor que B (la mitad del rango).'
+	},
 	campaigns_overflow_policy_check: {
 		field: 'overflowPolicy',
 		message: 'Política de desborde desconocida.'
@@ -159,6 +171,7 @@ const COLUMN_FIELDS: Record<string, CampaignFormField> = {
 	number_digits: 'numberDigits',
 	max_number: 'maxNumber',
 	associated_number_offset: 'associatedNumberOffset',
+	associated_number_mode: 'associatedNumberMode',
 	overflow_policy: 'overflowPolicy',
 	barcode_mode: 'barcodeMode',
 	barcode_pattern: 'barcodePattern'
@@ -342,6 +355,7 @@ export async function createCampaign(
 			p_number_digits: input.numberDigits,
 			p_max_number: input.maxNumber,
 			p_associated_number_offset: input.associatedNumberOffset,
+			p_associated_number_mode: input.associatedNumberMode,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
 			p_barcode_pattern: input.barcodePattern,
@@ -408,6 +422,7 @@ export async function updateCampaignRules(
 			p_number_digits: input.numberDigits,
 			p_max_number: input.maxNumber,
 			p_associated_number_offset: input.associatedNumberOffset,
+			p_associated_number_mode: input.associatedNumberMode,
 			p_overflow_policy: input.overflowPolicy,
 			p_barcode_mode: input.barcodeMode,
 			// Full replacement: null clears the pattern.

@@ -210,7 +210,7 @@ Collector-submitted payments (SAN-147, `payments.submitted_by_collector`):
 - A `draft` changes no installment, financial snapshot, commission or ledger entry: `settlement_close` only confirms `pending_in_settlement`. It does reserve the installment balance (every payment that is not annulled or adjusted counts), so drafts cannot exceed the installment together.
 - The operator/treasurer either includes it in an open settlement of the same collector and campaign (`settlement_attach_collector_payment`: `draft -> pending_in_settlement`, then the normal close confirms it) or rejects it with a mandatory reason (`settlement_reject_collector_payment`: `draft -> annulled`, the reason is stored in `annulment_reason` and shown to the collector).
 - `draft -> annulled` is only reachable through that rejection RPC (payments have no direct DML grants). `submitted_by_collector` and `collector_note` are immutable after insert.
-- The collector can neither confirm, edit after sending, nor annul. What the collector sees: `draft` and `pending_in_settlement` are "Pendiente de rendición", `confirmed` is "Confirmado" and a rejected `annulled` one is "Rechazado" with its reason.
+- The collector can neither confirm, edit after sending, nor annul. What the collector sees: `draft` is "Enviado", `pending_in_settlement` is "En rendición", `confirmed` is "Confirmado" and a rejected `annulled` one is "Rechazado" with its reason.
 - Unprocessed drafts block the close (SAN-156): `settlement_close` raises errcode `FF156` (`settlement has N unprocessed collector payments`, detail = N) when the collector of that settlement has at least one `draft` with `submitted_by_collector` in that campaign. Nothing is closed and nothing is written. Drafts of other collectors or other campaigns never block. Including (`settlement_attach_collector_payment`) or rejecting a draft unblocks. There is no automatic expiry: a draft waits until the operator processes it. The check runs after the settlement, payment and installment locks and the collector advisory lock (lock order unchanged). A submission committed after the check is not lost or half-applied: it stays a draft outside the closed settlement and blocks the collector's next close. The service maps FF156 to a 409 with neutral Spanish ("Hay N cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.").
 - `dashboard_submitted_payments(campaign)` (permission `report.view_operational`) returns the pending drafts per collector (count, amount, the collector's oldest open settlement) for the campaign dashboard.
 - Every submission, inclusion and rejection is written to `audit_log` (`payment.collector_submit`, `payment.collector_attach`, `payment.collector_reject`) with actor and `request_id`.
@@ -293,7 +293,7 @@ roster_generated -> roster_frozen
 roster_frozen -> completed
 completed -> closed
 scheduled -> annulled
-roster_generated -> annulled (extraordinary_full_payment only, before freeze; SAN-117)
+roster_generated -> annulled (extraordinary_full_payment only, before freeze; SAN-117; releases extras only for legacy rosters, SAN-152)
 ```
 
 Rules:

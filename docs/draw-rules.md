@@ -35,22 +35,23 @@ Rule:
 Those who have paid the full bond before the cutoff date participate.
 ```
 
-Extra numbers:
+Numbers (SAN-152):
 
 ```txt
-Simple bond = 1 extra number
-Pata = N extra numbers based on the quantity of base numbers
+Each eligible bond participates with its OWN numbers: its base and associated numbers.
+No extra or new numbers are assigned, so the draw does not depend on free numbers.
 ```
 
 Example:
 
 ```txt
-Pata with 5 base numbers
-Normal participation: 5 base + 5 associated = 10 numbers
-Additional extraordinary participation: 5 extra numbers
+Simple bond: 1 base + 1 associated = 2 numbers
+Pata with 5 base numbers: 5 base + 5 associated = 10 numbers (no extra numbers)
 ```
 
-Extra numbers must be persisted or frozen in the extraordinary draw roster to justify historical results.
+Eligibility is unchanged: the full payment plan must be covered before the cutoff date. A campaign whose whole number range is already assigned (for example a circular offset campaign) can generate this roster.
+
+Legacy: rosters generated before SAN-152 may contain `number_kind = 'extraordinary'` numbers. They stay readable and auditable (the roster UI marks them "Extra (sorteo anterior)"), history is never rewritten, and annulling such a draw still releases the extras no other active draw uses (SAN-117).
 
 ## Final draw
 

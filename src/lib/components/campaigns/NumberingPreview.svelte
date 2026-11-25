@@ -55,25 +55,39 @@
 				{/each}
 			</tbody>
 		</table>
-		<p class="m-0 mt-3">
-			Mayor número base utilizable:
-			<strong class="font-mono tabular-nums">{p.maxValidBase.baseFormatted}</strong>
-			(asociado {p.maxValidBase.associatedFormatted}).
-			<strong class="tabular-nums">{formatNumber(p.usableBaseCount)}</strong>
-			{p.usableBaseCount === 1 ? 'número base utilizable' : 'números base utilizables'}
-			({p.examples[0].baseFormatted}–{p.maxValidBase.baseFormatted}).
-		</p>
-		{#if p.overflowExample}
-			<p class="m-0 mt-1 text-warning-text">
-				Desborde: el número base
-				<span class="font-mono tabular-nums">{p.overflowExample.baseFormatted}</span>
-				daría el número asociado
-				<span class="font-mono tabular-nums">{p.overflowExample.associated}</span>, por encima del
-				máximo <span class="font-mono tabular-nums">{p.overflowExample.maxNumber}</span>, por lo que
-				se rechaza.
+		{#if p.mode === 'circular' && p.blockSize !== null && p.associatedRange}
+			<p class="m-0 mt-3">
+				Modo circular, <strong class="tabular-nums">{formatNumber(p.blockSize)}</strong> bonos:
+				números base
+				<strong class="font-mono tabular-nums"
+					>{p.examples[0].baseFormatted}–{p.maxValidBase.baseFormatted}</strong
+				>
+				y números asociados
+				<strong class="font-mono tabular-nums"
+					>{p.associatedRange.from}–{p.associatedRange.to}</strong
+				>. Cada número del rango se usa una sola vez.
 			</p>
 		{:else}
-			<p class="m-0 mt-1 text-muted">Ningún número base desborda (el desfase es 0).</p>
+			<p class="m-0 mt-3">
+				Mayor número base utilizable:
+				<strong class="font-mono tabular-nums">{p.maxValidBase.baseFormatted}</strong>
+				(asociado {p.maxValidBase.associatedFormatted}).
+				<strong class="tabular-nums">{formatNumber(p.usableBaseCount)}</strong>
+				{p.usableBaseCount === 1 ? 'número base utilizable' : 'números base utilizables'}
+				({p.examples[0].baseFormatted}–{p.maxValidBase.baseFormatted}).
+			</p>
+			{#if p.overflowExample}
+				<p class="m-0 mt-1 text-warning-text">
+					Desborde: el número base
+					<span class="font-mono tabular-nums">{p.overflowExample.baseFormatted}</span>
+					daría el número asociado
+					<span class="font-mono tabular-nums">{p.overflowExample.associated}</span>, por encima del
+					máximo <span class="font-mono tabular-nums">{p.overflowExample.maxNumber}</span>, por lo
+					que se rechaza.
+				</p>
+			{:else}
+				<p class="m-0 mt-1 text-muted">Ningún número base desborda (el desfase es 0).</p>
+			{/if}
 		{/if}
 	{/if}
 </div>

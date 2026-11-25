@@ -18,7 +18,8 @@ const rules: ImportRules = {
 	barcodePattern: null,
 	numberDigits: 4,
 	maxNumber: 9999,
-	associatedNumberOffset: 4871
+	associatedNumberOffset: 4871,
+	associatedNumberMode: 'linear'
 };
 
 const row = (
@@ -308,7 +309,8 @@ describe('validateImportBatch (mirror of import_session_revalidate / _check_grou
 			codes(
 				validateImportBatch([staged(2, { itemType: 'simple', baseNumber: 10 })], {
 					...rules,
-					associatedNumberOffset: 0
+					associatedNumberOffset: 0,
+					associatedNumberMode: 'linear'
 				})
 			)
 		).toEqual([[2, 'error', 'number_conflict']]);
@@ -397,7 +399,7 @@ describe('validateImportBatch (mirror of import_session_revalidate / _check_grou
 
 describe('summarizeImportItems', () => {
 	it('counts like import_session_summary', () => {
-		expect(summarizeImportItems([], 4871)).toMatchObject({ liveItems: 0, valid: false });
+		expect(summarizeImportItems([], rules)).toMatchObject({ liveItems: 0, valid: false });
 		expect(
 			summarizeImportItems(
 				[
@@ -405,7 +407,7 @@ describe('summarizeImportItems', () => {
 					{ status: 'valid', itemType: 'pata', groupKey: 'P', baseNumber: 2, errorCode: null },
 					{ status: 'valid', itemType: 'pata', groupKey: 'P', baseNumber: 2, errorCode: null }
 				],
-				4871
+				rules
 			)
 		).toEqual({
 			liveItems: 3,

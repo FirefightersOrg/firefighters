@@ -37,6 +37,7 @@
 		bind:numberDigits={values.numberDigits}
 		bind:maxNumber={values.maxNumber}
 		bind:associatedNumberOffset={values.associatedNumberOffset}
+		bind:associatedNumberMode={values.associatedNumberMode}
 		bind:overflowPolicy={values.overflowPolicy}
 		{errors}
 	/>

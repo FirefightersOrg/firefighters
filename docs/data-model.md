@@ -47,6 +47,7 @@ Fields:
 - `number_digits` (integer, 1 to 10, default 4)
 - `max_number` (integer, default 9999)
 - `associated_number_offset` (integer, default 4871)
+- `associated_number_mode` (text, default `linear`; SAN-151, `20270123000000_circular_offset_mode.sql`): `linear` (`N2 = base + offset`) or `circular` (`N2 = B + ((base + offset) mod B)`, `B = (max_number + 1) / 2`)
 - `overflow_policy` (text, default `reject`; only `reject` for now)
 - `barcode_mode` (text, required, no default): `base_number`, `internal_code`, `external_legacy_code`, `manual_mapping` (semantics in `docs/imports.md`)
 - `barcode_pattern` (text, optional, SAN-44): only for `internal_code` / `external_legacy_code`; a Postgres regular expression whose first capture group is the base number (null: the operator types the base number, like `manual_mapping`)
@@ -60,6 +61,7 @@ Constraints:
 - `simple_bond_value` and `installment_value` are not `NaN`. Postgres `numeric` accepts `'NaN'` and treats it as greater than every number and equal to itself, so it would otherwise pass `> 0` and the exact-installment check; `±Infinity` is already rejected by `numeric(14,2)`.
 - `max_number` fits in `number_digits` (`max_number < 10^number_digits`); 5-digit campaigns use `number_digits = 5`, `max_number = 99999`.
 - `associated_number_offset <= max_number` (otherwise no base number is valid).
+- `associated_number_mode in ('linear', 'circular')` (`campaigns_associated_number_mode_check`). Circular mode (SAN-151) also needs `max_number + 1` even, so `2 x B = max_number + 1` (`campaigns_circular_max_number_even_range`), and `associated_number_offset < B` (`campaigns_circular_offset_below_block`). The mode is a rule: editable only in draft (`campaigns_guard_write`) and frozen once the campaign has bonds (`campaigns_rules_frozen_with_bonds`).
 - `barcode_pattern` (SAN-44, `20261123000000_campaign_barcode_pattern.sql`): at most 200 characters, not blank, no surrounding whitespace (`campaigns_barcode_pattern_format`); null unless `barcode_mode` is `internal_code` or `external_legacy_code` (`campaigns_barcode_pattern_mode`); compiles as a Postgres (ARE) regex with at least one capture group (`campaigns_barcode_pattern_valid`, via `campaign_barcode_pattern_valid()`; embedded options such as a leading `(?i)` are not supported).
 - `installment_value * installment_count = simple_bond_value` exactly. `installment_value` is a stored column, not generated: a price that does not divide evenly (60000 in 7 installments) is rejected instead of rounded.
 
@@ -78,9 +80,9 @@ Access: `authenticated` can only `SELECT`, and RLS limits it to `campaign.view`.
 
 Write functions (`20261117000000_campaign_rpcs.sql`, SECURITY DEFINER, executable by `authenticated` only; they act as `auth.uid()`'s active profile):
 
-- `campaign_create(p_name, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_starts_at, p_ends_at, p_request_id, p_reason, p_barcode_pattern) returns uuid` (`campaign.create`).
+- `campaign_create(p_name, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_starts_at, p_ends_at, p_request_id, p_reason, p_barcode_pattern, p_associated_number_mode) returns uuid` (`campaign.create`; `p_associated_number_mode` is the last parameter, default `linear`).
 - `campaign_update(p_id, p_name, p_starts_at, p_ends_at, p_expected_updated_at, p_request_id, p_reason) returns boolean` (`campaign.update`).
-- `campaign_update_rules(p_id, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_expected_updated_at, p_request_id, p_reason, p_barcode_pattern) returns boolean` (`campaign.update_rules`; draft only).
+- `campaign_update_rules(p_id, p_simple_bond_value, p_installment_count, p_number_digits, p_max_number, p_associated_number_offset, p_overflow_policy, p_barcode_mode, p_expected_updated_at, p_request_id, p_reason, p_barcode_pattern, p_associated_number_mode) returns boolean` (`campaign.update_rules`; draft only; the mode is part of the full replacement and of the audit diff).
 - `p_barcode_pattern` (SAN-44) is the last parameter, default null, so existing positional callers keep working. It is trimmed (blank = null) and validated with `22023` (`barcode pattern is only used with the internal code or external legacy code barcode modes`, `... must be at most 200 characters`, `... must be a valid regular expression with a capture group for the base number`). `campaign_update_rules` is still a full replacement: omitting the pattern clears it.
 - `campaign_transition(p_id, p_to_status, p_reason, p_request_id)`: `active` needs `campaign.update_rules`; `closing`, `closed` and `annulled` need `campaign.close`; annulling needs a reason, the other transitions accept an optional one (stored in the audit log).
 
@@ -269,7 +271,7 @@ Fields:
 - `id`
 - `campaign_id`, `bond_id`: composite FK to `bonds (id, campaign_id)`, so a number always belongs to its bond's campaign
 - `number_value` (integer, >= 0)
-- `number_kind`: `base`, `associated`, `extraordinary`
+- `number_kind`: `base`, `associated`, `extraordinary` (`extraordinary` is legacy only: SAN-152 stopped creating it; old rows and frozen rosters that reference it stay valid)
 - `source_base_number_id`: for `associated`, the base number it derives from (required, same bond: composite FK to `bond_numbers (id, bond_id)`); null for `base`
 - `created_at` (set by the database)
 - `released_at`, `released_by` (profile): set together when the number is released (see below)
@@ -278,8 +280,8 @@ Fields:
 Rules (constraints and the `bond_numbers_guard_write` trigger):
 
 - `number_value <= campaigns.max_number` (`overflow_policy = reject`), `23514` otherwise.
-- `associated` number = its base number + `campaigns.associated_number_offset`; at most one associated number per base.
-- A bond has at most `commercial_unit_count` base and `commercial_unit_count` associated numbers (a simple bond: 1 + 1; a printed pata of N: N + N). Extraordinary numbers are not limited.
+- `associated` number = `public.bond_associated_number(base, offset, max_number, mode)` (SAN-151): the base number + `campaigns.associated_number_offset` in `linear` mode, `B + ((base + offset) mod B)` in `circular` mode (B = (max_number + 1) / 2, bases `0..B-1`, so the associated numbers cover `B..2B-1` exactly once and, with the bases, the whole range `0..2B-1` without collisions). One immutable SQL function is the only formula: `bond_numbers_guard_write`, `bond_validate_base_numbers`, `bond_create` and the import staging/confirmation call it; `numbering.ts` (`associatedNumberFor`) mirrors it. At most one associated number per base.
+- A bond has at most `commercial_unit_count` base and `commercial_unit_count` associated numbers (a simple bond: 1 + 1; a printed pata of N: N + N). Legacy extraordinary numbers (created before SAN-152) are not limited; no new ones are created.
 - A manually grouped pata has no numbers of its own: its members (simple bonds) keep theirs.
 - Numbers cannot be added to an annulled bond. Every column but the release is immutable (`23001`); a released number is immutable (`55000`).
 - Never deleted.
@@ -681,7 +683,7 @@ SECURITY DEFINER RPCs must write the audit row in the same transaction.
   an installment; any non-null installment is in 1..campaign.installment_count. Other types may
   supply one (notably consolation) or leave it null. Eligibility configuration is a JSON object,
   default `{}`: draw type and installment define the documented baseline, while future generation
-  code interprets optional configuration for consolation exclusions/extraordinary numbers. This
+  code interprets optional configuration for consolation exclusions. The extraordinary draw (SAN-152) uses each bond's own base and associated numbers. This
   migration does not compute eligibility, generate extra numbers, or validate a configuration schema.
 - Draws start scheduled and follow exactly the Draw state machine. Only scheduled rules can be
   edited. Closed and annulled rows are wholly immutable. Scheduled annulment requires

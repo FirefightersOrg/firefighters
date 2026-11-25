@@ -1,6 +1,6 @@
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(154);
+select plan(155);
 insert into auth.users(id,email)
 select ('a6380000-0000-0000-0000-00000000000'||n)::uuid,'roster-'||n||'@example.com' from generate_series(1,2)n;
 insert into public.profiles(id,auth_user_id,full_name,email,status)
@@ -100,17 +100,18 @@ select results_eq($$select number_value,eligible,ineligibility_reason from publi
 $$select * from (values(10,true,null::text),(20,false,'not_fully_paid'),(30,false,'not_fully_paid'),(40,false,'not_fully_paid'),(50,false,'not_sold'),(60,false,'annulled'),(70,true,null::text),(71,true,null::text))v$$,'final exact rows and reasons');
 insert into ids values('r-extra',public.draw_generate_roster(pg_temp.id('extra'),'038-extra'));
 select results_eq($$select number_value,eligible,ineligibility_reason from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-extra') and number_value<100 order by number_value$$,
-$$select * from (values(0,true,null::text),(1,true,null::text),(2,true,null::text),(10,true,null::text),(20,false,'not_fully_paid'),(30,false,'not_fully_paid'),(40,false,'not_fully_paid'),(50,false,'not_sold'),(60,false,'annulled'),(70,true,null::text),(71,true,null::text))v$$,'extraordinary exact rows, reasons and lowest-free ordering');
-select results_eq($$select n.number_value,b.number_value from public.bond_numbers n join public.bond_numbers b on b.id=n.source_base_number_id where n.campaign_id=pg_temp.id('c') and n.number_kind='extraordinary' order by n.number_value$$,
-$$select * from (values(0,10),(1,70),(2,71))v$$,'simple one and pata per-base extra persisted and linked');
+$$select * from (values(10,true,null::text),(20,false,'not_fully_paid'),(30,false,'not_fully_paid'),(40,false,'not_fully_paid'),(50,false,'not_sold'),(60,false,'annulled'),(70,true,null::text),(71,true,null::text))v$$,'extraordinary exact rows and reasons: own numbers only');
+select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('c') and number_kind='extraordinary'),0,'SAN-152: no extra numbers are allocated');
+select results_eq($$select b.id,array_agg(e.number_value order by e.number_value) from public.draw_roster_entries e join public.bonds b on b.id=e.bond_id where e.draw_roster_id=pg_temp.id('r-extra') and e.eligible group by b.id order by min(e.number_value)$$,
+$$select * from (values(pg_temp.id('bond1'),array[10,4881]),(pg_temp.id('bond7'),array[70,71,4941,4942]))v$$,'SAN-152: simple bond and pata of 2 participate with exactly their base and associated numbers');
 insert into ids values('r-extra-new',public.draw_generate_roster(pg_temp.id('extra'),'038-regenerate'));
 select is((select status from public.draw_rosters where id=pg_temp.id('r-extra')),'superseded','regeneration supersedes history');
-select is((select count(*)::int from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-extra')),19,'original entries preserved');
-select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('c') and number_kind='extraordinary'),3,'no extra leak on regeneration');
+select is((select count(*)::int from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-extra')),16,'original entries preserved');
+select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('c') and number_kind='extraordinary'),0,'no extra leak on regeneration');
 select results_eq($$select bond_number_id,eligible,ineligibility_reason from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-extra-new') order by bond_number_id$$,
 $$select bond_number_id,eligible,ineligibility_reason from public.draw_roster_entries where draw_roster_id=pg_temp.id('r-extra') order by bond_number_id$$,'regenerated contents stable');
 insert into ids values('r-extra2',public.draw_generate_roster(pg_temp.id('extra2'),'038-extra2'));
-select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('c') and number_kind='extraordinary'),3,'later extraordinary draws share extras');
+select is((select count(*)::int from public.bond_numbers where campaign_id=pg_temp.id('c') and number_kind='extraordinary'),0,'later extraordinary draws allocate no extras');
 select lives_ok($$select public.draw_freeze_roster(pg_temp.id('monthly'),'038-freeze')$$,'freeze current roster');
 select is((select status from public.draws where id=pg_temp.id('monthly')),'roster_frozen','draw frozen');
 select ok((select status='frozen' and frozen_at is not null and frozen_by='b6380000-0000-0000-0000-000000000001'::uuid from public.draw_rosters where id=pg_temp.id('r-monthly')),'freeze metadata');
@@ -142,19 +143,19 @@ select ok(not has_function_privilege(r,'public.draw_generate_roster(uuid,text)',
   and not has_function_privilege(r,'public.draw_freeze_roster(uuid,text)','execute'),r||' cannot invoke roster RPCs')
 from unnest(array['anon','service_role'])r;
 select ok(not has_function_privilege('authenticated','public.draw_payment_before_cutoff(text,date,timestamptz)','execute'),'cutoff helper is internal');
--- Capacity failure rolls back a regeneration (including supersession and allocations).
--- Reserve the remaining values with fixture-only extraordinary rows (legacy nullable source).
+-- SAN-152: a fully assigned campaign (no free number left) still generates an extraordinary roster.
+-- Fill the remaining values with fixture-only legacy extraordinary rows; they never join a new roster.
 insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind)
 select pg_temp.id('c'),pg_temp.id('bond5'),v,'extraordinary'
 from generate_series(0,9999)v where not exists (
   select 1 from public.bond_numbers where campaign_id=pg_temp.id('c') and number_value=v and released_at is null);
 set local role authenticated;
-select throws_ok($$select public.draw_generate_roster(pg_temp.id('extra'),'038-exhaustion')$$,'55000','not enough free campaign numbers','exhaustion refused atomically after newly eligible bond');
+select lives_ok($$select public.draw_generate_roster(pg_temp.id('extra'),'038-exhaustion')$$,'SAN-152: no free numbers left, generation still succeeds');
 reset role;
-select is((select status from public.draw_rosters where id=pg_temp.id('r-extra-new')),'generated','capacity failure preserves current roster');
-select is((select count(*)::int from public.draw_rosters where draw_id=pg_temp.id('extra')),2,'capacity failure creates no roster');
-select is((select count(*)::int from public.audit_log where request_id='038-exhaustion'),0,'capacity failure has no audit');
-select is((select count(*)::int from public.bond_numbers where bond_id=pg_temp.id('bond3') and number_kind='extraordinary'),0,'capacity failure leaves no partial extra');
+select is((select status from public.draw_rosters where id=pg_temp.id('r-extra-new')),'superseded','full campaign regeneration supersedes the previous roster');
+select is((select count(*)::int from public.draw_rosters where draw_id=pg_temp.id('extra')),3,'full campaign regeneration creates one roster');
+select is((select count(*)::int from public.audit_log where request_id='038-exhaustion'),1,'full campaign regeneration is audited once');
+select is((select count(*)::int from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id join public.bond_numbers n on n.id=e.bond_number_id where r.draw_id=pg_temp.id('extra') and r.status='generated' and n.number_kind='extraordinary'),0,'legacy extra numbers never join a new roster');
 set local role authenticated;
 select lives_ok($$select public.payment_annul(pg_temp.id('pay1'),'Correction after freeze','038-late-correction')$$,'audited payment correction after freeze');
 reset role;
@@ -254,11 +255,12 @@ begin
   perform pg_temp.remote_exec('roster_a','begin');
   perform pg_temp.remote_text('roster_a',$q$select public.draw_generate_roster('d6381000-0000-0000-0000-000000000003','038-race-allocation-a')::text$q$);
   perform extensions.dblink_send_query('roster_b',$q$select public.draw_generate_roster('d6381000-0000-0000-0000-000000000004','038-race-allocation-b')::text$q$);
-  return next ok(pg_temp.wait_lock(pid_b),'RPC race: different draw waits for campaign allocation lock');
+  -- SAN-152: no campaign-wide allocation lock any more; different draws never block each other.
+  return next ok(not pg_temp.wait_lock(pid_b),'RPC race: different draw does not wait on another extraordinary generation');
+  return next ok(pg_temp.result('roster_b') ~ '^[0-9a-f-]{36}$','RPC race: concurrent generation completes');
   perform pg_temp.remote_exec('roster_a','commit');
-  return next ok(pg_temp.result('roster_b') ~ '^[0-9a-f-]{36}$','RPC race: allocation resumes after lock release');
-  return next is(pg_temp.remote_text('roster_a',$q$select count(*)::text from public.bond_numbers where campaign_id='c6381000-0000-0000-0000-000000000001' and number_kind='extraordinary'$q$),'1','RPC race: concurrent extraordinary draws persist only one shared extra');
-  return next is(pg_temp.remote_text('roster_a',$q$select count(distinct e.bond_number_id)::text||'/'||count(*)::text from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id where r.draw_id in ('d6381000-0000-0000-0000-000000000003','d6381000-0000-0000-0000-000000000004')$q$),'2/4','RPC race: both rosters contain identical base and extra reservations');
+  return next is(pg_temp.remote_text('roster_a',$q$select count(*)::text from public.bond_numbers where campaign_id='c6381000-0000-0000-0000-000000000001' and number_kind='extraordinary'$q$),'0','RPC race: concurrent extraordinary draws persist no extras');
+  return next is(pg_temp.remote_text('roster_a',$q$select count(distinct e.bond_number_id)::text||'/'||count(*)::text from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id where r.draw_id in ('d6381000-0000-0000-0000-000000000003','d6381000-0000-0000-0000-000000000004')$q$),'1/2','RPC race: both rosters contain the same own base number');
   return next is(pg_temp.remote_text('roster_a',$q$select count(*)::text from public.draw_rosters where draw_id='d6381000-0000-0000-0000-000000000002'$q$),'1','RPC race: refused regeneration creates no roster');
   return next is(pg_temp.remote_text('roster_a',$q$reset role;select count(*)::text from public.audit_log where request_id='038-race-denied'$q$),'0','RPC race: refused regeneration creates no audit');
 end $$;

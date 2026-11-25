@@ -30,7 +30,9 @@
 		)?.required_installment_number ?? ''
 	);
 	const releasesExtras = $derived(
-		data.draw.drawType === 'extraordinary_full_payment' && data.draw.status === 'roster_generated'
+		data.hasLegacyExtras &&
+			data.draw.drawType === 'extraordinary_full_payment' &&
+			data.draw.status === 'roster_generated'
 	);
 </script>
 
@@ -188,9 +190,9 @@
 		<Disclosure summary="Anular sorteo">
 			{#if releasesExtras}
 				<Alert tone="warning">
-					Anular este sorteo libera los números extra reservados que ningún otro sorteo activo usa,
-					para que un sorteo posterior pueda volver a asignarlos. El padrón generado queda como
-					historial.
+					Este padrón es anterior al cambio y tiene números extra. Anular el sorteo libera los
+					números extra reservados que ningún otro sorteo activo usa, para que un sorteo posterior
+					pueda volver a asignarlos. El padrón generado queda como historial.
 				</Alert>
 			{/if}
 			<form method="POST" action="?/annul" class="mt-3 space-y-3">

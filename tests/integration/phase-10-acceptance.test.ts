@@ -101,6 +101,8 @@ async function sale(label: string, collectorId = collectorA) {
 		p_buyer_id: buyerA,
 		p_payment_mode: 'installments',
 		p_first_due_date: baDate(-1),
+		// SAN-106: past due dates need an earlier sale date.
+		p_sale_date: baDate(-1),
 		p_request_id: rid(`sale-${label}`)
 	});
 	const { data, error } = await users.admin.client

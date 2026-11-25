@@ -5,14 +5,30 @@ export function bondLabel(numbers: readonly number[], digits: number): string {
 	return numbers.length ? numbers.map((n) => formatPaddedNumber(n, digits)).join(', ') : '—';
 }
 
+export type SubmissionTone = 'info' | 'warning' | 'success' | 'danger';
+
 /**
- * What the collector sees for a collection it registered. The money only counts after the operator closes a
- * settlement, so both a draft and a payment included in an open settlement read as "Pendiente de rendición".
+ * What the collector sees for a collection, from the payment status (single map). A draft was sent and nobody
+ * touched it ("Enviado"); once the operator includes it in an open settlement it is "En rendición"; the money
+ * only counts after the settlement closes ("Confirmado"). Each state has its own word, so color is never the
+ * only signal. `adjusted` is a confirmed payment that was corrected afterwards.
  */
+export const SUBMISSION_STATUS: Record<string, { label: string; tone: SubmissionTone }> = {
+	draft: { label: 'Enviado', tone: 'info' },
+	pending_in_settlement: { label: 'En rendición', tone: 'warning' },
+	confirmed: { label: 'Confirmado', tone: 'success' },
+	adjusted: { label: 'Confirmado', tone: 'success' },
+	annulled: { label: 'Rechazado', tone: 'danger' }
+};
+
+const SUBMISSION_FALLBACK = SUBMISSION_STATUS.draft;
+
 export function submissionStatusLabel(status: string): string {
-	if (status === 'confirmed') return 'Confirmado';
-	if (status === 'annulled') return 'Rechazado';
-	return 'Pendiente de rendición';
+	return (SUBMISSION_STATUS[status] ?? SUBMISSION_FALLBACK).label;
+}
+
+export function submissionStatusTone(status: string): SubmissionTone {
+	return (SUBMISSION_STATUS[status] ?? SUBMISSION_FALLBACK).tone;
 }
 
 /** Today in Buenos Aires as `YYYY-MM-DD` (the default and the upper bound of the collection date). */

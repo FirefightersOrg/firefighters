@@ -19,7 +19,8 @@ function page(form: any = null) {
 				buyerTotal: 31,
 				canCreateBuyer: true,
 				today: '2027-01-01',
-				firstDueDateBounds: { min: '2026-12-01', max: '2028-01-01' }
+				saleDateBounds: { min: '2026-03-01', max: '2026-12-01' },
+				firstDueDateBounds: { min: '2026-12-01', max: '2027-12-01' }
 			},
 			form,
 			params: { id }

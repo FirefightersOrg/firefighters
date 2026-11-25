@@ -18,6 +18,7 @@
 					numberDigits: bond.campaignNumberDigits,
 					maxNumber: 10 ** bond.campaignNumberDigits - 1,
 					associatedNumberOffset: 0,
+					associatedNumberMode: 'linear',
 					overflowPolicy: 'reject'
 				})
 			)

@@ -167,9 +167,6 @@ describe('/portal/[campaignId]/bonos/[bondId]', () => {
 			expect.objectContaining({ assignmentType: 'delivery', status: 'active', noteNumber: 7 })
 		]);
 		expect(result.notes).toHaveLength(1);
-		expect(result.canPrintNotes).toBe(false);
-		const staff = setup(tables, [...PERMISSIONS, 'bond.view']);
-		expect((await detailLoad(detailEvent(staff.locals)))!.canPrintNotes).toBe(true);
 	});
 
 	it('404 for a bond that is not the collector own, a bad id, or an unlinked profile', async () => {

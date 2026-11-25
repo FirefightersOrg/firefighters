@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import {
-	evaluateDrawEligibility,
-	assignExtraordinaryNumbers,
-	type DrawType
-} from '$lib/domain/draw-eligibility';
+import { evaluateDrawEligibility, type DrawType } from '$lib/domain/draw-eligibility';
 import { generateDrawRoster, freezeDrawRoster } from '$lib/server/services/draw-rosters';
 import { createDraw, updateDraw, annulDraw } from '$lib/server/services/draws';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -186,7 +182,7 @@ beforeAll(async () => {
 	}
 });
 
-it('SAN-117 releases, audits and reallocates extras without changing shared frozen history', async () => {
+it('SAN-152 annulling a draw built from own numbers releases nothing and keeps shared frozen history', async () => {
 	// Dedicated mutable fixture: no dependence on other tests' draws, payments or reservations.
 	const scope = randomUUID();
 	const context = { permissions, requestId: `it-117-${scope}` };
@@ -269,13 +265,18 @@ it('SAN-117 releases, audits and reallocates extras without changing shared froz
 	const first = await newDraw('First');
 	const firstRoster = await generateDrawRoster(admin, { drawId: first }, context);
 	const before = await entries(firstRoster);
-	const oldExtra = await admin
-		.from('bond_numbers')
-		.select('*')
-		.eq('bond_id', bond)
-		.eq('number_kind', 'extraordinary')
-		.single();
-	expect(oldExtra.error).toBeNull();
+	const ownNumbers = async () => {
+		const result = await admin
+			.from('bond_numbers')
+			.select('*')
+			.eq('bond_id', bond)
+			.order('number_value');
+		expect(result.error).toBeNull();
+		return result.data!;
+	};
+	const owned = await ownNumbers();
+	expect(owned.map((n) => n.number_kind)).toEqual(['base', 'associated']);
+	expect(before.map((row) => row.number_value)).toEqual(owned.map((n) => n.number_value));
 	const deniedRequest = `${context.requestId}-denied`;
 	const denied = await readOnly.rpc('draw_annul', {
 		p_draw_id: first,
@@ -289,13 +290,6 @@ it('SAN-117 releases, audits and reallocates extras without changing shared froz
 	const unchanged = await admin.from('draws').select('status').eq('id', first).single();
 	expect(unchanged.error).toBeNull();
 	expect(unchanged.data?.status).toBe('roster_generated');
-	const deniedExtra = await admin
-		.from('bond_numbers')
-		.select('*')
-		.eq('id', oldExtra.data!.id)
-		.single();
-	expect(deniedExtra.error).toBeNull();
-	expect(deniedExtra.data).toEqual(oldExtra.data);
 	const releaseRequest = `${context.requestId}-release`;
 	await annulDraw(
 		admin,
@@ -305,39 +299,20 @@ it('SAN-117 releases, audits and reallocates extras without changing shared froz
 			requestId: releaseRequest
 		}
 	);
-	const released = await admin
-		.from('bond_numbers')
-		.select('*')
-		.eq('id', oldExtra.data!.id)
-		.single();
-	expect(released.error).toBeNull();
-	expect(released.data?.released_at).toBeTruthy();
-	expect(released.data?.released_by).toBeTruthy();
 	const audit = await admin
 		.from('audit_log')
 		.select('new_value,old_value,reason')
 		.eq('request_id', releaseRequest)
 		.single();
 	expect(audit.error).toBeNull();
-	expect(audit.data?.new_value).toMatchObject({
-		status: 'annulled',
-		released_number_ids: [oldExtra.data!.id]
-	});
+	expect(audit.data?.new_value).toMatchObject({ status: 'annulled', released_number_ids: [] });
 	expect(audit.data?.old_value).toMatchObject({ status: 'roster_generated' });
 	expect(await entries(firstRoster)).toEqual(before);
+	// The bond's own numbers stay reserved: no extra number was created or released.
+	expect(await ownNumbers()).toEqual(owned);
 	const second = await newDraw('Later');
 	await generateDrawRoster(admin, { drawId: second }, context);
-	const current = await admin
-		.from('bond_numbers')
-		.select('*')
-		.eq('bond_id', bond)
-		.eq('number_kind', 'extraordinary')
-		.is('released_at', null)
-		.single();
-	expect(current.error).toBeNull();
-	expect(current.data!.id).not.toBe(oldExtra.data!.id);
-	expect(current.data!.number_value).toBe(oldExtra.data!.number_value);
-	expect(current.data!.source_base_number_id).toBe(oldExtra.data!.source_base_number_id);
+	expect(await ownNumbers()).toEqual(owned);
 	const third = await newDraw('Shared frozen');
 	const thirdRoster = await generateDrawRoster(admin, { drawId: third }, context);
 	await freezeDrawRoster(admin, { drawId: third }, context);
@@ -345,12 +320,10 @@ it('SAN-117 releases, audits and reallocates extras without changing shared froz
 	const keepRequest = `${context.requestId}-keep`;
 	await annulDraw(
 		admin,
-		{ drawId: second, reason: 'Keep shared extra' },
+		{ drawId: second, reason: 'Keep shared numbers' },
 		{ ...context, requestId: keepRequest }
 	);
-	const kept = await admin.from('bond_numbers').select('*').eq('id', current.data!.id).single();
-	expect(kept.error).toBeNull();
-	expect(kept.data).toEqual(current.data);
+	expect(await ownNumbers()).toEqual(owned);
 	const keptAudit = await admin
 		.from('audit_log')
 		.select('new_value')
@@ -473,38 +446,30 @@ describe('transactional draw roster services with real users', () => {
 					}).toEqual(expected);
 			}
 			if (type === 'extraordinary_full_payment') {
+				// SAN-152: no extra numbers; every fully paid bond participates with its own numbers.
 				const { data: numbers, error } = await admin
 					.from('bond_numbers')
-					.select('id,bond_id,number_value,number_kind,source_base_number_id')
+					.select('id,bond_id,number_value,number_kind')
 					.eq('campaign_id', campaignId)
+					.is('released_at', null)
 					.order('number_value')
 					.order('id')
 					.range(0, 499);
 				if (error) throw error;
-				const expected = assignExtraordinaryNumbers({
-					maxNumber: 9999,
-					takenNumbers: numbers!
-						.filter((n) => n.number_kind !== 'extraordinary')
-						.map((n) => n.number_value),
-					eligibleBonds: fixtures
-						.filter((f) => f.paid === 'full')
-						.map((f) => ({
-							bondId: f.bondId,
-							kind: f.units === 1 ? 'simple' : 'pata',
-							baseNumbers: numbers!
-								.filter((n) => n.bond_id === f.bondId && n.number_kind === 'base')
-								.map((n) => ({ id: n.id, value: n.number_value }))
-						}))
-				});
-				expect(
-					numbers!
-						.filter((n) => n.number_kind === 'extraordinary')
-						.map((n) => ({
-							bondId: n.bond_id,
-							sourceBaseNumberId: n.source_base_number_id,
-							value: n.number_value
-						}))
-				).toEqual(expected);
+				expect(numbers!.filter((n) => n.number_kind === 'extraordinary')).toEqual([]);
+				for (const f of fixtures.filter((x) => x.paid === 'full')) {
+					expect(
+						rows
+							.filter((r) => r.bond_id === f.bondId)
+							.map((r) => r.number_value)
+							.sort((a, b) => a - b)
+					).toEqual(
+						numbers!
+							.filter((n) => n.bond_id === f.bondId)
+							.map((n) => n.number_value)
+							.sort((a, b) => a - b)
+					);
+				}
 			}
 			await freezeDrawRoster(admin, { drawId }, ctx(`freeze-${type}`));
 			const { data: frozen } = await admin
