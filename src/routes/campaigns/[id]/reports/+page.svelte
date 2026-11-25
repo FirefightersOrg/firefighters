@@ -5,6 +5,8 @@
 	import Section from '$lib/components/ui/Section.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import TextInput from '$lib/components/ui/TextInput.svelte';
+	import Alert from '$lib/components/ui/Alert.svelte';
+	import { formatDate } from '$lib/format';
 	import {
 		BOND_COMMERCIAL_STATUSES,
 		BOND_COMMERCIAL_STATUS_LABELS,
@@ -24,7 +26,14 @@
 	} from '$lib/domain/reports';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
+	const overdue = $derived(data.overdueWarning);
+	const thresholdForm = $derived(
+		form?.form === 'setOverdueThreshold'
+			? (form as { success?: boolean; message?: string; threshold?: string })
+			: null
+	);
+	const cuotas = (n: number) => (n === 1 ? 'cuota vencida' : 'cuotas vencidas');
 	const campaign = $derived(data.campaign);
 	const filters = $derived(data.filters);
 	const exportParams = $derived({
@@ -286,6 +295,86 @@
 							{/each}
 						</tr>
 					</tfoot>
+				</table>
+			</div>
+		{/if}
+	</Section>
+
+	<Section
+		id="overdue-warning"
+		title={`Ventas con ${overdue.threshold} o más ${cuotas(overdue.threshold)}`}
+	>
+		<p class="mb-3 text-body-sm text-muted">
+			Aviso informativo: no marca ninguna venta como incobrable. Solo ventas activas que no están
+			marcadas como incobrables. Respeta el filtro de cobrador.
+		</p>
+		{#if thresholdForm?.message}
+			<div class="mb-3">
+				<Alert tone={thresholdForm.success ? 'success' : 'danger'}>{thresholdForm.message}</Alert>
+			</div>
+		{/if}
+		{#if overdue.canEdit}
+			<form
+				method="POST"
+				action="?/setOverdueThreshold"
+				class="mb-4 flex flex-wrap items-end gap-3"
+			>
+				<Field
+					label="Avisar desde (cuotas vencidas)"
+					id="overdue-threshold"
+					hint="Entre 1 y 120. Vale para toda la campaña."
+				>
+					<TextInput
+						name="threshold"
+						inputmode="numeric"
+						autocomplete="off"
+						value={thresholdForm && !thresholdForm.success
+							? (thresholdForm.threshold ?? '')
+							: String(overdue.threshold)}
+					/>
+				</Field>
+				<Button type="submit">Guardar</Button>
+			</form>
+		{/if}
+		{#if overdue.sales.length === 0}
+			<p class="text-body-sm text-muted">
+				Ninguna venta tiene {overdue.threshold} o más {cuotas(overdue.threshold)}.
+			</p>
+		{:else}
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-border text-body-sm">
+					<thead>
+						<tr>
+							<th class={th}>Bono</th>
+							<th class={th}>Cobrador</th>
+							<th class={thRight}>Cuotas vencidas</th>
+							<th class={thRight}>Importe vencido</th>
+							<th class={th}>Vencida desde</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-border">
+						{#each overdue.sales as sale (sale.saleId)}
+							<tr>
+								<td class={td}>
+									{#if overdue.canViewSales}
+										<a
+											class="text-primary-text hover:underline"
+											href={resolve('/campaigns/[id]/sales/[saleId]', {
+												id: campaign.id,
+												saleId: sale.saleId
+											})}>{sale.bondLabel}</a
+										>
+									{:else}
+										{sale.bondLabel}
+									{/if}
+								</td>
+								<td class={td}>{sale.collectorName}</td>
+								<td class={tdRight}>{formatInteger(sale.overdueCount)}</td>
+								<td class={tdRight}>{formatMoney(sale.overdueAmount)}</td>
+								<td class={td}>{formatDate(sale.oldestDueDate)}</td>
+							</tr>
+						{/each}
+					</tbody>
 				</table>
 			</div>
 		{/if}

@@ -214,13 +214,13 @@ select is((select count(*)::int from public.report_prizes(pg_temp.id('other'))),
 -- Read only and hardening
 select is((select count(*)::int from public.audit_log where entity_type in ('report', 'reports')), 0, 'reports write no audit rows');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname like 'report\_%' and p.prosecdef and p.provolatile = 's'), 13, 'all report functions are stable security definer');
+  where n.nspname = 'public' and p.proname like 'report\_%' and p.prosecdef and p.provolatile = 's'), 14, 'all report functions are stable security definer');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname like 'report\_%' and p.proconfig::text like '%search_path=%'), 13, 'the report functions pin search_path');
+  where n.nspname = 'public' and p.proname like 'report\_%' and p.proconfig::text like '%search_path=%'), 14, 'the report functions pin search_path');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'report\_%' and p.proname <> 'report_require_financial' and p.proname <> 'report_require_operational'
     and has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')
-    and not has_function_privilege('service_role', p.oid, 'execute')), 11, 'report functions: authenticated only (SAN-87 functions also revoke service_role)');
+    and not has_function_privilege('service_role', p.oid, 'execute')), 12, 'report functions: authenticated only (SAN-87 and SAN-142 functions also revoke service_role)');
 
 select * from finish();
 rollback;

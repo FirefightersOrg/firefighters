@@ -50,6 +50,7 @@ Fields:
 - `overflow_policy` (text, default `reject`; only `reject` for now)
 - `barcode_mode` (text, required, no default): `base_number`, `internal_code`, `external_legacy_code`, `manual_mapping` (semantics in `docs/imports.md`)
 - `barcode_pattern` (text, optional, SAN-44): only for `internal_code` / `external_legacy_code`; a Postgres regular expression whose first capture group is the base number (null: the operator types the base number, like `manual_mapping`)
+- `overdue_warning_threshold` (integer 1..120, default 3, SAN-142): reports warn about a sale with this many overdue installments or more. Informative only.
 - `created_by` (profile, nullable for system actions, `on delete restrict`)
 - `created_at`, `updated_at` (set by the database)
 

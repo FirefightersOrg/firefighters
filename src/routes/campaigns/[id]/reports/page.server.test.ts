@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { load } from './+page.server';
+import { actions, load } from './+page.server';
 import { CAMPAIGN_ID, campaignRow, makeLocals, mockSupabase } from '../../test-helpers';
 
 const COLLECTOR_ID = 'c0000000-0000-0000-0000-000000000001';
@@ -39,6 +39,19 @@ const REPORT_ROWS: Record<string, unknown[]> = {
 			bucket: 'overdue',
 			installment_count: 1,
 			amount: '50.00'
+		}
+	],
+	report_overdue_sales: [
+		{
+			sale_id: 's1',
+			bond_id: 'b1',
+			bond_label: '0068',
+			collector_id: COLLECTOR_ID,
+			collector_name: 'Ana',
+			overdue_count: 4,
+			overdue_amount: '400.00',
+			oldest_due_date: '2027-01-10',
+			threshold: 3
 		}
 	],
 	report_collector_monthly: [
@@ -100,7 +113,7 @@ describe('/campaigns/[id]/reports load', () => {
 		expect(data.installments.totals.overdue).toEqual({ count: 1, amount: '50.00' });
 		expect(data.monthly.totals.paymentsTotal).toBe('100.00');
 		expect(data.collectors).toEqual([{ id: COLLECTOR_ID, displayName: 'Ana' }]);
-		expect(rpc).toHaveBeenCalledTimes(4);
+		expect(rpc).toHaveBeenCalledTimes(5);
 		for (const [, args] of rpc.mock.calls) expect(args.p_campaign_id).toBe(CAMPAIGN_ID);
 	});
 
@@ -166,5 +179,82 @@ describe('/campaigns/[id]/reports load', () => {
 		const { locals } = setup(VIEWER, { failRpc: 'report_installments' });
 		await expect(load(event(locals))).rejects.toMatchObject({ status: 500 });
 		spy.mockRestore();
+	});
+});
+
+describe('overdue warning (SAN-142)', () => {
+	it('loads the sales with N+ overdue installments, paged, with N and the edit flags', async () => {
+		const { locals, rpc } = setup([...VIEWER, 'campaign.update_rules', 'sale.view']);
+		const data = (await load(event(locals, `?collector=${COLLECTOR_ID}`)))!;
+		expect(data.overdueWarning).toMatchObject({
+			threshold: 3,
+			canEdit: true,
+			canViewSales: true,
+			sales: [{ saleId: 's1', bondLabel: '0068', overdueCount: 4, overdueAmount: '400.00' }]
+		});
+		expect(rpc.mock.calls.find(([n]) => n === 'report_overdue_sales')![1]).toEqual({
+			p_campaign_id: CAMPAIGN_ID,
+			p_collector_id: COLLECTOR_ID,
+			p_limit: 1000,
+			p_offset: 0
+		});
+		const viewer = (await load(event(setup().locals)))!;
+		expect(viewer.overdueWarning).toMatchObject({ canEdit: false, canViewSales: false });
+	});
+
+	it('is 500 when the overdue report fails', async () => {
+		const { locals } = setup(VIEWER, { failRpc: 'report_overdue_sales' });
+		await expect(load(event(locals))).rejects.toMatchObject({ status: 500 });
+	});
+
+	const act = async (permissions: string[] | null, threshold: string, rpcError: unknown = null) => {
+		const { locals, rpc } = setup(permissions);
+		rpc.mockResolvedValue({ data: null, error: rpcError });
+		const body = new FormData();
+		body.set('threshold', threshold);
+		const result = await actions.setOverdueThreshold({
+			locals,
+			params: { id: CAMPAIGN_ID },
+			url: new URL(`http://localhost/campaigns/${CAMPAIGN_ID}/reports`),
+			request: new Request('http://localhost', { method: 'POST', body })
+		} as never);
+		return { result, rpc };
+	};
+	const EDITOR = [...VIEWER, 'campaign.update_rules'];
+
+	it('requires campaign.update_rules before any RPC', async () => {
+		expect((await act(null, '2')).result).toMatchObject({ status: 500 });
+		const denied = await act(VIEWER, '2');
+		expect(denied.result).toMatchObject({ status: 403 });
+		expect(denied.rpc).not.toHaveBeenCalled();
+	});
+
+	it('validates 1..120 integers, saves, and maps database refusals', async () => {
+		for (const bad of ['0', '121', '2.5', 'x', '']) {
+			const { result, rpc } = await act(EDITOR, bad);
+			expect(result).toMatchObject({ status: 400, data: { threshold: bad } });
+			expect(rpc).not.toHaveBeenCalled();
+		}
+		const ok = await act(EDITOR, ' 2 ');
+		expect(ok.result).toEqual({
+			form: 'setOverdueThreshold',
+			success: true,
+			message: 'Aviso actualizado: desde 2 cuotas vencidas.'
+		});
+		expect(ok.rpc).toHaveBeenCalledWith('campaign_set_overdue_warning_threshold', {
+			p_campaign_id: CAMPAIGN_ID,
+			p_threshold: 2,
+			p_request_id: expect.anything()
+		});
+		expect((await act(EDITOR, '1')).result).toMatchObject({
+			message: 'Aviso actualizado: desde 1 cuota vencida.'
+		});
+		expect((await act(EDITOR, '4', { code: '55000', message: 'closed' })).result).toMatchObject({
+			status: 409,
+			data: { message: 'No se puede cambiar el aviso de una campaña cerrada o anulada.' }
+		});
+		expect((await act(EDITOR, '4', { code: '42501', message: 'no' })).result).toMatchObject({
+			status: 403
+		});
 	});
 });
