@@ -33,7 +33,8 @@
 			credit: entry.direction === 'collector_credit' ? money(entry.amount) : '',
 			balance: money(entry.runningBalance),
 			status: entry.status as LedgerStatus,
-			reference: !entry.affectsBalance
+			reference: !entry.affectsBalance,
+			reason: entry.adjustmentReason
 		}))
 	);
 	type EntryRow = (typeof entryRows)[number];
@@ -123,6 +124,12 @@
 						<span class={row.status === 'annulled' ? 'text-muted line-through' : undefined}
 							>{row.type}</span
 						>
+						{#if row.reason}<p
+								class="m-0 text-body-sm text-muted break-words"
+								data-testid="adjustment-reason"
+							>
+								Motivo: {row.reason}
+							</p>{/if}
 						{#if row.reference}<p class="m-0 text-body-sm text-muted">
 								Referencia: no cambia el saldo.
 							</p>{/if}

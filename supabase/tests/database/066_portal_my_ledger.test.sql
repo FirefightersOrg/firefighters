@@ -1,5 +1,5 @@
 -- SAN-146: portal_my_ledger_summary / portal_my_ledger. Two collectors are isolated, annulled entries are listed
--- but not counted, pages are stable and newest first, balances match the treasury view, no internal notes leak,
+-- but not counted, pages are stable and newest first, balances match the treasury view, no internal notes leak (SAN-154: only the manual adjustment reason is returned, see 073),
 -- and callers without collector.ledger.view_own are refused.
 begin;
 select plan(31);
@@ -76,7 +76,7 @@ select is((select array_agg(running_balance order by occurred_at) from public.po
 select is((select bool_and(affects_balance) from public.portal_my_ledger(pg_temp.id('camp'))), true, 'A: every entry affects the balance (no reference entries)');
 select is((select settlement_number from public.portal_my_ledger(pg_temp.id('camp')) where entry_type = 'commission_generated'), 1, 'A: the own settlement number is returned');
 select is((select count(*)::int from pg_proc p where p.proname = 'portal_my_ledger'
-   and pg_get_function_result(p.oid) ~* '(reason|notes|created_by|collector_id)'), 0, 'no internal notes or collector id in the result');
+   and pg_get_function_result(p.oid) ~* '(annul_reason|notes|created_by|annulled_by|collector_id)'), 0, 'no annul reason, internal notes or collector id in the result');
 select throws_ok(format('select * from public.portal_my_ledger(%L)', gen_random_uuid()), 'P0002', null, 'an unknown campaign is not found');
 select throws_ok(format('select * from public.portal_my_ledger(%L, 0, 0)', pg_temp.id('camp')), '22023', null, 'a page of 0 entries is refused');
 select throws_ok(format('select * from public.portal_my_ledger(%L, 25, -1)', pg_temp.id('camp')), '22023', null, 'a negative offset is refused');

@@ -320,7 +320,23 @@ describe('portal "Mi cuenta corriente" (local Supabase)', () => {
 		const a = (await cuentaLoad(event(linkedA)))!;
 		const annulled = a.ledger!.entries.filter((e: PortalLedgerEntry) => e.status === 'annulled');
 		expect(annulled.map((e: PortalLedgerEntry) => e.amount)).toEqual([20]);
-		expect(JSON.stringify(a.ledger)).not.toMatch(/Internal|reason/i);
+		expect(JSON.stringify(a.ledger)).not.toMatch(
+			/annulReason|annul_reason|created_by|createdBy|Internal annul note/i
+		);
+		// Manual adjustments show their reason; the annulled one keeps the original reason (not the annul reason).
+		const reasons = a
+			.ledger!.entries.filter((e: PortalLedgerEntry) => e.adjustmentReason !== null)
+			.map((e: PortalLedgerEntry) => e.adjustmentReason);
+		expect(reasons.sort()).toEqual([
+			'Internal treasury note a1',
+			'Internal treasury note a2',
+			'Internal treasury note a3'
+		]);
+		expect(
+			a
+				.ledger!.entries.filter((e: PortalLedgerEntry) => e.entryType === 'commission_generated')
+				.every((e: PortalLedgerEntry) => e.adjustmentReason === null)
+		).toBe(true);
 	});
 
 	it('matches the balance the treasury sees for the same collector', async () => {
