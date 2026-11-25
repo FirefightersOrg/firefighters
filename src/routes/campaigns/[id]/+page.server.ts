@@ -90,7 +90,7 @@ const TRANSITION_SUCCESS = {
  * Campaign data, permissions and (optionally) the dashboard. The campaign page loads everything; Datos y
  * reglas (`./configuracion`) shares this load without the dashboard queries it does not show.
  */
-export async function loadCampaignPage(
+export async function _loadCampaignPage(
 	{ locals, params, url }: { locals: App.Locals; params: { id: string }; url: URL },
 	options: { dashboard: boolean }
 ) {
@@ -192,7 +192,7 @@ export async function loadCampaignPage(
 	};
 }
 
-export const load: PageServerLoad = (event) => loadCampaignPage(event, { dashboard: true });
+export const load: PageServerLoad = (event) => _loadCampaignPage(event, { dashboard: true });
 
 /**
  * Dashboard figures (SAN-85). The operational group (bonds, revenue, next draw and at-risk bonds)
