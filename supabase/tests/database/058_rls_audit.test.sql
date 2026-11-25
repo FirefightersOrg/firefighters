@@ -103,7 +103,7 @@ insert into expected_matrix values
   'campaign.view','campaign.create','campaign.update','campaign.update_rules','campaign.close',
   'bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return','bond.mark_lost','bond.annul','bond.view_own',
   'buyer.view','buyer.manage','collector.view','collector.manage','collector.ledger.view','collector.ledger.adjust','collector.ledger.view_own',
-  'sale.view','sale.create','sale.correct','sale.mark_uncollectible','sale.view_own','payment.view','payment.create','payment.annul','payment.create_own',
+  'sale.view','sale.create','sale.correct','sale.mark_uncollectible','sale.revert_uncollectible','sale.view_own','payment.view','payment.create','payment.annul','payment.create_own',
   'settlement.view','settlement.create','settlement.update_open','settlement.close','settlement.correct',
   'commission.view','commission.rule_manage','commission.adjust','commission.settle',
   'draw.view','draw.create','draw.update','draw.annul','draw.complete','draw.generate_roster','draw.freeze_roster',

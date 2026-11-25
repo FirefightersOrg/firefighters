@@ -6,6 +6,7 @@
 	import { campaignEditFormKey } from '$lib/components/campaigns/types';
 	import { Alert, Card, PageHeader, StatusBadge, statusMeta } from '$lib/components/ui';
 	import {
+		ASSOCIATED_NUMBER_MODE_LABELS,
 		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
 		canEditCampaignRules,
@@ -89,6 +90,10 @@
 			<div>
 				<dt class="text-caption text-muted">Número máximo</dt>
 				<dd class="m-0 mt-0.5 tabular-nums">{campaign.maxNumber}</dd>
+			</div>
+			<div>
+				<dt class="text-caption text-muted">Modo del número asociado</dt>
+				<dd class="m-0 mt-0.5">{ASSOCIATED_NUMBER_MODE_LABELS[campaign.associatedNumberMode]}</dd>
 			</div>
 			<div>
 				<dt class="text-caption text-muted">Desfase del número asociado</dt>

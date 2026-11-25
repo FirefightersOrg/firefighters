@@ -12,6 +12,7 @@ const campaign = {
 	numberDigits: 4,
 	maxNumber: 9999,
 	associatedNumberOffset: 1,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject',
 	barcodeMode: 'base_number',
 	barcodePattern: null,

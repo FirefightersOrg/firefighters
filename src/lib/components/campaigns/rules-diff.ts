@@ -1,4 +1,5 @@
 import {
+	ASSOCIATED_NUMBER_MODE_LABELS,
 	BARCODE_MODE_LABELS,
 	OVERFLOW_POLICY_LABELS,
 	barcodeModeUsesPattern,
@@ -7,7 +8,7 @@ import {
 } from '$lib/domain/campaigns';
 import { previewInstallmentValue } from '$lib/domain/installments';
 import { centsToDecimalString, parseMoneyInput, parseMoneyToCents } from '$lib/domain/money';
-import type { OverflowPolicy } from '$lib/domain/numbering';
+import type { AssociatedNumberMode, OverflowPolicy } from '$lib/domain/numbering';
 import { formatMoney } from '$lib/format';
 import type { CampaignRulesValues } from './types';
 
@@ -87,6 +88,18 @@ export function diffCampaignRules(campaign: Campaign, values: CampaignRulesValue
 
 	pushWhole('numberDigits', 'Cantidad de dígitos', campaign.numberDigits);
 	pushWhole('maxNumber', 'Número máximo', campaign.maxNumber);
+	// An empty value is treated as linear, like the schema (a missing field = the default).
+	const typedMode = (values.associatedNumberMode.trim() || 'linear') as AssociatedNumberMode;
+	if (typedMode !== campaign.associatedNumberMode) {
+		const label = (mode: string) =>
+			ASSOCIATED_NUMBER_MODE_LABELS[mode as AssociatedNumberMode] ?? mode;
+		changes.push({
+			field: 'associatedNumberMode',
+			label: 'Modo del número asociado',
+			from: label(campaign.associatedNumberMode),
+			to: label(typedMode)
+		});
+	}
 	pushWhole(
 		'associatedNumberOffset',
 		'Desfase del número asociado',

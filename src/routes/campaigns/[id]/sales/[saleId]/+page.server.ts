@@ -16,7 +16,10 @@ import {
 	correctSaleCollector,
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
-import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
+import {
+	markSaleUncollectible,
+	revertSaleUncollectible
+} from '$lib/server/services/sale-uncollectible';
 import { SaleServiceError } from '$lib/server/services/sales';
 
 const field = (form: FormData, name: string) => String(form.get(name) ?? '').trim();
@@ -80,6 +83,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			hasPermissionIn(locals.permissions, 'sale.mark_uncollectible') &&
 			sale.data.sale.status === 'active' &&
 			sale.data.uncollectible === null,
+		/** Follow-up of SAN-106: an admin may revert the mark, with an audited reason. */
+		canRevertUncollectible:
+			hasPermissionIn(locals.permissions, 'sale.revert_uncollectible') &&
+			sale.data.sale.status === 'active' &&
+			sale.data.uncollectible !== null,
 		correction: canCorrect
 			? {
 					buyers: buyers.data?.items ?? [],
@@ -130,6 +138,34 @@ export const actions: Actions = {
 				values,
 				errors: service?.field ? { [service.field]: [service.message] } : {},
 				message: service?.message ?? 'No se pudo marcar la venta como incobrable.'
+			});
+		}
+	},
+	revertUncollectible: async ({ request, locals, params, url }) => {
+		const form = 'revertUncollectible';
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form, errors: {}, message: 'No se pudieron cargar los permisos.' });
+		requireCampaignViewer(locals, url);
+		if (!hasPermissionIn(locals.permissions, 'sale.revert_uncollectible'))
+			return fail(403, { form, errors: {}, message: 'No hay permiso para esta acción.' });
+		const data = await request.formData();
+		const values = { reason: field(data, 'reason') };
+		const missingSale = await saleForAction(locals, params, form, values);
+		if (missingSale) return missingSale;
+		try {
+			await revertSaleUncollectible(
+				locals.supabase,
+				{ saleId: params.saleId, ...values },
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return { form, success: true, message: 'Se revirtió la marca de incobrable.', errors: {} };
+		} catch (cause) {
+			const service = cause instanceof SaleServiceError ? cause : null;
+			return fail(service?.status ?? 500, {
+				form,
+				values,
+				errors: service?.field ? { [service.field]: [service.message] } : {},
+				message: service?.message ?? 'No se pudo revertir la marca de incobrable.'
 			});
 		}
 	},

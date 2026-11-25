@@ -8,6 +8,7 @@ const FIVE: CampaignNumberingConfig = {
 	numberDigits: 5,
 	maxNumber: 99999,
 	associatedNumberOffset: 48710,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject'
 };
 const CAMPAIGN_ID = 'f0000000-0000-0000-0000-000000000001';

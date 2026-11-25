@@ -75,12 +75,14 @@ describe('campaign status machine', () => {
 				numberDigits: 5,
 				maxNumber: 99999,
 				associatedNumberOffset: 4871,
+				associatedNumberMode: 'linear',
 				overflowPolicy: 'reject'
 			})
 		).toEqual({
 			numberDigits: 5,
 			maxNumber: 99999,
 			associatedNumberOffset: 4871,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		});
 	});

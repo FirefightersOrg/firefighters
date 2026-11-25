@@ -4,7 +4,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { assignBondsToCollector } from '$lib/server/services/deliveries';
 import { registerSale } from '$lib/server/services/sales';
-import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
+import {
+	markSaleUncollectible,
+	revertSaleUncollectible
+} from '$lib/server/services/sale-uncollectible';
 import { buildInstallmentSchedule } from '$lib/domain/sales';
 import {
 	getActiveSaleForBond,
@@ -343,5 +346,27 @@ describe('SAN-106: manual uncollectible mark (local Supabase)', () => {
 		expect(audit).toEqual([
 			{ reason: 'Se mudó sin aviso', request_id: ctx(treasurer, 'mark').requestId }
 		]);
+		// Follow-up of SAN-106: only an admin reverts the mark, with an audited reason.
+		await expect(
+			revertSaleUncollectible(
+				treasurer.client,
+				{ saleId, reason: 'Apareció' },
+				{ ...ctx(treasurer, 'revert-denied'), permissions: ['sale.revert_uncollectible'] }
+			)
+		).rejects.toMatchObject({ kind: 'permission' });
+		await revertSaleUncollectible(
+			admin.client,
+			{ saleId, reason: 'Apareció y pagó' },
+			ctx(admin, 'revert')
+		);
+		const reverted = await getSaleDetail(admin.client, campaignId, saleId);
+		expect(reverted.data?.uncollectible).toBeNull();
+		expect(reverted.data?.financialStatus).not.toBe('uncollectible');
+		const { data: revertAudit } = await admin.client
+			.from('audit_log')
+			.select('reason')
+			.eq('action', 'sale.revert_uncollectible')
+			.eq('entity_id', saleId);
+		expect(revertAudit).toEqual([{ reason: 'Apareció y pagó' }]);
 	});
 });

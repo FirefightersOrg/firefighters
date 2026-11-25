@@ -23,6 +23,7 @@ const FIVE_DIGITS: CampaignNumberingConfig = {
 	numberDigits: 5,
 	maxNumber: 99999,
 	associatedNumberOffset: 4871,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject'
 };
 
@@ -52,6 +53,7 @@ describe('DEFAULT_NUMBERING_CONFIG', () => {
 			numberDigits: 4,
 			maxNumber: 9999,
 			associatedNumberOffset: 4871,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		});
 		expect(validateNumberingConfig(DEFAULT_NUMBERING_CONFIG)).toEqual([]);
@@ -305,6 +307,7 @@ describe('validateNumberingConfig', () => {
 				numberDigits: 1,
 				maxNumber: 1,
 				associatedNumberOffset: 0,
+				associatedNumberMode: 'linear',
 				overflowPolicy: 'reject'
 			})
 		).toEqual([]);
@@ -320,6 +323,7 @@ describe('validateNumberingConfig', () => {
 			numberDigits: 10,
 			maxNumber: 2147483647,
 			associatedNumberOffset: 0,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		};
 		expect(validateNumberingConfig(tenDigits)).toEqual([]);
@@ -335,6 +339,7 @@ describe('validateNumberingConfig', () => {
 			numberDigits: 10,
 			maxNumber: 2147483647,
 			associatedNumberOffset: 0,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		};
 		expect(validateNumberingConfig(tenDigits)).toEqual([]);
@@ -356,6 +361,7 @@ describe('validateNumberingConfig', () => {
 			numberDigits: 2147483647,
 			maxNumber: 1,
 			associatedNumberOffset: 0,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		};
 		expect(fieldsOf(config)).toEqual(['numberDigits']);
@@ -395,6 +401,7 @@ describe('validateNumberingConfig', () => {
 			numberDigits: 0,
 			maxNumber: -5,
 			associatedNumberOffset: -1,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'truncate'
 		} as unknown as CampaignNumberingConfig;
 		expect(fieldsOf(config)).toEqual([

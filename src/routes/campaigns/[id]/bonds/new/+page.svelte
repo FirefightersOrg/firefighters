@@ -15,6 +15,7 @@
 	} from '$lib/components/ui';
 	import { previewBaseNumber } from '$lib/domain/bond-preview';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
+	import { associatedNumberRuleText } from '$lib/domain/numbering';
 	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
 	import { formatNumber } from '$lib/format';
 	import { BOND_CODE_MAX_LENGTH, BOND_ENTRY_INTENT_FIELD } from '$lib/schemas/bond';
@@ -128,8 +129,8 @@
 			<div class="flex flex-col gap-5">
 				<p class="m-0 text-body-sm text-muted">
 					Números de {campaign.numberDigits} dígitos hasta
-					<span class="font-mono tabular-nums">{campaign.maxNumber}</span>; número asociado = base +
-					<span class="tabular-nums">{campaign.associatedNumberOffset}</span>.
+					<span class="font-mono tabular-nums">{campaign.maxNumber}</span>; número asociado =
+					<span class="tabular-nums">{associatedNumberRuleText(campaign)}</span>.
 					{#if numbering.ok}
 						Números base utilizables:
 						<span class="font-mono tabular-nums"

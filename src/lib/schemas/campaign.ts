@@ -30,9 +30,11 @@ import {
 	parseMoneyInput
 } from '$lib/domain/money';
 import {
+	ASSOCIATED_NUMBER_MODES,
 	MAX_CAMPAIGN_NUMBER,
 	MAX_NUMBER_DIGITS,
 	validateNumberingConfig,
+	type AssociatedNumberMode,
 	type CampaignNumberingConfig,
 	type OverflowPolicy
 } from '$lib/domain/numbering';
@@ -55,6 +57,7 @@ export const CAMPAIGN_NUMBERING_FIELDS = [
 	'numberDigits',
 	'maxNumber',
 	'associatedNumberOffset',
+	'associatedNumberMode',
 	'overflowPolicy'
 ] as const;
 export const CAMPAIGN_RULES_FIELDS = [
@@ -183,6 +186,16 @@ const numberingShape = {
 		min: 0,
 		max: MAX_CAMPAIGN_NUMBER
 	}),
+	// A missing field means the default (linear), like the column default; the form always sends it.
+	associatedNumberMode: z
+		.string()
+		.trim()
+		.default('')
+		.refine(
+			(value) => value === '' || (ASSOCIATED_NUMBER_MODES as readonly string[]).includes(value),
+			'El modo del número asociado no es válido'
+		)
+		.transform((value): AssociatedNumberMode => (value || 'linear') as AssociatedNumberMode),
 	overflowPolicy: z.string().trim().min(1, 'La política de desborde es obligatoria')
 };
 
@@ -235,6 +248,7 @@ const NUMBERING_FIELD_LABELS: Record<keyof CampaignNumberingConfig, string> = {
 	numberDigits: 'La cantidad de dígitos',
 	maxNumber: 'El número máximo',
 	associatedNumberOffset: 'El desfase del número asociado',
+	associatedNumberMode: 'El modo del número asociado',
 	overflowPolicy: 'La política de desborde'
 };
 
@@ -254,6 +268,14 @@ function humanizeNumberingMessage(message: string): string {
 	if (m) return `${label('maxNumber')} debe entrar en ${m[1]} dígitos (hasta ${m[2]})`;
 	m = /^associatedNumberOffset must not exceed maxNumber \((\d+)\)/.exec(message);
 	if (m) return `${label('associatedNumberOffset')} no puede superar el número máximo (${m[1]})`;
+	if (message.startsWith('maxNumber + 1 must be even in circular mode')) {
+		return 'En modo circular, el número máximo más 1 debe ser par (el rango es 2 × B)';
+	}
+	m = /^associatedNumberOffset must be below B \((\d+)\) in circular mode/.exec(message);
+	if (m) return `En modo circular, el desfase debe ser menor que B (${m[1]}, la mitad del rango)`;
+	if (message.startsWith('associatedNumberMode must be one of')) {
+		return `${label('associatedNumberMode')} no es válido`;
+	}
 	if (message.startsWith('overflowPolicy must be one of')) {
 		return `${label('overflowPolicy')} no es válida`;
 	}
@@ -264,6 +286,7 @@ interface ParsedNumbering {
 	numberDigits: number;
 	maxNumber: number;
 	associatedNumberOffset: number;
+	associatedNumberMode: AssociatedNumberMode;
 	overflowPolicy: string;
 }
 
@@ -277,6 +300,7 @@ function refineNumbering(value: ParsedNumbering, ctx: RefinementCtx) {
 		numberDigits: value.numberDigits,
 		maxNumber: value.maxNumber,
 		associatedNumberOffset: value.associatedNumberOffset,
+		associatedNumberMode: value.associatedNumberMode,
 		overflowPolicy: value.overflowPolicy as OverflowPolicy
 	});
 	for (const issue of issues) {
@@ -356,6 +380,7 @@ function toRulesOutput(value: {
 	numberDigits: number;
 	maxNumber: number;
 	associatedNumberOffset: number;
+	associatedNumberMode: AssociatedNumberMode;
 	overflowPolicy: string;
 	barcodeMode: (typeof BARCODE_MODES)[number];
 	barcodePattern: string | null;
@@ -369,6 +394,7 @@ function toRulesOutput(value: {
 		numberDigits: value.numberDigits,
 		maxNumber: value.maxNumber,
 		associatedNumberOffset: value.associatedNumberOffset,
+		associatedNumberMode: value.associatedNumberMode,
 		overflowPolicy: value.overflowPolicy as OverflowPolicy,
 		barcodeMode: value.barcodeMode,
 		/** Regex whose first capture group is the base number, or null. */
@@ -500,7 +526,12 @@ export type CampaignNumberingInputPreview =
  * numeric field is still empty (no "required" noise while typing).
  */
 export function previewNumberingInput(
-	values: Record<(typeof CAMPAIGN_NUMBERING_FIELDS)[number], string>
+	values: Record<
+		Exclude<(typeof CAMPAIGN_NUMBERING_FIELDS)[number], 'associatedNumberMode'>,
+		string
+	> & {
+		associatedNumberMode?: string;
+	}
 ): CampaignNumberingInputPreview {
 	if (
 		[values.numberDigits, values.maxNumber, values.associatedNumberOffset].some((v) => !v.trim())

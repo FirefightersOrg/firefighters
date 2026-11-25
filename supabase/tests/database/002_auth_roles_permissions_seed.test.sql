@@ -2,7 +2,7 @@ begin;
 select plan(15);
 
 select is((select count(*)::int from public.roles), 5, '5 roles seeded');
-select is((select count(*)::int from public.permissions), 56, '56 permissions seeded');
+select is((select count(*)::int from public.permissions), 57, '57 permissions seeded');
 select is(
   (select array_agg(name order by name) from public.roles),
   array['admin', 'collector', 'operator', 'read-only', 'treasurer'],
@@ -19,7 +19,7 @@ from public.role_permissions rp
 join public.roles r on r.id = rp.role_id
 join public.permissions p on p.id = rp.permission_id;
 
-select is((select count(*)::int from _rp where role_name = 'admin'), 56, 'admin has all 56 permissions');
+select is((select count(*)::int from _rp where role_name = 'admin'), 57, 'admin has all 57 permissions');
 select is((select count(*)::int from _rp where role_name = 'operator'), 21, 'operator has 21 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
 select is((select count(*)::int from _rp where role_name = 'treasurer'), 21, 'treasurer has 21 permissions (SAN-93 view and matrix decisions, SAN-105 sale.view, SAN-106 sale.mark_uncollectible)');
 select is((select count(*)::int from _rp where role_name = 'read-only'), 6, 'read-only has 6 permissions (commission.view in SAN-93)');

@@ -292,6 +292,59 @@
 				{@render status()}
 			{/if}
 
+			{#if operational && operational.submitted.count > 0}
+				<Card
+					title="Cobros enviados sin procesar"
+					id="dash-submitted"
+					description="{operational.submitted.count === 1
+						? '1 cobro enviado'
+						: `${formatNumber(operational.submitted.count)} cobros enviados`} por cobradores desde su portal, por {formatMoney(
+						operational.submitted.amount
+					)}. No cuentan en ninguna rendición hasta que se incluyan o se rechacen, y bloquean el cierre de la rendición de su cobrador."
+				>
+					<table class="w-full border-collapse text-body-sm">
+						<caption class="sr-only">Cobros enviados sin procesar por cobrador</caption>
+						<thead>
+							<tr class="border-b border-border text-left text-muted">
+								<th scope="col" class="py-2 font-medium">Cobrador</th>
+								<th scope="col" class="py-2 text-right font-medium">Cobros</th>
+								<th scope="col" class="py-2 text-right font-medium">Importe</th>
+								<th scope="col" class="py-2 pl-4 font-medium">Dónde procesarlos</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each operational.submitted.byCollector as row (row.collectorId)}
+								<tr class="border-b border-border last:border-0">
+									<td class="py-2.5">{row.collectorName}</td>
+									<td class="py-2.5 text-right tabular-nums">{formatNumber(row.count)}</td>
+									<td class="py-2.5 text-right tabular-nums">{formatMoney(row.amount)}</td>
+									<td class="py-2.5 pl-4">
+										{#if !data.can.viewSettlements}
+											<span class="text-muted">Sin acceso a rendiciones</span>
+										{:else if row.openSettlementId}
+											<a
+												href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+													id: campaign.id,
+													settlementId: row.openSettlementId
+												})}
+												class="text-primary-text underline-offset-2 hover:underline"
+												>Abrir la rendición</a
+											>
+										{:else}
+											<a
+												href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
+												class="text-primary-text underline-offset-2 hover:underline"
+												>Ver rendiciones (no hay una abierta)</a
+											>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</Card>
+			{/if}
+
 			{#if operational}
 				<Card title="Próximo sorteo" id="dash-next-draw">
 					{#if nextDraw && countdown}

@@ -54,6 +54,7 @@ describe('unawarded prize certificate load', () => {
 				numberDigits: 4,
 				maxNumber: 9999,
 				associatedNumberOffset: 100,
+				associatedNumberMode: 'linear',
 				overflowPolicy: 'reject'
 			},
 			error: null

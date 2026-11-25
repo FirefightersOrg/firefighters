@@ -14,6 +14,7 @@ describe('sale detail', () => {
 						numberDigits: 4,
 						maxNumber: 9999,
 						associatedNumberOffset: 4871,
+						associatedNumberMode: 'linear',
 						overflowPolicy: 'reject'
 					},
 					sale: {
@@ -33,7 +34,8 @@ describe('sale detail', () => {
 					},
 					financialStatusSnapshot: 'no_payments',
 					correction,
-					canMarkUncollectible: extra.canMarkUncollectible ?? false
+					canMarkUncollectible: extra.canMarkUncollectible ?? false,
+					canRevertUncollectible: extra.canRevertUncollectible ?? false
 				},
 				params: { id: 'c', saleId: 's' }
 			} as any
@@ -72,5 +74,14 @@ describe('sale detail', () => {
 		expect(marked).toContain('Venta incobrable');
 		expect(marked).toContain('Se mudó sin aviso');
 		expect(marked).not.toContain('?/markUncollectible');
+	});
+	it('offers the revert form only to who may revert a marked sale', () => {
+		const marked = {
+			sale: { uncollectible: { markedAt: '2026-11-25T15:00:00Z', reason: 'Se mudó' } }
+		};
+		expect(page(null, marked)).not.toContain('?/revertUncollectible');
+		const body = page(null, { ...marked, canRevertUncollectible: true });
+		expect(body).toContain('Revertir la marca de incobrable');
+		expect(body).toContain('?/revertUncollectible');
 	});
 });

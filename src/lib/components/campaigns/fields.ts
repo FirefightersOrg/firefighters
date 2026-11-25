@@ -16,6 +16,7 @@ export const RULES_FIELDS: FormFieldRef[] = [
 	{ name: 'installmentCount', label: 'Cantidad de cuotas' },
 	{ name: 'numberDigits', label: 'Cantidad de dígitos' },
 	{ name: 'maxNumber', label: 'Número máximo' },
+	{ name: 'associatedNumberMode', label: 'Modo del número asociado' },
 	{ name: 'associatedNumberOffset', label: 'Desfase del número asociado' },
 	{ name: 'overflowPolicy', label: 'Política de desborde' },
 	{ name: 'barcodeMode', label: 'Modo de código de barras' },

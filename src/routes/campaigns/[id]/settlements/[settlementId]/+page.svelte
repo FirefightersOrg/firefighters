@@ -18,6 +18,7 @@
 		TextInput
 	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
+	import { unprocessedSubmittedMessage } from '$lib/copy';
 	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
 	import { parseMoneyToCents } from '$lib/domain/money';
 	import {
@@ -69,6 +70,11 @@
 				]
 	);
 	const open = $derived(data.settlement.status === 'open');
+	/** Collector-submitted payments nobody has included or rejected: they block the close (SAN-156). */
+	const pendingSubmitted = $derived(open ? data.submitted.length : 0);
+	const pendingSubmittedTotal = $derived(
+		money(data.submitted.reduce((sum, p) => sum + cents(p.amount), 0) / 100)
+	);
 	/** Closed (or closed and corrected) settlements read as a cash sheet (redesign). */
 	const sheet = $derived(['closed', 'corrected'].includes(data.settlement.status));
 	const cents = (value: string | number) => parseMoneyToCents(String(value)) ?? 0;
@@ -150,7 +156,12 @@
 	{#snippet actions()}
 		<StatusBadge kind="settlement" status={data.settlement.status} />
 		{#if data.can.close}
-			<Button variant="danger" onclick={() => (closeOpen = true)}>Cerrar rendición</Button>
+			<Button
+				variant="danger"
+				disabled={pendingSubmitted > 0}
+				aria-describedby={pendingSubmitted > 0 ? 'close-blocked' : undefined}
+				onclick={() => (closeOpen = true)}>Cerrar rendición</Button
+			>
 		{/if}
 	{/snippet}
 </PageHeader>
@@ -158,6 +169,19 @@
 <div class="space-y-6">
 	{#if form?.message}
 		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
+	{/if}
+
+	{#if pendingSubmitted > 0}
+		<Alert
+			tone="warning"
+			title={pendingSubmitted === 1
+				? '1 cobro enviado sin procesar'
+				: `${pendingSubmitted} cobros enviados sin procesar`}
+		>
+			<span id="close-blocked">
+				{unprocessedSubmittedMessage(pendingSubmitted)} Importe pendiente: {pendingSubmittedTotal}.
+			</span>
+		</Alert>
 	{/if}
 
 	{#if sheet}
@@ -263,10 +287,17 @@
 		{/if}
 	{/if}
 	{#if open && (data.submitted.length || data.can.reviewSubmitted)}
-		<Card title="Cobros enviados por el cobrador" flush>
+		<Card
+			title={pendingSubmitted > 0
+				? `Cobros enviados por el cobrador: ${pendingSubmitted} sin procesar`
+				: 'Cobros enviados por el cobrador'}
+			id="submitted-payments"
+			flush
+		>
 			<p class="m-0 px-4 pt-3 text-body-sm text-muted">
-				Los cobros que el cobrador registró desde su portal no cuentan en los totales hasta que los
-				incluyas en esta rendición y la cierres.
+				Los cobros que el cobrador registró desde su portal no cuentan en los totales hasta que se
+				incluyan en esta rendición y se cierre. Mientras haya alguno sin procesar no se puede cerrar
+				la rendición: incluya cada cobro o rechácelo con un motivo.
 			</p>
 			<Table
 				columns={submittedColumns}

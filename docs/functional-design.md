@@ -196,7 +196,7 @@ Campaign becomes active for bond entry
 ```txt
 User enters base number
 ↓
-System calculates associated number
+System calculates associated number (base + offset, or the circular formula when the campaign uses the circular mode; a base must then be below B)
 ↓
 System validates range per campaign
 ↓

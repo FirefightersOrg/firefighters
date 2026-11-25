@@ -198,6 +198,30 @@ export interface AtRiskBond {
 /** Rows of the at-risk list shown on the dashboard. */
 export const AT_RISK_LIMIT = 25;
 
+/** Collector-submitted payments waiting for the operator, for one collector (SAN-156). */
+export interface SubmittedPaymentsRow {
+	collectorId: string;
+	collectorName: string;
+	count: number;
+	amount: string;
+	/** The collector's open settlement in the campaign, where the operator handles them; null when none. */
+	openSettlementId: string | null;
+}
+
+export interface SubmittedSummary {
+	count: number;
+	amount: string;
+	byCollector: SubmittedPaymentsRow[];
+}
+
+export function summarizeSubmitted(rows: readonly SubmittedPaymentsRow[]): SubmittedSummary {
+	return {
+		count: rows.reduce((n, r) => n + r.count, 0),
+		amount: sumAmounts(rows.map((r) => r.amount)),
+		byCollector: [...rows]
+	};
+}
+
 /** What the dashboard says about the cutoff of the next draw. */
 export function countdownLabel(countdown: Countdown): string {
 	if (countdown.state === 'passed') return 'La fecha de corte ya pasó';
