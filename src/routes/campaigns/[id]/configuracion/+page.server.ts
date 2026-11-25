@@ -4,7 +4,7 @@
  * page (`?/update`, `?/rules`, `?/transition`), so permissions, validation and versions are identical.
  */
 import type { PageServerLoad } from './$types';
-import { actions as campaignActions, loadCampaignPage } from '../+page.server';
+import { actions as campaignActions, _loadCampaignPage } from '../+page.server';
 
-export const load: PageServerLoad = (event) => loadCampaignPage(event, { dashboard: false });
+export const load: PageServerLoad = (event) => _loadCampaignPage(event, { dashboard: false });
 export const actions = campaignActions;
