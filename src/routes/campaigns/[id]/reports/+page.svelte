@@ -309,6 +309,14 @@
 		id="overdue-warning"
 		title={`Ventas con ${overdue.threshold} o más ${cuotas(overdue.threshold)}`}
 	>
+		<div class="mb-3">
+			<ExportLinks
+				campaignId={campaign.id}
+				report="overdue-sales"
+				params={exportParams}
+				show={data.canExport}
+			/>
+		</div>
 		<p class="mb-3 text-body-sm text-muted">
 			Aviso informativo: no marca ninguna venta como incobrable. Solo ventas activas que no están
 			marcadas como incobrables. Respeta el filtro de cobrador.

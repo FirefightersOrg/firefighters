@@ -26,7 +26,8 @@ import {
 	getBondsByCollector,
 	getBondsByStatus,
 	getCollectorMonthly,
-	getInstallmentsReport
+	getInstallmentsReport,
+	getOverdueSales
 } from '$lib/server/repositories/reports';
 import type { RepositoryResult } from '$lib/server/repositories/campaigns';
 
@@ -59,6 +60,10 @@ export async function loadReportDataset(
 			break;
 		case 'installments':
 			result = await getInstallmentsReport(supabase, campaignId, operational);
+			break;
+		case 'overdue-sales':
+			// Paged inside (every sale over the campaign's N, no row cap); same N and filter as the screen.
+			result = await getOverdueSales(supabase, campaignId, operational);
 			break;
 		case 'collector-monthly':
 			result = await getCollectorMonthly(supabase, campaignId, operational);

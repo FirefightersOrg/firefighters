@@ -91,8 +91,8 @@ select is((select row(overdue_count, overdue_amount, oldest_due_date, threshold,
   from public.report_overdue_sales(pg_temp.id('campaign')) where sale_id = pg_temp.id('s3')),
   row(3::bigint, '300.00', (now() at time zone 'America/Argentina/Buenos_Aires')::date - 90, 3, 'Collector A')::text,
   'the row carries the overdue count, amount, oldest due date, threshold and collector');
-select ok((select bond_label is not null from public.report_overdue_sales(pg_temp.id('campaign')) where sale_id = pg_temp.id('s3')),
-  'the row carries a bond label');
+select ok((select bond_label = '—' from public.report_overdue_sales(pg_temp.id('campaign')) where sale_id = pg_temp.id('s3')),
+  'a bond without base numbers is labelled with a dash, never with its UUID (SAN-149)');
 select is(pg_temp.flagged(pg_temp.id('cb')), 'sb', 'the collector filter narrows the list');
 select is((select string_agg(ids.k, ',' order by r.overdue_count desc, r.oldest_due_date, r.sale_id)
   from public.report_overdue_sales(pg_temp.id('campaign'), null, 1, 1) r join ids on ids.id = r.sale_id),
