@@ -137,6 +137,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				canEditCampaignRules(campaign.status) &&
 				!hasBonds,
 			transitions: availableCampaignTransitions(campaign.status, permissions),
+			// Redesign workbench: the day's actions, only while the campaign is active.
+			registerSale: campaign.status === 'active' && hasPermissionIn(permissions, 'sale.create'),
+			deliverBonds: campaign.status === 'active' && hasPermissionIn(permissions, 'bond.assign'),
+			openSettlement:
+				campaign.status === 'active' && hasPermissionIn(permissions, 'settlement.create'),
 			viewCommissions: hasPermissionIn(permissions, 'commission.view'),
 			exportBackups: hasPermissionIn(permissions, 'report.export'),
 			viewReports: hasPermissionIn(permissions, 'report.view_operational'),

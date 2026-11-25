@@ -510,6 +510,10 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				editDates: true,
 				editRules: true,
 				transitions: ['active', 'annulled'],
+				// Redesign workbench: the day's actions exist only on an active campaign.
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false,
 				viewCommissions: true,
 				viewAudit: true,
 				viewBonds: true,
@@ -1177,6 +1181,10 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					editDates: false,
 					editRules: false,
 					transitions: [],
+					// Redesign workbench: the day's actions exist only on an active campaign.
+					registerSale: false,
+					deliverBonds: false,
+					openSettlement: false,
 					// SAN-93: treasurer (commission.adjust) and read-only (decision) hold commission.view.
 					viewCommissions: role !== 'operator',
 					viewAudit: role === 'treasurer',

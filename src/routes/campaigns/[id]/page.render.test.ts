@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import type { Campaign } from '$lib/domain/campaigns';
 import Page from './+page.svelte';
+import ConfigPage from './configuracion/+page.svelte';
 
 const V1 = '2026-11-17T10:00:00.123456+00:00';
 const V2 = '2026-11-17T10:05:00.654321+00:00';
@@ -34,6 +35,9 @@ const can = {
 	editDates: true,
 	editRules: true,
 	transitions: [],
+	registerSale: false,
+	deliverBonds: false,
+	openSettlement: false,
 	viewCommissions: false,
 	viewBonds: false,
 	loadBonds: false,
@@ -60,6 +64,20 @@ function renderPage(
 	return render(Page, { props }).body;
 }
 
+/** Datos y reglas (/campaigns/[id]/configuracion): same data, holds the summary and the edit forms. */
+function renderConfig(...args: Parameters<typeof renderPage>) {
+	const [loaded, form = null, extra = {}] = args;
+	const data = {
+		campaign: loaded,
+		dashboard: extra.dashboard ?? { operational: null, financial: null },
+		hasBonds: extra.hasBonds ?? false,
+		can: { ...can, ...extra.can }
+	};
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+	const props = { data, form, params: { id: loaded.id } } as any;
+	return render(ConfigPage, { props }).body;
+}
+
 describe('campaign draw navigation', () => {
 	it('shows Draws when any draw capability grants read access', () => {
 		const body = renderPage(campaign(), null, { can: { viewDraws: true } });
@@ -77,7 +95,7 @@ function inputValue(body: string, action: string, name: string): string | undefi
 
 describe('campaign page edit forms (values and version come from the same load)', () => {
 	it('posts the loaded version with the loaded values', () => {
-		const body = renderPage(campaign());
+		const body = renderConfig(campaign());
 		expect(inputValue(body, 'update', 'expectedUpdatedAt')).toBe(V1);
 		expect(inputValue(body, 'update', 'name')).toBe('Campaign 2026');
 		expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V1);
@@ -85,7 +103,7 @@ describe('campaign page edit forms (values and version come from the same load)'
 	});
 
 	it('refills a failed submit based on the loaded version (validation errors stay)', () => {
-		const body = renderPage(campaign(), {
+		const body = renderConfig(campaign(), {
 			form: 'general',
 			success: false,
 			message: 'Revisar los campos marcados.',
@@ -99,7 +117,7 @@ describe('campaign page edit forms (values and version come from the same load)'
 
 	it('never pairs values submitted at an older version with the newer loaded version', () => {
 		const reloaded = campaign({ name: 'Renamed elsewhere', updatedAt: V2 });
-		const body = renderPage(reloaded, {
+		const body = renderConfig(reloaded, {
 			form: 'general',
 			success: false,
 			message: 'Otra persona modificó esta campaña.',
@@ -133,14 +151,17 @@ describe('campaign page edit forms (values and version come from the same load)'
 			body.match(/<textarea[^>]*name="changeReason"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
 
 		it('refills the submitted rules and reason when based on the loaded version', () => {
-			const body = renderPage(campaign(), rulesFailure(V1));
+			const body = renderConfig(campaign(), rulesFailure(V1));
 			expect(inputValue(body, 'rules', 'installmentCount')).toBe('7');
 			expect(reasonOf(body)).toBe('Board decision');
 			expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V1);
 		});
 
 		it('drops the submitted rules and reason when the campaign has a newer version', () => {
-			const body = renderPage(campaign({ installmentCount: 12, updatedAt: V2 }), rulesFailure(V1));
+			const body = renderConfig(
+				campaign({ installmentCount: 12, updatedAt: V2 }),
+				rulesFailure(V1)
+			);
 			expect(inputValue(body, 'rules', 'installmentCount')).toBe('12');
 			expect(reasonOf(body)).toBe('');
 			expect(inputValue(body, 'rules', 'expectedUpdatedAt')).toBe(V2);
@@ -150,7 +171,7 @@ describe('campaign page edit forms (values and version come from the same load)'
 
 describe('campaign page: bonds', () => {
 	it('shows the rules of a draft with bonds as frozen, explaining why, without the rules form', () => {
-		const body = renderPage(campaign(), null, { hasBonds: true, can: { editRules: false } });
+		const body = renderConfig(campaign(), null, { hasBonds: true, can: { editRules: false } });
 		expect(body).toContain('Las reglas están congeladas.');
 		expect(body).toContain('Esta campaña ya tiene bonos');
 		expect(body).toContain('aunque la campaña siga siendo un');
@@ -160,7 +181,7 @@ describe('campaign page: bonds', () => {
 	});
 
 	it('explains the status when an active campaign has frozen rules', () => {
-		const body = renderPage(campaign({ status: 'active' }), null, {
+		const body = renderConfig(campaign({ status: 'active' }), null, {
 			hasBonds: true,
 			can: { editRules: false }
 		});
@@ -264,20 +285,19 @@ const financial = {
 };
 
 describe('campaign dashboard', () => {
-	it('shows no dashboard to a viewer without report permissions', () => {
-		expect(renderPage(campaign())).not.toContain('Tablero');
+	it('shows no figures to a viewer without report permissions', () => {
+		expect(renderPage(campaign())).not.toContain('dash-figures');
 	});
 
 	it('shows the operational groups with links to the Bond Record', () => {
 		const body = renderPage(campaign(), null, { dashboard: { operational, financial: null } });
 		for (const text of [
-			'Tablero',
-			'Vendidos',
-			'Disponibles',
-			'Entregados',
-			'Esperada',
-			'Cobrada',
-			'Pendiente',
+			'Bonos vendidos',
+			'de 20',
+			'En manos de cobradores',
+			'Cobrado',
+			'50 % de lo esperado',
+			'Cuotas vencidas',
 			'Próximo sorteo',
 			'Sorteo de diciembre',
 			'Cuota requerida: 3',
@@ -323,5 +343,39 @@ describe('campaign dashboard', () => {
 			dashboard: { operational: { ...operational, atRisk: [] }, financial: null }
 		});
 		expect(body).toContain('Ningún bono vendido está en riesgo para este sorteo.');
+	});
+});
+
+describe('campaign workbench (redesign)', () => {
+	it('puts the bond search first, as a GET to the bonds list, only with bond.view', () => {
+		expect(renderPage(campaign())).not.toContain('role="search"');
+		const body = renderPage(campaign(), null, { can: { viewBonds: true } });
+		expect(body).toContain('role="search"');
+		expect(body).toContain('action="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"');
+		expect(body).toContain('name="base"');
+	});
+	it("lists the day's actions by permission, the first one as the primary button", () => {
+		expect(renderPage(campaign())).not.toContain('Registrar venta');
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			can: { registerSale: true, deliverBonds: true, openSettlement: true }
+		});
+		for (const text of ['Registrar venta', 'Entregar bonos a un cobrador', 'Abrir rendición'])
+			expect(body).toContain(text);
+		expect(body.indexOf('Registrar venta')).toBeLessThan(body.indexOf('Abrir rendición'));
+	});
+	it('groups the sections and keeps Administración (with Datos y reglas) collapsed', () => {
+		const body = renderPage(campaign(), null, {
+			can: { viewBonds: true, viewCollectors: true, viewDraws: true }
+		});
+		for (const text of ['Operación', 'Personas', 'Sorteos y reportes', 'Administración'])
+			expect(body).toContain(text);
+		expect(body).toContain('<details');
+		expect(body).toContain('/campaigns/f0000000-0000-0000-0000-000000000001/configuracion');
+		// The rules and their forms live in Datos y reglas, not on the workbench.
+		expect(body).not.toContain('?/rules');
+		expect(body).not.toContain('Política de desborde');
+	});
+	it('shows dates and the installment plan under the title', () => {
+		expect(renderPage(campaign())).toMatch(/Sin fechas definidas, 10 cuotas de \$[\s\u00a0]6\.000/);
 	});
 });

@@ -105,6 +105,9 @@ describe('/campaigns/[id]', () => {
 				editDates: true,
 				editRules: true,
 				transitions: ['active', 'annulled'],
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false,
 				viewCommissions: false,
 				viewAudit: false,
 				viewBonds: false,
@@ -130,6 +133,9 @@ describe('/campaigns/[id]', () => {
 				editDates: true,
 				editRules: false,
 				transitions: ['closing', 'annulled'],
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false,
 				viewCommissions: false,
 				viewAudit: false,
 				viewBonds: false,
@@ -155,6 +161,9 @@ describe('/campaigns/[id]', () => {
 				editDates: false,
 				editRules: false,
 				transitions: ['closed'],
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false,
 				viewCommissions: false,
 				viewAudit: false,
 				viewBonds: false,
@@ -186,6 +195,30 @@ describe('/campaigns/[id]', () => {
 			expect(data.can.viewBonds).toBe(true);
 		});
 
+		it("offers the day's actions only on an active campaign, by permission (redesign)", async () => {
+			const perms = ['campaign.view', 'sale.create', 'bond.assign', 'settlement.create'];
+			const active = mockSupabase({
+				query: { data: campaignRow({ status: 'active' }), error: null }
+			});
+			const onActive = (await load(
+				loadEvent(makeLocals({ permissions: perms, supabase: active.supabase }))
+			))!;
+			expect(onActive.can).toMatchObject({
+				registerSale: true,
+				deliverBonds: true,
+				openSettlement: true
+			});
+			const draft = mockSupabase({ query: { data: campaignRow(), error: null } });
+			const onDraft = (await load(
+				loadEvent(makeLocals({ permissions: perms, supabase: draft.supabase }))
+			))!;
+			expect(onDraft.can).toMatchObject({
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false
+			});
+		});
+
 		it('viewer only (operator): no edit forms and no status actions', async () => {
 			const { supabase } = mockSupabase({ query: { data: campaignRow(), error: null } });
 			const data = (await load(
@@ -196,6 +229,9 @@ describe('/campaigns/[id]', () => {
 				editDates: false,
 				editRules: false,
 				transitions: [],
+				registerSale: false,
+				deliverBonds: false,
+				openSettlement: false,
 				viewCommissions: false,
 				viewAudit: false,
 				viewBonds: false,
