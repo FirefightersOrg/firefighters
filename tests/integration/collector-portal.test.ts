@@ -163,7 +163,7 @@ beforeAll(async () => {
 	});
 	if (activateError) throw new Error(activateError.message);
 
-	const base = 100 + Math.floor(Math.random() * 5000) * 2;
+	const base = 100 + Math.floor(Math.random() * 2000) * 4;
 	bondA = await rpcId(admin.client, 'bond_create', {
 		p_campaign_id: campaignId,
 		p_base_numbers: [base],
@@ -171,7 +171,7 @@ beforeAll(async () => {
 	});
 	bondB = await rpcId(admin.client, 'bond_create', {
 		p_campaign_id: campaignId,
-		p_base_numbers: [base + 1],
+		p_base_numbers: [base + 2],
 		p_request_id: `it-portal-bond-b-${RUN_ID}`
 	});
 	for (const [collector, bond, label] of [

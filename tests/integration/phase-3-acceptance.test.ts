@@ -1449,7 +1449,7 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			expect(bondPerms('operator')).not.toContain('audit.view');
 			expect(bondPerms('treasurer')).toEqual(['audit.view', 'bond.view', 'campaign.view']);
 			expect(bondPerms('read-only')).toEqual(['bond.view', 'campaign.view']);
-			expect(bondPerms('collector')).toEqual(['campaign.view']);
+			expect(bondPerms('collector')).toEqual(['bond.view_own', 'campaign.view']);
 		});
 
 		it('pages: who can open the list, the record and the entry forms', async () => {
