@@ -897,7 +897,9 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 			reviewSubmitted: false,
 			close: false,
 			correctPayment: true,
-			correctSettlement: true
+			correctSettlement: true,
+			// Redesign: the cash sheet links to the collector's current account.
+			viewLedger: true
 		});
 		const deniedLoadRequest = rid('load-denied');
 		await noWrites(deniedLoadRequest, async () =>

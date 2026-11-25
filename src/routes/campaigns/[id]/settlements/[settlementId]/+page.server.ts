@@ -109,7 +109,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				hasPermissionIn(locals.permissions, 'payment.create'),
 			close: open && hasPermissionIn(locals.permissions, 'settlement.close'),
 			correctPayment: canCorrectPayment,
-			correctSettlement: canCorrectSettlement
+			correctSettlement: canCorrectSettlement,
+			// Redesign: the cash sheet links to the collector's current account.
+			viewLedger:
+				hasPermissionIn(locals.permissions, 'collector.ledger.view') ||
+				hasPermissionIn(locals.permissions, 'collector.ledger.adjust')
 		}
 	};
 };
