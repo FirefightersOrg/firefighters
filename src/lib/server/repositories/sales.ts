@@ -227,13 +227,26 @@ export async function listSales(
 			};
 }
 
+/** SAN-106: the manual, final uncollectible mark of a sale (null when not marked). */
+export interface UncollectibleMark {
+	markedAt: string;
+	reason: string;
+}
+export type SaleDetail = SaleListItem & {
+	plan: PaymentPlan;
+	installments: Installment[];
+	uncollectible: UncollectibleMark | null;
+};
+type UncollectibleRow = {
+	uncollectible_at?: string | null;
+	uncollectible_reason?: string | null;
+};
+
 export async function getSaleDetail(
 	supabase: SupabaseClient,
 	campaignId: string,
 	saleId: string
-): Promise<
-	RepositoryResult<(SaleListItem & { plan: PaymentPlan; installments: Installment[] }) | null>
-> {
+): Promise<RepositoryResult<SaleDetail | null>> {
 	const { data, error } = await supabase
 		.from('sales')
 		.select(
@@ -243,7 +256,8 @@ export async function getSaleDetail(
 		.eq('id', saleId)
 		.limit(1)
 		.overrideTypes<
-			(SaleListRow & { payment_plans: (PlanRow & { installments: InstallmentRow[] })[] })[],
+			(SaleListRow &
+				UncollectibleRow & { payment_plans: (PlanRow & { installments: InstallmentRow[] })[] })[],
 			{ merge: false }
 		>();
 	if (error) return { data: null, error };
@@ -264,7 +278,11 @@ export async function getSaleDetail(
 			},
 			installments: plan.installments
 				.map(mapInstallmentRow)
-				.sort((a, b) => a.installmentNumber - b.installmentNumber)
+				.sort((a, b) => a.installmentNumber - b.installmentNumber),
+			uncollectible:
+				sale.uncollectible_at && sale.uncollectible_reason
+					? { markedAt: sale.uncollectible_at, reason: sale.uncollectible_reason }
+					: null
 		},
 		error: null
 	};
