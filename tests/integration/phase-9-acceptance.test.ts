@@ -131,7 +131,9 @@ const balance = (collectorId: string) =>
 async function entries(collectorId: string) {
 	const { data, error } = await users.admin.client
 		.from('collector_ledger_entries')
-		.select('id, entry_type, direction, amount, status, settlement_id, reason, annul_reason')
+		.select(
+			'id, entry_type, direction, amount, status, settlement_id, reason, annul_reason, affects_balance'
+		)
 		.eq('campaign_id', campaignId)
 		.eq('collector_id', collectorId)
 		.order('created_at');
@@ -286,16 +288,20 @@ describe('Phase 9: commissions and collector ledger', () => {
 			p_request_id: rid('close-cash')
 		});
 		const posted = (await entries(collectorA)).filter((e) => e.settlement_id === cashSettlement);
-		expect(posted.map((e) => [e.entry_type, e.direction, e.amount]).sort()).toEqual([
-			['commission_generated', 'collector_credit', 6000],
-			['commission_settled', 'collector_debit', 6000]
+		// SAN-107: the close also records the cash handed in as a reference entry (not in the balance).
+		expect(
+			posted.map((e) => [e.entry_type, e.direction, e.amount, e.affects_balance]).sort()
+		).toEqual([
+			['cash_settled', 'collector_credit', 30000, false],
+			['commission_generated', 'collector_credit', 6000, true],
+			['commission_settled', 'collector_debit', 6000, true]
 		]);
 		expect(await balance(collectorA)).toBe(0);
 	});
 
 	it('C2 repeated settlement_close fails without duplicating ledger entries', async () => {
 		const before = await entries(collectorA);
-		expect(before.filter((e) => e.settlement_id === cashSettlement)).toHaveLength(2);
+		expect(before.filter((e) => e.settlement_id === cashSettlement)).toHaveLength(3);
 		expect(
 			await codeOf(
 				rpc(users.admin, 'settlement_close', {
@@ -323,8 +329,9 @@ describe('Phase 9: commissions and collector ledger', () => {
 			p_request_id: rid('close-transfer')
 		});
 		const posted = (await entries(collectorA)).filter((e) => e.settlement_id === transfer);
-		expect(posted.map((e) => [e.entry_type, e.direction, e.amount])).toEqual([
-			['commission_generated', 'collector_credit', 6000]
+		expect(posted.map((e) => [e.entry_type, e.direction, e.amount, e.affects_balance])).toEqual([
+			['commission_generated', 'collector_credit', 6000, true],
+			['transfer_received_by_firefighters', 'collector_credit', 30000, false]
 		]);
 		expect(await balance(collectorA)).toBe(6000);
 		const settleRequest = rid('settle');
@@ -423,7 +430,7 @@ describe('Phase 9: commissions and collector ledger', () => {
 	it('C5 the balance is rebuilt only from non-annulled ledger entries', async () => {
 		const all = await entries(collectorA);
 		const rebuilt = all
-			.filter((e) => e.status !== 'annulled')
+			.filter((e) => e.status !== 'annulled' && e.affects_balance)
 			.reduce((sum, e) => sum + (e.direction === 'collector_credit' ? e.amount : -e.amount), 0);
 		expect(rebuilt).toBe(3000);
 		expect(await balance(collectorA)).toBe(rebuilt);

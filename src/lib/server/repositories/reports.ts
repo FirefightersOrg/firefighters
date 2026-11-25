@@ -9,9 +9,10 @@ import type {
 	CollectorMonthlyRow,
 	InstallmentBucket,
 	InstallmentBucketRow,
+	OverdueSaleRow,
 	ReportFilters
 } from '$lib/domain/reports';
-import { monthStart } from '$lib/domain/reports';
+import { DEFAULT_OVERDUE_WARNING_THRESHOLD, monthStart } from '$lib/domain/reports';
 import type { RepositoryResult } from './campaigns';
 
 type Raw = Record<string, unknown>;
@@ -128,4 +129,59 @@ export async function getCollectorMonthly(
 			paymentsTransfer: str(r.payments_transfer)
 		})
 	);
+}
+
+/** Rows per call of the paged `report_overdue_sales` (PostgREST caps a response at 1000). */
+export const OVERDUE_PAGE_SIZE = 1000;
+
+/** SAN-142: sales with N or more overdue installments (informative; it marks nothing). */
+export async function getOverdueSales(
+	supabase: SupabaseClient,
+	campaignId: string,
+	filters: Pick<ReportFilters, 'collectorId'>
+): Promise<RepositoryResult<OverdueSaleRow[]>> {
+	const all: Raw[] = [];
+	for (let offset = 0; ; offset += OVERDUE_PAGE_SIZE) {
+		const page = await call(supabase, 'report_overdue_sales', {
+			p_campaign_id: campaignId,
+			p_collector_id: filters.collectorId,
+			p_limit: OVERDUE_PAGE_SIZE,
+			p_offset: offset
+		});
+		if (page.error) return { data: null, error: page.error };
+		all.push(...page.data);
+		if (page.data.length < OVERDUE_PAGE_SIZE) break;
+	}
+	return {
+		data: all.map((r) => ({
+			saleId: String(r.sale_id),
+			bondId: String(r.bond_id),
+			bondLabel: String(r.bond_label ?? '—'),
+			collectorId: String(r.collector_id),
+			collectorName: String(r.collector_name),
+			overdueCount: num(r.overdue_count),
+			overdueAmount: str(r.overdue_amount),
+			oldestDueDate: String(r.oldest_due_date)
+		})),
+		error: null
+	};
+}
+
+/** SAN-142: the campaign's N (3 when the row predates the column, as the SQL default). */
+export async function getOverdueWarningThreshold(
+	supabase: SupabaseClient,
+	campaignId: string
+): Promise<RepositoryResult<number>> {
+	const { data, error } = await supabase
+		.from('campaigns')
+		.select('overdue_warning_threshold')
+		.eq('id', campaignId)
+		.maybeSingle()
+		.overrideTypes<{ overdue_warning_threshold?: number | null } | null, { merge: false }>();
+	if (error) return { data: null, error };
+	const value = data?.overdue_warning_threshold;
+	return {
+		data: typeof value === 'number' ? value : DEFAULT_OVERDUE_WARNING_THRESHOLD,
+		error: null
+	};
 }

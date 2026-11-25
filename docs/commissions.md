@@ -188,10 +188,9 @@ one `commission_generated` credit for the calculated commission and, only when p
 `commission_settled` debit for commission retained from cash applications. Transfer commission
 remains credit until an explicit `commission_settle`.
 
-`cash_settled` and `transfer_received_by_firefighters` are intentionally not created at close:
-their positive amount cannot be represented by one directed ledger row without changing the
-commission balance. Payments and closed-settlement snapshots remain the authoritative
-cash/transfer trace. `commission_paid_amount` is cash-retained commission,
+Closing also records the cash handed in and the transfers received as **reference entries**
+(SAN-107, see below). They never move the commission balance. Payments and closed-settlement
+snapshots remain the authoritative cash/transfer trace. `commission_paid_amount` is cash-retained commission,
 `net_to_firefighters` is total payment amount less that value, and preliminary
 `settlement_totals.collector_credit_balance` is the current reconstructed campaign balance with
 this settlement's generated and cash-settled commission applied.
@@ -204,6 +203,41 @@ because settlements do not store which rule was applied to each payment applicat
 persist the applied rule id per application and block edits/annulments of applied rules (end-date
 the rule and create a new one instead). Manual adjustments must be written as difference rows and their matching ledger
 entries by the adjustment service; they never modify a rule or computed commission.
+
+## Reference entries and linked compensations (SAN-107, SAN-108, SAN-109)
+
+Migration `20270113000000_ledger_memo_entries.sql` (Proposal A, approved in #50 on 2026-11-25).
+
+- **Reference entries.** `collector_ledger_entries.affects_balance` is false for `cash_settled` and
+  `transfer_received_by_firefighters` (enforced by a CHECK). `settlement_close` posts one
+  `cash_settled` credit for `total_cash` and one `transfer_received_by_firefighters` credit for
+  `total_transfer`, skipping zero amounts. Every balance adds only `affects_balance` entries:
+  `collector_ledger_balance`, the running balance (`collector_ledger_entries_with_balance`,
+  `report_collector_ledger`), `commission_settle`, `settlement_totals` and the totals of
+  `report_collector_accounts` (its `entry_count` still counts the reference rows, which are rows of
+  the account). Within one instant the running balance lists balance entries first, so the
+  reference rows of a close show the balance after it.
+- **Method corrections on a closed settlement** (SAN-110) post an `annulment` reference entry that
+  compensates the old method's reference entry and a new reference entry for the new method, so the
+  reference entries of a settlement always add up to its `total_cash` / `total_transfer`.
+- **Linked compensations.** `original_entry_id` points a compensating entry (an `annulment` or a
+  manual adjustment) at the entry it offsets. The insert guard requires the same campaign and
+  collector, the opposite direction, the same `affects_balance`, a `recorded` original, and never
+  more than what is left of it (`collector_ledger_uncompensated`). When the compensations add up to
+  the whole original, an AFTER INSERT trigger marks it `compensated`; that status cannot be set by
+  hand. A compensated entry keeps counting in the balance, offset by its compensations.
+  Compensating entries and entries that already have compensations cannot be annulled: they are
+  corrected with another compensation.
+- **SAN-109.** The compensating `annulment` rows of payment corrections (SAN-71), sale collector
+  corrections and closed-settlement corrections (SAN-72) reference the settlement's
+  `commission_generated` (commission reversals) or `commission_settled` (retained-cash reversals)
+  entry, when that entry has enough left; replacement credits for a new payment or collector are new
+  entries with no original.
+- **Manual adjustments** (`collector_ledger_adjust`) take an optional `p_original_entry_id`. The
+  current account screen offers the recorded balance entries with something left to compensate and
+  shows what each compensation offsets.
+- Settlements closed before the migration got their reference entries from the stored totals,
+  dated at their close.
 
 ## Special collector rules, adjustments and current account (SAN-69)
 

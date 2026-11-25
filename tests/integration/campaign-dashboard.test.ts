@@ -249,8 +249,12 @@ describe('campaign dashboard (local Supabase)', () => {
 			settledCash: '100.00',
 			generated: '0.00'
 		});
-		// No commission rule in this campaign: the current accounts are empty.
-		expect(financial!.balances).toMatchObject({ creditors: 0, net: '0.00', top: [] });
+		// No commission rule in this campaign: the only account movement is the cash reference entry
+		// of the close (SAN-107), so every balance is zero.
+		expect(financial!.balances).toMatchObject({ creditors: 0, net: '0.00' });
+		expect(financial!.balances.top.map((row: { balance: string }) => row.balance)).toEqual([
+			'0.00'
+		]);
 	});
 
 	it('lists the sold bond as at risk for the next draw, linked to its record', async () => {

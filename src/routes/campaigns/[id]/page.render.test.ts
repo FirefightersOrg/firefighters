@@ -306,6 +306,7 @@ describe('campaign dashboard', () => {
 			expect(body).toContain(text);
 		}
 		expect(body).toMatch(/-\$[\s\u00a0]20,00/);
+		expect(body).toContain('Hay 1 rendición abierta.');
 		expect(body).not.toContain('Próximo sorteo');
 	});
 
