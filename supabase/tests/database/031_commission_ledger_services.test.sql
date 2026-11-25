@@ -17,6 +17,7 @@ create function pg_temp.id(k text) returns uuid language sql stable as $$select 
 grant execute on function pg_temp.id(text) to authenticated;
 select set_config('request.jwt.claims','{"sub":"a6310000-0000-0000-0000-000000000001","role":"authenticated"}',true);
 with x as (insert into public.campaigns(name,simple_bond_value,installment_count,installment_value,barcode_mode) values('SAN 68',100,1,100,'base_number') returning id) insert into ids select 'campaign',id from x;
+insert into public.user_roles(user_id,role_id) select 'b6310000-0000-0000-0000-000000000003',id from public.roles where name='collector';
 with x as (insert into public.collectors(display_name,user_profile_id) values('Ana','b6310000-0000-0000-0000-000000000003') returning id) insert into ids select 'collector',id from x;
 with x as (insert into public.collectors(display_name) values('Other') returning id) insert into ids select 'other_collector',id from x;
 with x as (insert into public.buyers(type,first_name) values('individual','Eva') returning id) insert into ids select 'buyer',id from x;

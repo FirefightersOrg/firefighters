@@ -2,7 +2,7 @@ begin;
 select plan(15);
 
 select is((select count(*)::int from public.roles), 5, '5 roles seeded');
-select is((select count(*)::int from public.permissions), 52, '52 permissions seeded (SAN-106 sale.mark_uncollectible)');
+select is((select count(*)::int from public.permissions), 56, '56 permissions seeded');
 select is(
   (select array_agg(name order by name) from public.roles),
   array['admin', 'collector', 'operator', 'read-only', 'treasurer'],
@@ -19,15 +19,15 @@ from public.role_permissions rp
 join public.roles r on r.id = rp.role_id
 join public.permissions p on p.id = rp.permission_id;
 
-select is((select count(*)::int from _rp where role_name = 'admin'), 52, 'admin has all 52 permissions');
+select is((select count(*)::int from _rp where role_name = 'admin'), 56, 'admin has all 56 permissions');
 select is((select count(*)::int from _rp where role_name = 'operator'), 21, 'operator has 21 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
 select is((select count(*)::int from _rp where role_name = 'treasurer'), 21, 'treasurer has 21 permissions (SAN-93 view and matrix decisions, SAN-105 sale.view, SAN-106 sale.mark_uncollectible)');
 select is((select count(*)::int from _rp where role_name = 'read-only'), 6, 'read-only has 6 permissions (commission.view in SAN-93)');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'collector'),
-  array['campaign.view'], 'collector grants match the matrix'
+  array['bond.view_own', 'campaign.view', 'collector.ledger.view_own', 'payment.create_own', 'sale.view_own'], 'collector grants match the matrix'
 );
-select is((select count(*)::int from _rp where role_name = 'collector'), 1, 'collector has 1 permission (campaign.view in SAN-93)');
+select is((select count(*)::int from _rp where role_name = 'collector'), 5, 'collector has 5 permissions (campaign.view in SAN-93; own-scope codes in SAN-143)');
 
 select ok(exists (select 1 from _rp where role_name = 'treasurer' and code = 'payment.annul'), 'treasurer has payment.annul');
 select ok(not exists (select 1 from _rp where role_name = 'operator' and code = 'payment.annul'), 'operator lacks payment.annul');
