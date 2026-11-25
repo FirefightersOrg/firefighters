@@ -20,7 +20,7 @@
 				{#each data.campaigns as campaign (campaign.id)}
 					<li class="flex items-center gap-2">
 						<a
-							class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+							class="inline-flex min-h-11 items-center rounded-sm text-primary-text underline-offset-2 hover:underline"
 							href={resolve('/portal/[campaignId]/bonos', { campaignId: campaign.id })}
 							>{campaign.name}</a
 						>

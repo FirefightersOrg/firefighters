@@ -83,12 +83,18 @@ async function seed(page: Page, browser: Browser) {
 	const bond = page.url().split('/').pop()!;
 	const { saleId } = await deliverAndSell(page, campaignId, collectorName, 300);
 	const buyer = await linkedId(page, `/campaigns/${campaignId}/sales/${saleId}`, 'buyers');
-	const collectorId = await linkedId(page, `/campaigns/${campaignId}/collectors`, 'collectors');
 
 	// A collector login linked to that collector (no admin UI creates logins, so it goes through Supabase).
 	const { url, anonKey, serviceKey } = localSupabase();
 	const options = { auth: { autoRefreshToken: false, persistSession: false } };
 	const service = createClient(url, serviceKey, options);
+	// The collector that owns the sale (read from the data: the collectors list may link to other rows).
+	const { data: soldBy } = await service
+		.from('sales')
+		.select('collector_id')
+		.eq('id', saleId)
+		.single();
+	const collectorId = soldBy!.collector_id;
 	const email = `portal_e2e_${run}@firefighters.local`;
 	const created = await service.auth.admin.createUser({
 		email,
