@@ -193,7 +193,7 @@
 			<p class="m-0 text-body-sm">
 				Venta activa —
 				<a
-					class="text-primary-text underline-offset-2 hover:underline"
+					class="text-primary-text underline-offset-2 underline"
 					href={resolve('/campaigns/[id]/sales/[saleId]', {
 						id: campaign.id,
 						saleId: data.sale.sale.id

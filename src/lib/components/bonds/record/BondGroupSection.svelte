@@ -82,7 +82,7 @@
 				En la pata <span class="font-mono tabular-nums">{group.memberOf.label}</span>.
 				<a
 					href={bondHref(group.memberOf.pataId)}
-					class="font-medium text-primary-text underline-offset-2 hover:underline">Ver pata →</a
+					class="font-medium text-primary-text underline-offset-2 underline">Ver pata →</a
 				>
 			</p>
 			<p class="m-0 mt-1 text-body-sm text-muted">
