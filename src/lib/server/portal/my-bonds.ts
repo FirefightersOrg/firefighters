@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	BOND_COMMERCIAL_STATUSES,
+	BOND_KIND_LABELS,
 	BOND_FINANCIAL_STATUSES,
 	type BondCommercialStatus,
 	type BondFinancialStatus,
@@ -65,10 +66,6 @@ interface BondRowRaw {
 const BOND_SELECT =
 	'id, kind, commercial_status, financial_status_snapshot, commercial_unit_count, total_value, bond_numbers(number_value, number_kind, released_at)';
 
-export function typeLabel(kind: BondKind): string {
-	return kind === 'pata' ? 'Pata' : 'Bono simple';
-}
-
 function mapBond(row: BondRowRaw, campaign: Campaign): MyBondRow {
 	const config = campaignNumberingConfig(campaign);
 	const live = (row.bond_numbers ?? [])
@@ -81,7 +78,7 @@ function mapBond(row: BondRowRaw, campaign: Campaign): MyBondRow {
 	return {
 		id: row.id,
 		kind: row.kind,
-		typeLabel: typeLabel(row.kind),
+		typeLabel: BOND_KIND_LABELS[row.kind],
 		baseNumbers: fmt('base'),
 		associatedNumbers: fmt('associated'),
 		commercialStatus: row.commercial_status,
