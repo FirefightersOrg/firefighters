@@ -210,7 +210,7 @@ Collector-submitted payments (SAN-147, `payments.submitted_by_collector`):
 - A `draft` changes no installment, financial snapshot, commission or ledger entry: `settlement_close` only confirms `pending_in_settlement`. It does reserve the installment balance (every payment that is not annulled or adjusted counts), so drafts cannot exceed the installment together.
 - The operator/treasurer either includes it in an open settlement of the same collector and campaign (`settlement_attach_collector_payment`: `draft -> pending_in_settlement`, then the normal close confirms it) or rejects it with a mandatory reason (`settlement_reject_collector_payment`: `draft -> annulled`, the reason is stored in `annulment_reason` and shown to the collector).
 - `draft -> annulled` is only reachable through that rejection RPC (payments have no direct DML grants). `submitted_by_collector` and `collector_note` are immutable after insert.
-- The collector can neither confirm, edit after sending, nor annul. What the collector sees: `draft` and `pending_in_settlement` are "Pendiente de rendición", `confirmed` is "Confirmado" and a rejected `annulled` one is "Rechazado" with its reason.
+- The collector can neither confirm, edit after sending, nor annul. What the collector sees: `draft` is "Enviado", `pending_in_settlement` is "En rendición", `confirmed` is "Confirmado" and a rejected `annulled` one is "Rechazado" with its reason.
 - Every submission, inclusion and rejection is written to `audit_log` (`payment.collector_submit`, `payment.collector_attach`, `payment.collector_reject`) with actor and `request_id`.
 
 ## Settlement
