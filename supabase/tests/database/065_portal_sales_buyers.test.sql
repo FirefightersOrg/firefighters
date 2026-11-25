@@ -30,16 +30,15 @@ values (pg_temp.id('camp'), 'SAN145', 300, 3, 100, 'base_number');
 insert into public.collectors(id, display_name, user_profile_id, status) values
   (pg_temp.id('ca'), 'SAN145 A', 'b6610000-0000-0000-0000-000000000001', 'active'),
   (pg_temp.id('cb'), 'SAN145 B', 'b6610000-0000-0000-0000-000000000002', 'active');
-insert into public.buyers(id, type, first_name, last_name, document_number, tax_id, phone, address, notes) values
-  (pg_temp.id('buyer_a'), 'individual', 'Ana', 'Compradora', '30111222', '20301112224', '111', 'Calle A 1', 'secret note'),
-  (pg_temp.id('buyer_b'), 'individual', 'Beto', 'Comprador', '30333444', null, '222', 'Calle B 2', null),
-  (pg_temp.id('buyer_shared'), 'business', null, null, null, null, '333', 'Calle C 3', null);
-update public.buyers set business_name = 'Comercio Compartido' where id = pg_temp.id('buyer_shared');
+insert into public.buyers(id, type, first_name, last_name, business_name, document_number, tax_id, phone, address, notes) values
+  (pg_temp.id('buyer_a'), 'individual', 'Ana', 'Compradora', null, '30111222', '20301112224', '111', 'Calle A 1', 'secret note'),
+  (pg_temp.id('buyer_b'), 'individual', 'Beto', 'Comprador', null, '30333444', null, '222', 'Calle B 2', null),
+  (pg_temp.id('buyer_shared'), 'business', null, null, 'Comercio Compartido', null, null, '333', 'Calle C 3', null);
 
 insert into public.bonds(id, campaign_id, kind, origin, commercial_unit_count, total_value, commercial_status, current_collector_id) values
-  (pg_temp.id('bond_a'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'sold', pg_temp.id('ca')),
-  (pg_temp.id('bond_a2'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'sold', pg_temp.id('ca')),
-  (pg_temp.id('bond_b'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'sold', pg_temp.id('cb'));
+  (pg_temp.id('bond_a'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca')),
+  (pg_temp.id('bond_a2'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca')),
+  (pg_temp.id('bond_b'), pg_temp.id('camp'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('cb'));
 insert into public.bond_numbers(campaign_id, bond_id, number_value, number_kind) values
   (pg_temp.id('camp'), pg_temp.id('bond_a'), 11, 'base'),
   (pg_temp.id('camp'), pg_temp.id('bond_a2'), 12, 'base'),
@@ -56,11 +55,12 @@ insert into public.payment_plans(id, sale_id, installment_count, total_amount) v
   (pg_temp.id('plan_b'), pg_temp.id('sale_b'), 1, 100);
 -- Installment 1 paid, 2 due in the past (overdue, with 40 pending in a settlement), 3 due far ahead.
 insert into public.installments(id, payment_plan_id, installment_number, due_date, amount, status) values
-  (pg_temp.id('i_a1'), pg_temp.id('plan_a'), 1, current_date - 40, 100, 'paid'),
+  (pg_temp.id('i_a1'), pg_temp.id('plan_a'), 1, current_date - 40, 100, 'pending'),
   (pg_temp.id('i_a2'), pg_temp.id('plan_a'), 2, current_date - 10, 100, 'pending'),
   (pg_temp.id('i_a3'), pg_temp.id('plan_a'), 3, current_date + 60, 100, 'pending'),
   (pg_temp.id('i_a21'), pg_temp.id('plan_a2'), 1, current_date + 3, 100, 'pending'),
   (pg_temp.id('i_b1'), pg_temp.id('plan_b'), 1, current_date - 5, 100, 'pending');
+update public.installments set status = 'paid' where id = pg_temp.id('i_a1');
 insert into public.settlements(id, campaign_id, settlement_number, collector_id, created_by)
 values (pg_temp.id('set_a'), pg_temp.id('camp'), 1, pg_temp.id('ca'), pg_temp.actor());
 insert into public.payments(id, campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount, payment_method, status, created_by) values

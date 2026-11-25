@@ -200,9 +200,17 @@ async function sell(
 
 beforeAll(async () => {
 	admin = await signIn(seed.admin.email, seed.admin.password);
-	const collectorFixture = seed.fixtures.find((f) => f.roleNames.includes('collector'))!;
+	// A fresh collector-role login with no collector record (the seeded fixture may be linked by other suites).
+	const unlinkedEmail = `psales_free_${RUN_ID}@firefighters.local`;
+	await createAdminManagedUser(createClient(supabaseUrl, serviceRoleKey, options), {
+		email: unlinkedEmail,
+		password: PASSWORD,
+		fullName: `Portal sales free ${RUN_ID}`,
+		roleNames: ['collector'],
+		requestId: rid('user-free')
+	});
 	const operatorFixture = seed.fixtures.find((f) => f.roleNames.includes('operator'))!;
-	unlinked = await signIn(collectorFixture.email, collectorFixture.password);
+	unlinked = await signIn(unlinkedEmail, PASSWORD);
 	operator = await signIn(operatorFixture.email, operatorFixture.password);
 	const a = await linkedCollector('a');
 	const b = await linkedCollector('b');
