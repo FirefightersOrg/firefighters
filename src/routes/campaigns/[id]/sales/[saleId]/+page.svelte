@@ -4,6 +4,7 @@
 		Alert,
 		Button,
 		Card,
+		Disclosure,
 		Field,
 		PageHeader,
 		Select,
@@ -60,6 +61,15 @@
 	/** The markUncollectible action's result, typed loosely like the other form results. */
 	const markForm = $derived(
 		form?.form === 'markUncollectible'
+			? (form as {
+					success?: boolean;
+					values?: { reason?: string };
+					errors?: Record<string, string[] | undefined>;
+				})
+			: null
+	);
+	const revertForm = $derived(
+		form?.form === 'revertUncollectible'
 			? (form as {
 					success?: boolean;
 					values?: { reason?: string };
@@ -155,6 +165,26 @@
 			Marcada el {formatDateTime(data.sale.uncollectible.markedAt)}. Motivo: {data.sale
 				.uncollectible.reason}
 		</Alert>
+		{#if data.canRevertUncollectible}
+			<Disclosure summary="Revertir la marca de incobrable">
+				<p class="m-0 mb-3 text-body-sm text-muted">
+					La venta vuelve al estado que le dan sus cuotas. Queda auditado, con la marca anterior y
+					este motivo.
+				</p>
+				<form method="POST" action="?/revertUncollectible" class="space-y-3">
+					<Field
+						label="Motivo"
+						id="revert-uncollectible-reason"
+						required
+						hint="Hasta 1000 caracteres."
+						error={revertForm && !revertForm.success ? revertForm.errors?.reason?.[0] : undefined}
+					>
+						<Textarea name="reason" value={revertForm?.values?.reason ?? ''} />
+					</Field>
+					<Button type="submit">Revertir la marca</Button>
+				</form>
+			</Disclosure>
+		{/if}
 	{:else if data.canMarkUncollectible}
 		<Card title="Marcar como incobrable">
 			<p class="text-body text-muted">

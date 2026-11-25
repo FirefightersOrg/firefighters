@@ -51,7 +51,7 @@ describe('draw detail render', () => {
 			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
 			expect(body.includes('Anular sorteo')).toBe(allowed);
 			// New rosters use the bonds' own numbers (SAN-152): no extras copy.
-			expect(body.includes('libera los números extra reservados')).toBe(false);
+			expect(/libera los\s+números extra/.test(body)).toBe(false);
 		}
 	});
 	it('shows the extras release copy only for legacy rosters with extras', () => {
@@ -61,7 +61,7 @@ describe('draw detail render', () => {
 				form: null
 			} as any
 		}).body;
-		expect(body).toContain('libera los números');
+		expect(body).toMatch(/libera los\s+números/);
 		expect(body).toContain('anterior al cambio');
 	});
 	it('renders scheduled actions', () => {

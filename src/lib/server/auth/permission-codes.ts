@@ -29,6 +29,7 @@ export const PERMISSIONS = [
 	'sale.correct',
 	'sale.view_own',
 	'sale.mark_uncollectible',
+	'sale.revert_uncollectible',
 	'payment.view',
 	'payment.create',
 	'payment.annul',

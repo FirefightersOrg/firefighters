@@ -11,7 +11,10 @@ vi.mock('$lib/server/services/sale-corrections', async (original) => ({
 	correctSaleBuyer: vi.fn(),
 	correctSaleCollector: vi.fn()
 }));
-vi.mock('$lib/server/services/sale-uncollectible', () => ({ markSaleUncollectible: vi.fn() }));
+vi.mock('$lib/server/services/sale-uncollectible', () => ({
+	markSaleUncollectible: vi.fn(),
+	revertSaleUncollectible: vi.fn()
+}));
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getSaleDetail } from '$lib/server/repositories/sales';
@@ -23,7 +26,10 @@ import {
 	correctSaleCollectorSchema,
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
-import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
+import {
+	markSaleUncollectible,
+	revertSaleUncollectible
+} from '$lib/server/services/sale-uncollectible';
 import { SaleServiceError } from '$lib/server/services/sales';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
 const SALE = 'a0000000-0000-0000-0000-000000000009',
@@ -76,7 +82,7 @@ describe('sale detail', () => {
 });
 
 const run = async (
-	action: 'correctBuyer' | 'correctCollector' | 'markUncollectible',
+	action: 'correctBuyer' | 'correctCollector' | 'markUncollectible' | 'revertUncollectible',
 	permissions: string[] | null,
 	fields: Record<string, string>
 ) => {
@@ -229,5 +235,45 @@ describe('mark uncollectible (SAN-106)', () => {
 		});
 		vi.mocked(markSaleUncollectible).mockRejectedValueOnce(new Error('boom'));
 		expect(await run('markUncollectible', perms, { reason: 'x' })).toMatchObject({ status: 500 });
+	});
+});
+
+describe('revert uncollectible (follow-up of SAN-106)', () => {
+	it('offers the revert only to sale.revert_uncollectible on a marked active sale', async () => {
+		const marked = {
+			sale: { status: 'active' },
+			plan: { status: 'active' },
+			installments: [],
+			uncollectible: { markedAt: '2026-11-25T12:00:00Z', reason: 'Se mudó' }
+		};
+		vi.mocked(getSaleDetail).mockResolvedValueOnce({ data: marked, error: null } as never);
+		const admin = (await load(
+			event(['campaign.view', 'sale.view', 'sale.revert_uncollectible']) as never
+		)) as any;
+		expect(admin.canRevertUncollectible).toBe(true);
+		const unmarked = (await load(
+			event(['campaign.view', 'sale.view', 'sale.revert_uncollectible']) as never
+		)) as any;
+		expect(unmarked.canRevertUncollectible).toBe(false);
+	});
+	it('denies without the permission and reverts with the trimmed reason', async () => {
+		vi.mocked(revertSaleUncollectible).mockReset();
+		expect(
+			await run('revertUncollectible', ['campaign.view', 'sale.mark_uncollectible'], {
+				reason: 'x'
+			})
+		).toMatchObject({ status: 403 });
+		expect(revertSaleUncollectible).not.toHaveBeenCalled();
+		vi.mocked(revertSaleUncollectible).mockResolvedValueOnce();
+		expect(
+			await run('revertUncollectible', ['campaign.view', 'sale.revert_uncollectible'], {
+				reason: '  Apareció  '
+			})
+		).toMatchObject({ success: true, message: 'Se revirtió la marca de incobrable.' });
+		expect(revertSaleUncollectible).toHaveBeenLastCalledWith(
+			expect.anything(),
+			{ saleId: SALE, reason: 'Apareció' },
+			expect.anything()
+		);
 	});
 });
