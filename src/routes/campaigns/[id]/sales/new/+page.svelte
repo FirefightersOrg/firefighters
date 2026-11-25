@@ -22,12 +22,20 @@
 	let selectedBuyer = $state('');
 	let mode = $state('full_payment');
 	let due = $state('');
+	let saleDate = $state('');
+	const soldOn = $derived(saleDate || data.today);
+	/** Client mirror of the server bounds: [sale date, sale date + 365 days]. */
+	const dueMax = $derived.by(() => {
+		const [y, m, d] = soldOn.split('-').map(Number);
+		return new Date(Date.UTC(y, m - 1, d + 365)).toISOString().slice(0, 10);
+	});
 	const errors = $derived((form?.errors ?? {}) as Record<string, string[]>);
 	const selectedCandidate = $derived(
 		form?.form === 'lookup' ? form.found?.find((bond) => bond.id === selectedBond) : undefined
 	);
 	$effect(() => {
 		if (!due) due = data.today;
+		if (!saleDate) saleDate = data.today;
 	});
 	$effect(() => {
 		if (form?.form === 'buyer' && form.success && form.buyerId) selectedBuyer = form.buyerId;
@@ -36,7 +44,7 @@
 		selectedBond
 			? buildInstallmentSchedule({
 					paymentMode: mode as 'full_payment' | 'installments',
-					firstDueDate: mode === 'full_payment' ? data.today : due,
+					firstDueDate: mode === 'full_payment' ? soldOn : due,
 					totalAmount: selectedCandidate?.totalValue ?? data.campaign.simpleBondValue,
 					installmentCount: data.campaign.installmentCount,
 					installmentValue: data.campaign.installmentValue,
@@ -196,18 +204,26 @@
 			<p class="text-body-sm text-muted">
 				Cobrador: {selectedCandidate?.collectorName ?? 'elegir un bono para ver quién lo tiene.'}
 			</p>
+			<Field
+				label="Fecha de venta"
+				id="saleDate"
+				hint="Para cargar una venta vieja con su fecha original. No puede ser futura."
+				error={saleError('saleDate')}
+			>
+				<TextInput
+					name="saleDate"
+					type="date"
+					bind:value={saleDate}
+					min={data.saleDateBounds.min}
+					max={data.saleDateBounds.max}
+				/>
+			</Field>
 			<Field label="Modalidad" id="paymentMode" error={saleError('paymentMode')}>
 				<Select name="paymentMode" options={modeOptions} bind:value={mode} />
 			</Field>
 			{#if mode === 'installments'}
 				<Field label="Primer vencimiento" id="firstDueDate" error={saleError('firstDueDate')}>
-					<TextInput
-						name="firstDueDate"
-						type="date"
-						bind:value={due}
-						min={data.firstDueDateBounds.min}
-						max={data.firstDueDateBounds.max}
-					/>
+					<TextInput name="firstDueDate" type="date" bind:value={due} min={soldOn} max={dueMax} />
 				</Field>
 			{/if}
 			<h3 class="text-heading-3">4. Vista previa del plan</h3>

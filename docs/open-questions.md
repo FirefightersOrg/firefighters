@@ -180,19 +180,18 @@ Reference document: `docs/backup-operations.md`.
 
 ### Sale due dates and uncollectible status
 
-Provisional SAN-59 decisions: the first due date may be from 31 days before the sale through one
-year ahead, and later due dates add calendar months with end-of-month clamping.
-
-Santiago decided (2026-11-19, #50) that the first due date must fall between the sale date and one
-year after it, with the sale date being the original date of an old sale. `sale_register` has no
-sale date other than today, so applying that window as is would forbid every past due date. Still
-open: whether a sale can be registered with an earlier sale date. Until then the provisional window
-stays.
+Decided (SAN-106 a, Santiago 2026-11-19 and Juan 2026-11-25 in #50; migration `20270122000000`): a
+sale may be registered with an **earlier sale date** (anyone with `sale.create`), never in the future and,
+when earlier, never before the campaign start (Buenos Aires dates). The first due date falls within
+**[sale date, sale date + 1 year]**, which replaces SAN-59's provisional "31 days before today". An earlier
+sale is stamped at 12:00 Buenos Aires of its date. Later due dates add calendar months with end-of-month
+clamping.
 
 Decided (SAN-106): marking a sale `uncollectible` is manual only, by an admin or the treasurer
 (`sale.mark_uncollectible`), with a mandatory audited reason. Nothing marks it automatically; the
 overdue warning in reports (SAN-142: N overdue installments, set per campaign, default 3) is
-informative only. The mark is final: there is no unmark.
+informative only. Follow-ups decided in #50 (2026-11-25): a marked sale loses draw eligibility, and an
+admin may revert the mark with an audited reason.
 
 ### Definitive pata value
 

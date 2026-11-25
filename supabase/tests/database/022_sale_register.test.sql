@@ -103,7 +103,7 @@ select is((select commercial_status || ':' || current_buyer_id || ':' || current
 reset role;
 select is((select count(*)::int from public.audit_log where request_id = 'full' and action = 'sale.create'), 2,
   'sale and bond changes have two audit rows');
-select ok(has_function_privilege('authenticated', 'public.sale_register(uuid,uuid,uuid,text,date,text)', 'execute'),
+select ok(has_function_privilege('authenticated', 'public.sale_register(uuid,uuid,uuid,text,date,text,date)', 'execute'),
   'authenticated users may execute sale_register');
 set local role authenticated;
 select pg_temp.act_as(2);

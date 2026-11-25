@@ -376,8 +376,8 @@ describe('overdue warning export, SAN-149 (local Supabase)', () => {
 	};
 
 	it('exports every sale over N with the screen columns and the bond numbers, never the UUID', async () => {
-		// Own campaign: one sale whose first installment fell due 31 days ago (the provisional window
-		// allows it), so it has exactly one overdue installment; with N = 1 it is listed.
+		// Own campaign: one sale dated 31 days ago with its first installment due that day (SAN-106: an
+		// earlier sale date), so it has exactly one overdue installment; with N = 1 it is listed.
 		const overdueCampaign = await createCampaign('overdue-export');
 		const bond = await rpcId(users.admin.client, 'bond_create', {
 			p_campaign_id: overdueCampaign,
@@ -399,6 +399,7 @@ describe('overdue warning export, SAN-149 (local Supabase)', () => {
 			p_buyer_id: buyerId,
 			p_payment_mode: 'installments',
 			p_first_due_date: firstDue,
+			p_sale_date: firstDue,
 			p_request_id: rid('overdue-sale')
 		});
 		await rpc(users.admin.client, 'campaign_set_overdue_warning_threshold', {

@@ -19,6 +19,14 @@ import { load as settlementLoad } from '../../src/routes/campaigns/[id]/settleme
 import { load as settlementPrintLoad } from '../../src/routes/campaigns/[id]/settlements/[settlementId]/print/+page.server';
 import { load as paymentPrintLoad } from '../../src/routes/campaigns/[id]/payments/[paymentId]/print/+page.server';
 
+/** SAN-106: a past first due date needs an earlier sale date (the window is [sale date, +1 year]). */
+const saleDateFor = (firstDue: string | null | undefined) => {
+	const today = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Argentina/Buenos_Aires'
+	}).format(new Date());
+	return firstDue && firstDue < today ? firstDue : null;
+};
+
 const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
 const seed = resolveSeedConfig(seedEnv);
 const options = { auth: { autoRefreshToken: false, persistSession: false } };
@@ -140,6 +148,7 @@ async function createSale(
 		p_buyer_id: buyerId,
 		p_payment_mode: paymentMode,
 		p_first_due_date: firstDueDate,
+		p_sale_date: saleDateFor(firstDueDate),
 		p_request_id: rid(`sale-${label}`)
 	});
 	const { data: plan, error: planError } = await service
@@ -272,7 +281,7 @@ beforeAll(async () => {
 		p_associated_number_offset: 1,
 		p_overflow_policy: 'reject',
 		p_barcode_mode: 'base_number',
-		p_starts_at: `${baDate(-1)}T03:00:00Z`,
+		p_starts_at: `${baDate(-10)}T03:00:00Z`, // SAN-106: before the earliest (backdated) sale
 		p_ends_at: `${baDate(365)}T03:00:00Z`,
 		p_request_id: rid('campaign')
 	});

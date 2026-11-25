@@ -187,6 +187,8 @@ async function sell(collectorId: string, label: string) {
 		p_buyer_id: buyerId,
 		p_payment_mode: 'installments',
 		p_first_due_date: daysFromToday(-10),
+		// SAN-106: past due dates need an earlier sale date.
+		p_sale_date: daysFromToday(-10),
 		p_request_id: rid(`sale-${label}`)
 	});
 }
