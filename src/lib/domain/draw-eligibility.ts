@@ -25,7 +25,9 @@ export type DrawIneligibilityReason =
 	| 'not_fully_paid'
 	| 'already_won'
 	/** Consolation draw configured without any required installment (review of #77). */
-	| 'missing_required_installment';
+	| 'missing_required_installment'
+	/** The sale is marked uncollectible (follow-up of SAN-106, #50). */
+	| 'uncollectible';
 
 /** English labels match the language used by the existing application UI. */
 /** Spanish labels shown in screens, certificates and exports (docs/copy.md). */
@@ -35,7 +37,8 @@ export const DRAW_INELIGIBILITY_REASON_LABELS: Record<DrawIneligibilityReason, s
 	installments_not_covered: 'Cuotas requeridas no cubiertas',
 	not_fully_paid: 'Bono sin pago total',
 	already_won: 'El bono ya ganó un sorteo excluyente',
-	missing_required_installment: 'El sorteo no tiene cuota requerida configurada'
+	missing_required_installment: 'El sorteo no tiene cuota requerida configurada',
+	uncollectible: 'Venta marcada como incobrable'
 };
 
 export interface DrawEligibilityDrawSnapshot {
@@ -78,6 +81,8 @@ export interface DrawEligibilitySalePlanSnapshot {
 	paymentMode?: 'full_payment' | 'installments';
 	payment_mode?: 'full_payment' | 'installments';
 	installments: readonly DrawEligibilityInstallmentSnapshot[];
+	/** The sale is marked uncollectible: not eligible while the mark lasts. */
+	uncollectible?: boolean;
 }
 
 export interface DrawEligibilityPaymentApplicationSnapshot {
@@ -223,6 +228,7 @@ export function evaluateDrawEligibility(input: DrawEligibilityInput): DrawEligib
 	const status = bondCommercialStatus(input.bond);
 	if (input.bond.annulled || status === 'annulled') return { eligible: false, reason: 'annulled' };
 	if (status !== 'sold') return { eligible: false, reason: 'not_sold' };
+	if (salePlanFrom(input).uncollectible) return { eligible: false, reason: 'uncollectible' };
 
 	const coverage = coveredInstallments(input);
 	switch (input.draw.type) {

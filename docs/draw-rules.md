@@ -77,6 +77,14 @@ Conditions:
 - Being up to date per required installment or configured consolation rule.
 - Appearing as enabled in the frozen roster.
 
+## Uncollectible sales
+
+A sale marked `uncollectible` (manual, audited; SAN-106) is **not eligible for any draw** while the mark
+lasts, whatever its payments (decided in #50, 2026-11-25). Its numbers are still listed in the roster with
+the reason `uncollectible` (label "Venta marcada como incobrable"), which comes right after `annulled` and
+`not_sold`. Reverting the mark (admin, audited) makes the sale eligible again for rosters generated
+afterwards; a frozen roster never changes. Migration `20270129000000_uncollectible_not_eligible.sql`.
+
 ## Frozen roster
 
 All draws must have a frozen roster before loading winners.

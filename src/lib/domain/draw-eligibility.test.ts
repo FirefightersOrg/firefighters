@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	DRAW_INELIGIBILITY_REASON_LABELS,
 	evaluateDrawEligibility,
 	type DrawEligibilityInput,
 	type DrawType
@@ -185,4 +186,40 @@ describe('evaluateDrawEligibility', () => {
 			reason: 'already_won'
 		});
 	});
+});
+
+describe('uncollectible sales (follow-up of SAN-106)', () => {
+	it.each(['monthly', 'final', 'extraordinary_full_payment', 'consolation'] as const)(
+		'a sale marked uncollectible is not eligible for a %s draw, even when fully covered',
+		(type) => {
+			const input = eligibilityInput(type);
+			const marked = {
+				...input,
+				sale: { ...(input as { sale: object }).sale, uncollectible: true }
+			};
+			expect(evaluateDrawEligibility(marked as DrawEligibilityInput)).toEqual({
+				eligible: false,
+				reason: 'uncollectible'
+			});
+		}
+	);
+	it('annulled and not sold still take precedence, as in the SQL roster', () => {
+		const input = eligibilityInput('monthly');
+		const marked = (bond: object) =>
+			({
+				...input,
+				bond: { ...input.bond, ...bond },
+				sale: { ...(input as { sale: object }).sale, uncollectible: true }
+			}) as DrawEligibilityInput;
+		expect(evaluateDrawEligibility(marked({ annulled: true }))).toMatchObject({
+			reason: 'annulled'
+		});
+		expect(
+			evaluateDrawEligibility(marked({ commercialStatus: 'delivered_to_collector' }))
+		).toMatchObject({
+			reason: 'not_sold'
+		});
+	});
+	it('has a Spanish label', () =>
+		expect(DRAW_INELIGIBILITY_REASON_LABELS.uncollectible).toBe('Venta marcada como incobrable'));
 });
