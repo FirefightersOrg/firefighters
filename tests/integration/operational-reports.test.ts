@@ -8,6 +8,7 @@ import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
 import { actions, load } from '../../src/routes/campaigns/[id]/reports/+page.server';
+import { GET as exportReport } from '../../src/routes/campaigns/[id]/reports/export/[report]/+server';
 
 const { supabaseUrl, anonKey, serviceRoleKey, seedEnv } = inject('integrationEnv');
 const seed = resolveSeedConfig(seedEnv);
@@ -354,5 +355,101 @@ describe('overdue warning, SAN-142 (local Supabase)', () => {
 				new_value: { campaign_id: campaignId, overdue_warning_threshold: 5 }
 			}
 		]);
+	});
+});
+
+describe('overdue warning export, SAN-149 (local Supabase)', () => {
+	const exportAs = async (caller: Caller, format: 'csv' | 'xlsx') => {
+		const base = event(caller);
+		try {
+			return await exportReport({
+				...base,
+				params: { id: campaignId, report: 'overdue-sales' },
+				url: new URL(
+					`http://localhost/campaigns/${campaignId}/reports/export/overdue-sales?format=${format}`
+				)
+			} as never);
+		} catch (err) {
+			if (isHttpError(err)) return err.status;
+			throw err;
+		}
+	};
+
+	it('exports every sale over N with the screen columns and the bond numbers, never the UUID', async () => {
+		// Own campaign: one sale whose first installment fell due 31 days ago (the provisional window
+		// allows it), so it has exactly one overdue installment; with N = 1 it is listed.
+		const overdueCampaign = await createCampaign('overdue-export');
+		const bond = await rpcId(users.admin.client, 'bond_create', {
+			p_campaign_id: overdueCampaign,
+			p_base_numbers: [77],
+			p_request_id: rid('overdue-bond')
+		});
+		await rpc(users.admin.client, 'bond_deliver', {
+			p_campaign_id: overdueCampaign,
+			p_collector_id: collectorId,
+			p_bond_ids: [bond],
+			p_notes: null,
+			p_request_id: rid('overdue-deliver')
+		});
+		const [y, m, d] = todayInBuenosAires().split('-').map(Number);
+		const firstDue = new Date(Date.UTC(y, m - 1, d - 31)).toISOString().slice(0, 10);
+		await rpcId(users.admin.client, 'sale_register', {
+			p_campaign_id: overdueCampaign,
+			p_bond_id: bond,
+			p_buyer_id: buyerId,
+			p_payment_mode: 'installments',
+			p_first_due_date: firstDue,
+			p_request_id: rid('overdue-sale')
+		});
+		await rpc(users.admin.client, 'campaign_set_overdue_warning_threshold', {
+			p_campaign_id: overdueCampaign,
+			p_threshold: 1,
+			p_request_id: rid('overdue-n')
+		});
+		const res = (await exportReport({
+			...event(users.admin, { id: overdueCampaign }),
+			params: { id: overdueCampaign, report: 'overdue-sales' },
+			url: new URL(
+				`http://localhost/campaigns/${overdueCampaign}/reports/export/overdue-sales?format=csv`
+			)
+		} as never)) as Response;
+		const lines = (await res.text())
+			.replace(/^\uFEFF/, '')
+			.trim()
+			.split(/\r?\n/);
+		expect(lines[0]).toBe('Bond,Collector,Overdue installments,Overdue amount,Overdue since');
+		expect(lines).toHaveLength(2);
+		const cells = lines[1]!.split(',');
+		expect(cells[0]).toBe('0077');
+		expect(cells.slice(2)).toEqual(['1', '100.00', firstDue]);
+		// The screen lists the same sale.
+		const page = (await load(event(users.admin, { id: overdueCampaign })))!;
+		expect(page.overdueWarning.sales).toHaveLength(1);
+	});
+
+	it('exports the overdue list in CSV and xlsx for report.export holders, informative only', async () => {
+		const csv = (await exportAs(users.admin, 'csv')) as Response;
+		expect(csv.status).toBe(200);
+		expect(csv.headers.get('content-disposition')).toContain('report-overdue-sales-');
+		const text = await csv.text();
+		// No sale reaches N in this fixture: header only, with the screen's columns.
+		expect(text.replace(/^\uFEFF/, '').trim()).toBe(
+			'Bond,Collector,Overdue installments,Overdue amount,Overdue since'
+		);
+		const xlsx = (await exportAs(users.admin, 'xlsx')) as Response;
+		expect(xlsx.status).toBe(200);
+		expect(xlsx.headers.get('content-type')).toContain('spreadsheetml');
+		const { count } = await users.admin.client
+			.from('sales')
+			.select('id', { count: 'exact', head: true })
+			.not('uncollectible_at', 'is', null)
+			.eq('campaign_id', campaignId);
+		expect(count).toBe(0);
+	});
+
+	it('follows the export rule: read-only and operator export it, the collector gets 403', async () => {
+		expect(((await exportAs(users['read-only'], 'csv')) as Response).status).toBe(200);
+		expect(((await exportAs(users.operator, 'csv')) as Response).status).toBe(200);
+		expect(await exportAs(users.collector, 'csv')).toBe(403);
 	});
 });

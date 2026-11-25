@@ -11,7 +11,7 @@ import {
 
 describe('report export definitions', () => {
 	it('defines every key, with unique non-empty headers', () => {
-		expect(REPORT_EXPORT_KEYS).toHaveLength(10);
+		expect(REPORT_EXPORT_KEYS).toHaveLength(11);
 		for (const key of REPORT_EXPORT_KEYS) {
 			const def = REPORT_EXPORTS[key];
 			const headers = def.columns.map((c) => c.header);
@@ -21,18 +21,19 @@ describe('report export definitions', () => {
 		}
 	});
 
-	it('maps the four operational reports to the operational permission', () => {
-		for (const key of [
+	it('maps the five operational reports to the operational permission', () => {
+		const operational = [
 			'bonds-by-status',
 			'bonds-by-collector',
 			'installments',
+			'overdue-sales',
 			'collector-monthly'
-		] as const) {
+		] as const;
+		for (const key of operational) {
 			expect(REPORT_EXPORTS[key].permission).toBe('report.view_operational');
 		}
 		for (const key of REPORT_EXPORT_KEYS.filter(
-			(k) =>
-				!['bonds-by-status', 'bonds-by-collector', 'installments', 'collector-monthly'].includes(k)
+			(k) => !(operational as readonly string[]).includes(k)
 		)) {
 			expect(REPORT_EXPORTS[key].permission).toBe('report.view_financial');
 		}
@@ -116,5 +117,33 @@ describe('Excel cell values', () => {
 		}
 		expect(excelCellValue(byHeader('Reason'), { ...row, reason: 'plain' })).toBe('plain');
 		expect(excelCellValue(byHeader('Reason'), { ...row, reason: null })).toBeNull();
+	});
+
+	it('exports the overdue warning list with the screen columns (SAN-149)', () => {
+		const def = REPORT_EXPORTS['overdue-sales'];
+		expect(def.columns.map((c) => c.header)).toEqual([
+			'Bond',
+			'Collector',
+			'Overdue installments',
+			'Overdue amount',
+			'Overdue since'
+		]);
+		const row = {
+			saleId: 's',
+			bondId: 'b',
+			bondLabel: '0068',
+			collectorId: 'c',
+			collectorName: '=Ana',
+			overdueCount: 3,
+			overdueAmount: '18000.00',
+			oldestDueDate: '2027-01-10'
+		};
+		expect(def.columns.map((c) => excelCellValue(c, row as never))).toEqual([
+			'0068',
+			"'=Ana",
+			3,
+			18000,
+			'2027-01-10'
+		]);
 	});
 });

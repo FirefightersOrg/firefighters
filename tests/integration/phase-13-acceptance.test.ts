@@ -582,7 +582,9 @@ describe('Phase 13: reports, dashboard and exports without Excel', () => {
 				expect(csv.header).toEqual(headers);
 				expect(xlsx.header).toEqual(headers);
 				expect(csv.rows.length).toBe(xlsx.rows.length);
-				expect(csv.rows.length).toBeGreaterThan(0);
+				// The fixture's installments are not overdue, so the overdue list (SAN-149) is legitimately
+				// empty here; operational-reports.test.ts covers it with real rows.
+				if (key !== 'overdue-sales') expect(csv.rows.length).toBeGreaterThan(0);
 				for (const row of csv.rows) expect(row).toHaveLength(headers.length);
 				// Numeric columns: exact decimal text in CSV, the same number in Excel (never text).
 				columns.forEach((column, index) => {
@@ -719,6 +721,7 @@ describe('Phase 13: reports, dashboard and exports without Excel', () => {
 			'bonds-by-status',
 			'bonds-by-collector',
 			'installments',
+			'overdue-sales',
 			'collector-monthly'
 		];
 		// role -> [can view operational, can view financial, can export]

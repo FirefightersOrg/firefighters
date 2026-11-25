@@ -31,7 +31,8 @@ import {
 	type BondsByCollectorRow,
 	type BondsByStatusRow,
 	type CollectorMonthlyRow,
-	type InstallmentBucketRow
+	type InstallmentBucketRow,
+	type OverdueSaleRow
 } from './reports';
 
 export interface ExportColumn<Row> extends CsvColumn<Row> {
@@ -43,6 +44,7 @@ export const REPORT_EXPORT_KEYS = [
 	'bonds-by-status',
 	'bonds-by-collector',
 	'installments',
+	'overdue-sales',
 	'collector-monthly',
 	'payments-by-date',
 	'settlements-by-collector',
@@ -111,6 +113,19 @@ const installments: ReportExportDefinition<InstallmentBucketRow> = {
 		{ header: 'Bucket', value: (r) => INSTALLMENT_BUCKET_LABELS[r.bucket] ?? r.bucket },
 		{ header: 'Installments', numeric: true, value: (r) => r.installmentCount },
 		{ header: 'Amount', numeric: true, value: (r) => r.amount }
+	]
+};
+
+/** SAN-149: the overdue warning list of SAN-142, same columns as the screen. Informative only. */
+const overdueSales: ReportExportDefinition<OverdueSaleRow> = {
+	title: 'Sales with overdue installments',
+	permission: 'report.view_operational',
+	columns: [
+		{ header: 'Bond', text: true, value: (r) => r.bondLabel },
+		{ header: 'Collector', text: true, value: (r) => r.collectorName },
+		{ header: 'Overdue installments', numeric: true, value: (r) => r.overdueCount },
+		{ header: 'Overdue amount', numeric: true, value: (r) => r.overdueAmount },
+		{ header: 'Overdue since', value: (r) => r.oldestDueDate }
 	]
 };
 
@@ -246,6 +261,7 @@ export const REPORT_EXPORTS = {
 	'bonds-by-status': bondsByStatus,
 	'bonds-by-collector': bondsByCollector,
 	installments,
+	'overdue-sales': overdueSales,
 	'collector-monthly': collectorMonthly,
 	'payments-by-date': paymentsByDate,
 	'settlements-by-collector': settlementsByCollector,
