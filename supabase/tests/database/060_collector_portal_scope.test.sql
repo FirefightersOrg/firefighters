@@ -2,7 +2,7 @@
 -- and function; an unlinked collector login, a linked login without the own-scope permission and an
 -- inactive collector are covered; staff roles keep their global reads.
 begin;
-select plan(42);
+select plan(50);
 
 -- Users: 1 collector A, 2 collector B (both role collector), 3 collector role but unlinked,
 -- 4 collector role linked to an INACTIVE collector, 5 operator, 6 no role but linked to collector E.
@@ -186,6 +186,23 @@ set local role authenticated;
 select is(pg_temp.seen(), 'bonds=0 numbers=0 groups=0 notes=0 assign=0 sales=0 pay=0 sets=0 ledger=0 adj=0 buyers=0',
   'a profile linked to a collector but without the own-scope permissions sees nothing');
 select throws_ok($$select * from public.portal_my_buyers(pg_temp.id('camp'))$$, '42501', null, 'portal_my_buyers requires sale.view_own');
+-- Definer functions skip RLS: the wrappers must carry the permission (profile 6 is linked to collector E, no role).
+select is(public.collector_ledger_is_own_collector(pg_temp.id('ce')), false, 'linked without permission: collector_ledger_is_own_collector is false');
+select is(public.sale_is_own_collector(pg_temp.id('ce')), false, 'linked without permission: sale_is_own_collector is false');
+select is(public.delivery_is_own_collector(pg_temp.id('ce')), false, 'linked without permission: delivery_is_own_collector is false');
+select is(public.payment_settlement_is_own_collector(pg_temp.id('ce')), false, 'linked without permission: payment_settlement_is_own_collector is false');
+select is(public.delivery_can_read(pg_temp.id('ce')), false, 'linked without permission: delivery_can_read is false');
+reset role;
+-- Same on collector A's own data: an operator-like profile (no *_own) is refused by the RPCs.
+update public.collectors set user_profile_id = 'b6600000-0000-0000-0000-000000000005' where id = pg_temp.id('cfree');
+select pg_temp.act(5);
+set local role authenticated;
+select throws_ok($$select public.collector_ledger_balance(pg_temp.id('camp'), pg_temp.id('cfree'))$$, '42501', null, 'RPC collector_ledger_balance refuses a linked profile without collector.ledger.view_own');
+select throws_ok($$select * from public.collector_ledger_entries_with_balance(pg_temp.id('camp'), pg_temp.id('cfree'))$$, '42501', null, 'RPC entries_with_balance refuses a linked profile without collector.ledger.view_own');
+reset role;
+select pg_temp.act(1);
+set local role authenticated;
+select lives_ok($$select public.collector_ledger_balance(pg_temp.id('camp'), pg_temp.id('ca'))$$, 'collector A (with the permission) still reads its own balance');
 reset role;
 
 -- 5. Staff roles are unchanged ---------------------------------------------------------------------------

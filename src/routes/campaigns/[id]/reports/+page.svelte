@@ -78,7 +78,7 @@
 		{#if data.canViewFinancial}
 			<a
 				href={resolve('/campaigns/[id]/reports/financial', { id: campaign.id })}
-				class="mt-1 inline-block text-body-sm text-primary-text hover:underline"
+				class="mt-1 inline-flex min-h-11 items-center text-body-sm text-primary-text hover:underline"
 				>Reportes financieros y de sorteos →</a
 			>
 		{/if}

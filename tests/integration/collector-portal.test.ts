@@ -110,9 +110,6 @@ beforeAll(async () => {
 	operator = await signIn(byRole('operator').email, byRole('operator').password);
 	treasurer = await signIn(byRole('treasurer').email, byRole('treasurer').password);
 	readOnly = await signIn(byRole('read-only').email, byRole('read-only').password);
-	// The seeded collector fixture stays unlinked.
-	unlinked = await signIn(byRole('collector').email, byRole('collector').password);
-
 	// A dedicated collector login, linked to collector A below. Collectors cannot be deleted, so the
 	// user and its collector stay behind (every run uses fresh ids).
 	const service = createClient(supabaseUrl, serviceRoleKey, options);
@@ -125,6 +122,18 @@ beforeAll(async () => {
 		requestId: `it-portal-user-${RUN_ID}`
 	});
 	linked = await signIn(email, PASSWORD);
+
+	// A second collector login that is never linked. The seeded collector fixture cannot be used: other
+	// acceptance suites link it to a collector permanently, so this test would depend on file order.
+	const unlinkedEmail = `portal_unlinked_${RUN_ID}@firefighters.local`;
+	await createAdminManagedUser(service, {
+		email: unlinkedEmail,
+		password: PASSWORD,
+		fullName: `Portal unlinked ${RUN_ID}`,
+		roleNames: ['collector'],
+		requestId: `it-portal-unlinked-${RUN_ID}`
+	});
+	unlinked = await signIn(unlinkedEmail, PASSWORD);
 
 	const collectorInput = (name: string, userProfileId: string | null) => ({
 		displayName: `${name} ${RUN_ID}`,

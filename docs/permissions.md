@@ -77,7 +77,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 | Permission               | Description                                     |
 | ------------------------ | ----------------------------------------------- |
-| `sale.view`              | View sales.                                     |
+| `sale.view`              | View sales (RLS also accepts `bond.view`).      |
 | `sale.create`            | Register sales.                                 |
 | `sale.correct`           | Correct sales with audit.                       |
 | `payment.view`           | View payments.                                  |
@@ -199,6 +199,10 @@ A role that holds an action permission on a domain also holds that domain's `<do
 
 Product decisions (SAN-93): the three new `.view` permissions are implied by any sale, payment or settlement action; the operator gets `collector.view`, `settlement.update_open` and `bond.return` (not `bond.mark_lost`); the treasurer gets `collector.ledger.view`; read-only gets `commission.view`; the collector gets `campaign.view`. Other cross-domain needs are not covered by the rule. The pgTAP test `017_role_view_permissions` checks the rule for every role, so a later grant cannot break it silently.
 
+### Sales are readable through `bond.view`
+
+`sale_can_read()` (the SELECT policy of `sales` and its lines) accepts `sale.view`, `sale.create`, `sale.correct` or `bond.view`, because a bond's commercial state is derived from its sale. Product decision: `read-only` MAY read sales. It holds `bond.view` but not `sale.view`, so the matrix above keeps `no` in the `sale.view` row for `read-only` (the matrix lists permission codes, not what RLS lets through), while RLS lets it read sales. The same holds for `treasurer`, which holds `bond.view`. Writing sales still needs `sale.create` (or the own-collector rule). The pgTAP test `058_rls_audit` asserts this: read-only sees bonds, delivery notes, assignments, commission rules and sales, and nothing else.
+
 ### Operational reports (SAN-86)
 
 `20270101000000_operational_reports.sql` grants `report.view_operational` to `operator` (operations), `treasurer` and `read-only` (auditor); `admin` holds every permission. The catalog has no collector-coordinator role, so reports are not scoped per coordinator yet: a future coordinator role needs its own scope rule in the `report_*` functions (known gap, SAN-140).
@@ -235,6 +239,8 @@ The collector never receives the global `bond.view`, `sale.view`, `collector.led
 
 - Identity: `collectors.user_profile_id` = `current_profile_id()`. One helper, `is_own_collector(uuid)` (`SECURITY DEFINER`, `stable`, `search_path = ''`), holds that logic; the four older per-domain helpers are thin wrappers over it.
 - RLS rule: global permission OR (`*_own` permission AND `is_own_collector(collector_id)`). An unlinked profile, or another collector's rows, return zero rows. An inactive collector keeps read access to its own history.
+- The four per-domain wrappers (`delivery_`, `sale_`, `payment_settlement_`, `collector_ledger_is_own_collector`) carry the matching `*_own` permission, because `SECURITY DEFINER` functions (ledger balance, settlement totals, `delivery_can_read`) skip RLS and only call them. Settlements use `collector.ledger.view_own`.
+- `bonds_select` own-scope uses `current_collector_id`: a bond that was returned, or moved to another collector, leaves the portal, while its sale (`sales.collector_id`) and delivery note stay visible. "My bonds" means today's holdings; a history view (SAN-144) must read assignments/sales instead.
 - Buyers: `buyers_select` stays closed. `portal_my_buyers(campaign)` is a read-only `SECURITY DEFINER` function (name, phone, address only, own sales only); `portal_my_collector()` resolves the caller's collector. Both are revoked from `public`, `anon` and `service_role` and granted to `authenticated`.
 - Server: `requireOwnCollector(locals, returnTo, permission)` resolves the collector from the session, never from a URL or form value; permissions not loaded answer 500, a missing permission 403, no link returns `null` (empty state in the portal). `/` redirects collectors to `/portal`; the nav shows "Mi portal" for `bond.view_own`.
 - The `*_own` codes are excluded from the "action implies view" rule (pgTAP 017 ignores codes ending in `_own`): they open own rows only and never imply a global view.
