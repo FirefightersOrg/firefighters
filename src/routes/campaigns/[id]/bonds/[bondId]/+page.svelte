@@ -22,7 +22,7 @@
 		Textarea,
 		type TableColumn
 	} from '$lib/components/ui';
-	import { DRAW_INELIGIBILITY_REASON_LABELS_ES } from '$lib/domain/draw-eligibility';
+	import { DRAW_INELIGIBILITY_REASON_LABELS } from '$lib/domain/draw-eligibility';
 	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 	import type { PaymentMode } from '$lib/domain/sales';
 	import { wonPrizeCount as wonCount } from '$lib/domain/prizes';
@@ -71,9 +71,7 @@
 		extraordinary: 'Extraordinario'
 	};
 	const ineligibility = (reason: string | null) =>
-		reason
-			? ((DRAW_INELIGIBILITY_REASON_LABELS_ES as Record<string, string>)[reason] ?? reason)
-			: '';
+		reason ? ((DRAW_INELIGIBILITY_REASON_LABELS as Record<string, string>)[reason] ?? reason) : '';
 	const collectorOptions = $derived([
 		{ value: '', label: 'Elegir…' },
 		...data.custody.collectors.map((c) => ({ value: c.id, label: c.displayName }))
@@ -195,7 +193,7 @@
 			<p class="m-0 text-body-sm">
 				Venta activa —
 				<a
-					class="text-primary-text underline-offset-2 hover:underline"
+					class="text-primary-text underline-offset-2 underline"
 					href={resolve('/campaigns/[id]/sales/[saleId]', {
 						id: campaign.id,
 						saleId: data.sale.sale.id

@@ -16,7 +16,7 @@
 		TextInput,
 		type TableColumn
 	} from '$lib/components/ui';
-	import { BARCODE_MODE_LABELS_ES } from '$lib/domain/campaigns';
+	import { BARCODE_MODE_LABELS } from '$lib/domain/campaigns';
 	import { translateImportMessage } from '$lib/domain/import-messages';
 	import { formatImportNumber } from '$lib/domain/import-preview';
 	import { formatDateTime } from '$lib/format';
@@ -105,7 +105,7 @@
 
 <PageHeader
 	title="Escanear bonos"
-	description={`Modo de código de barras: ${BARCODE_MODE_LABELS_ES[campaign.barcodeMode]}. Los escaneos se verifican al instante y solo crean bonos al confirmar el lote.`}
+	description={`Modo de código de barras: ${BARCODE_MODE_LABELS[campaign.barcodeMode]}. Los escaneos se verifican al instante y solo crean bonos al confirmar el lote.`}
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: campaignHref },
@@ -122,7 +122,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/import', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 hover:underline">Importar un archivo →</a
+			class="text-primary-text underline-offset-2 underline">Importar un archivo →</a
 		>
 	</p>
 

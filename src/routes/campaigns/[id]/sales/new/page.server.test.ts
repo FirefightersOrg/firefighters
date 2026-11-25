@@ -100,11 +100,11 @@ describe('new sale', () => {
 			number: 68
 		});
 		vi.mocked(findBondsForSale).mockResolvedValueOnce({
-			data: [{ id: BOND, sellable: false, reason: 'It is already sold.' }],
+			data: [{ id: BOND, sellable: false, reason: 'Ya está vendido.' }],
 			error: null
 		} as never);
 		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '2' })).toMatchObject({
-			found: [{ sellable: false, reason: 'It is already sold.' }]
+			found: [{ sellable: false, reason: 'Ya está vendido.' }]
 		});
 	});
 	it('accepts full payments without a due date and validates installment due-date bounds', async () => {

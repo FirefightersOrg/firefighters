@@ -61,7 +61,7 @@
 	<div class="mx-auto flex min-h-14 max-w-content items-center gap-4 px-4">
 		<a
 			href={homeHref}
-			class="rounded-sm text-heading-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+			class="inline-flex min-h-touch items-center rounded-sm text-heading-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
 			>{product}</a
 		>
 

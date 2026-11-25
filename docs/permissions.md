@@ -165,6 +165,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `prize.reverse_delivery`  |   yes |       no |        no |        no |        no |
 | `report.view_operational` |   yes |      yes |       yes |        no |       yes |
 | `report.view_financial`   |   yes |       no |       yes |        no |       yes |
+| `report.export`           |   yes |      yes |       yes |        no |       yes |
 | `audit.view`              |   yes |       no |       yes |        no |        no |
 | `user.manage`             |   yes |       no |        no |        no |        no |
 

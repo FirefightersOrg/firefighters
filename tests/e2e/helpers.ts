@@ -30,8 +30,8 @@ export function baDay(days = 0) {
 	);
 }
 
-/** Creates and activates a one-installment campaign; returns its id. */
-export async function createActiveCampaign(page: Page, name: string) {
+/** Creates a one-installment campaign left in draft; returns its id. */
+export async function createDraftCampaign(page: Page, name: string) {
 	await open(page, '/campaigns/new');
 	await page.locator('#name').fill(name);
 	await page.locator('#startsOn').fill(baDay(-1));
@@ -44,7 +44,12 @@ export async function createActiveCampaign(page: Page, name: string) {
 	await page.locator('#barcodeMode').selectOption('base_number');
 	await page.getByRole('button', { name: 'Crear campaña' }).click();
 	await expect(page).toHaveURL(/\/campaigns\/[0-9a-f-]{36}$/);
-	const id = page.url().split('/').pop()!;
+	return page.url().split('/').pop()!;
+}
+
+/** Creates and activates a one-installment campaign; returns its id. */
+export async function createActiveCampaign(page: Page, name: string) {
+	const id = await createDraftCampaign(page, name);
 	await page.getByRole('button', { name: 'Activar', exact: true }).click();
 	await page.getByRole('dialog').getByRole('button', { name: 'Activar campaña' }).click();
 	await expect(page.getByText('Activa', { exact: true }).first()).toBeVisible();
@@ -83,6 +88,7 @@ export async function deliverSellAndSettle(
 	await page.locator('#collectorId').selectOption({ label: collector });
 	await page.getByRole('button', { name: 'Entregar y emitir remito' }).click();
 	await expect(page).toHaveURL(/\/deliveries\/[0-9a-f-]{36}$/);
+	const noteId = page.url().split('/').pop()!;
 	await expect(page.getByRole('heading', { name: /Remito \d{4}/ })).toBeVisible();
 
 	// Sell it to a buyer created inline.
@@ -97,6 +103,7 @@ export async function deliverSellAndSettle(
 	await expect(page.locator('#buyerId')).not.toHaveValue('');
 	await page.getByRole('button', { name: 'Confirmar venta' }).click();
 	await expect(page).toHaveURL(/\/sales\/[0-9a-f-]{36}$/);
+	const saleId = page.url().split('/').pop()!;
 	await expect(page.getByText('Pago total').first()).toBeVisible();
 
 	// Open a settlement, add the cash payment and close it.
@@ -104,6 +111,7 @@ export async function deliverSellAndSettle(
 	await page.locator('#collectorId').selectOption({ label: collector });
 	await page.getByRole('button', { name: 'Abrir rendición' }).click();
 	await expect(page).toHaveURL(/\/settlements\/[0-9a-f-]{36}$/);
+	const settlementId = page.url().split('/').pop()!;
 	await page.waitForLoadState('networkidle');
 	await page.locator('#sale').selectOption({ index: 1 });
 	await page.locator('input[name="installmentId"]').first().check();
@@ -115,4 +123,5 @@ export async function deliverSellAndSettle(
 	await dialog.getByRole('button', { name: 'Cerrar rendición' }).click();
 	await expect(page.getByText('Rendición cerrada.')).toBeVisible();
 	await expect(page.getByText('Cerrada', { exact: true }).first()).toBeVisible();
+	return { noteId, saleId, settlementId };
 }

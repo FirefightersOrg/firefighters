@@ -67,7 +67,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 hover:underline"
+			class="text-primary-text underline-offset-2 underline"
 			>Usar el lector de códigos de barras →</a
 		>
 	</p>

@@ -9,18 +9,8 @@ export const LEDGER_ENTRY_TYPES = [
 	'annulment'
 ] as const;
 export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
-export const LEDGER_ENTRY_TYPE_LABELS: Record<LedgerEntryType, string> = {
-	commission_generated: 'Commission generated',
-	commission_settled: 'Commission settled',
-	cash_settled: 'Cash settled',
-	transfer_received_by_firefighters: 'Transfer received by Firefighters',
-	adjustment_in_favor_of_collector: 'Adjustment in favor of collector',
-	adjustment_in_favor_of_firefighters: 'Adjustment in favor of Firefighters',
-	annulment: 'Annulment'
-};
-
 /** Spanish UI labels (docs/copy.md). */
-export const LEDGER_ENTRY_TYPE_LABELS_ES: Record<LedgerEntryType, string> = {
+export const LEDGER_ENTRY_TYPE_LABELS: Record<LedgerEntryType, string> = {
 	commission_generated: 'Comisión generada',
 	commission_settled: 'Comisión liquidada',
 	cash_settled: 'Efectivo rendido',
@@ -33,8 +23,8 @@ export const LEDGER_ENTRY_TYPE_LABELS_ES: Record<LedgerEntryType, string> = {
 export const LEDGER_DIRECTIONS = ['collector_credit', 'collector_debit'] as const;
 export type LedgerDirection = (typeof LEDGER_DIRECTIONS)[number];
 export const LEDGER_DIRECTION_LABELS: Record<LedgerDirection, string> = {
-	collector_credit: 'Credit to collector',
-	collector_debit: 'Debit to collector'
+	collector_credit: 'A favor del cobrador',
+	collector_debit: 'En contra del cobrador'
 };
 
 export const LEDGER_STATUSES = ['recorded', 'annulled', 'compensated'] as const;

@@ -93,7 +93,7 @@ const nested = (header: string, a: string, b: string, text = true): CsvColumn<Ex
 export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = {
 	bonds: {
 		kind: 'bonds',
-		label: 'Bonds per campaign',
+		label: 'Bonos de la campaña',
 		table: 'bonds',
 		select:
 			'id, kind, origin, internal_code, barcode, commercial_status, financial_status_snapshot, current_collector_id, current_buyer_id, commercial_unit_count, total_value::text, annulled_at, annul_reason, created_at, bond_numbers(number_value, number_kind, released_at)',
@@ -126,7 +126,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 	},
 	payments: {
 		kind: 'payments',
-		label: 'Payments by period',
+		label: 'Pagos por período',
 		table: 'payments',
 		select:
 			'id, sale_id, collector_id, buyer_id, settlement_id, replaces_payment_id, amount::text, payment_method, payment_date, status, created_at, annulled_at, annulment_reason',
@@ -151,7 +151,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 	},
 	settlements: {
 		kind: 'settlements',
-		label: 'Settlements',
+		label: 'Rendiciones',
 		table: 'settlements',
 		select:
 			'id, settlement_number, collector_id, status, opened_at, closed_at, total_cash::text, total_transfer::text, total_amount::text, commission_amount::text, commission_paid_amount::text, net_to_firefighters::text, notes, collectors(display_name)',
@@ -176,7 +176,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 	},
 	'collector-ledger': {
 		kind: 'collector-ledger',
-		label: 'Collector current accounts',
+		label: 'Cuentas corrientes de cobradores',
 		table: 'collector_ledger_entries',
 		select:
 			'id, collector_id, settlement_id, payment_id, corrects_sale_id, entry_type, direction, amount::text, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
@@ -202,7 +202,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 	},
 	'frozen-rosters': {
 		kind: 'frozen-rosters',
-		label: 'Frozen rosters',
+		label: 'Padrones congelados',
 		table: 'draw_roster_entries',
 		// Only frozen rosters (never generated/superseded). The campaign hangs off the draw.
 		select:
@@ -236,7 +236,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 	},
 	'settlement-corrections': {
 		kind: 'settlement-corrections',
-		label: 'Closed settlement corrections',
+		label: 'Correcciones de rendiciones cerradas',
 		table: 'settlement_corrections',
 		// The table has no campaign_id: it is filtered through the inner-joined settlement.
 		campaignColumn: 'settlements.campaign_id',

@@ -4,6 +4,7 @@ import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { PartyServiceError } from '$lib/server/services/parties';
 import { buyerSchema, BUYER_FORM_FIELDS } from '$lib/schemas/buyer';
 import { readFormFields } from '$lib/schemas/campaign';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 export function buyerValues(formData: FormData) {
 	const values = readFormFields(formData, BUYER_FORM_FIELDS);
@@ -37,7 +38,7 @@ export function partyFailure(err: unknown, values: Record<string, unknown>) {
 		success: false,
 		values,
 		errors: {},
-		message: 'Algo salió mal. Volver a intentar.'
+		message: GENERIC_ERROR_MESSAGE
 	});
 }
 

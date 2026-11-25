@@ -15,6 +15,7 @@ import type {
 	BondGroupInput,
 	BondUngroupInput
 } from '$lib/schemas/bond';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Bond use cases. Every write calls one audited SQL function with the USER-SCOPED client
@@ -95,7 +96,7 @@ export const BOND_MESSAGES = {
 	permission: 'No hay permiso para realizar esta acción.',
 	campaignNotFound: 'No se encontró la campaña.',
 	bondNotFound: 'No se encontró el bono. Puede que se haya quitado o que no haya acceso a él.',
-	internal: 'Algo salió mal. Volver a intentar.',
+	internal: GENERIC_ERROR_MESSAGE,
 	invalid: 'Hay valores no válidos. Revisar el formulario.',
 	campaignLocked:
 		'Los bonos solo se pueden cargar o modificar mientras la campaña es un borrador o está activa.',
@@ -123,7 +124,7 @@ export function campaignStatusLabel(status: string): string {
  * The database raises English messages; these are their Spanish wording (docs/copy.md). The
  * first matching pattern wins; unknown messages fall back to the original text.
  */
-const DB_MESSAGES_ES: [RegExp, (m: RegExpExecArray) => string][] = [
+const DB_MESSAGES: [RegExp, (m: RegExpExecArray) => string][] = [
 	[/^an active profile is required/, () => 'Se requiere un perfil activo para modificar bonos'],
 	[/^at least one base number is required/, () => 'Se requiere al menos un número base'],
 	[/^base numbers (must be a flat list|cannot be empty)/, () => 'Los números base no son válidos'],
@@ -205,7 +206,7 @@ const BOND_MESSAGES_NOT_FOUND = 'No se encontró el bono.';
 /** Database message → sentence for people: Spanish, capitalized, final period. */
 function humanize(message: string): string {
 	let text = message;
-	for (const [pattern, translate] of DB_MESSAGES_ES) {
+	for (const [pattern, translate] of DB_MESSAGES) {
 		const match = pattern.exec(message);
 		if (match) {
 			text = translate(match);

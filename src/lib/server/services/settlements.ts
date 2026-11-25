@@ -7,6 +7,7 @@ import {
 } from '$lib/domain/payments';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 const uuid = z.guid();
 /** numeric(12,2): positive, at most 2 decimals and below 10^10. */
@@ -67,7 +68,7 @@ export function mapSettlementRpcError(error: RpcError) {
 			'conflict',
 			error.message || 'La rendición ya no se puede modificar.'
 		);
-	return new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.', {
+	return new SettlementServiceError('internal', GENERIC_ERROR_MESSAGE, {
 		cause: error
 	});
 }
@@ -81,8 +82,7 @@ function requirePermission(
 	permissions: readonly string[] | null | undefined,
 	permission: PermissionCode
 ) {
-	if (permissions == null)
-		throw new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.');
+	if (permissions == null) throw new SettlementServiceError('internal', GENERIC_ERROR_MESSAGE);
 	if (!hasPermissionIn(permissions, permission))
 		throw new SettlementServiceError('permission', 'No hay permiso para esta acción.');
 }
@@ -95,7 +95,7 @@ async function rpc<T>(
 	try {
 		result = await client.rpc(name, args);
 	} catch (cause) {
-		throw new SettlementServiceError('internal', 'Algo salió mal. Volver a intentar.', {
+		throw new SettlementServiceError('internal', GENERIC_ERROR_MESSAGE, {
 			cause
 		});
 	}

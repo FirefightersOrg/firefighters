@@ -121,7 +121,7 @@
 			<p class="text-body">
 				Padrón actual: <StatusBadge kind="roster" status={data.roster.status} />
 				<a
-					class="ml-2 rounded-sm text-primary-text underline-offset-2 hover:underline"
+					class="ml-2 rounded-sm text-primary-text underline-offset-2 underline"
 					href={resolve('/campaigns/[id]/draws/[drawId]/roster', {
 						id: data.campaign.id,
 						drawId: data.draw.id
@@ -164,7 +164,7 @@
 		<p class="text-body">
 			Configurar premios, cargar números ganadores y registrar entregas.
 			<a
-				class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+				class="rounded-sm text-primary-text underline-offset-2 underline"
 				href={resolve('/campaigns/[id]/draws/[drawId]/winners', {
 					id: data.campaign.id,
 					drawId: data.draw.id
