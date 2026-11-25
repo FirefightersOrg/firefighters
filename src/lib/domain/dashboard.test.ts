@@ -7,8 +7,28 @@ import {
 	summarizeCash,
 	summarizeCommissions,
 	summarizeRevenue,
+	summarizeSubmitted,
 	TOP_BALANCES
 } from './dashboard';
+
+describe('summarizeSubmitted (SAN-156)', () => {
+	it('adds up count and amount in cents and keeps the per-collector rows', () => {
+		const rows = [
+			{
+				collectorId: 'a',
+				collectorName: 'Ana',
+				count: 2,
+				amount: '100.10',
+				openSettlementId: 's1'
+			},
+			{ collectorId: 'b', collectorName: 'Beto', count: 1, amount: '0.20', openSettlementId: null }
+		];
+		expect(summarizeSubmitted(rows)).toEqual({ count: 3, amount: '100.30', byCollector: rows });
+	});
+	it('is empty when nothing is pending', () => {
+		expect(summarizeSubmitted([])).toEqual({ count: 0, amount: '0.00', byCollector: [] });
+	});
+});
 
 const bondRow = (commercialStatus: string, bondCount: number, financialStatus = 'unpaid') => ({
 	commercialStatus,

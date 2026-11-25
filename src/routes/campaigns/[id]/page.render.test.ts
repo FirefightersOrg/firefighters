@@ -87,6 +87,63 @@ describe('campaign draw navigation', () => {
 	});
 });
 
+describe('dashboard: collector-submitted payments waiting (SAN-156)', () => {
+	const operational = (submitted: unknown) => ({
+		operational: {
+			bonds: { total: 1, sold: 0, available: 1, delivered: 0, returned: 0, annulled: 0 },
+			revenue: {
+				expected: '0.00',
+				collected: '0.00',
+				pending: '0.00',
+				overdue: '0.00',
+				collectedPercent: 0
+			},
+			nextDraw: null,
+			atRisk: [],
+			submitted
+		},
+		financial: null
+	});
+	const withRows = {
+		count: 3,
+		amount: '175.50',
+		byCollector: [
+			{
+				collectorId: 'a',
+				collectorName: 'Ana',
+				count: 2,
+				amount: '100.00',
+				openSettlementId: 'set-1'
+			},
+			{ collectorId: 'b', collectorName: 'Beto', count: 1, amount: '75.50', openSettlementId: null }
+		]
+	};
+	it('shows the count, the amount and a link to where each collector is handled', () => {
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			dashboard: operational(withRows),
+			can: { viewSettlements: true } as never
+		});
+		expect(body).toContain('Cobros enviados sin procesar');
+		expect(body).toContain('3 cobros enviados');
+		expect(body).toContain('Ana');
+		expect(body).toContain('/settlements/set-1');
+		expect(body).toContain('Ver rendiciones (no hay una abierta)');
+	});
+	it('says there is no access to settlements instead of linking', () => {
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			dashboard: operational(withRows)
+		});
+		expect(body).toContain('Sin acceso a rendiciones');
+		expect(body).not.toContain('/settlements/set-1');
+	});
+	it('does not render the card when nothing is waiting', () => {
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			dashboard: operational({ count: 0, amount: '0.00', byCollector: [] })
+		});
+		expect(body).not.toContain('Cobros enviados sin procesar');
+	});
+});
+
 /** `value` of the input named `name` inside the form posting to `action`. */
 function inputValue(body: string, action: string, name: string): string | undefined {
 	const form = body.match(new RegExp(`<form[^>]*action="\\?/${action}"[\\s\\S]*?</form>`))?.[0];
@@ -216,6 +273,7 @@ describe('campaign page: bonds', () => {
 });
 
 const operational = {
+	submitted: { count: 0, amount: '0.00', byCollector: [] },
 	bonds: { total: 20, sold: 6, available: 10, delivered: 4, returned: 0, annulled: 0 },
 	revenue: {
 		expected: '3000.00',

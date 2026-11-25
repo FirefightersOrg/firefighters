@@ -10,6 +10,7 @@ import {
 } from '$lib/server/services/collector-payments';
 import { submissionStatusLabel } from '$lib/portal/labels';
 import { closeSettlement } from '$lib/server/services/settlements';
+import { unprocessedSubmittedMessage } from '$lib/copy';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
@@ -484,6 +485,79 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		expect(foreign).toEqual([]);
 	});
 });
+
+describe('SAN-156: unprocessed collector submissions block the settlement close', () => {
+	it('collector submits -> close fails with the Spanish message -> operator rejects -> close succeeds', async () => {
+		// A has leftover drafts (previous tests); B has its own, which must never block A.
+		const { data: pending } = await admin.client
+			.from('payments')
+			.select('id,amount')
+			.eq('collector_id', collectorAId)
+			.eq('campaign_id', campaignId)
+			.eq('status', 'draft')
+			.eq('submitted_by_collector', true)
+			.order('amount', { ascending: false });
+		expect(pending!.length).toBeGreaterThanOrEqual(2);
+		const [toInclude, ...toReject] = pending!.map((p) => p.id as string);
+		const settlementId = await rpcId(admin.client, 'settlement_open', {
+			p_campaign_id: campaignId,
+			p_collector_id: collectorAId,
+			p_notes: null,
+			p_request_id: rid('san156-settlement')
+		});
+		const ctx = { requestId: rid('san156'), permissions: admin.permissions };
+		await attachCollectorPayment(admin.client, { settlementId, paymentId: toInclude }, ctx);
+
+		const dashboard = await admin.client.rpc('dashboard_submitted_payments', {
+			p_campaign_id: campaignId
+		});
+		expect(dashboard.error).toBeNull();
+		expect((dashboard.data as any[]).find((r) => r.collector_id === collectorAId)).toMatchObject({
+			payment_count: toReject.length,
+			open_settlement_id: settlementId
+		});
+
+		const message = unprocessedSubmittedMessage(toReject.length);
+		expect(message).toMatch(/^Hay \d+ cobros? enviados? por el cobrador sin procesar\. Incl/);
+		await expect(closeSettlement(admin.client, { settlementId }, ctx)).rejects.toMatchObject({
+			kind: 'conflict',
+			status: 409,
+			message
+		});
+		const { data: still } = await admin.client
+			.from('settlements')
+			.select('status')
+			.eq('id', settlementId)
+			.single();
+		expect(still!.status).toBe('open');
+
+		for (const paymentId of toReject)
+			await rejectCollectorPayment(admin.client, { paymentId, reason: 'No se recibió' }, ctx);
+		await closeSettlement(admin.client, { settlementId }, ctx);
+		const { data: closed } = await admin.client
+			.from('settlements')
+			.select('status')
+			.eq('id', settlementId)
+			.single();
+		expect(closed!.status).toBe('closed');
+		// B's draft was never part of this and is still waiting.
+		const { count } = await admin.client
+			.from('payments')
+			.select('id', { count: 'exact', head: true })
+			.eq('collector_id', (await collectorBRow()).id)
+			.eq('status', 'draft');
+		expect(count).toBe(1);
+	});
+});
+
+async function collectorBRow() {
+	const { data } = await admin.client
+		.from('collectors')
+		.select('id')
+		.eq('user_profile_id', collectorB.profile.id)
+		.single();
+	return data as { id: string };
+}
 
 async function firstInstallment(saleId: string) {
 	const { data: plan } = await admin.client

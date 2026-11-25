@@ -7,7 +7,7 @@ import {
 } from '$lib/domain/payments';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
 import type { PermissionCode } from '$lib/server/auth/permission-codes';
-import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
+import { GENERIC_ERROR_MESSAGE, unprocessedSubmittedMessage } from '$lib/copy';
 
 const uuid = z.guid();
 /** numeric(12,2): positive, at most 2 decimals and below 10^10. */
@@ -57,6 +57,16 @@ export function mapSettlementRpcError(error: RpcError) {
 		return new SettlementServiceError('permission', 'No hay permiso para esta acción.');
 	if (error.code === 'P0002')
 		return new SettlementServiceError('not_found', 'No se encontró el recurso de la rendición.');
+	// FF156 (SAN-156): the collector still has submitted collections nobody included or rejected.
+	if (error.code === 'FF156') {
+		const count = Number(/(\d+) unprocessed/.exec(error.message ?? '')?.[1]);
+		return new SettlementServiceError(
+			'conflict',
+			Number.isInteger(count) && count > 0
+				? unprocessedSubmittedMessage(count)
+				: 'Hay cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
+		);
+	}
 	if (['22023', '23514'].includes(error.code ?? ''))
 		return new SettlementServiceError(
 			'validation',

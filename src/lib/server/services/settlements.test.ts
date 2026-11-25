@@ -136,6 +136,40 @@ describe('settlement service review hardening (SAN-63)', () => {
 				p_request_id: 'req-close'
 			});
 		});
+		it.each([
+			[
+				1,
+				'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o rechácelo antes de cerrar la rendición.'
+			],
+			[
+				3,
+				'Hay 3 cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
+			]
+		])(
+			'maps unprocessed collector payments (FF156, %i) to a Spanish 409 that says what to do',
+			async (count, message) => {
+				const rpc = vi.fn().mockResolvedValue({
+					data: null,
+					error: {
+						code: 'FF156',
+						message: `settlement has ${count} unprocessed collector payments`
+					}
+				});
+				await expect(
+					closeSettlement(
+						{ rpc } as never,
+						{ settlementId: id },
+						{ permissions: ['settlement.close'] }
+					)
+				).rejects.toMatchObject({ status: 409, kind: 'conflict', message });
+			}
+		);
+		it('still gives a clear message when the FF156 count cannot be read', () => {
+			expect(mapSettlementRpcError({ code: 'FF156', message: 'x' })).toMatchObject({
+				kind: 'conflict',
+				message: expect.stringContaining('sin procesar')
+			});
+		});
 		it('maps a settlement that can no longer be closed to a 409', async () => {
 			const rpc = vi.fn().mockResolvedValue({
 				data: null,

@@ -129,6 +129,27 @@ describe('collector submissions (SAN-147)', () => {
 		expect(html).toContain('name="paymentId" value="pay-1"');
 		expect(html).toMatch(/name="reason"[^>]*required|required[^>]*name="reason"/);
 	});
+	it('blocks the close and says what to do while drafts are pending (SAN-156)', () => {
+		const html = render_({ reviewSubmitted: true, close: true }, [row, { ...row, id: 'pay-2' }]);
+		expect(html).toContain('2 cobros enviados sin procesar');
+		expect(html).toContain(
+			'Hay 2 cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
+		);
+		expect(html).toContain('Cobros enviados por el cobrador: 2 sin procesar');
+		// The header button is disabled and points at the explanation.
+		const closeButton = html.match(/<button[^>]*aria-describedby="close-blocked"[^>]*>/)?.[0];
+		expect(closeButton).toMatch(/\sdisabled/);
+		expect(html).toContain('id="close-blocked"');
+	});
+	it('singular wording and an enabled close button when nothing is pending', () => {
+		expect(render_({ reviewSubmitted: true, close: true }, [row])).toContain(
+			'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o rechácelo'
+		);
+		const clear = render_({ reviewSubmitted: true, close: true }, []);
+		expect(clear).not.toContain('Hay ');
+		expect(clear).not.toContain('close-blocked');
+		expect(clear).toContain('Cerrar rendición');
+	});
 	it('is read-only without the settlement permissions', () => {
 		const html = render_({ reviewSubmitted: false }, [row]);
 		expect(html).toContain('Cobros enviados por el cobrador');
