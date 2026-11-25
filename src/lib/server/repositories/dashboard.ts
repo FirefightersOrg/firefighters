@@ -3,7 +3,8 @@
  * `dashboard_next_draw` / `dashboard_at_risk_bonds` SQL functions (permission `report.view_operational`).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AtRiskBond, NextDraw } from '$lib/domain/dashboard';
+import type { AtRiskBond, NextDraw, SubmittedPaymentsRow } from '$lib/domain/dashboard';
+import { toDecimalString } from '$lib/domain/money';
 import type { RepositoryResult } from './campaigns';
 
 type Raw = Record<string, unknown>;
@@ -29,6 +30,27 @@ export async function getNextDraw(
 			status: String(r.draw_status),
 			atRiskCount: Number(r.at_risk_count ?? 0)
 		},
+		error: null
+	};
+}
+
+/** Collector-submitted drafts waiting for the operator, per collector (SAN-156; `report.view_operational`). */
+export async function getSubmittedPayments(
+	supabase: SupabaseClient,
+	campaignId: string
+): Promise<RepositoryResult<SubmittedPaymentsRow[]>> {
+	const { data, error } = await supabase.rpc('dashboard_submitted_payments', {
+		p_campaign_id: campaignId
+	});
+	if (error) return { data: null, error };
+	return {
+		data: ((data ?? []) as Raw[]).map((r) => ({
+			collectorId: String(r.collector_id),
+			collectorName: String(r.collector_name),
+			count: Number(r.payment_count ?? 0),
+			amount: toDecimalString(r.total_amount as string | number),
+			openSettlementId: optStr(r.open_settlement_id)
+		})),
 		error: null
 	};
 }

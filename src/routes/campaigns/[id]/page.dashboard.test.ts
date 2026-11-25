@@ -88,6 +88,15 @@ const RPC_ROWS: Record<string, unknown[]> = {
 			total_count: '1'
 		}
 	],
+	dashboard_submitted_payments: [
+		{
+			collector_id: 'c1',
+			collector_name: 'Ana',
+			payment_count: '2',
+			total_amount: '75.00',
+			open_settlement_id: 's1'
+		}
+	],
 	report_payments_by_date: [
 		{ payment_date: '2026-03-01', payment_method: 'cash', payment_count: 2, total: '90.00' },
 		{ payment_date: '2026-03-01', payment_method: 'transfer', payment_count: 1, total: '10.00' }
@@ -170,6 +179,29 @@ describe('/campaigns/[id] dashboard load', () => {
 		expect(called).not.toContain('report_payments_by_date');
 	});
 
+	it('adds the collector-submitted payments waiting for the operator (SAN-156)', async () => {
+		const { supabase, rpc } = supabaseWithReports();
+		const data = (await load(loadEvent(makeLocals({ supabase, permissions: OPERATIONAL }))))!;
+		expect(rpc).toHaveBeenCalledWith('dashboard_submitted_payments', {
+			p_campaign_id: CAMPAIGN_ID
+		});
+		expect(data.dashboard.operational).toMatchObject({
+			submitted: {
+				count: 2,
+				amount: '75.00',
+				byCollector: [
+					{
+						collectorId: 'c1',
+						collectorName: 'Ana',
+						count: 2,
+						amount: '75.00',
+						openSettlementId: 's1'
+					}
+				]
+			}
+		});
+	});
+
 	it('builds the financial group from the SQL aggregates', async () => {
 		const { supabase } = supabaseWithReports();
 		const data = (await load(loadEvent(makeLocals({ supabase, permissions: FINANCIAL }))))!;
@@ -200,6 +232,7 @@ describe('/campaigns/[id] dashboard load', () => {
 		['report_installments', OPERATIONAL, 'operational', 'financial'],
 		['dashboard_next_draw', OPERATIONAL, 'operational', 'financial'],
 		['dashboard_at_risk_bonds', OPERATIONAL, 'operational', 'financial'],
+		['dashboard_submitted_payments', OPERATIONAL, 'operational', 'financial'],
 		['report_payments_by_date', FINANCIAL, 'financial', 'operational'],
 		['report_settlements_by_collector', FINANCIAL, 'financial', 'operational'],
 		['report_collector_accounts', FINANCIAL, 'financial', 'operational']

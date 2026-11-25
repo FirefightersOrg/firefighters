@@ -16,12 +16,17 @@ import {
 	summarizeBonds,
 	summarizeCash,
 	summarizeCommissions,
-	summarizeRevenue
+	summarizeRevenue,
+	summarizeSubmitted
 } from '$lib/domain/dashboard';
 import { todayInBuenosAires, type ReportFilters } from '$lib/domain/reports';
 import type { FinancialFilters } from '$lib/domain/financial-reports';
 import { hasPermissionIn } from '$lib/server/auth/permissions';
-import { getAtRiskBonds, getNextDraw } from '$lib/server/repositories/dashboard';
+import {
+	getAtRiskBonds,
+	getNextDraw,
+	getSubmittedPayments
+} from '$lib/server/repositories/dashboard';
 import {
 	getCollectorAccounts,
 	getPaymentsByDate,
@@ -236,11 +241,13 @@ async function loadDashboard(locals: App.Locals, campaignId: string) {
 	const [operational, financial] = await Promise.all([
 		group(hasPermissionIn(permissions, 'report.view_operational'), async () => {
 			const filters = noReportFilters();
-			const [bonds, installments, nextDraw] = await Promise.all([
+			const [bonds, installments, nextDraw, submitted] = await Promise.all([
 				getBondsByStatus(supabase, campaignId, filters),
 				getInstallmentsReport(supabase, campaignId, filters),
-				getNextDraw(supabase, campaignId)
+				getNextDraw(supabase, campaignId),
+				getSubmittedPayments(supabase, campaignId)
 			]);
+			if (submitted.error) fail('submitted payments', submitted.error);
 			if (bonds.error) fail('bonds', bonds.error);
 			if (installments.error) fail('installments', installments.error);
 			if (nextDraw.error) fail('next draw', nextDraw.error);
@@ -253,6 +260,7 @@ async function loadDashboard(locals: App.Locals, campaignId: string) {
 				bonds: summarizeBonds(bonds.data ?? []),
 				revenue: summarizeRevenue(installments.data ?? []),
 				nextDraw: draw,
+				submitted: summarizeSubmitted(submitted.data ?? []),
 				atRisk: atRisk?.data ?? []
 			};
 		}),

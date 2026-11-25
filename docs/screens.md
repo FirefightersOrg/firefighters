@@ -210,6 +210,8 @@ Actions:
 - Close settlement.
 - Print delivery note.
 
+Collector-submitted payments (SAN-156): the "Cobros enviados por el cobrador" section lists the drafts the collector registered from the portal, with the pending count in its title and a warning at the top of the screen. While any is pending, "Cerrar rendición" is disabled with the reason (include or reject each one); the server check (`settlement_close`, errcode `FF156`) is authoritative and its message is shown if the close is attempted anyway. The campaign dashboard shows a "Cobros enviados sin procesar" card (count, amount, per collector, link to the collector's open settlement) while there are any.
+
 ### Collector current account
 
 Objective: explain the administrative balance.
