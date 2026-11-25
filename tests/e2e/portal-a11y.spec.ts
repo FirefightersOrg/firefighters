@@ -31,7 +31,7 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const anon = (route: string) => route.replace(new RegExp(UUID, 'g'), ':id');
 const PASSWORD = 'PortalA11y123!';
 
-type Ids = { campaignId: string; bond: string; sale: string; buyer: string };
+type Ids = { campaignId: string; bond: string; sale: string; buyer: string; note: string };
 let ids: Ids;
 let desktop: BrowserContext;
 let phone: BrowserContext;
@@ -95,6 +95,14 @@ async function seed(page: Page, browser: Browser) {
 		.eq('id', saleId)
 		.single();
 	const collectorId = soldBy!.collector_id;
+	const { data: noteRow } = await service
+		.from('delivery_notes')
+		.select('id')
+		.eq('campaign_id', campaignId)
+		.eq('collector_id', collectorId)
+		.limit(1)
+		.single();
+	const note = noteRow!.id as string;
 	const email = `portal_e2e_${run}@firefighters.local`;
 	const created = await service.auth.admin.createUser({
 		email,
@@ -163,7 +171,7 @@ async function seed(page: Page, browser: Browser) {
 	await login(collectorPage, { email, password: PASSWORD });
 	const state = await ctx.storageState();
 	await ctx.close();
-	return { ids: { campaignId, bond, sale: saleId, buyer } satisfies Ids, state };
+	return { ids: { campaignId, bond, sale: saleId, buyer, note } satisfies Ids, state };
 }
 
 type Route = { name: string; path: (i: Ids) => string };
@@ -326,6 +334,25 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 				'aria-current',
 				'page'
 			);
+		});
+	});
+
+	test('the own delivery note prints from the bond page and passes axe (SAN-153)', async () => {
+		test.setTimeout(60_000);
+		await inPage(desktop, 'light', async (page) => {
+			await open(page, `/portal/${ids.campaignId}/bonos/${ids.bond}`);
+			await page.getByRole('link', { name: 'Ver remito' }).first().click();
+			await expect(page).toHaveURL(
+				new RegExp(`/portal/${ids.campaignId}/remitos/${ids.note}/imprimir$`)
+			);
+			await expect(
+				page.getByRole('heading', { name: 'Remito de entrega de bonos' }).first()
+			).toBeVisible();
+			await expectNoSeriousViolations(page, 'remito imprimible');
+		});
+		await inPage(phone, 'light', async (page) => {
+			await open(page, `/portal/${ids.campaignId}/remitos/${ids.note}/imprimir`);
+			expect((await measure(page, false)).overflow).toBeLessThanOrEqual(1);
 		});
 	});
 
