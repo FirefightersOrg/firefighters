@@ -174,6 +174,7 @@ const ROUTES: Route[] = [
 	r('campaigns list', () => '/campaigns'),
 	r('campaign new', () => '/campaigns/new'),
 	r('campaign detail', campaign),
+	r('campaign data and rules', (i) => `${campaign(i)}/configuracion`),
 	r('campaign audit', (i) => `${campaign(i)}/audit`),
 	r('campaign backups', (i) => `${campaign(i)}/backups`),
 	r('bonds list', (i) => `${campaign(i)}/bonds`),

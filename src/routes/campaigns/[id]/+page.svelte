@@ -1,30 +1,19 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
-	import CampaignGeneralForm from '$lib/components/campaigns/CampaignGeneralForm.svelte';
-	import CampaignRulesForm from '$lib/components/campaigns/CampaignRulesForm.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
-	import { campaignEditFormKey } from '$lib/components/campaigns/types';
 	import {
 		Alert,
+		Button,
 		Card,
 		PageHeader,
-		Stat,
 		StatusBadge,
 		Table,
-		statusMeta,
 		type TableColumn
 	} from '$lib/components/ui';
 	import { countdownLabel, cutoffCountdown, type AtRiskBond } from '$lib/domain/dashboard';
 	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
 	import { formatSignedMoney } from '$lib/domain/financial-reports';
-	import {
-		BARCODE_MODE_LABELS,
-		campaignNumberingConfig,
-		canEditCampaignRules,
-		OVERFLOW_POLICY_LABELS
-	} from '$lib/domain/campaigns';
-	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
 	import {
 		formatDate,
 		formatDateTime,
@@ -37,17 +26,11 @@
 	let { data, form }: PageProps = $props();
 
 	const campaign = $derived(data.campaign);
-	const generalResult = $derived(form?.form === 'general' ? form : null);
-	const rulesResult = $derived(form?.form === 'rules' ? form : null);
 	const transitionResult = $derived(form?.form === 'transition' ? form : null);
 	const transitionMessage = $derived(
 		Object.values(transitionResult?.errors ?? {}).flat()[0] ?? transitionResult?.message
 	);
 	const missingDates = $derived(!campaign.startsAt || !campaign.endsAt);
-	const frozenByStatus = $derived(!canEditCampaignRules(campaign.status));
-	const rulesFrozen = $derived(frozenByStatus || data.hasBonds);
-	const numbering = $derived(buildNumberingPreview(campaignNumberingConfig(campaign)));
-	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
 
 	const operationalGroup = $derived(data.dashboard.operational);
 	const financialGroup = $derived(data.dashboard.financial);
@@ -69,59 +52,117 @@
 		{ key: 'missing', header: 'Cuotas pendientes', align: 'right' }
 	];
 
-	/** Links to the campaign's other sections, shown only when the person may open them. */
-	const sections = $derived(
+	/** Dates and installment plan, under the title (the full rules live in Datos y reglas). */
+	const meta = $derived(
 		[
-			[data.can.viewBonds, 'Bonos', resolve('/campaigns/[id]/bonds', { id: campaign.id })],
+			campaign.startsAt && campaign.endsAt
+				? `Del ${formatDate(campaign.startsAt)} al ${formatDate(campaign.endsAt)}`
+				: 'Sin fechas definidas',
+			`${campaign.installmentCount} ${campaign.installmentCount === 1 ? 'cuota' : 'cuotas'} de ${formatMoney(campaign.installmentValue)}`
+		].join(', ')
+	);
+
+	type Link = { label: string; href: string };
+	const allowed = (items: [boolean, string, string][]): Link[] =>
+		items.filter(([ok]) => ok).map(([, label, href]) => ({ label, href }));
+	const id = $derived(campaign.id);
+
+	/** The day's actions, first: what operations does every day (only while the campaign is active). */
+	const dayActions = $derived(
+		allowed([
+			[data.can.registerSale, 'Registrar venta', resolve('/campaigns/[id]/sales/new', { id })],
 			[
-				data.can.loadBonds,
-				'Cargar bonos',
-				resolve('/campaigns/[id]/bonds/new', { id: campaign.id })
+				data.can.deliverBonds,
+				'Entregar bonos a un cobrador',
+				resolve('/campaigns/[id]/deliveries/new', { id })
 			],
 			[
-				data.can.loadBonds,
-				'Cargar una pata',
-				resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })
+				data.can.openSettlement,
+				'Abrir rendición',
+				resolve('/campaigns/[id]/settlements/new', { id })
 			],
-			[
-				data.can.viewCollectors,
-				'Cobradores',
-				resolve('/campaigns/[id]/collectors', { id: campaign.id })
-			],
-			[data.can.viewBuyers, 'Compradores', resolve('/campaigns/[id]/buyers', { id: campaign.id })],
-			[
-				data.can.viewDeliveries,
-				'Entregas',
-				resolve('/campaigns/[id]/deliveries', { id: campaign.id })
-			],
-			[data.can.viewSales, 'Ventas', resolve('/campaigns/[id]/sales', { id: campaign.id })],
-			[
-				data.can.viewSettlements,
-				'Rendiciones',
-				resolve('/campaigns/[id]/settlements', { id: campaign.id })
-			],
-			[data.can.viewDraws, 'Sorteos', resolve('/campaigns/[id]/draws', { id: campaign.id })],
-			[data.can.viewReports, 'Reportes', resolve('/campaigns/[id]/reports', { id: campaign.id })],
-			[
-				data.can.exportBackups,
-				'Copias de seguridad',
-				resolve('/campaigns/[id]/backups', { id: campaign.id })
-			],
+			[data.can.loadBonds, 'Cargar bonos', resolve('/campaigns/[id]/bonds/new', { id })],
+			[data.can.loadBonds, 'Cargar una pata', resolve('/campaigns/[id]/bonds/pata/new', { id })]
+		])
+	);
+
+	/** Campaign sections, grouped. Administración stays collapsed. */
+	const groups = $derived(
+		[
+			{
+				title: 'Operación',
+				links: allowed([
+					[data.can.viewBonds, 'Bonos', resolve('/campaigns/[id]/bonds', { id })],
+					[data.can.viewDeliveries, 'Entregas', resolve('/campaigns/[id]/deliveries', { id })],
+					[data.can.viewSales, 'Ventas', resolve('/campaigns/[id]/sales', { id })],
+					[data.can.viewSettlements, 'Rendiciones', resolve('/campaigns/[id]/settlements', { id })]
+				])
+			},
+			{
+				title: 'Personas',
+				links: allowed([
+					[data.can.viewCollectors, 'Cobradores', resolve('/campaigns/[id]/collectors', { id })],
+					[data.can.viewBuyers, 'Compradores', resolve('/campaigns/[id]/buyers', { id })]
+				])
+			},
+			{
+				title: 'Sorteos y reportes',
+				links: allowed([
+					[data.can.viewDraws, 'Sorteos', resolve('/campaigns/[id]/draws', { id })],
+					[data.can.viewReports, 'Reportes', resolve('/campaigns/[id]/reports', { id })]
+				])
+			}
+		].filter((g) => g.links.length)
+	);
+	const adminLinks = $derived(
+		allowed([
+			[true, 'Datos y reglas', resolve('/campaigns/[id]/configuracion', { id })],
 			[
 				data.can.viewCommissions,
 				'Reglas de comisión',
-				resolve('/campaigns/[id]/commissions', { id: campaign.id })
+				resolve('/campaigns/[id]/commissions', { id })
 			],
-			[
-				data.can.viewAudit,
-				'Registro de auditoría',
-				resolve('/campaigns/[id]/audit', { id: campaign.id })
-			]
-		]
-			.filter(([allowed]) => allowed)
-			.map(([, label, href]) => ({ label: label as string, href: href as string }))
+			[data.can.viewAudit, 'Registro de auditoría', resolve('/campaigns/[id]/audit', { id })],
+			[data.can.exportBackups, 'Copias de seguridad', resolve('/campaigns/[id]/backups', { id })]
+		])
 	);
+	const navLink =
+		'-ml-2.5 flex min-h-touch items-center rounded-md px-2.5 text-body text-text hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
+
+{#snippet figure(label: string, value: string, detail?: string)}
+	<div>
+		<dt class="text-body-sm text-muted">{label}</dt>
+		<dd class="m-0 font-figure text-figure tabular-nums">{value}</dd>
+		{#if detail}<dd class="m-0 text-body-sm text-muted">{detail}</dd>{/if}
+	</div>
+{/snippet}
+
+{#snippet status()}
+	{#if data.can.transitions.length > 0}
+		<Card title="Estado" id="status">
+			{#if data.can.transitions.includes('closing') || data.can.transitions.includes('closed')}
+				<div class="mb-4">
+					<RiskyOperationChecklist
+						campaignId={campaign.id}
+						operation="cerrar la campaña"
+						canExport={data.can.exportBackups}
+					/>
+				</div>
+			{/if}
+			<div class="flex flex-wrap items-start gap-3">
+				{#each data.can.transitions as toStatus (toStatus)}
+					<TransitionAction
+						{toStatus}
+						blockedReason={toStatus === 'active' && missingDates
+							? 'Definir las fechas de inicio y de fin antes de activar.'
+							: undefined}
+					/>
+				{/each}
+			</div>
+		</Card>
+	{/if}
+{/snippet}
 
 <svelte:head>
 	<title>{campaign.name} - Campañas - Firefighters</title>
@@ -129,161 +170,150 @@
 
 <PageHeader
 	title={campaign.name}
+	description={meta}
 	breadcrumbs={[{ label: 'Campañas', href: resolve('/campaigns') }, { label: campaign.name }]}
 >
 	{#snippet actions()}
 		<StatusBadge kind="campaign" status={campaign.status} />
+		<Button variant="ghost" size="sm" href={resolve('/campaigns/[id]/configuracion', { id })}
+			>Datos y reglas</Button
+		>
 	{/snippet}
 </PageHeader>
 
+<!-- eslint-disable svelte/no-navigation-without-resolve -- every href is resolved in the script -->
 <div class="flex flex-col gap-6">
-	{#if sections.length}
-		<nav aria-label="Secciones de la campaña">
-			<ul class="m-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0 text-label">
-				{#each sections as section (section.href)}
-					<li>
-						<!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs are resolved above -->
-						<a
-							href={section.href}
-							class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-							>{section.label}</a
-						>
-						<!-- eslint-enable svelte/no-navigation-without-resolve -->
-					</li>
-				{/each}
-			</ul>
-		</nav>
-	{/if}
-
 	{#if transitionResult}
 		<Alert tone={transitionResult.success ? 'success' : 'danger'}>{transitionMessage}</Alert>
 	{/if}
 
-	{#if operational || financial || operationalFailed || financialFailed}
-		<section aria-labelledby="dashboard-title" class="flex flex-col gap-6">
-			<h2 id="dashboard-title" class="m-0 text-heading-2">Tablero</h2>
+	{#if data.can.viewBonds}
+		<!-- The hero: finding a bond is what happens most. Plain GET to the bonds list. -->
+		<form
+			method="GET"
+			action={resolve('/campaigns/[id]/bonds', { id })}
+			class="flex max-w-[720px] flex-col gap-2 sm:flex-row"
+			role="search"
+			aria-label="Buscar bono"
+		>
+			<label for="bond-search" class="sr-only">Número de bono</label>
+			<input
+				id="bond-search"
+				name="base"
+				inputmode="numeric"
+				autocomplete="off"
+				placeholder="Número de bono"
+				class="h-13 w-full min-w-0 shrink-0 rounded-md sm:w-auto sm:flex-1 border border-border-strong bg-surface px-4 text-[18px] font-medium text-text placeholder:font-normal"
+			/>
+			<Button type="submit" variant="primary" size="lg">Buscar bono</Button>
+		</form>
+	{/if}
 
-			{#if operationalFailed}
-				<Alert tone="danger"
-					>No se pudo cargar el tablero operativo (bonos, recaudación y próximo sorteo). Volver a
-					intentar.</Alert
+	{#if dayActions.length}
+		<div class="flex flex-wrap gap-2">
+			{#each dayActions as action, i (action.href)}
+				<Button href={action.href} variant={i === 0 ? 'primary' : 'secondary'}
+					>{action.label}</Button
 				>
-			{/if}
-			{#if financialFailed}
-				<Alert tone="danger"
-					>No se pudo cargar el tablero financiero (efectivo, comisiones y saldos). Volver a
-					intentar.</Alert
-				>
-			{/if}
+			{/each}
+		</div>
+	{/if}
 
-			{#if operational}
-				<Card title="Bonos" id="dash-bonds">
-					<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-						<Stat label="Total" value={formatNumber(operational.bonds.total)} />
-						<Stat label="Vendidos" value={formatNumber(operational.bonds.sold)} />
-						<Stat label="Disponibles" value={formatNumber(operational.bonds.available)} />
-						<Stat
-							label="Entregados"
-							value={formatNumber(operational.bonds.delivered)}
-							detail="Con cobrador, sin vender"
-						/>
-					</div>
-				</Card>
+	{#if operational}
+		<!-- One line of figures, no nested cards. -->
+		<dl
+			id="dash-figures"
+			class="m-0 grid grid-cols-2 gap-x-8 gap-y-4 border-y border-border py-4 lg:grid-cols-4"
+		>
+			<div>
+				<dt class="text-body-sm text-muted">Bonos vendidos</dt>
+				<dd class="m-0 font-figure text-figure tabular-nums">
+					{formatNumber(operational.bonds.sold)}<span
+						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
+						>de {formatNumber(operational.bonds.total)}</span
+					>
+				</dd>
+			</div>
+			<div>
+				<dt class="text-body-sm text-muted">En manos de cobradores</dt>
+				<dd class="m-0 font-figure text-figure tabular-nums">
+					{formatNumber(operational.bonds.delivered)}<span
+						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
+						>{formatNumber(operational.bonds.available)} disponibles</span
+					>
+				</dd>
+			</div>
+			<div>
+				<dt class="text-body-sm text-muted">Cobrado</dt>
+				<dd class="m-0 font-figure text-figure tabular-nums">
+					{formatMoney(operational.revenue.collected)}
 
-				<Card title="Recaudación" id="dash-revenue" description="Cuotas de las ventas activas.">
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<Stat label="Esperada" value={formatMoney(operational.revenue.expected)} />
-						<Stat
-							label="Cobrada"
-							value={formatMoney(operational.revenue.collected)}
-							detail="{operational.revenue.collectedPercent} % de lo esperado"
-						/>
-						<Stat
-							label="Pendiente"
-							value={formatMoney(operational.revenue.pending)}
-							detail="Vencido: {formatMoney(operational.revenue.overdue)}"
-						/>
+					<div
+						class="mt-2 h-1.5 overflow-hidden rounded-full bg-border"
+						role="img"
+						aria-label="{operational.revenue.collectedPercent} % de lo esperado ({formatMoney(
+							operational.revenue.expected
+						)})"
+					>
+						<span
+							class="block h-full bg-primary"
+							style="width: {Math.min(100, operational.revenue.collectedPercent)}%"
+						></span>
 					</div>
-				</Card>
-			{/if}
+				</dd>
+			</div>
+			<div>
+				<dt class="text-body-sm text-muted">Cuotas vencidas</dt>
+				<dd class="m-0 font-figure text-figure tabular-nums">
+					{formatMoney(operational.revenue.overdue)}<span
+						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
+						>pendiente {formatMoney(operational.revenue.pending)}</span
+					>
+				</dd>
+			</div>
+		</dl>
+	{/if}
 
-			{#if financial}
-				<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<Stat label="Efectivo" value={formatMoney(financial.cash.cash)} />
-						<Stat label="Transferencias" value={formatMoney(financial.cash.transfer)} />
-						<Stat label="Total cobrado" value={formatMoney(financial.cash.total)} />
-					</div>
-					<p class="m-0 mt-4 text-body-sm text-muted">
-						Rendido en {formatNumber(financial.commissions.closedSettlements)}
-						{financial.commissions.closedSettlements === 1
-							? 'rendición cerrada'
-							: 'rendiciones cerradas'}:
-						{formatMoney(financial.commissions.settledCash)} en efectivo y
-						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
-						{#if financial.commissions.openSettlements > 0}
-							{financial.commissions.openSettlements === 1
-								? 'Hay 1 rendición abierta.'
-								: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
-						{/if}
-					</p>
-				</Card>
+	{#if operationalFailed}
+		<Alert tone="danger"
+			>No se pudo cargar el tablero operativo (bonos, recaudación y próximo sorteo). Volver a
+			intentar.</Alert
+		>
+	{/if}
+	{#if financialFailed}
+		<Alert tone="danger"
+			>No se pudo cargar el tablero financiero (efectivo, comisiones y saldos). Volver a intentar.</Alert
+		>
+	{/if}
 
-				<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<Stat label="Generadas" value={formatMoney(financial.commissions.generated)} />
-						<Stat label="Liquidadas" value={formatMoney(financial.commissions.settled)} />
-						<Stat label="Sin liquidar" value={formatSignedMoney(financial.commissions.pending)} />
-					</div>
-				</Card>
-
-				<Card title="Saldos de cobradores" id="dash-balances">
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Stat label="Saldo neto" value={formatSignedMoney(financial.balances.net)} />
-						<Stat
-							label="Cobradores con saldo a favor"
-							value={formatNumber(financial.balances.creditors)}
-						/>
-					</div>
-					{#if financial.balances.top.length}
-						<ul class="m-0 mt-4 list-none space-y-1 p-0 text-body-sm">
-							{#each financial.balances.top as row (row.collectorId)}
-								<li class="flex justify-between gap-4">
-									<span>{row.collectorName}</span>
-									<span class="tabular-nums">{formatSignedMoney(row.balance)}</span>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="m-0 mt-4 text-body-sm text-muted">
-							Todavía no hay movimientos en las cuentas corrientes.
-						</p>
-					{/if}
-				</Card>
+	<div class="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+		<div class="flex min-w-0 flex-col gap-5 lg:order-2">
+			{#if campaign.status === 'draft'}
+				{@render status()}
 			{/if}
 
 			{#if operational}
 				<Card title="Próximo sorteo" id="dash-next-draw">
 					{#if nextDraw && countdown}
-						<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-							<Stat
-								label={DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name}
-								value={formatDate(nextDraw.drawDate)}
-								detail={nextDraw.name}
-							/>
-							<Stat
-								label="Fecha de corte"
-								value={formatDateTime(nextDraw.paymentCutoffAt)}
-								detail={countdownLabel(countdown)}
-							/>
-							<Stat
-								label={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
-								value={formatNumber(nextDraw.atRiskCount)}
-								detail={nextDraw.requiredInstallmentNumber
+						<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+							{@render figure(
+								DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name,
+								formatDate(nextDraw.drawDate),
+								nextDraw.name
+							)}
+							{@render figure(
+								'Fecha de corte',
+								formatDateTime(nextDraw.paymentCutoffAt),
+								countdownLabel(countdown)
+							)}
+							{@render figure(
+								rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo',
+								formatNumber(nextDraw.atRiskCount),
+								nextDraw.requiredInstallmentNumber
 									? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
-									: 'Requiere el pago total'}
-							/>
-						</div>
+									: 'Requiere el pago total'
+							)}
+						</dl>
 					{:else}
 						<p class="m-0 text-body-sm text-muted">No hay sorteos programados.</p>
 					{/if}
@@ -311,7 +341,7 @@
 												id: campaign.id,
 												bondId: row.bondId
 											})}
-											class="font-mono text-primary-text underline-offset-2 hover:underline"
+											class="font-figure font-bold text-primary-text tabular-nums underline-offset-2 hover:underline"
 											>{row.baseNumber === null
 												? 'Sin número'
 												: formatPaddedNumber(row.baseNumber, campaign.numberDigits)}</a
@@ -337,136 +367,97 @@
 					</Card>
 				{/if}
 			{/if}
-		</section>
-	{/if}
 
-	<Card title="Resumen" id="summary">
-		<dl class="m-0 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-			<div>
-				<dt class="text-caption text-muted">Fecha de inicio</dt>
-				<dd class="m-0 mt-0.5">{formatDate(campaign.startsAt)}</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Fecha de fin</dt>
-				<dd class="m-0 mt-0.5">{formatDate(campaign.endsAt)}</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Modo de código de barras</dt>
-				<dd class="m-0 mt-0.5">{BARCODE_MODE_LABELS[campaign.barcodeMode]}</dd>
-			</div>
-			{#if campaign.barcodePattern}
-				<div>
-					<dt class="text-caption text-muted">Patrón del código de barras</dt>
-					<dd class="m-0 mt-0.5 font-mono break-all">{campaign.barcodePattern}</dd>
-				</div>
-			{/if}
-			<div>
-				<dt class="text-caption text-muted">Valor del bono simple</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">{formatMoney(campaign.simpleBondValue)}</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Cuotas</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">
-					{campaign.installmentCount} × {formatMoney(campaign.installmentValue)}
-				</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Política de desborde</dt>
-				<dd class="m-0 mt-0.5">
-					{OVERFLOW_POLICY_LABELS[campaign.overflowPolicy] ?? campaign.overflowPolicy}
-				</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Cantidad de dígitos</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">{campaign.numberDigits}</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Número máximo</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">{campaign.maxNumber}</dd>
-			</div>
-			<div>
-				<dt class="text-caption text-muted">Desfase del número asociado</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">+{campaign.associatedNumberOffset}</dd>
-			</div>
-			{#if numbering.ok}
-				<div class="sm:col-span-2">
-					<dt class="text-caption text-muted">Números base utilizables</dt>
-					<dd class="m-0 mt-0.5 tabular-nums">
-						<span class="font-mono"
-							>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
-						>
-						({formatNumber(numbering.usableBaseCount)}); el mayor da el número asociado
-						<span class="font-mono">{numbering.maxValidBase.associatedFormatted}</span>
-					</dd>
-				</div>
-			{/if}
-		</dl>
-		{#if rulesFrozen}
-			<div class="mt-4">
-				<Alert tone="warning">
-					{#if frozenByStatus}
-						<strong>Las reglas están congeladas.</strong> Esta campaña está {statusLabel} y las reglas
-						(precio, cuotas, numeración, política de desborde y modo de código de barras) solo se pueden
-						cambiar mientras la campaña es un borrador. Se muestran arriba en solo lectura.
+			{#if financial}
+				<Card title="Saldos de cobradores" id="dash-balances">
+					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
+						{@render figure('Saldo neto', formatSignedMoney(financial.balances.net))}
+						{@render figure(
+							'Cobradores con saldo a favor',
+							formatNumber(financial.balances.creditors)
+						)}
+					</dl>
+					{#if financial.balances.top.length}
+						<table class="mt-4 w-full border-collapse text-body-sm">
+							<caption class="sr-only">Saldos más grandes por cobrador</caption>
+							<thead>
+								<tr class="border-b border-border text-left text-muted">
+									<th scope="col" class="py-2 font-medium">Cobrador</th>
+									<th scope="col" class="py-2 text-right font-medium">Saldo</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each financial.balances.top as row (row.collectorId)}
+									<tr class="border-b border-border last:border-0">
+										<td class="py-2.5">{row.collectorName}</td>
+										<td class="py-2.5 text-right tabular-nums">{formatSignedMoney(row.balance)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					{:else}
-						<strong>Las reglas están congeladas.</strong> Esta campaña ya tiene bonos y sus números y
-						valores dependen de las reglas (precio, cuotas, numeración, política de desborde y modo de
-						código de barras), por lo que ya no se pueden cambiar, aunque la campaña siga siendo un borrador.
-						Se muestran arriba en solo lectura.
+						<p class="m-0 mt-4 text-body-sm text-muted">
+							Todavía no hay movimientos en las cuentas corrientes.
+						</p>
 					{/if}
-				</Alert>
-			</div>
-		{:else if !data.can.editRules}
-			<p class="m-0 mt-4 text-body-sm text-muted">
-				Las reglas se pueden cambiar mientras la campaña es un borrador, por quienes tienen permiso
-				para modificarlas.
-			</p>
-		{/if}
-	</Card>
+				</Card>
 
-	{#if data.can.transitions.length > 0}
-		<Card title="Estado" id="status">
-			{#if data.can.transitions.includes('closing') || data.can.transitions.includes('closed')}
-				<div class="mb-4">
-					<RiskyOperationChecklist
-						campaignId={campaign.id}
-						operation="cerrar la campaña"
-						canExport={data.can.exportBackups}
-					/>
-				</div>
+				<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
+					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+						{@render figure('Efectivo', formatMoney(financial.cash.cash))}
+						{@render figure('Transferencias', formatMoney(financial.cash.transfer))}
+						{@render figure('Total cobrado', formatMoney(financial.cash.total))}
+					</dl>
+					<p class="m-0 mt-4 text-body-sm text-muted">
+						Rendido en {formatNumber(financial.commissions.closedSettlements)}
+						{financial.commissions.closedSettlements === 1
+							? 'rendición cerrada'
+							: 'rendiciones cerradas'}:
+						{formatMoney(financial.commissions.settledCash)} en efectivo y
+						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
+						{#if financial.commissions.openSettlements > 0}
+							{financial.commissions.openSettlements === 1
+								? 'Hay 1 rendición abierta.'
+								: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
+						{/if}
+					</p>
+				</Card>
+
+				<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
+					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+						{@render figure('Generadas', formatMoney(financial.commissions.generated))}
+						{@render figure('Liquidadas', formatMoney(financial.commissions.settled))}
+						{@render figure('Sin liquidar', formatSignedMoney(financial.commissions.pending))}
+					</dl>
+				</Card>
 			{/if}
-			<div class="flex flex-wrap items-start gap-3">
-				{#each data.can.transitions as toStatus (toStatus)}
-					<TransitionAction
-						{toStatus}
-						blockedReason={toStatus === 'active' && missingDates
-							? 'Definir las fechas de inicio y de fin antes de activar.'
-							: undefined}
-					/>
-				{/each}
-			</div>
-		</Card>
-	{/if}
 
-	<!-- The forms keep their own input state, taken with the version it belongs to: re-mount them
-	     whenever a load brings another campaign or a new version (e.g. after a status change). -->
-	{#key campaignEditFormKey(campaign)}
-		{#if data.can.editName || data.can.editDates}
-			<CampaignGeneralForm
-				{campaign}
-				result={generalResult}
-				nameReadonly={!data.can.editName}
-				datesReadonly={!data.can.editDates}
-			/>
-		{/if}
-
-		{#if data.can.editRules}
-			<RiskyOperationChecklist
-				campaignId={campaign.id}
-				operation="cambiar las reglas de la campaña"
-				canExport={data.can.exportBackups}
-			/>
-			<CampaignRulesForm {campaign} result={rulesResult} />
-		{/if}
-	{/key}
+			{#if campaign.status !== 'draft'}
+				{@render status()}
+			{/if}
+		</div>
+		<nav aria-label="Secciones de la campaña" class="lg:order-1">
+			{#each groups as group (group.title)}
+				<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted first:mt-0">{group.title}</h2>
+				<ul class="m-0 list-none p-0">
+					{#each group.links as link (link.href)}
+						<li><a href={link.href} class={navLink}>{link.label}</a></li>
+					{/each}
+				</ul>
+			{/each}
+			<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted">Administración</h2>
+			<details>
+				<summary
+					class="flex min-h-touch cursor-pointer items-center rounded-sm text-body-sm text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+					>Datos y reglas, comisiones, auditoría y copias</summary
+				>
+				<ul class="m-0 list-none p-0">
+					{#each adminLinks as link (link.href)}
+						<li><a href={link.href} class={navLink}>{link.label}</a></li>
+					{/each}
+				</ul>
+			</details>
+		</nav>
+	</div>
 </div>
+<!-- eslint-enable svelte/no-navigation-without-resolve -->
