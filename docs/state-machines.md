@@ -291,7 +291,7 @@ roster_generated -> roster_frozen
 roster_frozen -> completed
 completed -> closed
 scheduled -> annulled
-roster_generated -> annulled (extraordinary_full_payment only, before freeze; SAN-117)
+roster_generated -> annulled (extraordinary_full_payment only, before freeze; SAN-117; releases extras only for legacy rosters, SAN-152)
 ```
 
 Rules:

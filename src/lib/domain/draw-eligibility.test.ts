@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	compareBinary,
-	ExtraordinaryNumberAssignmentError,
-	assignExtraordinaryNumbers,
 	evaluateDrawEligibility,
 	type DrawEligibilityInput,
 	type DrawType
@@ -187,86 +184,5 @@ describe('evaluateDrawEligibility', () => {
 			eligible: false,
 			reason: 'already_won'
 		});
-	});
-});
-
-describe('assignExtraordinaryNumbers', () => {
-	const eligibleBonds = [
-		{
-			bondId: 'pata-b',
-			kind: 'pata' as const,
-			baseNumbers: [
-				{ id: 'base-9', value: 9 },
-				{ id: 'base-4', value: 4 }
-			]
-		},
-		{
-			bondId: 'simple-a',
-			kind: 'simple' as const,
-			baseNumbers: [{ id: 'base-2', value: 2 }]
-		}
-	];
-
-	it('assigns one number to a simple bond and one per pata base in deterministic order', () => {
-		expect(assignExtraordinaryNumbers({ eligibleBonds, takenNumbers: [], maxNumber: 10 })).toEqual([
-			{ bondId: 'simple-a', sourceBaseNumberId: 'base-2', value: 0 },
-			{ bondId: 'pata-b', sourceBaseNumberId: 'base-4', value: 1 },
-			{ bondId: 'pata-b', sourceBaseNumberId: 'base-9', value: 2 }
-		]);
-	});
-
-	it('respects all taken numbers and numbers assigned earlier in the same call', () => {
-		expect(
-			assignExtraordinaryNumbers({
-				eligibleBonds,
-				takenNumbers: [0, 1, 3, 4, 8],
-				maxNumber: 10
-			}).map((assignment) => assignment.value)
-		).toEqual([2, 5, 6]);
-	});
-
-	it('is deterministic when input bonds and bases are reordered', () => {
-		const first = assignExtraordinaryNumbers({ eligibleBonds, takenNumbers: [0], maxNumber: 10 });
-		const reordered = assignExtraordinaryNumbers({
-			eligibleBonds: [
-				eligibleBonds[1],
-				{ ...eligibleBonds[0], baseNumbers: eligibleBonds[0].baseNumbers.slice().reverse() }
-			],
-			takenNumbers: [0],
-			maxNumber: 10
-		});
-		expect(reordered).toEqual(first);
-	});
-
-	it('throws a typed exhaustion error without returning a partial result', () => {
-		expect(() =>
-			assignExtraordinaryNumbers({
-				eligibleBonds,
-				takenNumbers: [0, 1],
-				maxNumber: 2
-			})
-		).toThrowError(ExtraordinaryNumberAssignmentError);
-		try {
-			assignExtraordinaryNumbers({ eligibleBonds, takenNumbers: [0, 1], maxNumber: 2 });
-		} catch (error) {
-			expect(error).toMatchObject({
-				code: 'not_enough_free_numbers',
-				required: 3,
-				available: 1
-			});
-		}
-	});
-});
-
-describe('compareBinary', () => {
-	it('orders ids by code units, independent of the locale (TS/SQL parity)', () => {
-		const ids = ['b0000000-0000-4000-8000-000000000001', 'A0000000', 'a0000000', '0f000000'];
-		expect([...ids].sort(compareBinary)).toEqual([
-			'0f000000',
-			'A0000000',
-			'a0000000',
-			'b0000000-0000-4000-8000-000000000001'
-		]);
-		expect(compareBinary('x', 'x')).toBe(0);
 	});
 });

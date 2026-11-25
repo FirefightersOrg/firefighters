@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
 vi.mock('$lib/server/repositories/draws', () => ({
 	getDraw: vi.fn(),
-	getCurrentDrawRoster: vi.fn()
+	getCurrentDrawRoster: vi.fn(),
+	rosterHasLegacyExtras: vi.fn()
 }));
 vi.mock('$lib/server/services/draws', async (original) => ({
 	...(await original<any>()),
@@ -18,7 +19,11 @@ vi.mock('$lib/server/services/draw-rosters', async (original) => ({
 }));
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
+import {
+	getCurrentDrawRoster,
+	getDraw,
+	rosterHasLegacyExtras
+} from '$lib/server/repositories/draws';
 import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
@@ -57,6 +62,7 @@ beforeEach(() => {
 	} as never);
 	vi.mocked(getDraw).mockResolvedValue({ data: draw, error: null } as never);
 	vi.mocked(getCurrentDrawRoster).mockResolvedValue({ data: null, error: null });
+	vi.mocked(rosterHasLegacyExtras).mockResolvedValue({ data: false, error: null });
 });
 describe('draw detail', () => {
 	it('draw.update permits editing but not annulment or completion', async () => {
