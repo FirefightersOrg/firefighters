@@ -225,4 +225,68 @@ describe('settlement workspace corrections (SAN-73)', () => {
 		expect(body.match(/<option value="sale-b"/g)).toHaveLength(1);
 		expect(body).toContain('Bono 0068 — Ana');
 	});
+
+	it('reads a closed settlement as a cash sheet (redesign)', () => {
+		const sheet = (can: Record<string, boolean> = {}) =>
+			render(Page, {
+				props: {
+					data: {
+						campaign: { id },
+						settlement: {
+							...settlement,
+							status: 'closed',
+							collectorId: 'col-1',
+							closedAt: '2026-11-24T21:05:00Z'
+						},
+						totals: {
+							totalCash: '115000.00',
+							totalTransfer: '45000.00',
+							totalAmount: '160000.00',
+							commissionAmount: '16000.00',
+							commissionPaidAmount: '11500.00',
+							netToFirefighters: '148500.00',
+							collectorCreditBalance: '4500.00'
+						},
+						payments: [
+							{
+								id: 'p1',
+								date: '2026-11-20',
+								amount: '115000.00',
+								method: 'cash',
+								status: 'confirmed'
+							},
+							{
+								id: 'p2',
+								date: '2026-11-21',
+								amount: '45000.00',
+								method: 'transfer',
+								status: 'confirmed'
+							}
+						],
+						candidates: [],
+						submitted: [],
+						reasonMax: 2000,
+						can: { add: false, remove: false, close: false, ...can }
+					},
+					params: { id, settlementId: 's' }
+				} as any
+			}).body;
+		const body = sheet();
+		expect(body).toContain('Efectivo recibido (1 pago)');
+		expect(body).toContain('Transferencias (1 pago)');
+		expect(body).toContain('Neto para Bomberos');
+		expect(body).toMatch(/148\.500,00/);
+		// Cash handed over = cash collected − commission kept from it, in cents: 115000 − 11500.
+		expect(body).toMatch(/Se entregan \$[\s\u00a0]103\.500,00 en efectivo/);
+		expect(body).toContain('Saldo a favor del cobrador');
+		expect(body).toContain('Ana, cerrada el');
+		expect(body).not.toContain('/collectors/col-1/ledger');
+		expect(body).not.toContain('Corregir esta rendición');
+		const allowed = sheet({ viewLedger: true, correctSettlement: true });
+		expect(allowed).toContain('/collectors/col-1/ledger');
+		expect(allowed).toContain('Corregir esta rendición');
+		expect(allowed).toContain('?/correctSettlement');
+		// The open-workspace metric grid is not shown on the sheet.
+		expect(allowed).not.toContain('Comisión retenida ahora');
+	});
 });

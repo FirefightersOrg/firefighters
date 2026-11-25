@@ -18,7 +18,8 @@
 		TextInput
 	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
-	import { formatDate, formatMoney } from '$lib/format';
+	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
+	import { centsToDecimalString, parseMoneyToCents } from '$lib/domain/money';
 	import {
 		PAYMENT_METHOD_LABELS,
 		type PaymentMethod,
@@ -59,6 +60,21 @@
 		{ label: 'Saldo a favor del cobrador', value: data.totals.collectorCreditBalance }
 	]);
 	const open = $derived(data.settlement.status === 'open');
+	/** Closed (or closed and corrected) settlements read as a cash sheet (redesign). */
+	const sheet = $derived(['closed', 'corrected'].includes(data.settlement.status));
+	const cents = (value: string | number) => parseMoneyToCents(String(value)) ?? 0;
+	const confirmedCount = (method: PaymentMethod) =>
+		data.payments.filter((p) => p.method === method && p.status === 'confirmed').length;
+	const pagos = (n: number) => (n === 1 ? '1 pago' : `${n} pagos`);
+	/** Cash that changes hands: cash collected minus the commission the collector kept from it. */
+	const cashToHandOver = $derived(
+		centsToDecimalString(cents(data.totals.totalCash) - cents(data.totals.commissionPaidAmount))
+	);
+	const meta = $derived(
+		sheet && data.settlement.closedAt
+			? `${data.settlement.collectorName}, cerrada el ${formatDateTime(data.settlement.closedAt)}`
+			: `${data.settlement.collectorName}, abierta el ${formatDate(data.settlement.openedAt)}`
+	);
 	type Payment = (typeof data.payments)[number];
 	const columns = $derived<TableColumn<Payment>[]>([
 		{ key: 'date', header: 'Fecha' },
@@ -88,13 +104,34 @@
 	);
 </script>
 
+{#snippet correctionForm()}
+	<form method="POST" action="?/correctSettlement" class="space-y-4">
+		<div class="grid gap-4 sm:grid-cols-2">
+			<Field label="Diferencia de comisión" id="commissionDelta">
+				<TextInput name="commissionDelta" bind:value={commissionDelta} class="tabular-nums" />
+			</Field>
+			<Field label="Diferencia de comisión retenida en efectivo" id="cashRetainedDelta">
+				<TextInput name="cashRetainedDelta" bind:value={cashRetainedDelta} class="tabular-nums" />
+			</Field>
+		</div>
+		<Alert tone="info" title="Vista indicativa del libro">
+			{ledgerPreview} La validación numérica de la base de datos y los movimientos registrados son los
+			que valen.
+		</Alert>
+		<Field label="Motivo" id="settlement-correction-reason" required hint={reasonHint}>
+			<Textarea name="reason" />
+		</Field>
+		<Button type="submit" variant="primary">Registrar corrección</Button>
+	</form>
+{/snippet}
+
 <svelte:head
 	><title>Rendición {data.settlement.settlementNumber} - {data.campaign.name}</title></svelte:head
 >
 
 <PageHeader
 	title="Rendición #{data.settlement.settlementNumber}"
-	description="{data.settlement.collectorName} · abierta el {formatDate(data.settlement.openedAt)}"
+	description={meta}
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
@@ -106,6 +143,7 @@
 	]}
 >
 	{#snippet actions()}
+		<StatusBadge kind="settlement" status={data.settlement.status} />
 		{#if data.can.close}
 			<Button variant="danger" onclick={() => (closeOpen = true)}>Cerrar rendición</Button>
 		{/if}
@@ -113,24 +151,99 @@
 </PageHeader>
 
 <div class="space-y-6">
-	<div><StatusBadge kind="settlement" status={data.settlement.status} /></div>
 	{#if form?.message}
 		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
 	{/if}
 
-	<section aria-label="Totales" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		{#each metrics as item (item.label)}
-			<Stat label={item.label} value={money(item.value)} />
-		{/each}
-	</section>
-
-	{#if !open}
-		<Card title="Documentos de la rendición">
-			<Button
-				href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
-				>Imprimir remito de rendición</Button
-			>
-		</Card>
+	{#if sheet}
+		<!-- Redesign: a closed settlement reads like a cash sheet, top to bottom. -->
+		<section
+			aria-labelledby="sheet-title"
+			class="max-w-[560px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5"
+		>
+			<h2 id="sheet-title" class="sr-only">Totales de la rendición</h2>
+			<dl class="m-0 tabular-nums">
+				<div class="flex justify-between gap-3 py-2.5">
+					<dt>Efectivo recibido ({pagos(confirmedCount('cash'))})</dt>
+					<dd class="m-0 font-medium whitespace-nowrap">{money(data.totals.totalCash)}</dd>
+				</div>
+				<div class="flex justify-between gap-3 py-2.5">
+					<dt>Transferencias ({pagos(confirmedCount('transfer'))})</dt>
+					<dd class="m-0 font-medium whitespace-nowrap">{money(data.totals.totalTransfer)}</dd>
+				</div>
+				<div class="flex justify-between gap-3 border-t border-border-strong py-2.5 font-semibold">
+					<dt>Total cobrado</dt>
+					<dd class="m-0 whitespace-nowrap">{money(data.totals.totalAmount)}</dd>
+				</div>
+				<div class="flex justify-between gap-3 py-2.5 text-muted">
+					<dt>Comisión que el cobrador se quedó del efectivo</dt>
+					<dd class="m-0 whitespace-nowrap">− {money(data.totals.commissionPaidAmount)}</dd>
+				</div>
+				<div
+					class="mt-1 flex items-baseline justify-between gap-3 border-t-[3px] border-double border-text pt-3.5"
+				>
+					<dt class="text-body font-semibold">Neto para Bomberos</dt>
+					<dd class="m-0 font-figure text-figure-lg whitespace-nowrap">
+						{money(data.totals.netToFirefighters)}
+					</dd>
+				</div>
+			</dl>
+			<p class="m-0 mt-1 text-body-sm text-muted">
+				Se entregan {money(cashToHandOver)} en efectivo; las transferencias ya las recibió Bomberos.
+			</p>
+			<dl class="m-0 mt-3 grid gap-1 text-body-sm text-muted tabular-nums">
+				<div class="flex justify-between gap-3">
+					<dt>Comisión generada</dt>
+					<dd class="m-0 whitespace-nowrap">{money(data.totals.commissionAmount)}</dd>
+				</div>
+				{#if cents(data.totals.collectorCreditBalance) !== 0}
+					<div class="flex justify-between gap-3">
+						<dt>Saldo a favor del cobrador</dt>
+						<dd class="m-0 whitespace-nowrap">{money(data.totals.collectorCreditBalance)}</dd>
+					</div>
+				{/if}
+			</dl>
+			<div class="mt-4 flex flex-wrap gap-2">
+				<Button
+					variant="primary"
+					href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
+					>Imprimir remito de rendición</Button
+				>
+				{#if data.can.viewLedger}
+					<Button
+						href={resolve('/campaigns/[id]/collectors/[collectorId]/ledger', {
+							id: data.campaign.id,
+							collectorId: data.settlement.collectorId
+						})}>Ver cuenta corriente de {data.settlement.collectorName}</Button
+					>
+				{/if}
+			</div>
+			{#if data.can.correctSettlement}
+				<div class="mt-4 border-t border-border pt-3">
+					<Disclosure summary="Corregir esta rendición">
+						<p class="m-0 mb-3 text-body-sm text-muted">
+							La rendición cerrada no se edita: se registra una corrección con motivo, que queda en
+							la cuenta corriente.
+						</p>
+						{@render correctionForm()}
+					</Disclosure>
+				</div>
+			{/if}
+		</section>
+	{:else}
+		<section aria-label="Totales" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			{#each metrics as item (item.label)}
+				<Stat label={item.label} value={money(item.value)} />
+			{/each}
+		</section>
+		{#if !open}
+			<Card title="Documentos de la rendición">
+				<Button
+					href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
+					>Imprimir remito de rendición</Button
+				>
+			</Card>
+		{/if}
 	{/if}
 	{#if open && (data.submitted.length || data.can.reviewSubmitted)}
 		<Card title="Cobros enviados por el cobrador" flush>
@@ -352,33 +465,12 @@
 		{/snippet}
 	</Table>
 
-	{#if data.can.correctSettlement}
+	{#if data.can.correctSettlement && !sheet}
 		<Card
 			title="Corregir la rendición cerrada"
 			description="Crea una corrección inmutable; los totales originales no se editan."
 		>
-			<form method="POST" action="?/correctSettlement" class="space-y-4">
-				<div class="grid gap-4 sm:grid-cols-2">
-					<Field label="Diferencia de comisión" id="commissionDelta">
-						<TextInput name="commissionDelta" bind:value={commissionDelta} class="tabular-nums" />
-					</Field>
-					<Field label="Diferencia de comisión retenida en efectivo" id="cashRetainedDelta">
-						<TextInput
-							name="cashRetainedDelta"
-							bind:value={cashRetainedDelta}
-							class="tabular-nums"
-						/>
-					</Field>
-				</div>
-				<Alert tone="info" title="Vista indicativa del libro">
-					{ledgerPreview} La validación numérica de la base de datos y los movimientos registrados son
-					los que valen.
-				</Alert>
-				<Field label="Motivo" id="settlement-correction-reason" required hint={reasonHint}>
-					<Textarea name="reason" />
-				</Field>
-				<Button type="submit" variant="primary">Registrar corrección</Button>
-			</form>
+			{@render correctionForm()}
 		</Card>
 	{/if}
 
