@@ -31,12 +31,16 @@
 		<dl class="m-0 mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-2">
 			<div>
 				<dt class="text-caption text-muted">Número base</dt>
-				<dd class="m-0 font-mono text-number-lg tabular-nums">{preview.baseFormatted}</dd>
+				<dd class="m-0 font-figure text-number-lg font-bold tabular-nums">
+					{preview.baseFormatted}
+				</dd>
 			</div>
 			<div aria-hidden="true" class="text-heading-2 text-subtle">→</div>
 			<div>
 				<dt class="text-caption text-muted">Número asociado</dt>
-				<dd class="m-0 font-mono text-number-lg tabular-nums">{preview.associatedFormatted}</dd>
+				<dd class="m-0 font-figure text-number-lg font-bold tabular-nums">
+					{preview.associatedFormatted}
+				</dd>
 			</div>
 		</dl>
 	{/if}

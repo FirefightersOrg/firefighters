@@ -35,8 +35,9 @@
 	let menuOpen = $state(false);
 	const menuId = $props.id();
 
+	// Redesign: the current section is marked by a reflective-yellow underline plus weight (not colour alone).
 	const linkClass =
-		'inline-flex min-h-touch items-center rounded-md px-3 text-label text-muted hover:bg-surface-hover hover:text-text aria-[current=page]:bg-primary-soft aria-[current=page]:text-primary-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
+		'inline-flex min-h-touch items-center rounded-md border-b-[3px] border-transparent px-3 text-label text-muted hover:bg-surface-hover hover:text-text aria-[current=page]:border-accent aria-[current=page]:font-semibold aria-[current=page]:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs are resolved by the caller -->
@@ -61,8 +62,10 @@
 	<div class="mx-auto flex min-h-14 max-w-content items-center gap-4 px-4">
 		<a
 			href={homeHref}
-			class="inline-flex min-h-touch items-center rounded-sm text-heading-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-			>{product}</a
+			class="inline-flex min-h-touch items-center gap-2.5 rounded-sm text-heading-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+		>
+			<!-- The institution mark: the only place, with the bond stub, where the brand red appears. -->
+			<span class="h-7 w-2.5 rounded-xs bg-brand" aria-hidden="true"></span>{product}</a
 		>
 
 		{#if links.length}
