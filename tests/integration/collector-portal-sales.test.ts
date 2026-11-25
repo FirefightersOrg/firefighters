@@ -13,6 +13,14 @@ import { load as buyersLoadRaw } from '../../src/routes/portal/[campaignId]/comp
 import { load as buyerLoadRaw } from '../../src/routes/portal/[campaignId]/compradores/[buyerId]/+page.server';
 import { load as dueLoadRaw } from '../../src/routes/portal/[campaignId]/por-cobrar/+page.server';
 
+/** SAN-106: a past first due date needs an earlier sale date (the window is [sale date, +1 year]). */
+const saleDateFor = (firstDue: string | null | undefined) => {
+	const today = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Argentina/Buenos_Aires'
+	}).format(new Date());
+	return firstDue && firstDue < today ? firstDue : null;
+};
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Loader = (event: never) => any;
 const salesLoad = salesLoadRaw as unknown as Loader;
@@ -194,6 +202,7 @@ async function sell(
 		p_buyer_id: buyerId,
 		p_payment_mode: mode,
 		p_first_due_date: firstDue,
+		p_sale_date: saleDateFor(firstDue),
 		p_request_id: rid(`sale-${label}`)
 	});
 }
