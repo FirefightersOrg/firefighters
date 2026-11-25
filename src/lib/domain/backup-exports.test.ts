@@ -8,6 +8,7 @@ import {
 	exportFileName,
 	isBackupExportKind,
 	buenosAiresDateTime,
+	currentAward,
 	parseExportPeriod,
 	snapshotBuyerName
 } from './backup-exports';
@@ -40,7 +41,8 @@ describe('exports', () => {
 	it('knows its kinds and the stable orders end in a unique key', () => {
 		expect(isBackupExportKind('bonds')).toBe(true);
 		expect(isBackupExportKind('frozen-rosters')).toBe(true);
-		expect(isBackupExportKind('winners-prizes')).toBe(false);
+		expect(isBackupExportKind('winners-prizes')).toBe(true);
+		expect(isBackupExportKind('prizes')).toBe(false);
 		for (const kind of BACKUP_EXPORT_KINDS) {
 			expect(BACKUP_EXPORTS[kind].order.at(-1)).toMatch(/^(id|settlement_number|number_value)$/);
 		}
@@ -167,5 +169,90 @@ describe('exportDateInBuenosAires', () => {
 		// 2027-05-02T01:30Z is still 2027-05-01 22:30 in Buenos Aires (UTC-3).
 		expect(exportDateInBuenosAires(new Date('2027-05-02T01:30:00Z'))).toBe('2027-05-01');
 		expect(exportDateInBuenosAires(new Date('2027-05-02T03:00:00Z'))).toBe('2027-05-02');
+	});
+
+	it('exports winners and prizes: winning number, current award and counts (SAN-92)', () => {
+		const row = {
+			id: 'p1',
+			draw_id: 'd1',
+			position: 1,
+			name: '=Auto',
+			description: null,
+			status: 'delivered',
+			excludes_from_consolation: true,
+			annulled_at: null,
+			annul_reason: null,
+			draws: {
+				id: 'd1',
+				campaign_id: 'c',
+				name: 'Final',
+				draw_type: 'final',
+				draw_date: '2027-12-20',
+				status: 'completed'
+			},
+			winning_numbers: {
+				number_value: 68,
+				result_status: 'eligible_winner',
+				matched_roster_entry_id: 'e1',
+				loaded_at: '2027-12-20T15:00:00Z',
+				notes: null
+			},
+			prize_awards: [
+				{
+					id: 'a0',
+					status: 'annulled',
+					bond_id: 'b0',
+					buyer_id: 'u0',
+					collector_id: 'k0',
+					awarded_at: '2027-12-20T15:01:00Z',
+					delivered_at: null,
+					notes: null,
+					annul_reason: 'Error'
+				},
+				{
+					id: 'a1',
+					status: 'delivered',
+					bond_id: 'b1',
+					buyer_id: 'u1',
+					collector_id: 'k1',
+					awarded_at: '2027-12-20T15:05:00Z',
+					delivered_at: '2027-12-21T13:00:00Z',
+					notes: 'Entregado',
+					annul_reason: null
+				}
+			],
+			prize_delivery_reversals: [{ id: 'r1' }]
+		};
+		const [header, line] = parseCsv(buildCsv(BACKUP_EXPORTS['winners-prizes'].columns, [row])).map(
+			(r) => r.cells
+		);
+		const cells = Object.fromEntries(header!.map((h, i) => [h.replace(/^\uFEFF/, ''), line![i]]));
+		expect(cells).toMatchObject({
+			draw_id: 'd1',
+			draw_status: 'completed',
+			prize: "'=Auto",
+			prize_status: 'delivered',
+			winning_number: '68',
+			result_status: 'eligible_winner',
+			winner_loaded_at: '2027-12-20 12:00:00',
+			award_id: 'a1',
+			award_status: 'delivered',
+			bond_id: 'b1',
+			delivered_at: '2027-12-21 10:00:00',
+			awards_count: '2',
+			delivery_reversals_count: '1'
+		});
+		expect(BACKUP_EXPORTS['winners-prizes'].permissions).toEqual(['draw.view']);
+	});
+	it('picks the live award, else the latest annulled one, else none', () => {
+		expect(currentAward(null)).toBeNull();
+		expect(currentAward([])).toBeNull();
+		expect(
+			currentAward([
+				{ id: 'old', status: 'annulled', awarded_at: '2027-01-01T00:00:00Z' },
+				{ id: 'new', status: 'annulled', awarded_at: '2027-02-01T00:00:00Z' }
+			])?.id
+		).toBe('new');
+		expect(currentAward({ id: 'only', status: 'awarded' })?.id).toBe('only');
 	});
 });

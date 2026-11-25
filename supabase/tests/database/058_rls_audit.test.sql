@@ -3,7 +3,7 @@
 -- collector_coordinator and auditor; the seeded roles are admin, treasurer, operator, collector and
 -- read-only (auditor). There is no collector-coordinator role (SAN-139, deferred).
 begin;
-select plan(25);
+select plan(28);
 
 -- 1. Tables ------------------------------------------------------------------------------------
 create temp view audited_tables as
@@ -63,6 +63,22 @@ select is(array(select proname::text from definers
                 where exists (select 1 from aclexplode(coalesce(proacl, acldefault('f', 10))) a
                               where a.grantee = 0 and a.privilege_type = 'EXECUTE') order by 1),
   '{}'::text[], 'no SECURITY DEFINER function is executable by PUBLIC');
+-- Collector portal functions (#129 and later, SAN-92 review): listed by name so new `portal_*` functions are
+-- audited automatically. None is open to anon or PUBLIC; the client-facing ones are granted to authenticated.
+create temp view portal_functions as
+  select p.oid, p.proname, p.proacl from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and (p.proname like 'portal\_%' or p.proname like '%is\_own\_collector');
+select ok((select count(*) from portal_functions) >= 7, 'the audit sees the collector portal functions');
+select is(array(select proname::text from portal_functions
+                where has_function_privilege('anon', oid, 'execute')
+                   or exists (select 1 from aclexplode(coalesce(proacl, acldefault('f', 10))) a
+                              where a.grantee = 0 and a.privilege_type = 'EXECUTE')
+                order by 1),
+  '{}'::text[], 'no collector portal function is executable by anon or PUBLIC');
+select ok(has_function_privilege('authenticated', 'public.is_own_collector(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.portal_my_collector()', 'execute')
+  and has_function_privilege('authenticated', (select oid from pg_proc where proname = 'portal_my_buyers' limit 1), 'execute'),
+  'the client-facing portal functions (is_own_collector, portal_my_collector, portal_my_buyers) are granted to authenticated');
 
 -- 3. The five seeded roles: has_permission returns exactly the set documented in docs/permissions.md ------------------
 insert into auth.users(id, email)

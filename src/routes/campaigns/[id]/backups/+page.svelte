@@ -64,12 +64,6 @@
 					{/if}
 				</li>
 			{/each}
-			{#each data.pending as p (p)}
-				<li class="flex items-center justify-between gap-3 py-2 text-muted">
-					<span>{p === 'winners-prizes' ? 'Ganadores y premios' : p}</span>
-					<span class="text-body-sm">Pendiente</span>
-				</li>
-			{/each}
 		</ul>
 	</Card>
 </div>

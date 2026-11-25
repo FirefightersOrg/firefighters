@@ -1,11 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import {
-	BACKUP_EXPORTS,
-	BACKUP_EXPORT_KINDS,
-	PENDING_BACKUP_EXPORTS
-} from '$lib/domain/backup-exports';
+import { BACKUP_EXPORTS, BACKUP_EXPORT_KINDS } from '$lib/domain/backup-exports';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
@@ -35,7 +31,6 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				hasPermissionIn(locals.permissions, p)
 			),
 			hasPeriod: Boolean(BACKUP_EXPORTS[kind].periodColumn)
-		})),
-		pending: [...PENDING_BACKUP_EXPORTS]
+		}))
 	};
 };
