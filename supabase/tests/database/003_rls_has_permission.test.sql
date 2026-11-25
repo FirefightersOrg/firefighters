@@ -152,7 +152,7 @@ select is(
 );
 select is(public.current_profile_id(), '10000000-0000-0000-0000-000000000001'::uuid, 'admin: current_profile_id is own profile');
 select ok(public.has_permission('user.manage'), 'admin: has_permission(user.manage)');
-select is(cardinality(public.my_permissions()), 51, 'admin: my_permissions returns 51 codes');
+select is(cardinality(public.my_permissions()), 52, 'admin: my_permissions returns 52 codes');
 select is(
   (select count(*)::int from public.audit_log
    where id = '20000000-0000-0000-0000-000000000001'::uuid),
@@ -247,7 +247,7 @@ select is((select count(*)::int from public.profiles), 1, 'operator reads only o
 select is((select count(*)::int from public.user_roles), 1, 'operator reads only own user_roles');
 select is((select count(*)::int from public.audit_log), 0, 'operator reads no audit_log rows');
 select cmp_ok((select count(*)::int from public.roles), '=', 5, 'operator can read roles');
-select is((select count(*)::int from public.permissions), 51, 'operator can read permissions');
+select is((select count(*)::int from public.permissions), 52, 'operator can read permissions');
 select set_eq(
   $$select role_id from public.role_permissions$$,
   $$select id from public.roles where name = 'operator'$$,
