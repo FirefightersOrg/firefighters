@@ -59,7 +59,10 @@
 	description={`${sale.campaignName} · ${PAYMENT_MODE_LABELS[sale.paymentMode]} · ${formatDate(sale.soldAt)}`}
 	breadcrumbs={[
 		{ label: 'Mi portal', href: resolve('/portal') },
-		{ label: 'Mis ventas', href: resolve('/portal/ventas') },
+		{
+			label: 'Mis ventas',
+			href: resolve('/portal/[campaignId]/ventas', { campaignId: data.campaign.id })
+		},
 		{ label: `Bono ${bond}` }
 	]}
 />
@@ -104,8 +107,10 @@
 				<dd class="m-0">
 					<a
 						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-						href={resolve('/portal/compradores/[buyerId]', { buyerId: sale.buyerId })}
-						>{sale.buyerName}</a
+						href={resolve('/portal/[campaignId]/compradores/[buyerId]', {
+							campaignId: data.campaign.id,
+							buyerId: sale.buyerId
+						})}>{sale.buyerName}</a
 					>
 				</dd>
 			</div>

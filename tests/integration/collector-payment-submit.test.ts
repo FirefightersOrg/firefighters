@@ -15,7 +15,7 @@ import type { UserProfile } from '../../src/app';
 import {
 	actions as actionsRaw,
 	load as loadRaw
-} from '../../src/routes/portal/ventas/[saleId]/+page.server';
+} from '../../src/routes/portal/[campaignId]/ventas/[saleId]/+page.server';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const actions = actionsRaw as unknown as Record<string, (event: never) => Promise<any>>;

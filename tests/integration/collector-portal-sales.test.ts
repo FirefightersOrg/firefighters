@@ -7,11 +7,11 @@ import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
-import { load as salesLoadRaw } from '../../src/routes/portal/ventas/+page.server';
-import { load as saleLoadRaw } from '../../src/routes/portal/ventas/[saleId]/+page.server';
-import { load as buyersLoadRaw } from '../../src/routes/portal/compradores/+page.server';
-import { load as buyerLoadRaw } from '../../src/routes/portal/compradores/[buyerId]/+page.server';
-import { load as dueLoadRaw } from '../../src/routes/portal/por-cobrar/+page.server';
+import { load as salesLoadRaw } from '../../src/routes/portal/[campaignId]/ventas/+page.server';
+import { load as saleLoadRaw } from '../../src/routes/portal/[campaignId]/ventas/[saleId]/+page.server';
+import { load as buyersLoadRaw } from '../../src/routes/portal/[campaignId]/compradores/+page.server';
+import { load as buyerLoadRaw } from '../../src/routes/portal/[campaignId]/compradores/[buyerId]/+page.server';
+import { load as dueLoadRaw } from '../../src/routes/portal/[campaignId]/por-cobrar/+page.server';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Loader = (event: never) => any;

@@ -36,14 +36,18 @@
 			{#if column.key === 'bond'}
 				<a
 					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-					href={resolve('/portal/ventas/[saleId]', { saleId: row.saleId })}
-					>{bondLabel(row.bondNumbers, row.numberDigits)}</a
+					href={resolve('/portal/[campaignId]/ventas/[saleId]', {
+						campaignId: data.campaign.id,
+						saleId: row.saleId
+					})}>{bondLabel(row.bondNumbers, row.numberDigits)}</a
 				>
 			{:else if column.key === 'buyerName'}
 				<a
 					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-					href={resolve('/portal/compradores/[buyerId]', { buyerId: row.buyerId })}
-					>{row.buyerName}</a
+					href={resolve('/portal/[campaignId]/compradores/[buyerId]', {
+						campaignId: data.campaign.id,
+						buyerId: row.buyerId
+					})}>{row.buyerName}</a
 				>
 			{:else if column.key === 'saleStatus'}
 				<StatusBadge kind="sale" status={row.saleStatus} />
@@ -74,7 +78,7 @@
 	<PortalPagination
 		page={data.pagination.page}
 		pageCount={data.pagination.pageCount}
-		path={resolve('/portal/ventas')}
+		path={resolve('/portal/[campaignId]/ventas', { campaignId: data.campaign.id })}
 		label="Páginas de ventas"
 	/>
 </div>

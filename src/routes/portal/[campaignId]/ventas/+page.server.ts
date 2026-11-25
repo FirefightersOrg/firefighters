@@ -1,11 +1,18 @@
 import type { PageServerLoad } from './$types';
 import { listMySales } from '$lib/server/repositories/portal';
-import { loadFailed, pageParam, pagination, requireSalesViewer } from '$lib/server/portal/route';
+import {
+	loadFailed,
+	pageParam,
+	pagination,
+	requireSalesViewer,
+	requireUuid
+} from '$lib/server/portal/route';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const collector = await requireSalesViewer(locals, url);
+	const campaignId = requireUuid(params.campaignId, 'Campaña no encontrada.');
 	if (!collector) return { collector, sales: [], pagination: { page: 1, pageCount: 1 } };
-	const result = await listMySales(locals.supabase, pageParam(url));
+	const result = await listMySales(locals.supabase, pageParam(url), campaignId);
 	if (result.error) loadFailed(locals, 'las ventas', result.error);
 	return { collector, sales: result.data.items, pagination: pagination(result.data) };
 };

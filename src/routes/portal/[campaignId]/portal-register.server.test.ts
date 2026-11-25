@@ -5,6 +5,7 @@ import { buenosAiresToday } from '$lib/portal/labels';
 
 const actions = actionsRaw as unknown as Record<string, (event: never) => Promise<any>>;
 const load = loadRaw as unknown as (event: never) => Promise<any>;
+const CAMP = '33333333-3333-4333-8333-333333333333';
 const SALE = '11111111-1111-4111-8111-111111111111';
 const INSTALLMENT = '22222222-2222-4222-8222-222222222222';
 const collectorRow = [{ id: 'c1', display_name: 'Ana', status: 'active' }];
@@ -32,10 +33,10 @@ function setup(
 const post = (locals: App.Locals, fields: Record<string, string>) => {
 	const body = new FormData();
 	for (const [k, v] of Object.entries(fields)) body.append(k, v);
-	const path = `/portal/ventas/${SALE}`;
+	const path = `/portal/${CAMP}/ventas/${SALE}`;
 	return {
 		locals,
-		params: { saleId: SALE },
+		params: { campaignId: CAMP, saleId: SALE },
 		url: new URL(`http://localhost${path}`),
 		request: new Request(`http://localhost${path}`, { method: 'POST', body })
 	} as never;
@@ -64,7 +65,7 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 		const result = await thrown(() => actions.registrar(post(locals, valid)));
 		expect(result.thrown).toMatchObject({
 			status: 303,
-			location: `/portal/ventas/${SALE}?enviado=1`
+			location: `/portal/${CAMP}/ventas/${SALE}?enviado=1`
 		});
 		const call = submitCalls(rpc)[0] as unknown as [string, Record<string, unknown>];
 		expect(call[1]).toMatchObject({
@@ -131,7 +132,7 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 	it('load exposes the register flag, Buenos Aires today and does not list sent collections twice', async () => {
 		const saleRow = {
 			sale_id: SALE,
-			campaign_id: 'k',
+			campaign_id: CAMP,
 			campaign_name: 'C',
 			number_digits: 4,
 			bond_numbers: [1],
@@ -184,8 +185,8 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 		});
 		const data = await load({
 			locals,
-			params: { saleId: SALE },
-			url: new URL(`http://localhost/portal/ventas/${SALE}?enviado=1`)
+			params: { campaignId: CAMP, saleId: SALE },
+			url: new URL(`http://localhost/portal/${CAMP}/ventas/${SALE}?enviado=1`)
 		} as never);
 		expect(data.canRegister).toBe(true);
 		expect(data.today).toBe(buenosAiresToday());
@@ -198,7 +199,7 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 		});
 		const readOnlyData = await load({
 			locals: readOnly.locals,
-			params: { saleId: SALE },
+			params: { campaignId: CAMP, saleId: SALE },
 			url: new URL('http://localhost/x')
 		} as never);
 		expect(readOnlyData.canRegister).toBe(false);

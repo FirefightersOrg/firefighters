@@ -12,6 +12,7 @@ const saleLoad = saleLoadRaw as unknown as Loader;
 const buyersLoad = buyersLoadRaw as unknown as Loader;
 const buyerLoad = buyerLoadRaw as unknown as Loader;
 const dueLoad = dueLoadRaw as unknown as Loader;
+const CAMP = '33333333-3333-4333-8333-333333333333';
 const SALE = '11111111-1111-4111-8111-111111111111';
 const BUYER = '22222222-2222-4222-8222-222222222222';
 
@@ -34,7 +35,11 @@ function setup(opts: { permissions?: string[] | null; rpc?: Record<string, unkno
 
 const collectorRow = { portal_my_collector: [{ id: 'c1', display_name: 'Ana', status: 'active' }] };
 const ev = (locals: App.Locals, path: string, params: Record<string, string> = {}) =>
-	({ locals, params, url: new URL(`http://localhost${path}`) }) as never;
+	({
+		locals,
+		params: { campaignId: CAMP, ...params },
+		url: new URL(`http://localhost${path}`)
+	}) as never;
 
 async function failure(fn: () => Promise<unknown>) {
 	try {
@@ -53,11 +58,11 @@ describe('portal sales and buyers loads', () => {
 	it('answers 500 when the permissions could not be loaded, on every screen', async () => {
 		const { locals } = setup({ permissions: null });
 		for (const run of [
-			() => salesLoad(ev(locals, '/portal/ventas')),
-			() => buyersLoad(ev(locals, '/portal/compradores')),
-			() => dueLoad(ev(locals, '/portal/por-cobrar')),
-			() => saleLoad(ev(locals, `/portal/ventas/${SALE}`, { saleId: SALE })),
-			() => buyerLoad(ev(locals, `/portal/compradores/${BUYER}`, { buyerId: BUYER }))
+			() => salesLoad(ev(locals, `/portal/${CAMP}/ventas`)),
+			() => buyersLoad(ev(locals, `/portal/${CAMP}/compradores`)),
+			() => dueLoad(ev(locals, `/portal/${CAMP}/por-cobrar`)),
+			() => saleLoad(ev(locals, `/portal/${CAMP}/ventas/${SALE}`, { saleId: SALE })),
+			() => buyerLoad(ev(locals, `/portal/${CAMP}/compradores/${BUYER}`, { buyerId: BUYER }))
 		]) {
 			expect(await failure(run)).toMatchObject({ status: 500 });
 		}
@@ -65,7 +70,7 @@ describe('portal sales and buyers loads', () => {
 
 	it('answers 403 without sale.view_own', async () => {
 		const { locals } = setup({ permissions: ['bond.view_own'], rpc: collectorRow });
-		expect(await failure(() => salesLoad(ev(locals, '/portal/ventas')))).toMatchObject({
+		expect(await failure(() => salesLoad(ev(locals, `/portal/${CAMP}/ventas`)))).toMatchObject({
 			status: 403
 		});
 	});
@@ -95,9 +100,9 @@ describe('portal sales and buyers loads', () => {
 		const { locals, rpc } = setup({
 			rpc: { ...collectorRow, portal_my_sales: [row('s2'), row('s1')] }
 		});
-		const out = (await salesLoad(ev(locals, '/portal/ventas?page=3')))!;
+		const out = (await salesLoad(ev(locals, `/portal/${CAMP}/ventas?page=3`)))!;
 		expect(rpc).toHaveBeenCalledWith('portal_my_sales', {
-			p_campaign_id: null,
+			p_campaign_id: CAMP,
 			p_limit: 20,
 			p_offset: 40
 		});
@@ -108,7 +113,7 @@ describe('portal sales and buyers loads', () => {
 
 	it('ignores an invalid page number', async () => {
 		const { locals, rpc } = setup({ rpc: collectorRow });
-		await salesLoad(ev(locals, '/portal/ventas?page=-4'));
+		await salesLoad(ev(locals, `/portal/${CAMP}/ventas?page=-4`));
 		expect(rpc).toHaveBeenCalledWith('portal_my_sales', expect.objectContaining({ p_offset: 0 }));
 	});
 
@@ -132,7 +137,7 @@ describe('portal sales and buyers loads', () => {
 		expect(await failure(() => saleLoad(ev(locals, '/x', { saleId: SALE })))).toMatchObject({
 			status: 404
 		});
-		expect(await salesLoad(ev(locals, '/portal/ventas'))).toMatchObject({
+		expect(await salesLoad(ev(locals, `/portal/${CAMP}/ventas`))).toMatchObject({
 			collector: null,
 			sales: []
 		});
@@ -140,7 +145,7 @@ describe('portal sales and buyers loads', () => {
 
 	it('answers 500 when a read function fails', async () => {
 		const { locals } = setup({ rpc: { ...collectorRow, portal_my_sales: new Error('boom') } });
-		expect(await failure(() => salesLoad(ev(locals, '/portal/ventas')))).toMatchObject({
+		expect(await failure(() => salesLoad(ev(locals, `/portal/${CAMP}/ventas`)))).toMatchObject({
 			status: 500
 		});
 	});

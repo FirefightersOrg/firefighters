@@ -6,7 +6,8 @@ import SalePage from './ventas/[saleId]/+page.svelte';
 import BuyersPage from './compradores/+page.svelte';
 import BuyerPage from './compradores/[buyerId]/+page.svelte';
 import DuePage from './por-cobrar/+page.svelte';
-import HomePage from './+page.svelte';
+import HomePage from '../+page.svelte';
+import PortalNav from '$lib/components/portal/PortalNav.svelte';
 
 const collector = { id: 'c', displayName: 'Ana', status: 'active' };
 const pagination = { page: 1, pageCount: 1 };
@@ -32,14 +33,16 @@ const sale = {
 	soldAt: '2026-11-01T15:00:00Z'
 };
 const body = (Page: any, data: Record<string, unknown>) =>
-	render(Page, { props: { data, params: {} } as never }).body;
+	render(Page, {
+		props: { data: { campaign: { id: 'k', name: 'Campaña 2027' }, ...data }, params: {} } as never
+	}).body;
 
 describe('portal sales and buyers pages', () => {
 	it('lists sales with status badges, formatted money and links', () => {
 		const html = body(SalesPage, { collector, sales: [sale], pagination });
 		expect(html).toContain('0068');
-		expect(html).toContain('href="/portal/ventas/s1"');
-		expect(html).toContain('href="/portal/compradores/b1"');
+		expect(html).toContain('href="/portal/k/ventas/s1"');
+		expect(html).toContain('href="/portal/k/compradores/b1"');
 		expect(html).toContain('En mora');
 		expect(html).toContain('01/12/2026');
 		expect(html).toContain('1 vencida');
@@ -62,8 +65,8 @@ describe('portal sales and buyers pages', () => {
 			pagination: { page: 2, pageCount: 3 }
 		});
 		expect(html).toContain('Página 2 de 3');
-		expect(html).toContain('href="/portal/ventas"');
-		expect(html).toContain('href="/portal/ventas?page=3"');
+		expect(html).toContain('href="/portal/k/ventas"');
+		expect(html).toContain('href="/portal/k/ventas?page=3"');
 	});
 
 	it('renders the sale detail: installment states, pending payment and no write controls', () => {
@@ -135,7 +138,7 @@ describe('portal sales and buyers pages', () => {
 		});
 		expect(html).toContain('Ada Lovelace');
 		expect(html).toContain('11 5555');
-		expect(html).toContain('href="/portal/compradores/b1"');
+		expect(html).toContain('href="/portal/k/compradores/b1"');
 		expect(html).not.toContain('Documento');
 	});
 
@@ -146,7 +149,7 @@ describe('portal sales and buyers pages', () => {
 			sales: [sale]
 		});
 		expect(html).toContain('Calle 1');
-		expect(html).toContain('href="/portal/ventas/s1"');
+		expect(html).toContain('href="/portal/k/ventas/s1"');
 	});
 
 	it('renders the due list with its empty state', () => {
@@ -170,11 +173,41 @@ describe('portal sales and buyers pages', () => {
 		expect(body(DuePage, { collector, due: [], pagination })).toContain('No hay cuotas por cobrar');
 	});
 
-	it('links the portal home to the new sections only with sale.view_own', () => {
-		expect(body(HomePage, { collector, canViewSales: true })).toContain(
-			'href="/portal/por-cobrar"'
-		);
-		expect(body(HomePage, { collector, canViewSales: false })).not.toContain('/portal/ventas');
+	it('lists the campaigns on the portal landing, each linking to its bonds', () => {
+		const html = body(HomePage, {
+			collector,
+			campaigns: [
+				{ id: 'k', name: 'Campaña 2027', status: 'active' },
+				{ id: 'j', name: 'Campaña 2026', status: 'closed' }
+			]
+		});
+		expect(html).toContain('href="/portal/k/bonos"');
+		expect(html).toContain('href="/portal/j/bonos"');
+		expect(body(HomePage, { collector: null, campaigns: [] })).toContain('no está vinculado');
+	});
+
+	describe('portal sub-navigation', () => {
+		const nav = (permissions: string[], pathname: string) =>
+			render(PortalNav, {
+				props: { campaignId: 'k', campaignName: 'Campaña 2027', permissions, pathname }
+			}).body;
+		const all = ['bond.view_own', 'sale.view_own', 'collector.ledger.view_own'];
+
+		it('links every section, including Mi cuenta corriente, and marks the current one', () => {
+			const html = nav(all, '/portal/k/ventas/s1');
+			for (const section of ['bonos', 'ventas', 'compradores', 'por-cobrar', 'cuenta'])
+				expect(html).toContain(`href="/portal/k/${section}"`);
+			expect(html).toContain('Mi cuenta corriente');
+			expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+			expect(html).toMatch(/aria-current="page"[^>]*>Mis ventas/);
+		});
+
+		it('hides the sections the collector has no permission for', () => {
+			const html = nav(['bond.view_own'], '/portal/k/bonos');
+			expect(html).toContain('href="/portal/k/bonos"');
+			expect(html).not.toContain('/portal/k/ventas');
+			expect(html).not.toContain('/portal/k/cuenta');
+		});
 	});
 
 	describe('Registrar cobro (SAN-147)', () => {
