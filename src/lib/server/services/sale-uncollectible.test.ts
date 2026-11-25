@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mapSaleUncollectibleRpcError, markSaleUncollectible } from './sale-uncollectible';
+import {
+	mapSaleUncollectibleRpcError,
+	markSaleUncollectible,
+	revertSaleUncollectible
+} from './sale-uncollectible';
 
 const SALE = 'a0000000-0000-4000-8000-000000000009';
 const ctx = { requestId: 'req-1', permissions: ['sale.mark_uncollectible'] };
@@ -80,4 +84,27 @@ describe('markSaleUncollectible (SAN-106)', () => {
 			markSaleUncollectible({ rpc } as never, { saleId: SALE, reason: 'x' }, ctx)
 		).rejects.toMatchObject({ kind: 'internal' });
 	});
+});
+
+describe('revertSaleUncollectible (follow-up of SAN-106)', () => {
+	const admin = { requestId: 'req-2', permissions: ['sale.revert_uncollectible'] };
+	it('calls sale_revert_uncollectible with the trimmed reason; admin permission only', async () => {
+		const rpc = vi.fn().mockResolvedValue({ error: null });
+		await revertSaleUncollectible({ rpc } as never, { saleId: SALE, reason: ' Apareció ' }, admin);
+		expect(rpc).toHaveBeenCalledWith('sale_revert_uncollectible', {
+			p_sale_id: SALE,
+			p_reason: 'Apareció',
+			p_request_id: 'req-2'
+		});
+		await expect(
+			revertSaleUncollectible({ rpc } as never, { saleId: SALE, reason: 'x' }, ctx)
+		).rejects.toMatchObject({ kind: 'permission' });
+		await expect(
+			revertSaleUncollectible({ rpc } as never, { saleId: SALE, reason: '  ' }, admin)
+		).rejects.toMatchObject({ kind: 'validation', field: 'reason' });
+	});
+	it('says when the sale is not marked', () =>
+		expect(
+			mapSaleUncollectibleRpcError({ code: '55000', message: 'sale is not marked uncollectible' })
+		).toMatchObject({ kind: 'conflict', message: 'La venta no está marcada como incobrable.' }));
 });

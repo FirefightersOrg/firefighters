@@ -75,20 +75,21 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 ### Sales, payments, and settlements
 
-| Permission                | Description                                     |
-| ------------------------- | ----------------------------------------------- |
-| `sale.view`               | View sales (RLS also accepts `bond.view`).      |
-| `sale.create`             | Register sales.                                 |
-| `sale.correct`            | Correct sales with audit.                       |
-| `sale.mark_uncollectible` | Mark an active sale uncollectible (SAN-106).    |
-| `payment.view`            | View payments.                                  |
-| `payment.create`          | Register payments.                              |
-| `payment.annul`           | Annul confirmed payments.                       |
-| `settlement.view`         | View settlements.                               |
-| `settlement.create`       | Create settlements.                             |
-| `settlement.update_open`  | Edit open settlements.                          |
-| `settlement.close`        | Close settlements.                              |
-| `settlement.correct`      | Correct closed settlements through adjustments. |
+| Permission                  | Description                                          |
+| --------------------------- | ---------------------------------------------------- |
+| `sale.view`                 | View sales (RLS also accepts `bond.view`).           |
+| `sale.create`               | Register sales.                                      |
+| `sale.correct`              | Correct sales with audit.                            |
+| `sale.mark_uncollectible`   | Mark an active sale uncollectible (SAN-106).         |
+| `sale.revert_uncollectible` | Revert an uncollectible mark, with a reason (admin). |
+| `payment.view`              | View payments.                                       |
+| `payment.create`            | Register payments.                                   |
+| `payment.annul`             | Annul confirmed payments.                            |
+| `settlement.view`           | View settlements.                                    |
+| `settlement.create`         | Create settlements.                                  |
+| `settlement.update_open`    | Edit open settlements.                               |
+| `settlement.close`          | Close settlements.                                   |
+| `settlement.correct`        | Correct closed settlements through adjustments.      |
 
 ### Commissions
 
@@ -147,6 +148,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `sale.view`                 |   yes |      yes |       yes |        no |        no |
 | `sale.create`               |   yes |      yes |        no |        no |        no |
 | `sale.mark_uncollectible`   |   yes |       no |       yes |        no |        no |
+| `sale.revert_uncollectible` |   yes |       no |        no |        no |        no |
 | `payment.view`              |   yes |      yes |       yes |        no |        no |
 | `payment.create`            |   yes |      yes |       yes |    future |        no |
 | `payment.annul`             |   yes |       no |       yes |        no |        no |

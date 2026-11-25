@@ -35,7 +35,11 @@ export function mapSaleUncollectibleRpcError(error: RpcError): SaleServiceError 
 			'conflict',
 			/already/.test(message)
 				? 'La venta ya está marcada como incobrable.'
-				: 'Solo se puede marcar como incobrable una venta activa.'
+				: /not marked/.test(message)
+					? 'La venta no está marcada como incobrable.'
+					: /reverted/.test(message)
+						? 'Solo se puede revertir la marca de una venta activa.'
+						: 'Solo se puede marcar como incobrable una venta activa.'
 		);
 	return new SaleServiceError('internal', GENERIC_ERROR_MESSAGE, { cause: error });
 }
@@ -62,6 +66,42 @@ export async function markSaleUncollectible(
 	let result: { error: RpcError | null };
 	try {
 		result = await supabase.rpc('sale_mark_uncollectible', {
+			p_sale_id: parsed.data.saleId,
+			p_reason: parsed.data.reason,
+			p_request_id: ctx.requestId ?? null
+		});
+	} catch (cause) {
+		throw new SaleServiceError('internal', GENERIC_ERROR_MESSAGE, { cause });
+	}
+	if (result.error) throw mapSaleUncollectibleRpcError(result.error);
+}
+
+/**
+ * Reverts the uncollectible mark of a sale (decided in #50: admin only, mandatory audited reason). The
+ * sale gets its installment-derived financial status back; it may be marked again later.
+ */
+export async function revertSaleUncollectible(
+	supabase: SupabaseClient,
+	input: z.input<typeof markSaleUncollectibleSchema>,
+	ctx: { requestId?: string | null; permissions?: readonly string[] | null }
+): Promise<void> {
+	if (ctx.permissions == null)
+		throw new SaleServiceError('internal', 'No se pudieron cargar los permisos.');
+	if (!hasPermissionIn(ctx.permissions, 'sale.revert_uncollectible'))
+		throw new SaleServiceError('permission', 'No hay permiso para esta acción.');
+	const parsed = markSaleUncollectibleSchema.safeParse(input);
+	if (!parsed.success) {
+		const issue = parsed.error.issues[0];
+		if (issue?.path[0] !== 'reason')
+			throw new SaleServiceError('not_found', 'Venta no encontrada.', { cause: parsed.error });
+		throw new SaleServiceError('validation', issue.message, {
+			field: 'reason',
+			cause: parsed.error
+		});
+	}
+	let result: { error: RpcError | null };
+	try {
+		result = await supabase.rpc('sale_revert_uncollectible', {
 			p_sale_id: parsed.data.saleId,
 			p_reason: parsed.data.reason,
 			p_request_id: ctx.requestId ?? null
