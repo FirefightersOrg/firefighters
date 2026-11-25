@@ -40,8 +40,10 @@ insert into public.collector_ledger_entries(campaign_id, collector_id, settlemen
   (pg_temp.id('camp'), pg_temp.id('ca'), pg_temp.id('set_a'), 'commission_generated', 'collector_credit', 100, '2026-11-01T10:00:00Z', pg_temp.actor(), null),
   (pg_temp.id('camp'), pg_temp.id('ca'), null, 'adjustment_in_favor_of_firefighters', 'collector_debit', 30, '2026-11-02T10:00:00Z', pg_temp.actor(), 'internal treasury note'),
   (pg_temp.id('camp'), pg_temp.id('cb'), pg_temp.id('set_b'), 'commission_generated', 'collector_credit', 999, '2026-11-01T11:00:00Z', pg_temp.actor(), null);
-insert into public.collector_ledger_entries(campaign_id, collector_id, entry_type, direction, amount, occurred_at, created_by, reason, status, annulled_by, annulled_at, annul_reason) values
-  (pg_temp.id('camp'), pg_temp.id('ca'), 'adjustment_in_favor_of_collector', 'collector_credit', 500, '2026-11-03T10:00:00Z', pg_temp.actor(), 'wrong', 'annulled', pg_temp.actor(), '2026-11-03T11:00:00Z', 'internal annul note');
+insert into public.collector_ledger_entries(campaign_id, collector_id, entry_type, direction, amount, occurred_at, created_by, reason) values
+  (pg_temp.id('camp'), pg_temp.id('ca'), 'adjustment_in_favor_of_collector', 'collector_credit', 500, '2026-11-03T10:00:00Z', pg_temp.actor(), 'wrong');
+update public.collector_ledger_entries set status = 'annulled', annulled_by = pg_temp.actor(), annulled_at = '2026-11-03T11:00:00Z',
+  annul_reason = 'internal annul note' where amount = 500 and collector_id = pg_temp.id('ca');
 insert into public.collector_ledger_entries(campaign_id, collector_id, entry_type, direction, amount, occurred_at, created_by) values
   (pg_temp.id('camp'), pg_temp.id('ca'), 'commission_settled', 'collector_debit', 20, '2026-11-04T10:00:00Z', pg_temp.actor());
 

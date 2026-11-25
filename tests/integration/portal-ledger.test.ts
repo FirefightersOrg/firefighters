@@ -134,7 +134,15 @@ beforeAll(async () => {
 	admin = await signIn(seed.admin.email, seed.admin.password);
 	const byRole = (role: string) => seed.fixtures.find((f) => f.roleNames.includes(role))!;
 	operator = await signIn(byRole('operator').email, byRole('operator').password);
-	unlinked = await signIn(byRole('collector').email, byRole('collector').password);
+	const unlinkedEmail = `ledger_free_${RUN_ID}@firefighters.local`;
+	await createAdminManagedUser(createClient(supabaseUrl, serviceRoleKey, options), {
+		email: unlinkedEmail,
+		password: PASSWORD,
+		fullName: `Ledger free ${RUN_ID}`,
+		roleNames: ['collector'],
+		requestId: `it-ledger-user-free-${RUN_ID}`
+	});
+	unlinked = await signIn(unlinkedEmail, PASSWORD);
 	({ caller: linkedA, id: collectorA } = await makeCollectorUser('a', 'A'));
 	({ caller: linkedB, id: collectorB } = await makeCollectorUser('b', 'B'));
 
