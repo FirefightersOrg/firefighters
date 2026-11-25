@@ -203,6 +203,12 @@ const ROUTES: Route[] = [
 		'unawarded prize certificate',
 		(i) => `${campaign(i)}/draws/${i.draw}/winners/${i.unawardedPrize}/unawarded-certificate`
 	),
+	r('reports (operational)', (i) => `${campaign(i)}/reports`),
+	r('reports (financial)', (i) => `${campaign(i)}/reports/financial`),
+	r(
+		'reports (financial, collector account and draw roster)',
+		(i) => `${campaign(i)}/reports/financial?collector=${i.collector}&draw=${i.draw}`
+	),
 	r('payment print', (i) => `${campaign(i)}/payments/${i.payment}/print`),
 	r('sales list', (i) => `${campaign(i)}/sales`),
 	r('sale new', (i) => `${campaign(i)}/sales/new`),
