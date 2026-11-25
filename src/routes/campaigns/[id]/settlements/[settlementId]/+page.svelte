@@ -48,7 +48,10 @@
 		{ label: 'Total en transferencias', value: data.totals.totalTransfer },
 		{ label: 'Total general', value: data.totals.totalAmount },
 		{
-			label: data.settlement.status === 'open' ? 'Comisión preliminar' : 'Comisión generada',
+			// Closed (or closed and later corrected) settlements generated their commission.
+			label: ['closed', 'corrected'].includes(data.settlement.status)
+				? 'Comisión generada'
+				: 'Comisión preliminar',
 			value: data.totals.commissionAmount
 		},
 		{ label: 'Comisión retenida ahora', value: data.totals.commissionPaidAmount },

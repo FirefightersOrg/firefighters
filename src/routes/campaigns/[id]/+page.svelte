@@ -17,6 +17,7 @@
 	} from '$lib/components/ui';
 	import { countdownLabel, cutoffCountdown, type AtRiskBond } from '$lib/domain/dashboard';
 	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
+	import { formatSignedMoney } from '$lib/domain/financial-reports';
 	import {
 		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
@@ -120,9 +121,6 @@
 			.filter(([allowed]) => allowed)
 			.map(([, label, href]) => ({ label: label as string, href: href as string }))
 	);
-	/** Signed amounts with the same format as the rest of the dashboard ($ 0, not $ 0,00). */
-	const formatSignedMoney = (value: string) =>
-		value.startsWith('-') ? `-${formatMoney(value.slice(1))}` : formatMoney(value);
 </script>
 
 <svelte:head>

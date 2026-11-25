@@ -49,7 +49,7 @@ export function buildPrintableUnawardedPrizeCertificate(
 			source.winningNumber === null
 				? 'Sin cargar'
 				: formatCampaignNumber(source.winningNumber, campaignNumberingConfig(campaign)),
-		associatedBond: source.bondLabel || source.bondId || '—',
+		associatedBond: source.bondLabel || '—',
 		buyer: source.buyerSnapshot ? frozenBuyerLabel(source.buyerSnapshot) : '—',
 		reason: reason(source),
 		rosterStatus:

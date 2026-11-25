@@ -52,6 +52,13 @@ describe('prize delivery certificate', () => {
 		});
 	});
 
+	it('never prints the bond UUID when the bond has no label', () => {
+		expect(
+			buildPrintablePrizeDeliveryCertificate(campaign, { ...source, bondLabel: null })
+				.associatedBond
+		).toBe('—');
+	});
+
 	it('uses frozen person names and safe placeholders for absent optional fields', () => {
 		const doc = buildPrintablePrizeDeliveryCertificate(campaign, {
 			...source,
