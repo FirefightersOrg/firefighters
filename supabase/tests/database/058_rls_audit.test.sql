@@ -3,7 +3,7 @@
 -- collector_coordinator and auditor; the seeded roles are admin, treasurer, operator, collector and
 -- read-only (auditor). There is no collector-coordinator role (SAN-139, deferred).
 begin;
-select plan(19);
+select plan(25);
 
 -- 1. Tables ------------------------------------------------------------------------------------
 create temp view audited_tables as
@@ -21,6 +21,12 @@ select is(array(select relname::text from audited_tables t
                 where not exists (select 1 from pg_policy p where p.polrelid = t.oid and p.polcmd in ('r', '*'))
                 order by 1), '{}'::text[],
   'every public table has a SELECT policy (no table is readable only by bypassing RLS)');
+-- A policy whose USING / WITH CHECK is the literal `true` exposes the whole table to every role. The only
+-- legitimate ones are the read-only permission catalog (roles, permissions), readable by design.
+select is(array(select p.tablename::text || '.' || p.policyname::text from pg_policies p
+                where p.schemaname = 'public' and (p.qual = 'true' or p.with_check = 'true')
+                  and p.tablename not in ('roles', 'permissions') order by 1),
+  '{}'::text[], 'no policy outside the roles/permissions catalog is trivially true');
 -- Direct writes by authenticated exist only for user administration (profiles, user_roles); every
 -- business write goes through audited SECURITY DEFINER RPCs.
 select is(array(select distinct table_name::text from information_schema.role_table_grants
@@ -58,7 +64,7 @@ select is(array(select proname::text from definers
                               where a.grantee = 0 and a.privilege_type = 'EXECUTE') order by 1),
   '{}'::text[], 'no SECURITY DEFINER function is executable by PUBLIC');
 
--- 3. The five seeded roles: has_permission returns exactly the role's seeded set ------------------
+-- 3. The five seeded roles: has_permission returns exactly the set documented in docs/permissions.md ------------------
 insert into auth.users(id, email)
 select ('a6580000-0000-0000-0000-00000000000' || n)::uuid, 'san91-' || n || '@example.com' from generate_series(1, 5) n;
 insert into public.profiles(id, auth_user_id, full_name, email, status)
@@ -71,9 +77,36 @@ join public.roles r on r.name = v.name;
 create function pg_temp.act(n int) returns void language sql as $$
   select set_config('request.jwt.claims',
     format('{"sub":"a6580000-0000-0000-0000-00000000000%s","role":"authenticated"}', n), true) $$;
+-- Expected role -> permission matrix, written by hand from docs/permissions.md ("Initial suggested
+-- matrix" plus the SAN-93 "Action implies view" additions). admin is the full documented catalog; the
+-- other roles hold exactly what the docs grant (collector: campaign.view only, its own-bond access is
+-- future work). It is NOT derived from the seed, so a seed that drifts from the docs fails here.
+create temp table expected_matrix(role_name text primary key, codes text[]);
+insert into expected_matrix values
+('admin', array[
+  'campaign.view','campaign.create','campaign.update','campaign.update_rules','campaign.close',
+  'bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return','bond.mark_lost','bond.annul',
+  'buyer.view','buyer.manage','collector.view','collector.manage','collector.ledger.view','collector.ledger.adjust',
+  'sale.view','sale.create','sale.correct','payment.view','payment.create','payment.annul',
+  'settlement.view','settlement.create','settlement.update_open','settlement.close','settlement.correct',
+  'commission.view','commission.rule_manage','commission.adjust','commission.settle',
+  'draw.view','draw.create','draw.update','draw.annul','draw.complete','draw.generate_roster','draw.freeze_roster',
+  'draw.load_winner','prize.resolve','prize.deliver','prize.annul','prize.reverse_delivery',
+  'report.view_operational','report.view_financial','report.export','audit.view','user.manage']),
+('operator', array[
+  'campaign.view','bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return',
+  'buyer.view','buyer.manage','collector.view','sale.view','sale.create','payment.view','payment.create',
+  'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner']),
+('treasurer', array[
+  'campaign.view','bond.view','collector.ledger.view','payment.view','payment.create','payment.annul',
+  'settlement.view','settlement.create','settlement.close','settlement.correct',
+  'commission.view','commission.adjust','draw.view','draw.freeze_roster','draw.load_winner',
+  'report.view_financial','audit.view']),
+('collector', array['campaign.view']),
+('read-only', array['campaign.view','bond.view','commission.view','report.view_financial']);
+update expected_matrix set codes = (select array_agg(c order by c) from unnest(codes) c);
 create function pg_temp.granted(role_name text) returns text[] language sql stable as $$
-  select array(select p.code from public.role_permissions rp join public.roles r on r.id = rp.role_id
-               join public.permissions p on p.id = rp.permission_id where r.name = role_name order by 1) $$;
+  select codes from expected_matrix where expected_matrix.role_name = granted.role_name $$;
 create temp table effective(role_name text primary key, codes text[]);
 grant all on effective to authenticated;
 grant execute on function pg_temp.act(int) to authenticated;
@@ -88,13 +121,15 @@ begin
     execute 'reset role';
   end loop;
 end $$;
-select is((select codes from effective where role_name = 'admin'), pg_temp.granted('admin'), 'admin: effective = seeded permissions');
-select is((select codes from effective where role_name = 'operator'), pg_temp.granted('operator'), 'operator (operations): effective = seeded permissions');
-select is((select codes from effective where role_name = 'treasurer'), pg_temp.granted('treasurer'), 'treasurer (treasury): effective = seeded permissions');
-select is((select codes from effective where role_name = 'collector'), pg_temp.granted('collector'), 'collector: effective = seeded permissions');
-select is((select codes from effective where role_name = 'read-only'), pg_temp.granted('read-only'), 'read-only (auditor): effective = seeded permissions');
+select is((select codes from effective where role_name = 'admin'), pg_temp.granted('admin'), 'admin: effective = documented permissions');
+select is((select codes from effective where role_name = 'operator'), pg_temp.granted('operator'), 'operator (operations): effective = documented permissions');
+select is((select codes from effective where role_name = 'treasurer'), pg_temp.granted('treasurer'), 'treasurer (treasury): effective = documented permissions');
+select is((select codes from effective where role_name = 'collector'), pg_temp.granted('collector'), 'collector: effective = documented permissions');
+select is((select codes from effective where role_name = 'read-only'), pg_temp.granted('read-only'), 'read-only (auditor): effective = documented permissions');
 select is((select cardinality(codes) from effective where role_name = 'admin'),
   (select count(*)::int from public.permissions), 'admin holds every permission');
+select is(array(select code::text from public.permissions where code <> all (select unnest(codes) from expected_matrix where role_name = 'admin') order by 1),
+  '{}'::text[], 'every seeded permission is in the documented catalog');
 
 -- 4. A protected financial row is visible only to roles with its view permission ------------------
 insert into public.campaigns(id, name, simple_bond_value, installment_count, installment_value, barcode_mode)
@@ -135,6 +170,83 @@ select is(array(select role_name || ':' || payments || '/' || settlements from v
                                                 'settlement.close', 'settlement.correct'] then 1 else 0 end)
     from public.roles r where r.name in ('admin', 'operator', 'treasurer', 'collector', 'read-only') order by 1),
   'payments and settlements are visible exactly to the roles holding a matching permission');
+
+-- 5. Beyond payments/settlements: one fixture row in every sensitive table, and a role WITHOUT the read
+-- permission (collector; read-only where it lacks it) plus anon must see 0 rows, while admin sees them.
+-- A `USING (true)` policy would fail the collector/anon checks; admin > 0 keeps them from passing vacuously.
+insert into public.delivery_notes(id, campaign_id, note_number, collector_id, created_by)
+values ('c6580000-0000-0000-0000-000000000008', 'c6580000-0000-0000-0000-000000000001', 1,
+  'c6580000-0000-0000-0000-000000000002', 'b6580000-0000-0000-0000-000000000001');
+insert into public.bond_assignments(id, campaign_id, bond_id, assignment_type, status, created_by, collector_id, delivery_note_id)
+values ('c6580000-0000-0000-0000-000000000009', 'c6580000-0000-0000-0000-000000000001', 'c6580000-0000-0000-0000-000000000004',
+  'delivery', 'active', 'b6580000-0000-0000-0000-000000000001', 'c6580000-0000-0000-0000-000000000002',
+  'c6580000-0000-0000-0000-000000000008');
+insert into public.collector_ledger_entries(id, campaign_id, collector_id, entry_type, direction, amount, created_by)
+values ('c6580000-0000-0000-0000-000000000010', 'c6580000-0000-0000-0000-000000000001', 'c6580000-0000-0000-0000-000000000002',
+  'cash_settled', 'collector_credit', 10, 'b6580000-0000-0000-0000-000000000001');
+insert into public.audit_log(action, entity_type) values ('san91.probe', 'san91');
+insert into public.commission_rules(id, campaign_id, rule_type, valid_from, percentage)
+values ('c6580000-0000-0000-0000-000000000011', 'c6580000-0000-0000-0000-000000000001', 'cash_full_payment', current_date, 10);
+insert into public.draws(id, campaign_id, draw_type, name, draw_date, payment_cutoff_at, required_installment_number, created_by)
+values ('c6580000-0000-0000-0000-000000000012', 'c6580000-0000-0000-0000-000000000001', 'monthly', 'SAN91 draw',
+  current_date, now(), 1, 'b6580000-0000-0000-0000-000000000001');
+insert into public.draw_rosters(id, draw_id, generated_by, created_by)
+values ('c6580000-0000-0000-0000-000000000013', 'c6580000-0000-0000-0000-000000000012',
+  'b6580000-0000-0000-0000-000000000001', 'b6580000-0000-0000-0000-000000000001');
+insert into public.prizes(id, draw_id, name, position, created_by)
+values ('c6580000-0000-0000-0000-000000000014', 'c6580000-0000-0000-0000-000000000012', 'SAN91 prize', 1,
+  'b6580000-0000-0000-0000-000000000001');
+update public.draw_rosters set status = 'frozen', frozen_at = now(), frozen_by = 'b6580000-0000-0000-0000-000000000001'
+  where id = 'c6580000-0000-0000-0000-000000000013';
+update public.draws set status = 'roster_generated' where id = 'c6580000-0000-0000-0000-000000000012';
+update public.draws set status = 'roster_frozen' where id = 'c6580000-0000-0000-0000-000000000012';
+insert into public.winning_numbers(id, draw_id, prize_id, number_value, result_status, loaded_by, created_by)
+values ('c6580000-0000-0000-0000-000000000015', 'c6580000-0000-0000-0000-000000000012', 'c6580000-0000-0000-0000-000000000014',
+  1, 'no_match', 'b6580000-0000-0000-0000-000000000001', 'b6580000-0000-0000-0000-000000000001');
+insert into public.import_sessions(id, campaign_id, source_type, created_by)
+values ('c6580000-0000-0000-0000-000000000016', 'c6580000-0000-0000-0000-000000000001', 'barcode_scan',
+  'b6580000-0000-0000-0000-000000000001');
+
+-- (table, does read-only see it?) read-only holds bond.view and commission.view. sale_can_read() also
+-- accepts bond.view by design (a bond's commercial state is derived from its sale), so sales is visible.
+create temp table probe_tables(tbl text primary key, readonly_sees boolean);
+insert into probe_tables values
+  ('bonds', true), ('bond_assignments', true), ('delivery_notes', true), ('commission_rules', true),
+  ('sales', true), ('buyers', false), ('collectors', false), ('payments', false), ('settlements', false),
+  ('collector_ledger_entries', false), ('audit_log', false), ('draws', false), ('draw_rosters', false),
+  ('prizes', false), ('winning_numbers', false), ('import_sessions', false);
+create temp table probe(who text, tbl text, n int, primary key (who, tbl));
+grant all on probe to authenticated, anon;
+grant select on probe_tables to authenticated, anon;
+do $$
+declare v record; t record; c int;
+begin
+  for v in select * from (values (1, 'admin'), (4, 'collector'), (5, 'read-only'), (0, 'anon')) x(n, name) loop
+    for t in select tbl from probe_tables loop
+      if v.n > 0 then
+        perform pg_temp.act(v.n);
+        execute 'set local role authenticated';
+      else
+        execute 'set local role anon';
+      end if;
+      begin
+        execute format('select count(*)::int from public.%I', t.tbl) into c;
+      exception when insufficient_privilege then c := 0;  -- anon has no grant at all: nothing readable
+      end;
+      insert into probe values (v.name, t.tbl, c);
+      execute 'reset role';
+    end loop;
+  end loop;
+end $$;
+select is(array(select tbl::text from probe where who = 'admin' and n = 0 order by 1), '{}'::text[],
+  'admin reads a fixture row in every sensitive table (the zero-row checks below are not vacuous)');
+select is(array(select tbl::text from probe where who = 'collector' and n <> 0 order by 1), '{}'::text[],
+  'collector (no read permission) sees 0 rows in bonds, sales, buyers, collectors, ledger, audit_log, prizes, draws, imports and the rest');
+select is(array(select tbl::text from probe where who = 'anon' and n <> 0 order by 1), '{}'::text[],
+  'anon sees 0 rows in every sensitive table');
+select is(array(select p.tbl::text || ':' || (p.n > 0) from probe p join probe_tables t using (tbl)
+                where p.who = 'read-only' and (p.n > 0) <> t.readonly_sees order by 1), '{}'::text[],
+  'read-only sees exactly bonds, delivery notes, assignments and commission rules and sales (via bond.view), commission rules and nothing else');
 
 select * from finish();
 rollback;
