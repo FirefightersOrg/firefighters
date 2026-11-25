@@ -297,7 +297,7 @@
 			<p class="m-0 px-4 pt-3 text-body-sm text-muted">
 				Los cobros que el cobrador registró desde su portal no cuentan en los totales hasta que se
 				incluyan en esta rendición y se cierre. Mientras haya alguno sin procesar no se puede cerrar
-				la rendición: incluya cada cobro o recházelo con un motivo.
+				la rendición: incluya cada cobro o rechácelo con un motivo.
 			</p>
 			<Table
 				columns={submittedColumns}
