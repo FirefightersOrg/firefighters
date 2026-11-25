@@ -26,6 +26,19 @@ describe('listPortalLedger', () => {
 						settlement_number: 4,
 						running_balance: '1.50',
 						total_count: 9
+					},
+					{
+						id: 'b',
+						occurred_at: 't',
+						entry_type: 'adjustment_in_favor_of_collector',
+						direction: 'collector_credit',
+						amount: '2.00',
+						status: 'recorded',
+						settlement_id: null,
+						settlement_number: null,
+						running_balance: '3.50',
+						total_count: 9,
+						adjustment_reason: '  Bonus  '
 					}
 				],
 				error: null
@@ -39,8 +52,10 @@ describe('listPortalLedger', () => {
 		expect(page.entries[0]).toMatchObject({
 			amount: 1.5,
 			settlementNumber: 4,
-			runningBalance: 1.5
+			runningBalance: 1.5,
+			adjustmentReason: null
 		});
+		expect(page.entries[1].adjustmentReason).toBe('Bonus');
 		expect(rpc).toHaveBeenCalledOnce();
 	});
 
