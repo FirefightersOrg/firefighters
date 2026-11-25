@@ -75,19 +75,20 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 ### Sales, payments, and settlements
 
-| Permission               | Description                                     |
-| ------------------------ | ----------------------------------------------- |
-| `sale.view`              | View sales (RLS also accepts `bond.view`).      |
-| `sale.create`            | Register sales.                                 |
-| `sale.correct`           | Correct sales with audit.                       |
-| `payment.view`           | View payments.                                  |
-| `payment.create`         | Register payments.                              |
-| `payment.annul`          | Annul confirmed payments.                       |
-| `settlement.view`        | View settlements.                               |
-| `settlement.create`      | Create settlements.                             |
-| `settlement.update_open` | Edit open settlements.                          |
-| `settlement.close`       | Close settlements.                              |
-| `settlement.correct`     | Correct closed settlements through adjustments. |
+| Permission                | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `sale.view`               | View sales (RLS also accepts `bond.view`).      |
+| `sale.create`             | Register sales.                                 |
+| `sale.correct`            | Correct sales with audit.                       |
+| `sale.mark_uncollectible` | Mark an active sale uncollectible (SAN-106).    |
+| `payment.view`            | View payments.                                  |
+| `payment.create`          | Register payments.                              |
+| `payment.annul`           | Annul confirmed payments.                       |
+| `settlement.view`         | View settlements.                               |
+| `settlement.create`       | Create settlements.                             |
+| `settlement.update_open`  | Edit open settlements.                          |
+| `settlement.close`        | Close settlements.                              |
+| `settlement.correct`      | Correct closed settlements through adjustments. |
 
 ### Commissions
 
@@ -143,8 +144,9 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 | `collector.view`            |   yes |      yes |        no |        no |        no |
 | `collector.manage`          |   yes |       no |        no |        no |        no |
 | `collector.ledger.view`     |   yes |       no |       yes |        no |        no |
-| `sale.view`                 |   yes |      yes |        no |        no |        no |
+| `sale.view`                 |   yes |      yes |       yes |        no |        no |
 | `sale.create`               |   yes |      yes |        no |        no |        no |
+| `sale.mark_uncollectible`   |   yes |       no |       yes |        no |        no |
 | `payment.view`              |   yes |      yes |       yes |        no |        no |
 | `payment.create`            |   yes |      yes |       yes |    future |        no |
 | `payment.annul`             |   yes |       no |       yes |        no |        no |
@@ -201,7 +203,7 @@ Product decisions (SAN-93): the three new `.view` permissions are implied by any
 
 ### Sales are readable through `bond.view`
 
-`sale_can_read()` (the SELECT policy of `sales` and its lines) accepts `sale.view`, `sale.create`, `sale.correct` or `bond.view`, because a bond's commercial state is derived from its sale. Product decision: `read-only` MAY read sales. It holds `bond.view` but not `sale.view`, so the matrix above keeps `no` in the `sale.view` row for `read-only` (the matrix lists permission codes, not what RLS lets through), while RLS lets it read sales. The same holds for `treasurer`, which holds `bond.view`. Writing sales still needs `sale.create` (or the own-collector rule). The pgTAP test `058_rls_audit` asserts this: read-only sees bonds, delivery notes, assignments, commission rules and sales, and nothing else.
+`sale_can_read()` (the SELECT policy of `sales` and its lines) accepts `sale.view`, `sale.create`, `sale.correct` or `bond.view`, because a bond's commercial state is derived from its sale. Product decision: `read-only` MAY read sales. It holds `bond.view` but not `sale.view`, so the matrix above keeps `no` in the `sale.view` row for `read-only` (the matrix lists permission codes, not what RLS lets through), while RLS lets it read sales. The `treasurer` reads sales through its own `sale.view` since SAN-105 (`20270114000000_treasurer_sale_view.sql`, decided on 2026-11-19: it reconciles payments against sales). Writing sales still needs `sale.create` (or the own-collector rule). The pgTAP test `058_rls_audit` asserts this: read-only sees bonds, delivery notes, assignments, commission rules and sales, and nothing else.
 
 ### Operational reports (SAN-86)
 

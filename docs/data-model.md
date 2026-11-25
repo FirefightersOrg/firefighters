@@ -386,6 +386,8 @@ Suggested fields:
 - `total_amount`
 - `status`
 - `created_by`
+- `uncollectible_at`, `uncollectible_by`, `uncollectible_reason`: the manual, final uncollectible
+  mark (SAN-106). All three are set together by `sale_mark_uncollectible`, or all are null.
 
 ### payment_plans
 

@@ -4,7 +4,7 @@ import { render } from 'svelte/server';
 import Page from './+page.svelte';
 
 describe('sale detail', () => {
-	const page = (correction: unknown = null) =>
+	const page = (correction: unknown = null, extra: Record<string, unknown> = {}) =>
 		render(Page, {
 			props: {
 				data: {
@@ -27,10 +27,13 @@ describe('sale detail', () => {
 						},
 						buyerName: 'Ada',
 						collectorName: 'Ana',
-						installments: []
+						installments: [],
+						uncollectible: null,
+						...((extra.sale as object) ?? {})
 					},
 					financialStatusSnapshot: 'no_payments',
-					correction
+					correction,
+					canMarkUncollectible: extra.canMarkUncollectible ?? false
 				},
 				params: { id: 'c', saleId: 's' }
 			} as any
@@ -57,5 +60,17 @@ describe('sale detail', () => {
 		expect(truncated).toContain('data-testid="buyers-truncated"');
 		expect(truncated).toContain('Se muestran los primeros 1 de 750');
 		expect(page({ buyers, buyersTotal: 1, collectors: [] })).not.toContain('buyers-truncated');
+	});
+	it('shows the uncollectible form only when allowed, and the mark once set (SAN-106)', () => {
+		expect(page()).not.toContain('?/markUncollectible');
+		const form = page(null, { canMarkUncollectible: true });
+		expect(form).toContain('?/markUncollectible');
+		expect(form).toContain('no se puede deshacer');
+		const marked = page(null, {
+			sale: { uncollectible: { markedAt: '2026-11-25T15:00:00Z', reason: 'Se mudó sin aviso' } }
+		});
+		expect(marked).toContain('Venta incobrable');
+		expect(marked).toContain('Se mudó sin aviso');
+		expect(marked).not.toContain('?/markUncollectible');
 	});
 });

@@ -4,8 +4,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { assignBondsToCollector } from '$lib/server/services/deliveries';
 import { registerSale } from '$lib/server/services/sales';
+import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
 import { buildInstallmentSchedule } from '$lib/domain/sales';
-import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
+import {
+	getActiveSaleForBond,
+	getSaleDetail,
+	listInstallmentsForSale
+} from '$lib/server/repositories/sales';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 
@@ -278,3 +283,65 @@ async function createDeliveredBond(baseNumber: number): Promise<string> {
 	);
 	return id;
 }
+
+describe('SAN-106: manual uncollectible mark (local Supabase)', () => {
+	let markBondId: string;
+	beforeAll(async () => {
+		const bond = await admin.client.rpc('bond_create', {
+			p_campaign_id: campaignId,
+			p_base_numbers: [901],
+			p_request_id: ctx(admin, 'mark-bond').requestId
+		});
+		if (bond.error) throw new Error(bond.error.message);
+		markBondId = bond.data as string;
+		await assignBondsToCollector(
+			operator.client,
+			{ campaignId, collectorId, bondIds: [markBondId] },
+			ctx(operator, 'deliver-mark')
+		);
+	});
+	it('lets the treasurer, not the operator, mark a sale uncollectible once, with an audited reason', async () => {
+		const saleId = await registerSale(
+			operator.client,
+			{ campaignId, bondId: markBondId, buyerId, paymentMode: 'full_payment' },
+			ctx(operator, 'mark-sale')
+		);
+		await expect(
+			markSaleUncollectible(
+				operator.client,
+				{ saleId, reason: 'No paga' },
+				{
+					...ctx(operator, 'mark-denied'),
+					permissions: [...operator.permissions, 'sale.mark_uncollectible']
+				}
+			)
+		).rejects.toMatchObject({ kind: 'permission' });
+		await markSaleUncollectible(
+			treasurer.client,
+			{ saleId, reason: '  Se mudó sin aviso  ' },
+			ctx(treasurer, 'mark')
+		);
+		const detail = await getSaleDetail(treasurer.client, campaignId, saleId);
+		expect(detail.error).toBeNull();
+		expect(detail.data?.uncollectible).toMatchObject({ reason: 'Se mudó sin aviso' });
+		expect(detail.data?.financialStatus).toBe('uncollectible');
+		await expect(
+			markSaleUncollectible(
+				treasurer.client,
+				{ saleId, reason: 'Otra vez' },
+				ctx(treasurer, 'again')
+			)
+		).rejects.toMatchObject({
+			kind: 'conflict',
+			message: 'La venta ya está marcada como incobrable.'
+		});
+		const { data: audit } = await admin.client
+			.from('audit_log')
+			.select('reason, request_id')
+			.eq('action', 'sale.mark_uncollectible')
+			.eq('entity_id', saleId);
+		expect(audit).toEqual([
+			{ reason: 'Se mudó sin aviso', request_id: ctx(treasurer, 'mark').requestId }
+		]);
+	});
+});

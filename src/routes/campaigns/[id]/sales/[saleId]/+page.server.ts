@@ -16,6 +16,8 @@ import {
 	correctSaleCollector,
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
+import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
+import { SaleServiceError } from '$lib/server/services/sales';
 
 const field = (form: FormData, name: string) => String(form.get(name) ?? '').trim();
 const correctionFailure = (cause: unknown, form: string, values: Record<string, string>) => {
@@ -73,6 +75,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		sale: sale.data,
+		/** SAN-106: admin or treasurer, on an active sale that is not marked yet. */
+		canMarkUncollectible:
+			hasPermissionIn(locals.permissions, 'sale.mark_uncollectible') &&
+			sale.data.sale.status === 'active' &&
+			sale.data.uncollectible === null,
 		correction: canCorrect
 			? {
 					buyers: buyers.data?.items ?? [],
@@ -85,7 +92,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		financialStatus: calculateFinancialStatus({
 			saleStatus: sale.data.sale.status,
 			planStatus: sale.data.plan.status,
-			markedUncollectible: false,
+			markedUncollectible: sale.data.uncollectible !== null,
 			today,
 			installments: sale.data.installments.map((item) => ({
 				...item,
@@ -98,6 +105,34 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
+	markUncollectible: async ({ request, locals, params, url }) => {
+		const form = 'markUncollectible';
+		if (permissionsUnavailable(locals.permissions))
+			return fail(500, { form, errors: {}, message: 'No se pudieron cargar los permisos.' });
+		requireCampaignViewer(locals, url);
+		if (!hasPermissionIn(locals.permissions, 'sale.mark_uncollectible'))
+			return fail(403, { form, errors: {}, message: 'No hay permiso para esta acción.' });
+		const data = await request.formData();
+		const values = { reason: field(data, 'reason') };
+		const missingSale = await saleForAction(locals, params, form, values);
+		if (missingSale) return missingSale;
+		try {
+			await markSaleUncollectible(
+				locals.supabase,
+				{ saleId: params.saleId, ...values },
+				{ requestId: locals.requestId ?? null, permissions: locals.permissions ?? null }
+			);
+			return { form, success: true, message: 'Venta marcada como incobrable.', errors: {} };
+		} catch (cause) {
+			const service = cause instanceof SaleServiceError ? cause : null;
+			return fail(service?.status ?? 500, {
+				form,
+				values,
+				errors: service?.field ? { [service.field]: [service.message] } : {},
+				message: service?.message ?? 'No se pudo marcar la venta como incobrable.'
+			});
+		}
+	},
 	correctBuyer: async ({ request, locals, params, url }) => {
 		if (permissionsUnavailable(locals.permissions))
 			return fail(500, {
