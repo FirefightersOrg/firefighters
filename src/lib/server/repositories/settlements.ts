@@ -291,3 +291,66 @@ export async function listCollectorPaymentCandidates(
 		error: null
 	};
 }
+
+export type CollectorSubmittedPayment = {
+	id: string;
+	date: string;
+	amount: string;
+	method: string;
+	note: string | null;
+	submittedAt: string;
+	bond: string;
+	buyer: string;
+	installments: number[];
+};
+
+/** Drafts the collector registered from the portal (SAN-147) and nobody has included or rejected yet. */
+export async function listCollectorSubmittedPayments(
+	client: SupabaseClient,
+	campaignId: string,
+	collectorId: string
+) {
+	const { data, error } = await readPages((from, to) =>
+		client
+			.from('payments')
+			.select(
+				'id,amount,payment_method,payment_date,collector_note,created_at,buyers(first_name,last_name,business_name),sales(bonds(bond_numbers(number_value,number_kind))),payment_installments(installments(installment_number))'
+			)
+			.eq('campaign_id', campaignId)
+			.eq('collector_id', collectorId)
+			.eq('status', 'draft')
+			.eq('submitted_by_collector', true)
+			.order('created_at')
+			.order('id')
+			.range(from, to)
+			.overrideTypes<Row[], { merge: false }>()
+	);
+	if (error) return { data: null, error };
+	return {
+		data: (data ?? []).map((p): CollectorSubmittedPayment => {
+			const buyer = p.buyers as Row | null;
+			const bond = ((p.sales as Row | null)?.bonds ?? null) as Row | null;
+			return {
+				id: p.id as string,
+				date: p.payment_date as string,
+				amount: money(p.amount),
+				method: p.payment_method as string,
+				note: (p.collector_note as string | null) ?? null,
+				submittedAt: p.created_at as string,
+				bond: ((bond?.bond_numbers as Row[] | null) ?? [])
+					.filter((n) => n.number_kind === 'base')
+					.map((n) => n.number_value)
+					.join(', '),
+				buyer:
+					(buyer?.business_name as string | null) ||
+					[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
+					'Comprador sin nombre',
+				installments: ((p.payment_installments as Row[] | null) ?? [])
+					.map((a) => ((a.installments as Row | null)?.installment_number ?? 0) as number)
+					.filter(Boolean)
+					.sort((a, b) => a - b)
+			};
+		}),
+		error: null
+	};
+}
