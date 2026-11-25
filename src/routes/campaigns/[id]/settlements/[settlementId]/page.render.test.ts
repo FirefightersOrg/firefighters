@@ -55,6 +55,14 @@ describe('settlement workspace render', () => {
 		expect(body).not.toContain('?/add');
 		expect(body).not.toContain('?/close');
 	});
+	it('labels the commission as generated only once the settlement closed', () => {
+		for (const status of ['open', 'annulled'])
+			expect(page(status)).toContain('Comisión preliminar');
+		for (const status of ['closed', 'corrected']) {
+			expect(page(status)).toContain('Comisión generada');
+			expect(page(status)).not.toContain('Comisión preliminar');
+		}
+	});
 	it('does not print certificates for unconfirmed payments', () => {
 		const body = render(Page, {
 			props: {
