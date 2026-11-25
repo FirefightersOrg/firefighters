@@ -47,7 +47,10 @@
 		{ label: 'Total en efectivo', value: data.totals.totalCash },
 		{ label: 'Total en transferencias', value: data.totals.totalTransfer },
 		{ label: 'Total general', value: data.totals.totalAmount },
-		{ label: 'Comisión preliminar', value: data.totals.commissionAmount },
+		{
+			label: data.settlement.status === 'open' ? 'Comisión preliminar' : 'Comisión generada',
+			value: data.totals.commissionAmount
+		},
 		{ label: 'Comisión retenida ahora', value: data.totals.commissionPaidAmount },
 		{ label: 'Neto para Bomberos', value: data.totals.netToFirefighters },
 		{ label: 'Saldo a favor del cobrador', value: data.totals.collectorCreditBalance }

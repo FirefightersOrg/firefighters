@@ -17,7 +17,6 @@
 	} from '$lib/components/ui';
 	import { countdownLabel, cutoffCountdown, type AtRiskBond } from '$lib/domain/dashboard';
 	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
-	import { formatSignedMoney } from '$lib/domain/financial-reports';
 	import {
 		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
@@ -121,6 +120,9 @@
 			.filter(([allowed]) => allowed)
 			.map(([, label, href]) => ({ label: label as string, href: href as string }))
 	);
+	/** Signed amounts with the same format as the rest of the dashboard ($ 0, not $ 0,00). */
+	const formatSignedMoney = (value: string) =>
+		value.startsWith('-') ? `-${formatMoney(value.slice(1))}` : formatMoney(value);
 </script>
 
 <svelte:head>
@@ -215,11 +217,16 @@
 						<Stat label="Total cobrado" value={formatMoney(financial.cash.total)} />
 					</div>
 					<p class="m-0 mt-4 text-body-sm text-muted">
-						Rendido en {formatNumber(financial.commissions.closedSettlements)} rendiciones cerradas:
+						Rendido en {formatNumber(financial.commissions.closedSettlements)}
+						{financial.commissions.closedSettlements === 1
+							? 'rendición cerrada'
+							: 'rendiciones cerradas'}:
 						{formatMoney(financial.commissions.settledCash)} en efectivo y
 						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
 						{#if financial.commissions.openSettlements > 0}
-							Hay {formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.
+							{financial.commissions.openSettlements === 1
+								? 'Hay 1 rendición abierta.'
+								: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
 						{/if}
 					</p>
 				</Card>
