@@ -125,6 +125,7 @@ Generated on demand as CSV (UTF-8 with BOM, CRLF, formula-safe text cells) at
 | Collector current accounts | `collector-ledger`       | `collector_ledger_entries` (`?from=&to=` on `occurred_at`) | `collector.ledger.view` |
 | Settlement corrections     | `settlement-corrections` | `settlement_corrections` (via its settlement's campaign)   | `settlement.view`       |
 | Frozen rosters             | `frozen-rosters`         | `draw_roster_entries` of `frozen` rosters + draw           | `draw.view`             |
+| Winners and prizes         | `winners-prizes`         | `prizes` + draw, winning number, awards, reversals         | `draw.view`             |
 
 Correction links (SAN-114): `payments` includes `replaces_payment_id` (links an `adjusted` payment to
 its replacement), `collector-ledger` includes `corrects_sale_id` (links cross-collector
@@ -148,9 +149,13 @@ otherwise; both read from `bond_numbers`, so extra numbers can be told apart fro
 justifying historical results), eligibility and reason, and the buyer and collector snapshots taken
 when the roster was generated. Ordered by (`draw_roster_id`, `number_value`), which is unique.
 
-Pending (Phase 12 tables do not exist yet): **winners and prizes**. Hooks are marked
-`TODO(SAN-113)` in `src/lib/domain/backup-exports.ts` and `scripts/reconcile-backup.sql`
-(SAN-113 stays open for it).
+Winners and prizes (SAN-92): one row per prize of the campaign (annulled prizes too), ordered by
+(`draw_id`, `position`, `id`): draw id/name/type/date/status, prize id, position, name, description,
+status, `excludes_from_consolation`, annulment date and reason, the winning number with its
+`result_status`, matched roster entry and load time, and the award the prize resolved to (the live
+award, else the latest annulled one): award id and status, bond, buyer and collector ids, award and
+delivery times and delivery notes. `awards_count` and `delivery_reversals_count` show the history
+behind the current award. Times are Buenos Aires wall-clock.
 
 ### Checklist in the app
 
@@ -215,6 +220,6 @@ diff before.txt restored.txt
 It reports: bonds per campaign and status (count and value), payments per campaign and status
 (count and amount), correction link counts and deltas, settlements per campaign and status (totals), collector balances per campaign
 (credits minus debits, annulled entries excluded), frozen roster entry counts per draw (section 6;
-compare them with the source before reopening) and integrity checks that must return no rows.
-Only winners and prizes counts are still pending (Phase 12). Differences must be explained by the
+compare them with the source before reopening), prizes per draw and status with their winning
+numbers and awards (section 6b) and integrity checks that must return no rows (sections 5a-5c, 6c). Differences must be explained by the
 accepted loss window only; anything else blocks reopening.

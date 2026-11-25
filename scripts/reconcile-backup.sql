@@ -107,5 +107,30 @@ where r.status = 'frozen'
 group by d.campaign_id, d.id, r.id, r.frozen_at
 order by d.campaign_id, d.draw_date, d.id;
 
-\echo '== 6b. winners and prizes: PENDING (Phase 12 tables do not exist yet; add the counts here)'
--- TODO(SAN-113): count winners and prizes per draw once the Phase 12 tables exist.
+\echo '== 6b. winners and prizes: prizes per draw and status, with winning numbers and awards (compare with the source)'
+select d.campaign_id, d.id as draw_id, pr.status as prize_status, count(*) as prizes,
+  count(w.id) as winning_numbers,
+  count(*) filter (where w.result_status = 'eligible_winner') as eligible_winners,
+  coalesce(sum(a.live), 0) as live_awards, coalesce(sum(a.delivered), 0) as delivered_awards,
+  coalesce(sum(a.annulled), 0) as annulled_awards
+from public.prizes pr
+join public.draws d on d.id = pr.draw_id
+left join public.winning_numbers w on w.prize_id = pr.id
+left join lateral (
+  select count(*) filter (where pa.status <> 'annulled') as live,
+         count(*) filter (where pa.status = 'delivered') as delivered,
+         count(*) filter (where pa.status = 'annulled') as annulled
+  from public.prize_awards pa where pa.prize_id = pr.id
+) a on true
+group by d.campaign_id, d.id, d.draw_date, pr.status
+order by d.campaign_id, d.draw_date, d.id, pr.status;
+
+\echo '== 6c. integrity: prizes with more than one live award, or delivered without a delivered award (expect 0 rows)'
+select pr.id as prize_id, pr.status,
+  count(pa.id) filter (where pa.status <> 'annulled') as live_awards,
+  count(pa.id) filter (where pa.status = 'delivered') as delivered_awards
+from public.prizes pr
+left join public.prize_awards pa on pa.prize_id = pr.id
+group by pr.id, pr.status
+having count(pa.id) filter (where pa.status <> 'annulled') > 1
+  or (pr.status = 'delivered') <> (count(pa.id) filter (where pa.status = 'delivered') = 1);
