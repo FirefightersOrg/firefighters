@@ -263,7 +263,13 @@ export interface LedgerEntryView {
 	originalEntryId: string | null;
 }
 
-/** Ledger entries in order with the running balance (annulled and reference entries add 0). */
+/** PostgREST caps a response at `max_rows` (1000), so the ledger is read in pages of this size. */
+export const LEDGER_PAGE_SIZE = 1000;
+
+/**
+ * Ledger entries in order with the running balance (annulled and reference entries add 0).
+ * Reads every page: the page uses the last row's balance, so a truncated read would be wrong.
+ */
 export async function listCollectorLedger(
 	client: SupabaseClient,
 	input: z.input<typeof collectorLedgerBalanceSchema>
@@ -273,12 +279,27 @@ export async function listCollectorLedger(
 		input,
 		'La consulta de la cuenta corriente no es válida.'
 	);
-	const rows = await rpc<Record<string, unknown>[] | null>(
-		client,
-		'collector_ledger_entries_with_balance',
-		{ p_campaign_id: d.campaignId, p_collector_id: d.collectorId }
-	);
-	return (rows ?? []).map((r) => ({
+	const rows: Record<string, unknown>[] = [];
+	for (let offset = 0; ; offset += LEDGER_PAGE_SIZE) {
+		let result: { data: Record<string, unknown>[] | null; error: RpcError | null };
+		try {
+			// The function orders its rows (and computes the running balance over all of them), so
+			// offset pages are stable and concatenate in order.
+			result = await client
+				.rpc('collector_ledger_entries_with_balance', {
+					p_campaign_id: d.campaignId,
+					p_collector_id: d.collectorId
+				})
+				.range(offset, offset + LEDGER_PAGE_SIZE - 1);
+		} catch (cause) {
+			throw new CommissionLedgerServiceError('internal', GENERIC_ERROR_MESSAGE, { cause });
+		}
+		if (result.error) throw mapError(result.error);
+		const page = result.data ?? [];
+		rows.push(...page);
+		if (page.length < LEDGER_PAGE_SIZE) break;
+	}
+	return rows.map((r) => ({
 		id: String(r.id),
 		occurredAt: String(r.occurred_at),
 		entryType: String(r.entry_type),

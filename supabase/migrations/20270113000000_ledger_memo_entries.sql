@@ -348,7 +348,8 @@ begin
   if v_reason is null or length(v_reason)>1000 then raise exception 'a trimmed reason of at most 1000 characters is required' using errcode='invalid_parameter_value'; end if;
   if p_direction not in ('collector_credit','collector_debit') then raise exception 'invalid ledger direction' using errcode='invalid_parameter_value'; end if;
   if not exists(select 1 from public.collectors where id=p_collector_id) then raise exception 'collector % not found',p_collector_id using errcode='no_data_found'; end if;
-  if p_direction='collector_debit' then perform pg_advisory_xact_lock(hashtextextended(p_campaign_id::text || p_collector_id::text, 68)); end if;
+  -- Debits and every compensation take the collector's advisory lock first (uniform lock order, #130).
+  if p_direction='collector_debit' or p_original_entry_id is not null then perform pg_advisory_xact_lock(hashtextextended(p_campaign_id::text || p_collector_id::text, 68)); end if;
   insert into public.collector_ledger_entries(campaign_id,collector_id,entry_type,direction,amount,reason,created_by,original_entry_id)
   values(p_campaign_id,p_collector_id,case when p_direction='collector_credit' then 'adjustment_in_favor_of_collector' else 'adjustment_in_favor_of_firefighters' end,p_direction,p_amount,v_reason,v_actor,p_original_entry_id) returning id into v_id;
   insert into public.audit_log(actor_user_id,action,entity_type,entity_id,new_value,reason,request_id)

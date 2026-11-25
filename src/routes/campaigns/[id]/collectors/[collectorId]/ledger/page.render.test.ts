@@ -173,13 +173,20 @@ describe('collector current account page', () => {
 				id: 'e3',
 				direction: 'collector_credit',
 				label: '19/11/2026 · Ajuste a favor del cobrador (queda $ 1,50)'
+			},
+			{
+				id: 'e5',
+				direction: 'collector_debit',
+				label: '20/11/2026 · Ajuste a favor de Firefighters (queda $ 2,00)'
 			}
 		]);
 		expect(body).toContain('Efectivo rendido');
 		expect(body).toContain('Referencia: no cambia el saldo.');
 		expect(body).toMatch(/Compensa: Ajuste a favor del cobrador del 19\/11\/2026/);
 		expect(body).toContain('name="originalEntryId"');
-		expect(body).toContain('(queda $ 1,50)');
+		// The default adjustment is a credit, so only debits are offered to compensate (#130).
+		expect(body).toContain('(queda $ 2,00)');
+		expect(body).not.toContain('(queda $ 1,50)');
 		// Entries linked to a compensation are corrected with another adjustment, never annulled.
 		expect(body.match(/data-annul=/g)).toBeNull();
 	});

@@ -120,6 +120,11 @@
 			collectorId: data.collector.id
 		})
 	);
+	/** A compensation goes the opposite way of its original, so only those entries are offered. */
+	let ledgerDirection = $state('collector_credit');
+	const compensableForDirection = $derived(
+		data.compensable.filter((entry) => entry.direction !== ledgerDirection)
+	);
 </script>
 
 <svelte:head>
@@ -309,6 +314,7 @@
 					>
 						<Select
 							name="direction"
+							bind:value={ledgerDirection}
 							options={[
 								{ value: 'collector_credit', label: 'Crédito (a favor del cobrador)' },
 								{ value: 'collector_debit', label: 'Débito (a favor de Firefighters)' }
@@ -326,7 +332,7 @@
 							name="originalEntryId"
 							options={[
 								{ value: '', label: 'Ninguno' },
-								...data.compensable.map((entry) => ({ value: entry.id, label: entry.label }))
+								...compensableForDirection.map((entry) => ({ value: entry.id, label: entry.label }))
 							]}
 						/>
 					</Field>

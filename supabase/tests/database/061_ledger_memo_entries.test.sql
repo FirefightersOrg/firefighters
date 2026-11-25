@@ -2,7 +2,7 @@
 -- method corrections that keep them reconciled, and compensations linked to the entry they offset.
 begin;
 set local time zone 'America/Argentina/Buenos_Aires';
-select plan(34);
+select plan(37);
 
 insert into auth.users(id, email) values ('a6610000-0000-0000-0000-000000000001', 'admin661@example.com');
 insert into public.profiles(id, auth_user_id, full_name, email, status)
@@ -170,6 +170,17 @@ select throws_ok($$update public.collector_ledger_entries set status = 'compensa
 select public.collector_ledger_adjust(pg_temp.id('campaign'), pg_temp.id('collector'), 20, 'collector_debit', 'Rest of the bonus', 'san107-x2', pg_temp.id('x'));
 select is((select status from public.collector_ledger_entries where id = pg_temp.id('x')), 'compensated',
   'the last compensation marks the original compensated');
+
+-- 7. Nothing left to compensate: the correction still goes through, without a reference (#130) ----
+select public.collector_ledger_adjust(pg_temp.id('campaign'), pg_temp.id('collector'), 25, 'collector_debit',
+  'Use up commission_generated', 'san107-z', pg_temp.entry('commission_generated'));
+select is((select status from public.collector_ledger_entries where id = pg_temp.entry('commission_generated')), 'compensated',
+  'commission_generated has nothing left (40 - 10 - 5 - 25)');
+select lives_ok($$select public.payment_annul(pg_temp.id('tr2_payment'), 'not received either', 'san107-a2')$$,
+  'a payment annulment is not blocked when its commission entry has nothing left to compensate');
+select is((select string_agg(direction || ':' || amount || ':' || coalesce(original_entry_id::text, 'none'), ',')
+           from public.collector_ledger_entries where payment_id = pg_temp.id('tr2_payment') and affects_balance),
+  'collector_debit:10.00:none', 'its annulment entry is recorded without an original entry');
 
 select * from finish();
 rollback;
