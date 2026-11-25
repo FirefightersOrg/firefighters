@@ -22,8 +22,8 @@ import {
 } from '$lib/components/campaigns/types';
 import { campaignNumberingConfig, canLoadBonds, type Campaign } from '$lib/domain/campaigns';
 import {
-	formatCommissionRuleType,
-	formatCommissionValue,
+	describeCommissionRuleType,
+	describeCommissionValue,
 	type CommissionRule
 } from '$lib/domain/commissions';
 import {
@@ -1507,7 +1507,11 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 			const byId = new Map(rules.map((r) => [r.id, r]));
 			const shown = (key: string) => {
 				const rule = byId.get(ruleIds[key]!)!;
-				return { type: formatCommissionRuleType(rule), value: formatCommissionValue(rule), rule };
+				return {
+					type: describeCommissionRuleType(rule),
+					value: describeCommissionValue(rule),
+					rule
+				};
 			};
 			expect(shown('cash')).toMatchObject({
 				value: `25${NBSP}%`,
@@ -1519,13 +1523,13 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 				}
 			});
 			expect(shown('first')).toMatchObject({
-				value: `$${NBSP}1.500,00`,
+				value: `$${NBSP}1.500`,
 				rule: { percentage: null, fixedAmount: '1500.00', validTo: null }
 			});
 			expect(shown('middle').value).toBe(`12,5${NBSP}%`);
 			expect(shown('last').value).toBe(`$${NBSP}2.000,50`);
 			expect(shown('custom10')).toMatchObject({
-				type: 'Specific installment: #10',
+				type: 'Cuota específica: #10',
 				value: `5${NBSP}%`,
 				rule: { installmentNumber: 10 }
 			});

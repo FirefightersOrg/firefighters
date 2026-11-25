@@ -11,7 +11,7 @@
 		"prepare": "husky",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "prettier --check . && eslint .",
+		"lint": "prettier --check . && eslint . && tsx scripts/check-palette.ts",
 		"test": "vitest run",
 		"test:integration": "scripts/with-db-lock.sh vitest run --config vitest.integration.config.ts",
 		"test:e2e": "scripts/with-db-lock.sh playwright test",
@@ -49,7 +49,8 @@
 	"lint-staged": {
 		"*.{js,ts,svelte}": [
 			"prettier --write",
-			"eslint --fix"
+			"eslint --fix",
+			"tsx scripts/check-palette.ts"
 		],
 		"*.{json,md,yml,yaml}": [
 			"prettier --write"

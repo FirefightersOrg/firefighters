@@ -11,7 +11,7 @@ const uuid = (v: string) => z.guid().safeParse(v).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'payment.view');
-	if (!uuid(params.id) || !uuid(params.paymentId)) error(404, { message: 'Payment not found.' });
+	if (!uuid(params.id) || !uuid(params.paymentId)) error(404, { message: 'Pago no encontrado.' });
 	const [campaign, found, actor] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getPaymentCertificate(locals.supabase, params.id, params.paymentId),
@@ -23,9 +23,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			paymentId: params.paymentId,
 			error: campaign.error ?? found.error ?? actor.error
 		});
-		error(500, { message: 'Could not load the payment.' });
+		error(500, { message: 'No se pudo cargar el pago.' });
 	}
-	if (!campaign.data) error(404, { message: 'Campaign not found.' });
+	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	// SAN-111: confirmed payments, and annulled/adjusted ones that were confirmed first (they carry a
 	// legend). A pending payment removed from an open settlement was never valid: no certificate.
 	if (

@@ -10,6 +10,7 @@ import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { createDraw, DrawServiceError } from '$lib/server/services/draws';
 import { DRAW_TYPES, type DrawType } from '$lib/domain/draws';
 import { field, readDrawFields, validateDrawFields } from '$lib/server/draws/route-helpers';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
@@ -75,7 +76,7 @@ export const actions: Actions = {
 				form: 'draw',
 				values,
 				errors: {},
-				message: serviceError?.message ?? 'Something went wrong. Please try again.'
+				message: serviceError?.message ?? GENERIC_ERROR_MESSAGE
 			});
 		}
 		redirect(303, `/campaigns/${params.id}/draws/${drawId}`);

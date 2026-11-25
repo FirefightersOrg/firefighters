@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { z } from 'zod';
+import { formatDate } from '$lib/format';
 import {
 	hasPermissionIn,
 	permissionsUnavailable,
@@ -58,7 +59,7 @@ const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
 				context.addIssue({
 					code: 'custom',
 					path: ['firstDueDate'],
-					message: `Choose a date between ${min} and ${max}.`
+					message: `Elegir una fecha entre el ${formatDate(min)} y el ${formatDate(max)}.`
 				});
 		});
 };

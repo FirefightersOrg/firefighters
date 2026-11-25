@@ -3,8 +3,7 @@
  * (migration `20261118000000_commission_rules.sql`, docs/commissions.md).
  */
 import type { CampaignStatus } from './campaigns';
-import { formatDate, formatMoney as formatMoneyEs } from '../format';
-import { formatMoney } from './money';
+import { formatDate, formatMoney } from '../format';
 import { formatPercent } from './percent';
 
 export const COMMISSION_RULE_TYPES = [
@@ -15,22 +14,6 @@ export const COMMISSION_RULE_TYPES = [
 	'custom'
 ] as const;
 export type CommissionRuleType = (typeof COMMISSION_RULE_TYPES)[number];
-
-export const COMMISSION_RULE_TYPE_LABELS: Record<CommissionRuleType, string> = {
-	cash_full_payment: 'Cash (full payment)',
-	installment_first: 'First installment',
-	installment_middle: 'Middle installments',
-	installment_last: 'Last installment',
-	custom: 'Specific installment'
-};
-
-export const COMMISSION_RULE_TYPE_HINTS: Record<CommissionRuleType, string> = {
-	cash_full_payment: 'The bond is paid in full at once.',
-	installment_first: 'Payment of the first installment.',
-	installment_middle: 'Payments of every installment between the first and the last.',
-	installment_last: 'Payment of the last installment.',
-	custom: 'Payment of one specific installment number.'
-};
 
 export const COMMISSION_RULE_STATUSES = ['active', 'annulled'] as const;
 export type CommissionRuleStatus = (typeof COMMISSION_RULE_STATUSES)[number];
@@ -65,39 +48,6 @@ export interface CommissionRule {
 /** Commission rules can be created, edited and annulled while the campaign is draft or active. */
 export function canManageCommissionRules(status: CampaignStatus): boolean {
 	return status === 'draft' || status === 'active';
-}
-
-/** `"12,5 %"` or `"$ 1.500,00"` (es-AR). */
-export function formatCommissionValue(
-	rule: Pick<CommissionRule, 'percentage' | 'fixedAmount'>
-): string {
-	if (rule.percentage !== null) return formatPercent(rule.percentage);
-	if (rule.fixedAmount !== null) return formatMoney(rule.fixedAmount);
-	return '—';
-}
-
-/** Type label, with the installment for `custom` rules (`"Specific installment: #4"`). */
-export function formatCommissionRuleType(
-	rule: Pick<CommissionRule, 'ruleType' | 'installmentNumber'>
-): string {
-	const label = COMMISSION_RULE_TYPE_LABELS[rule.ruleType];
-	return rule.ruleType === 'custom' && rule.installmentNumber !== null
-		? `${label}: #${rule.installmentNumber}`
-		: label;
-}
-
-/** Display format for a calendar day (`"2026-03-01"` → `"Mar 1, 2026"`), like campaign dates. */
-export function formatDay(day: string): string {
-	const ms = Date.parse(`${day}T00:00:00Z`);
-	if (Number.isNaN(ms)) return day;
-	return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(ms);
-}
-
-/** `"Mar 1, 2026 – Mar 31, 2026"` or `"From Mar 1, 2026"` (open-ended). */
-export function formatValidity(rule: Pick<CommissionRule, 'validFrom' | 'validTo'>): string {
-	return rule.validTo
-		? `${formatDay(rule.validFrom)} – ${formatDay(rule.validTo)}`
-		: `From ${formatDay(rule.validFrom)}`;
 }
 
 /** Where an active rule stands relative to `today` (`YYYY-MM-DD`). */
@@ -210,11 +160,10 @@ export function calculateApplicationCommission(
 }
 
 // ---------------------------------------------------------------------------
-// Spanish display (docs/copy.md) for the migrated screens. The English helpers above stay until
-// the remaining screens (collector detail) move to Cimiento, then they are replaced by these.
+// Spanish display (docs/copy.md).
 // ---------------------------------------------------------------------------
 
-export const COMMISSION_RULE_TYPE_LABELS_ES: Record<CommissionRuleType, string> = {
+export const COMMISSION_RULE_TYPE_LABELS: Record<CommissionRuleType, string> = {
 	cash_full_payment: 'Pago al contado',
 	installment_first: 'Primera cuota',
 	installment_middle: 'Cuotas intermedias',
@@ -222,7 +171,7 @@ export const COMMISSION_RULE_TYPE_LABELS_ES: Record<CommissionRuleType, string> 
 	custom: 'Cuota específica'
 };
 
-export const COMMISSION_RULE_TYPE_HINTS_ES: Record<CommissionRuleType, string> = {
+export const COMMISSION_RULE_TYPE_HINTS: Record<CommissionRuleType, string> = {
 	cash_full_payment: 'El bono se paga completo en un solo pago.',
 	installment_first: 'Pago de la primera cuota.',
 	installment_middle: 'Pagos de todas las cuotas entre la primera y la última.',
@@ -235,7 +184,7 @@ export function describeCommissionValue(
 	rule: Pick<CommissionRule, 'percentage' | 'fixedAmount'>
 ): string {
 	if (rule.percentage !== null) return formatPercent(rule.percentage);
-	if (rule.fixedAmount !== null) return formatMoneyEs(rule.fixedAmount);
+	if (rule.fixedAmount !== null) return formatMoney(rule.fixedAmount);
 	return '—';
 }
 
@@ -243,7 +192,7 @@ export function describeCommissionValue(
 export function describeCommissionRuleType(
 	rule: Pick<CommissionRule, 'ruleType' | 'installmentNumber'>
 ): string {
-	const label = COMMISSION_RULE_TYPE_LABELS_ES[rule.ruleType];
+	const label = COMMISSION_RULE_TYPE_LABELS[rule.ruleType];
 	return rule.ruleType === 'custom' && rule.installmentNumber !== null
 		? `${label}: #${rule.installmentNumber}`
 		: label;

@@ -7,7 +7,7 @@
 	import { campaignEditFormKey } from '$lib/components/campaigns/types';
 	import { Alert, Card, PageHeader, StatusBadge, statusMeta } from '$lib/components/ui';
 	import {
-		BARCODE_MODE_LABELS_ES,
+		BARCODE_MODE_LABELS,
 		campaignNumberingConfig,
 		canEditCampaignRules,
 		OVERFLOW_POLICY_LABELS
@@ -132,7 +132,7 @@
 			</div>
 			<div>
 				<dt class="text-caption text-muted">Modo de código de barras</dt>
-				<dd class="m-0 mt-0.5">{BARCODE_MODE_LABELS_ES[campaign.barcodeMode]}</dd>
+				<dd class="m-0 mt-0.5">{BARCODE_MODE_LABELS[campaign.barcodeMode]}</dd>
 			</div>
 			{#if campaign.barcodePattern}
 				<div>

@@ -26,13 +26,17 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requirePermissionIn(locals.permissions, 'report.export');
 	const { kind, id } = params;
 	if (!kind || !id || !isBackupExportKind(kind) || !z.guid().safeParse(id).success) {
-		error(404, { message: 'Export not found.' });
+		error(404, { message: 'Exportación no encontrada.' });
 	}
 	const def = BACKUP_EXPORTS[kind];
 	for (const permission of def.permissions) requirePermissionIn(locals.permissions, permission);
 
 	const period = parseExportPeriod(url.searchParams.get('from'), url.searchParams.get('to'));
-	if (!period) error(400, { message: 'Invalid period: use from/to as YYYY-MM-DD, from <= to.' });
+	if (!period)
+		error(400, {
+			message:
+				'Período inválido: usar desde/hasta como AAAA-MM-DD, con desde anterior o igual a hasta.'
+		});
 
 	// A syntactically valid id must also be an existing campaign visible to the caller (RLS).
 	const campaign = await getCampaignById(locals.supabase, id);
@@ -42,7 +46,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 			campaignId: id,
 			error: campaign.error
 		});
-		error(500, { message: 'Could not generate the export. Please try again.' });
+		error(500, { message: 'No se pudo generar la exportación. Intentar nuevamente.' });
 	}
 	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 
@@ -56,7 +60,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 			campaignId: id,
 			error: cause
 		});
-		error(500, { message: 'Could not generate the export. Please try again.' });
+		error(500, { message: 'No se pudo generar la exportación. Intentar nuevamente.' });
 	}
 	console.info('[backups] export generated', {
 		requestId: locals.requestId,

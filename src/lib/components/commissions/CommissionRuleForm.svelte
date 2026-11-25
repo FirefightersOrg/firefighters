@@ -12,8 +12,8 @@
 		TextInput
 	} from '$lib/components/ui';
 	import {
-		COMMISSION_RULE_TYPE_HINTS_ES,
-		COMMISSION_RULE_TYPE_LABELS_ES,
+		COMMISSION_RULE_TYPE_HINTS,
+		COMMISSION_RULE_TYPE_LABELS,
 		COMMISSION_RULE_TYPES,
 		type CommissionRule
 	} from '$lib/domain/commissions';
@@ -160,8 +160,7 @@
 					label="Tipo de regla"
 					id={fieldId('ruleType')}
 					hint={COMMISSION_RULE_TYPES.map(
-						(type) =>
-							`${COMMISSION_RULE_TYPE_LABELS_ES[type]}: ${COMMISSION_RULE_TYPE_HINTS_ES[type]}`
+						(type) => `${COMMISSION_RULE_TYPE_LABELS[type]}: ${COMMISSION_RULE_TYPE_HINTS[type]}`
 					).join(' ')}
 					error={errors.ruleType?.[0]}
 					required
@@ -172,7 +171,7 @@
 						value={initial.ruleType}
 						options={COMMISSION_RULE_TYPES.map((type) => ({
 							value: type,
-							label: COMMISSION_RULE_TYPE_LABELS_ES[type]
+							label: COMMISSION_RULE_TYPE_LABELS[type]
 						}))}
 					/>
 				</Field>
