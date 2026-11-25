@@ -18,19 +18,20 @@
 	} = $props();
 </script>
 
+<!-- The visible text is the accessible text (caption, then the number as written), so a screen reader
+     reads "0100" as on paper instead of an aria-label it might pronounce as "cien". -->
 <div
-	class="relative inline-flex items-stretch rounded-md border border-border-strong bg-surface"
-	role="img"
-	aria-label="{caption}: número {number}{detail ? `, ${detail}` : ''}"
+	class="relative inline-flex max-w-full items-stretch rounded-md border border-border-strong bg-surface"
 >
-	<span class="w-2.5 rounded-l-md bg-brand" aria-hidden="true"></span>
+	<span class="w-2.5 shrink-0 rounded-l-md bg-brand" aria-hidden="true"></span>
 	<span
-		class="stub-cut relative w-4 border-r-2 border-dotted border-border-strong"
+		class="stub-cut relative w-4 shrink-0 border-r-2 border-dotted border-border-strong"
 		aria-hidden="true"
 	></span>
-	<span class="px-5 pt-3 pb-2.5" aria-hidden="true">
+	<span class="min-w-0 px-4 pt-3 pb-2.5 sm:px-5">
 		<span class="block text-caption text-muted">{caption}</span>
-		<span class="block font-figure text-[54px] leading-none font-bold tracking-wide tabular-nums"
+		<span
+			class="block font-figure text-[40px] leading-none font-bold tracking-wide break-all tabular-nums sm:text-[54px]"
 			>{number}</span
 		>
 		{#if detail}<span class="block text-body-sm text-muted">{detail}</span>{/if}

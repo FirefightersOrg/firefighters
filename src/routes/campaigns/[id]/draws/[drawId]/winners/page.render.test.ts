@@ -141,7 +141,7 @@ describe('winners and prizes render', () => {
 		}).body;
 		expect(body).toContain('Resultado de la validación del 0007');
 		// Redesign: the winning number is drawn as the bond's stub.
-		expect(body).toContain('aria-label="Número ganador: número 0007"');
+		expect(body).toMatch(/>Número ganador<\/span>\s*<span[^>]*font-figure[^>]*>0007</);
 		expect(body).toContain('B-7');
 		expect(body).toContain('Fire Supplies SA');
 		expect(body).toContain('Central station');
