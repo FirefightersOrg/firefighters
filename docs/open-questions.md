@@ -180,7 +180,7 @@ Reference document: `docs/backup-operations.md`.
 
 ### Sale due dates and uncollectible status
 
-Decided (SAN-106 a, Santiago 2026-11-19 and Juan 2026-11-25 in #50; migration `20270122000000`): a
+Decided (SAN-106 a, Santiago 2026-11-19 and Juan 2026-11-25 in #50; migration `20270124000000`): a
 sale may be registered with an **earlier sale date** (anyone with `sale.create`), never in the future and,
 when earlier, never before the campaign start (Buenos Aires dates). The first due date falls within
 **[sale date, sale date + 1 year]**, which replaces SAN-59's provisional "31 days before today". An earlier
