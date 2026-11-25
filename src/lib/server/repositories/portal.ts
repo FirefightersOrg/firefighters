@@ -7,7 +7,7 @@ import type { RepositoryResult } from './campaigns';
 
 /**
  * Read-only access of the collector portal (SAN-145). Everything goes through the narrow SECURITY DEFINER
- * `portal_my_*` functions (20270113000000): they check `sale.view_own`, return only the caller's own rows and
+ * `portal_my_*` functions (20270117000000): they check `sale.view_own`, return only the caller's own rows and
  * expose buyers as name, phone and address. `buyers` itself is never read from here.
  */
 
