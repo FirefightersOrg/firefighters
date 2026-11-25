@@ -11,6 +11,6 @@ export const GENERIC_ERROR_MESSAGE = 'Algo salió mal. Volver a intentar.';
  */
 export function unprocessedSubmittedMessage(count: number): string {
 	return count === 1
-		? 'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o recházalo antes de cerrar la rendición.'
-		: `Hay ${count} cobros enviados por el cobrador sin procesar. Inclúyalos o recházalos antes de cerrar la rendición.`;
+		? 'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o rechácelo antes de cerrar la rendición.'
+		: `Hay ${count} cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.`;
 }

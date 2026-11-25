@@ -64,7 +64,7 @@ export function mapSettlementRpcError(error: RpcError) {
 			'conflict',
 			Number.isInteger(count) && count > 0
 				? unprocessedSubmittedMessage(count)
-				: 'Hay cobros enviados por el cobrador sin procesar. Inclúyalos o recházalos antes de cerrar la rendición.'
+				: 'Hay cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
 		);
 	}
 	if (['22023', '23514'].includes(error.code ?? ''))

@@ -139,11 +139,11 @@ describe('settlement service review hardening (SAN-63)', () => {
 		it.each([
 			[
 				1,
-				'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o recházalo antes de cerrar la rendición.'
+				'Hay 1 cobro enviado por el cobrador sin procesar. Inclúyalo o rechácelo antes de cerrar la rendición.'
 			],
 			[
 				3,
-				'Hay 3 cobros enviados por el cobrador sin procesar. Inclúyalos o recházalos antes de cerrar la rendición.'
+				'Hay 3 cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
 			]
 		])(
 			'maps unprocessed collector payments (FF156, %i) to a Spanish 409 that says what to do',
