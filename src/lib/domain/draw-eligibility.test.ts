@@ -6,7 +6,7 @@ import {
 	type DrawType
 } from './draw-eligibility';
 
-function eligibilityInput(type: DrawType): DrawEligibilityInput {
+function eligibilityInput(type: DrawType, { uncollectible = false } = {}): DrawEligibilityInput {
 	return {
 		draw: {
 			type,
@@ -20,6 +20,7 @@ function eligibilityInput(type: DrawType): DrawEligibilityInput {
 			baseNumberCount: 1
 		},
 		sale: {
+			uncollectible,
 			paymentMode: 'installments',
 			installments: [
 				{ number: 1, amount: '100.00' },
@@ -192,33 +193,20 @@ describe('uncollectible sales (follow-up of SAN-106)', () => {
 	it.each(['monthly', 'final', 'extraordinary_full_payment', 'consolation'] as const)(
 		'a sale marked uncollectible is not eligible for a %s draw, even when fully covered',
 		(type) => {
-			const input = eligibilityInput(type);
-			const marked = {
-				...input,
-				sale: { ...(input as { sale: object }).sale, uncollectible: true }
-			};
-			expect(evaluateDrawEligibility(marked as DrawEligibilityInput)).toEqual({
+			expect(evaluateDrawEligibility(eligibilityInput(type))).toEqual({ eligible: true });
+			expect(evaluateDrawEligibility(eligibilityInput(type, { uncollectible: true }))).toEqual({
 				eligible: false,
 				reason: 'uncollectible'
 			});
 		}
 	);
 	it('annulled and not sold still take precedence, as in the SQL roster', () => {
-		const input = eligibilityInput('monthly');
-		const marked = (bond: object) =>
-			({
-				...input,
-				bond: { ...input.bond, ...bond },
-				sale: { ...(input as { sale: object }).sale, uncollectible: true }
-			}) as DrawEligibilityInput;
-		expect(evaluateDrawEligibility(marked({ annulled: true }))).toMatchObject({
-			reason: 'annulled'
-		});
-		expect(
-			evaluateDrawEligibility(marked({ commercialStatus: 'delivered_to_collector' }))
-		).toMatchObject({
-			reason: 'not_sold'
-		});
+		const annulled = eligibilityInput('monthly', { uncollectible: true });
+		annulled.bond = { ...annulled.bond, annulled: true };
+		expect(evaluateDrawEligibility(annulled)).toMatchObject({ reason: 'annulled' });
+		const notSold = eligibilityInput('monthly', { uncollectible: true });
+		notSold.bond = { ...notSold.bond, commercialStatus: 'delivered_to_collector' };
+		expect(evaluateDrawEligibility(notSold)).toMatchObject({ reason: 'not_sold' });
 	});
 	it('has a Spanish label', () =>
 		expect(DRAW_INELIGIBILITY_REASON_LABELS.uncollectible).toBe('Venta marcada como incobrable'));
