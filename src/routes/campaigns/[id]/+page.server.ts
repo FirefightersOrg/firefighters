@@ -86,7 +86,14 @@ const TRANSITION_SUCCESS = {
 	annulled: 'Campaña anulada.'
 } as const;
 
-export const load: PageServerLoad = async ({ locals, params, url }) => {
+/**
+ * Campaign data, permissions and (optionally) the dashboard. The campaign page loads everything; Datos y
+ * reglas (`./configuracion`) shares this load without the dashboard queries it does not show.
+ */
+export async function loadCampaignPage(
+	{ locals, params, url }: { locals: App.Locals; params: { id: string }; url: URL },
+	options: { dashboard: boolean }
+) {
 	requireCampaignViewer(locals, url);
 	if (!isUuid(params.id)) {
 		error(404, { message: CAMPAIGN_MESSAGES.notFound });
@@ -118,7 +125,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	}
 
 	const campaign = result.data;
-	const dashboard = await loadDashboard(locals, campaign.id);
+	const dashboard = options.dashboard
+		? await loadDashboard(locals, campaign.id)
+		: { operational: null, financial: null };
 	const hasBonds = bondsResult.data ?? false;
 	const permissions = locals.permissions ?? [];
 	const canUpdate = hasPermissionIn(permissions, 'campaign.update');
@@ -181,7 +190,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			).some((permission) => hasPermissionIn(permissions, permission))
 		}
 	};
-};
+}
+
+export const load: PageServerLoad = (event) => loadCampaignPage(event, { dashboard: true });
 
 /**
  * Dashboard figures (SAN-85). The operational group (bonds, revenue, next draw and at-risk bonds)

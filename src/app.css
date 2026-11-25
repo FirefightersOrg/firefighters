@@ -29,7 +29,6 @@
 	--color-primary-soft: var(--primary-soft);
 	--color-primary-text: var(--primary-text);
 	--color-focus: var(--focus);
-	--color-focus-inner: var(--focus-inner);
 	--color-brand: var(--brand);
 	--color-accent: var(--accent);
 	--color-success: var(--success);
@@ -128,12 +127,13 @@
 		font-family: var(--font-mono);
 	}
 
-	/* Redesign: reflective-yellow ring with a navy inner ring. Yellow alone is ~1.6:1 on white; the inner
-	   ring keeps the indicator at >= 3:1 against both the element and the page (WCAG 1.4.11). */
+	/* Redesign focus: the outline carries the contrast (navy in light, 12.4:1 on white; reflective
+	   yellow in dark, 11.7:1), so it holds even where a component sets its own shadow. The yellow
+	   halo is decorative: it shows only on elements without a shadow of their own (WCAG 1.4.11). */
 	:focus-visible {
-		outline: 3px solid var(--focus);
+		outline: 2px solid var(--focus);
 		outline-offset: 2px;
-		box-shadow: 0 0 0 2px var(--focus-inner);
+		box-shadow: 0 0 0 6px var(--accent);
 	}
 
 	::placeholder {

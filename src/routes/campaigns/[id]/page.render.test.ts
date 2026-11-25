@@ -295,6 +295,7 @@ describe('campaign dashboard', () => {
 			'Bonos vendidos',
 			'de 20',
 			'En manos de cobradores',
+			'10 disponibles',
 			'Cobrado',
 			'50 % de lo esperado',
 			'Cuotas vencidas',
@@ -371,6 +372,8 @@ describe('campaign workbench (redesign)', () => {
 			expect(body).toContain(text);
 		expect(body).toContain('<details');
 		expect(body).toContain('/campaigns/f0000000-0000-0000-0000-000000000001/configuracion');
+		// Also reachable from the header, not only from the collapsed Administración group.
+		expect(body.match(/\/configuracion"/g)?.length).toBeGreaterThanOrEqual(2);
 		// The rules and their forms live in Datos y reglas, not on the workbench.
 		expect(body).not.toContain('?/rules');
 		expect(body).not.toContain('Política de desborde');
