@@ -5,3 +5,4 @@ export * from './redirect';
 export * from './session';
 export * from './guards';
 export * from './route-guard';
+export * from './own-collector';

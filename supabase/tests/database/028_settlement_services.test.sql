@@ -13,6 +13,7 @@ select set_config('request.jwt.claims','{"sub":"a6280000-0000-0000-0000-00000000
 create temp table ids(k text primary key,id uuid); grant select,insert on ids to authenticated;
 create function pg_temp.id(k text) returns uuid language sql stable as $$select id from ids where k=$1$$; grant execute on function pg_temp.id(text) to authenticated;
 with x as (insert into public.campaigns(name,simple_bond_value,installment_count,installment_value,barcode_mode) values('S',100,2,50,'base_number') returning id) insert into ids select 'c',id from x;
+insert into public.user_roles(user_id,role_id) select 'b6280000-0000-0000-0000-000000000003',id from public.roles where name='collector';
 with x as (insert into public.collectors(display_name,user_profile_id) values('Ana','b6280000-0000-0000-0000-000000000003') returning id) insert into ids select 'collector',id from x;
 with x as (insert into public.buyers(type,first_name) values('individual','Eva') returning id) insert into ids select 'buyer',id from x;
 with x as (insert into public.bonds(campaign_id,kind,origin,commercial_unit_count,total_value,commercial_status) values(pg_temp.id('c'),'simple','printed',1,100,'available') returning id) insert into ids select 'bond',id from x;

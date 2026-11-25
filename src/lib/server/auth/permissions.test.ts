@@ -328,10 +328,10 @@ describe('request-scoped checks (hasPermissionIn / requirePermissionIn)', () => 
 });
 
 describe('canonical permission codes', () => {
-	it('defines exactly 52 unique permission codes', () => {
-		expect(PERMISSIONS.length).toBe(52);
+	it('defines exactly 56 unique permission codes', () => {
+		expect(PERMISSIONS.length).toBe(56);
 		const unique = new Set(PERMISSIONS);
-		expect(unique.size).toBe(52);
+		expect(unique.size).toBe(56);
 	});
 
 	it('includes core administrative and operational permissions', () => {

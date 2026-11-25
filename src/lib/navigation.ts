@@ -1,5 +1,5 @@
 /** Main navigation of the signed-in app shell: entries depend on the person's permissions. */
-export type MainNavPath = '/campaigns';
+export type MainNavPath = '/campaigns' | '/portal';
 
 export interface MainNavItem {
 	label: string;
@@ -9,7 +9,8 @@ export interface MainNavItem {
 }
 
 export const MAIN_NAV: readonly MainNavItem[] = [
-	{ label: 'Campañas', path: '/campaigns', permission: 'campaign.view' }
+	{ label: 'Campañas', path: '/campaigns', permission: 'campaign.view' },
+	{ label: 'Mi portal', path: '/portal', permission: 'bond.view_own' }
 ];
 
 /** Entries the holder of `permissions` may see; `current` marks the section of `pathname`. */

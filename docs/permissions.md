@@ -20,7 +20,7 @@ This allows changing permissions of a role without rewriting business logic, scr
 | `admin`     | Full configuration, users, rules, and critical corrections.                      |
 | `operator`  | Daily operations for bonds, buyers, sales, payments, and open settlements.       |
 | `treasurer` | Settlements, commissions, current account, cash register, and financial reports. |
-| `collector` | Future limited access to own portfolio.                                          |
+| `collector` | Own portfolio only, through the collector portal (`/portal`, SAN-143).           |
 | `read-only` | Read-only within defined scope.                                                  |
 
 ## Granular permissions
@@ -128,48 +128,52 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 ## Initial suggested matrix
 
-| Permission                | admin | operator | treasurer | collector | read-only |
-| ------------------------- | ----: | -------: | --------: | --------: | --------: |
-| `campaign.view`           |   yes |      yes |       yes |       yes |       yes |
-| `campaign.create`         |   yes |       no |        no |        no |        no |
-| `campaign.update_rules`   |   yes |       no |        no |        no |        no |
-| `bond.view`               |   yes |      yes |       yes |       own |       yes |
-| `bond.create`             |   yes |      yes |        no |        no |        no |
-| `bond.import`             |   yes |      yes |        no |        no |        no |
-| `bond.scan`               |   yes |      yes |        no |        no |        no |
-| `bond.assign`             |   yes |      yes |        no |        no |        no |
-| `bond.return`             |   yes |      yes |        no |        no |        no |
-| `buyer.view`              |   yes |      yes |        no |        no |        no |
-| `buyer.manage`            |   yes |      yes |        no |        no |        no |
-| `collector.view`          |   yes |      yes |        no |        no |        no |
-| `collector.manage`        |   yes |       no |        no |        no |        no |
-| `collector.ledger.view`   |   yes |       no |       yes |        no |        no |
-| `sale.view`               |   yes |      yes |       yes |        no |        no |
-| `sale.create`             |   yes |      yes |        no |        no |        no |
-| `sale.mark_uncollectible` |   yes |       no |       yes |        no |        no |
-| `payment.view`            |   yes |      yes |       yes |        no |        no |
-| `payment.create`          |   yes |      yes |       yes |    future |        no |
-| `payment.annul`           |   yes |       no |       yes |        no |        no |
-| `settlement.view`         |   yes |      yes |       yes |        no |        no |
-| `settlement.create`       |   yes |      yes |       yes |        no |        no |
-| `settlement.update_open`  |   yes |      yes |        no |        no |        no |
-| `settlement.close`        |   yes |       no |       yes |        no |        no |
-| `settlement.correct`      |   yes |       no |       yes |        no |        no |
-| `commission.view`         |   yes |       no |       yes |        no |       yes |
-| `commission.rule_manage`  |   yes |       no |        no |        no |        no |
-| `commission.adjust`       |   yes |       no |       yes |        no |        no |
-| `draw.view`               |   yes |      yes |       yes |        no |        no |
-| `draw.annul`              |   yes |       no |        no |        no |        no |
-| `draw.complete`           |   yes |       no |        no |        no |        no |
-| `draw.freeze_roster`      |   yes |       no |       yes |        no |        no |
-| `draw.load_winner`        |   yes |      yes |       yes |        no |        no |
-| `prize.annul`             |   yes |       no |        no |        no |        no |
-| `prize.reverse_delivery`  |   yes |       no |        no |        no |        no |
-| `report.view_operational` |   yes |      yes |       yes |        no |       yes |
-| `report.view_financial`   |   yes |       no |       yes |        no |       yes |
-| `report.export`           |   yes |      yes |       yes |        no |       yes |
-| `audit.view`              |   yes |       no |       yes |        no |        no |
-| `user.manage`             |   yes |       no |        no |        no |        no |
+| Permission                  | admin | operator | treasurer | collector | read-only |
+| --------------------------- | ----: | -------: | --------: | --------: | --------: |
+| `campaign.view`             |   yes |      yes |       yes |       yes |       yes |
+| `campaign.create`           |   yes |       no |        no |        no |        no |
+| `campaign.update_rules`     |   yes |       no |        no |        no |        no |
+| `bond.view`                 |   yes |      yes |       yes |        no |       yes |
+| `bond.create`               |   yes |      yes |        no |        no |        no |
+| `bond.import`               |   yes |      yes |        no |        no |        no |
+| `bond.scan`                 |   yes |      yes |        no |        no |        no |
+| `bond.assign`               |   yes |      yes |        no |        no |        no |
+| `bond.return`               |   yes |      yes |        no |        no |        no |
+| `buyer.view`                |   yes |      yes |        no |        no |        no |
+| `buyer.manage`              |   yes |      yes |        no |        no |        no |
+| `collector.view`            |   yes |      yes |        no |        no |        no |
+| `collector.manage`          |   yes |       no |        no |        no |        no |
+| `collector.ledger.view`     |   yes |       no |       yes |        no |        no |
+| `sale.view`                 |   yes |      yes |       yes |        no |        no |
+| `sale.create`               |   yes |      yes |        no |        no |        no |
+| `sale.mark_uncollectible`   |   yes |       no |       yes |        no |        no |
+| `payment.view`              |   yes |      yes |       yes |        no |        no |
+| `payment.create`            |   yes |      yes |       yes |    future |        no |
+| `payment.annul`             |   yes |       no |       yes |        no |        no |
+| `settlement.view`           |   yes |      yes |       yes |        no |        no |
+| `settlement.create`         |   yes |      yes |       yes |        no |        no |
+| `settlement.update_open`    |   yes |      yes |        no |        no |        no |
+| `settlement.close`          |   yes |       no |       yes |        no |        no |
+| `settlement.correct`        |   yes |       no |       yes |        no |        no |
+| `commission.view`           |   yes |       no |       yes |        no |       yes |
+| `commission.rule_manage`    |   yes |       no |        no |        no |        no |
+| `commission.adjust`         |   yes |       no |       yes |        no |        no |
+| `draw.view`                 |   yes |      yes |       yes |        no |        no |
+| `draw.annul`                |   yes |       no |        no |        no |        no |
+| `draw.complete`             |   yes |       no |        no |        no |        no |
+| `draw.freeze_roster`        |   yes |       no |       yes |        no |        no |
+| `draw.load_winner`          |   yes |      yes |       yes |        no |        no |
+| `prize.annul`               |   yes |       no |        no |        no |        no |
+| `prize.reverse_delivery`    |   yes |       no |        no |        no |        no |
+| `report.view_operational`   |   yes |      yes |       yes |        no |       yes |
+| `report.view_financial`     |   yes |       no |       yes |        no |       yes |
+| `report.export`             |   yes |      yes |       yes |        no |       yes |
+| `audit.view`                |   yes |       no |       yes |        no |        no |
+| `user.manage`               |   yes |       no |        no |        no |        no |
+| `bond.view_own`             |   yes |       no |        no |       yes |        no |
+| `sale.view_own`             |   yes |       no |        no |       yes |        no |
+| `collector.ledger.view_own` |   yes |       no |        no |       yes |        no |
+| `payment.create_own`        |   yes |       no |        no |       yes |        no |
 
 ### Action implies view (SAN-93)
 
@@ -222,7 +226,26 @@ Exports (`/campaigns/[id]/reports/export/[report]?format=csv|xlsx`) need `report
 - Permissions must be versioned in the database or initial migrations.
 - The catalog (`roles`, `permissions`, `role_permissions`) is read-only at runtime; it changes only through migrations. `user.manage` covers profiles and role assignments (`user_roles`).
 - At least one active profile must keep `user.manage`: the database rejects removing the last holder's role, deactivating them, or removing `user.manage` from their role.
-- If collector access is enabled, their queries must be limited to their own portfolio.
+- Collector queries are limited to their own portfolio (see "Collector portal own scope (SAN-143)").
+
+## Collector portal own scope (SAN-143)
+
+The collector never receives the global `bond.view`, `sale.view`, `collector.ledger.view` or `payment.create`: those are grants used by many policies and functions and would open every collector's data. The role gets four dedicated own-scope codes instead (`20270112000000_collector_portal_scope.sql`; admin holds them too):
+
+| Permission                  | Opens, only for the caller's own collector                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `bond.view_own`             | Bonds, bond numbers, bond groups (through their bonds), delivery notes, assignments. Also gates `/portal`. |
+| `sale.view_own`             | Sales, payment plans, installments, payments, and the narrow buyer read.                                   |
+| `collector.ledger.view_own` | Current account, commission adjustments, settlements.                                                      |
+| `payment.create_own`        | Reserved for SAN-147 (register a collection); no function accepts it yet.                                  |
+
+- Identity: `collectors.user_profile_id` = `current_profile_id()`. One helper, `is_own_collector(uuid)` (`SECURITY DEFINER`, `stable`, `search_path = ''`), holds that logic; the four older per-domain helpers are thin wrappers over it.
+- RLS rule: global permission OR (`*_own` permission AND `is_own_collector(collector_id)`). An unlinked profile, or another collector's rows, return zero rows. An inactive collector keeps read access to its own history.
+- The four per-domain wrappers (`delivery_`, `sale_`, `payment_settlement_`, `collector_ledger_is_own_collector`) carry the matching `*_own` permission, because `SECURITY DEFINER` functions (ledger balance, settlement totals, `delivery_can_read`) skip RLS and only call them. Settlements use `collector.ledger.view_own`.
+- `bonds_select` own-scope uses `current_collector_id`: a bond that was returned, or moved to another collector, leaves the portal, while its sale (`sales.collector_id`) and delivery note stay visible. "My bonds" means today's holdings; a history view (SAN-144) must read assignments/sales instead.
+- Buyers: `buyers_select` stays closed. `portal_my_buyers(campaign)` is a read-only `SECURITY DEFINER` function (name, phone, address only, own sales only); `portal_my_collector()` resolves the caller's collector. Both are revoked from `public`, `anon` and `service_role` and granted to `authenticated`.
+- Server: `requireOwnCollector(locals, returnTo, permission)` resolves the collector from the session, never from a URL or form value; permissions not loaded answer 500, a missing permission 403, no link returns `null` (empty state in the portal). `/` redirects collectors to `/portal`; the nav shows "Mi portal" for `bond.view_own`.
+- The `*_own` codes are excluded from the "action implies view" rule (pgTAP 017 ignores codes ending in `_own`): they open own rows only and never imply a global view.
 
 ## Campaign dashboard (SAN-85)
 
