@@ -7,7 +7,11 @@ import {
 } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { getCurrentDrawRoster, getDraw } from '$lib/server/repositories/draws';
+import {
+	getCurrentDrawRoster,
+	getDraw,
+	rosterHasLegacyExtras
+} from '$lib/server/repositories/draws';
 import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { canTransitionDraw, DRAW_REASON_MAX } from '$lib/domain/draws';
@@ -75,12 +79,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!draw.data) error(404, { message: 'Sorteo no encontrado.' });
 	const roster = await getCurrentDrawRoster(locals.supabase, draw.data.id);
 	if (roster.error) error(500, { message: 'No se pudo cargar el padrón del sorteo.' });
+	// SAN-152: new extraordinary rosters use the bonds' own numbers; only legacy rosters hold extras.
+	const legacy = roster.data ? await rosterHasLegacyExtras(locals.supabase, roster.data.id) : null;
+	if (legacy?.error) error(500, { message: 'No se pudo cargar el padrón del sorteo.' });
 	const scheduled = draw.data.status === 'scheduled';
 	const generated = draw.data.status === 'roster_generated';
 	return {
 		campaign: campaign.data,
 		draw: draw.data,
 		roster: roster.data,
+		hasLegacyExtras: legacy?.data ?? false,
 		reasonMax: DRAW_REASON_MAX,
 		can: {
 			edit: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),

@@ -15,7 +15,7 @@ vi.mock('$lib/server/services/sales', async (o) => ({
 	registerSale: vi.fn()
 }));
 vi.mock('$lib/server/services/parties', () => ({ createBuyer: vi.fn() }));
-import { actions, _firstDueDateBounds, load } from './+page.server';
+import { actions, _firstDueDateBounds, _saleDateBounds, load } from './+page.server';
 import {
 	getBuyer,
 	getCollectorsByIds,
@@ -106,6 +106,44 @@ describe('new sale', () => {
 		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '2' })).toMatchObject({
 			found: [{ sellable: false, reason: 'Ya está vendido.' }]
 		});
+	});
+	it('bounds the sale date to [campaign start (Buenos Aires), today] and the due date to [sale, +1 year] (SAN-106)', () => {
+		expect(_saleDateBounds('2026-03-01T03:00:00Z', '2026-11-25')).toEqual({
+			min: '2026-03-01',
+			max: '2026-11-25'
+		});
+		// 02:00 UTC is still the previous day in Buenos Aires.
+		expect(_saleDateBounds('2026-03-01T02:00:00Z', '2026-11-25').min).toBe('2026-02-28');
+		expect(_saleDateBounds(null, '2026-11-25')).toEqual({ min: '2026-11-25', max: '2026-11-25' });
+		expect(_firstDueDateBounds('2026-09-10')).toEqual({ min: '2026-09-10', max: '2027-09-10' });
+	});
+	it('registers an earlier sale with its date and validates both dates (SAN-106)', async () => {
+		vi.mocked(getCampaignById).mockResolvedValue({
+			data: mapCampaignRow(campaignRow({ status: 'active', starts_at: '2020-01-01T03:00:00Z' })),
+			error: null
+		} as never);
+		vi.mocked(registerSale).mockResolvedValue('a0000000-0000-0000-0000-000000000009');
+		const perms = ['campaign.view', 'sale.create'];
+		const base = { bondId: BOND, buyerId: BUYER, paymentMode: 'installments' };
+		expect(
+			await run('register', perms, { ...base, saleDate: '2026-09-10', firstDueDate: '2026-09-10' })
+		).toMatchObject({ status: 303 });
+		expect(registerSale).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.objectContaining({ saleDate: '2026-09-10', firstDueDate: '2026-09-10' }),
+			expect.anything()
+		);
+		// The due date may not precede the sale date.
+		expect(
+			await run('register', perms, { ...base, saleDate: '2026-09-10', firstDueDate: '2026-09-09' })
+		).toMatchObject({ status: 400, data: { errors: { firstDueDate: expect.any(Array) } } });
+		// The sale date may be neither in the future nor before the campaign start.
+		expect(
+			await run('register', perms, { ...base, saleDate: '2999-01-01', firstDueDate: '2999-01-01' })
+		).toMatchObject({ status: 400, data: { errors: { saleDate: expect.any(Array) } } });
+		expect(
+			await run('register', perms, { ...base, saleDate: '2019-12-31', firstDueDate: '2019-12-31' })
+		).toMatchObject({ status: 400, data: { errors: { saleDate: expect.any(Array) } } });
 	});
 	it('accepts full payments without a due date and validates installment due-date bounds', async () => {
 		const { min, max } = _firstDueDateBounds();
