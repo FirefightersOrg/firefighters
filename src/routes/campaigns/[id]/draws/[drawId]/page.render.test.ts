@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from './+page.svelte';
-const data = (status: string, type = 'monthly') => ({
+const data = (status: string, type = 'monthly', legacy = false) => ({
 	campaign: { id: 'c', name: 'Campaign', installmentCount: 10 },
 	draw: {
 		id: 'd',
@@ -16,6 +16,7 @@ const data = (status: string, type = 'monthly') => ({
 	},
 	roster:
 		status === 'scheduled' ? null : { status: status === 'roster_frozen' ? 'frozen' : 'generated' },
+	hasLegacyExtras: legacy,
 	reasonMax: 1000,
 	can: {
 		edit: status === 'scheduled',
@@ -49,8 +50,19 @@ describe('draw detail render', () => {
 		] as const) {
 			const body = render(Page, { props: { data: data(status, type), form: null } as any }).body;
 			expect(body.includes('Anular sorteo')).toBe(allowed);
-			expect(body.includes('libera los números extra reservados')).toBe(allowed);
+			// New rosters use the bonds' own numbers (SAN-152): no extras copy.
+			expect(body.includes('libera los números extra reservados')).toBe(false);
 		}
+	});
+	it('shows the extras release copy only for legacy rosters with extras', () => {
+		const body = render(Page, {
+			props: {
+				data: data('roster_generated', 'extraordinary_full_payment', true),
+				form: null
+			} as any
+		}).body;
+		expect(body).toContain('libera los números');
+		expect(body).toContain('anterior al cambio');
 	});
 	it('renders scheduled actions', () => {
 		const body = render(Page, { props: { data: data('scheduled'), form: null } as any }).body;

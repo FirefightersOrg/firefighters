@@ -28,8 +28,35 @@ describe('roster render', () => {
 			} as any
 		}).body;
 		expect(body).toContain('Padrón congelado');
-		expect(body).toContain('Extra');
+		expect(body).toContain('Extra (sorteo anterior)');
 		expect(body).toContain('Bono sin pago total');
 		expect(body).toContain('Siguiente');
+	});
+	it('shows no extra badge for rosters built from the bonds own numbers', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id: 'c' },
+					draw: { id: 'd', name: 'Draw' },
+					roster: { status: 'generated' },
+					filters: { q: '', eligibility: '' },
+					pagination: { page: 1, pages: 1, total: 1 },
+					entries: [
+						{
+							id: 'e',
+							formattedNumber: '0002',
+							numberKind: 'associated',
+							bondLabel: 'B-2',
+							buyerName: 'Ana',
+							collectorName: 'Luis',
+							eligible: true,
+							reasonLabel: ''
+						}
+					]
+				}
+			} as any
+		}).body;
+		expect(body).toContain('0002');
+		expect(body).not.toContain('Extra');
 	});
 });

@@ -353,9 +353,9 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 		).toBe('ok'); // SAN-81 enabled consolation: with no prior prizes there is nothing to exclude.
 	});
 
-	it('C2 allocates and reuses extraordinary numbers per base without campaign collisions', async () => {
+	it('C2 extraordinary roster uses exactly the bonds own base and associated numbers (SAN-152)', async () => {
 		const drawId = await draw('extraordinary_full_payment');
-		await generateDrawRoster(
+		const rosterId = await generateDrawRoster(
 			admin.client,
 			{ drawId },
 			{ requestId: rid('extra-numbers-one'), permissions: admin.permissions }
@@ -363,37 +363,38 @@ describe('Phase 11: draw roster generation and frozen roster immutability', () =
 		const numbers = async () => {
 			const { data, error } = await admin.client
 				.from('bond_numbers')
-				.select('id,bond_id,number_value,number_kind,source_base_number_id')
+				.select('id,bond_id,number_value,number_kind')
 				.eq('campaign_id', campaignId)
+				.is('released_at', null)
 				.order('number_value')
 				.order('id')
 				.range(0, 499);
 			if (error) throw new Error(error.message);
 			return data ?? [];
 		};
-		const first = (await numbers()).filter((number) => number.number_kind === 'extraordinary');
-		const base = (await numbers()).filter((number) => number.number_kind === 'base');
-		expect(first.filter((number) => number.bond_id === fixtures.full.bondId)).toHaveLength(1);
-		expect(first.filter((number) => number.bond_id === fixtures.pata.bondId)).toHaveLength(2);
-		expect(
-			first.every((number) =>
-				base.some(
-					(source) =>
-						source.id === number.source_base_number_id && source.bond_id === number.bond_id
-				)
-			)
-		).toBe(true);
-		expect(new Set((await numbers()).map((number) => number.number_value)).size).toBe(
-			(await numbers()).length
-		);
+		const all = await numbers();
+		expect(all.filter((number) => number.number_kind === 'extraordinary')).toEqual([]);
+		const rows = (await rosterEntries(rosterId)).filter((row) => row.eligible);
+		for (const bondId of [fixtures.full.bondId, fixtures.pata.bondId]) {
+			expect(
+				rows
+					.filter((row) => row.bond_id === bondId)
+					.map((row) => row.number_value)
+					.sort((a, b) => a - b)
+			).toEqual(
+				all
+					.filter((number) => number.bond_id === bondId)
+					.map((number) => number.number_value)
+					.sort((a, b) => a - b)
+			);
+		}
+		const before = all.length;
 		await generateDrawRoster(
 			admin.client,
 			{ drawId },
 			{ requestId: rid('extra-numbers-two'), permissions: admin.permissions }
 		);
-		expect((await numbers()).filter((number) => number.number_kind === 'extraordinary')).toEqual(
-			first
-		);
+		expect(await numbers()).toHaveLength(before);
 	});
 
 	it('C3 persists eligible and ineligible rows with real party snapshots and the roster UI reads the business buyer label', async () => {

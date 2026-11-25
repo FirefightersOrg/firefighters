@@ -82,7 +82,8 @@
 		{#snippet cell({ row, column })}
 			{#if column.key === 'formattedNumber'}
 				{row.formattedNumber}
-				{#if row.numberKind === 'extraordinary'}<Badge tone="info">Extra</Badge>{/if}
+				{#if row.numberKind === 'extraordinary'}<Badge tone="info">Extra (sorteo anterior)</Badge
+					>{/if}
 			{:else if column.key === 'eligibility'}
 				{row.eligible ? 'Habilitado' : `No habilitado — ${row.reasonLabel}`}
 			{:else}
