@@ -127,7 +127,7 @@
 		])
 	);
 	const navLink =
-		'-ml-2.5 block rounded-md px-2.5 py-1.5 text-body text-text hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:flex pointer-coarse:min-h-touch pointer-coarse:items-center';
+		'-ml-2.5 flex min-h-touch items-center rounded-md px-2.5 text-body text-text hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
 
 {#snippet figure(label: string, value: string, detail?: string)}
@@ -175,6 +175,9 @@
 >
 	{#snippet actions()}
 		<StatusBadge kind="campaign" status={campaign.status} />
+		<Button variant="ghost" size="sm" href={resolve('/campaigns/[id]/configuracion', { id })}
+			>Datos y reglas</Button
+		>
 	{/snippet}
 </PageHeader>
 
@@ -234,7 +237,10 @@
 			<div>
 				<dt class="text-body-sm text-muted">En manos de cobradores</dt>
 				<dd class="m-0 font-figure text-figure tabular-nums">
-					{formatNumber(operational.bonds.delivered)}
+					{formatNumber(operational.bonds.delivered)}<span
+						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
+						>{formatNumber(operational.bonds.available)} disponibles</span
+					>
 				</dd>
 			</div>
 			<div>
@@ -281,30 +287,7 @@
 	{/if}
 
 	<div class="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
-		<nav aria-label="Secciones de la campaña" class="order-2 lg:order-1">
-			{#each groups as group (group.title)}
-				<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted first:mt-0">{group.title}</h2>
-				<ul class="m-0 list-none p-0">
-					{#each group.links as link (link.href)}
-						<li><a href={link.href} class={navLink}>{link.label}</a></li>
-					{/each}
-				</ul>
-			{/each}
-			<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted">Administración</h2>
-			<details>
-				<summary
-					class="cursor-pointer rounded-sm py-1.5 text-body-sm text-muted pointer-coarse:flex pointer-coarse:min-h-touch pointer-coarse:items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-					>Datos y reglas, comisiones, auditoría y copias</summary
-				>
-				<ul class="m-0 list-none p-0">
-					{#each adminLinks as link (link.href)}
-						<li><a href={link.href} class={navLink}>{link.label}</a></li>
-					{/each}
-				</ul>
-			</details>
-		</nav>
-
-		<div class="order-1 flex min-w-0 flex-col gap-5 lg:order-2">
+		<div class="flex min-w-0 flex-col gap-5 lg:order-2">
 			{#if campaign.status === 'draft'}
 				{@render status()}
 			{/if}
@@ -453,6 +436,28 @@
 				{@render status()}
 			{/if}
 		</div>
+		<nav aria-label="Secciones de la campaña" class="lg:order-1">
+			{#each groups as group (group.title)}
+				<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted first:mt-0">{group.title}</h2>
+				<ul class="m-0 list-none p-0">
+					{#each group.links as link (link.href)}
+						<li><a href={link.href} class={navLink}>{link.label}</a></li>
+					{/each}
+				</ul>
+			{/each}
+			<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted">Administración</h2>
+			<details>
+				<summary
+					class="flex min-h-touch cursor-pointer items-center rounded-sm text-body-sm text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+					>Datos y reglas, comisiones, auditoría y copias</summary
+				>
+				<ul class="m-0 list-none p-0">
+					{#each adminLinks as link (link.href)}
+						<li><a href={link.href} class={navLink}>{link.label}</a></li>
+					{/each}
+				</ul>
+			</details>
+		</nav>
 	</div>
 </div>
 <!-- eslint-enable svelte/no-navigation-without-resolve -->
