@@ -130,6 +130,15 @@ describe('decideRouteAccess', () => {
 		});
 	});
 
+	it('keeps the collector portal private: anonymous visitors go to /login, never a public path', () => {
+		expect(isPublicPath('/portal')).toBe(false);
+		expect(access('/portal')).toEqual({
+			kind: 'redirect',
+			location: '/login?redirectTo=%2Fportal'
+		});
+		expect(access('/portal', { authenticated: true })).toEqual({ kind: 'allow' });
+	});
+
 	it('protects routes that do not exist yet (protected by default)', () => {
 		expect(access('/imports/new')).toEqual({
 			kind: 'redirect',

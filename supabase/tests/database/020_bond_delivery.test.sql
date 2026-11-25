@@ -338,6 +338,9 @@ insert into public.profiles (id, auth_user_id, full_name, email, status)
 values ('b6200000-0000-0000-0000-000000000005', 'a6200000-0000-0000-0000-000000000005', 'Ana login',
   'deliv-5@example.com', 'active');
 update public.collectors set user_profile_id = 'b6200000-0000-0000-0000-000000000005' where id = pg_temp.id('ana');
+-- Own scope needs the dedicated permission (bond.view_own, SAN-143) as well as the link.
+insert into public.user_roles (user_id, role_id)
+select 'b6200000-0000-0000-0000-000000000005', id from public.roles where name = 'collector';
 set local role authenticated;
 select pg_temp.act_as(5);
 select ok(

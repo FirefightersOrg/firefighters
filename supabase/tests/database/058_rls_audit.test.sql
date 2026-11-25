@@ -79,15 +79,15 @@ create function pg_temp.act(n int) returns void language sql as $$
     format('{"sub":"a6580000-0000-0000-0000-00000000000%s","role":"authenticated"}', n), true) $$;
 -- Expected role -> permission matrix, written by hand from docs/permissions.md ("Initial suggested
 -- matrix" plus the SAN-93 "Action implies view" additions). admin is the full documented catalog; the
--- other roles hold exactly what the docs grant (collector: campaign.view only, its own-bond access is
--- future work). It is NOT derived from the seed, so a seed that drifts from the docs fails here.
+-- other roles hold exactly what the docs grant (collector: campaign.view plus the own-scope codes of SAN-143;
+-- nothing else). It is NOT derived from the seed, so a seed that drifts from the docs fails here.
 create temp table expected_matrix(role_name text primary key, codes text[]);
 insert into expected_matrix values
 ('admin', array[
   'campaign.view','campaign.create','campaign.update','campaign.update_rules','campaign.close',
-  'bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return','bond.mark_lost','bond.annul',
-  'buyer.view','buyer.manage','collector.view','collector.manage','collector.ledger.view','collector.ledger.adjust',
-  'sale.view','sale.create','sale.correct','payment.view','payment.create','payment.annul',
+  'bond.view','bond.create','bond.import','bond.scan','bond.assign','bond.return','bond.mark_lost','bond.annul','bond.view_own',
+  'buyer.view','buyer.manage','collector.view','collector.manage','collector.ledger.view','collector.ledger.adjust','collector.ledger.view_own',
+  'sale.view','sale.create','sale.correct','sale.mark_uncollectible','sale.view_own','payment.view','payment.create','payment.annul','payment.create_own',
   'settlement.view','settlement.create','settlement.update_open','settlement.close','settlement.correct',
   'commission.view','commission.rule_manage','commission.adjust','commission.settle',
   'draw.view','draw.create','draw.update','draw.annul','draw.complete','draw.generate_roster','draw.freeze_roster',
@@ -99,11 +99,11 @@ insert into expected_matrix values
   'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner',
   'report.view_operational','report.export']),
 ('treasurer', array[
-  'campaign.view','bond.view','collector.ledger.view','payment.view','payment.create','payment.annul',
+  'campaign.view','bond.view','sale.view','sale.mark_uncollectible','collector.ledger.view','payment.view','payment.create','payment.annul',
   'settlement.view','settlement.create','settlement.close','settlement.correct',
   'commission.view','commission.adjust','draw.view','draw.freeze_roster','draw.load_winner',
   'report.view_operational','report.view_financial','report.export','audit.view']),
-('collector', array['campaign.view']),
+('collector', array['campaign.view','bond.view_own','sale.view_own','collector.ledger.view_own','payment.create_own']),
 ('read-only', array['campaign.view','bond.view','commission.view','report.view_operational',
   'report.view_financial','report.export']);
 update expected_matrix set codes = (select array_agg(c order by c) from unnest(codes) c);

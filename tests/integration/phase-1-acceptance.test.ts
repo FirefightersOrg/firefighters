@@ -173,7 +173,7 @@ describe('Phase 1 end-to-end acceptance (local Supabase)', () => {
 			const { data, error } = await serviceClient.from('permissions').select('code');
 
 			expect(error).toBeNull();
-			expect(PERMISSIONS).toHaveLength(51);
+			expect(PERMISSIONS).toHaveLength(56);
 			expect(data?.map((p) => p.code).sort()).toEqual(sortedPermissionCodes);
 		});
 
