@@ -19,6 +19,11 @@ export default defineConfig({
 			adapter: adapter()
 		})
 	],
+	// Agent worktrees live under .claude/worktrees inside the repo; their builds must not
+	// trigger reloads in the main dev server.
+	server: {
+		watch: { ignored: ['**/.claude/**'] }
+	},
 	// Vitest reads this file (no separate vitest.config.ts) so the sveltekit() plugin
 	// resolves $lib, $env/* and $app/* in tests exactly as in the app.
 	// Unit tests only: `pnpm test` must not need Supabase or the network. The live-Supabase

@@ -77,7 +77,7 @@ Import sessions and their items (Phase 4) are readable with `bond.import` or `bo
 
 | Permission               | Description                                     |
 | ------------------------ | ----------------------------------------------- |
-| `sale.view`              | View sales.                                     |
+| `sale.view`              | View sales (RLS also accepts `bond.view`).      |
 | `sale.create`            | Register sales.                                 |
 | `sale.correct`           | Correct sales with audit.                       |
 | `payment.view`           | View payments.                                  |
@@ -198,6 +198,10 @@ A role that holds an action permission on a domain also holds that domain's `<do
 | `collector` | `campaign.view`          | decision                                                      |
 
 Product decisions (SAN-93): the three new `.view` permissions are implied by any sale, payment or settlement action; the operator gets `collector.view`, `settlement.update_open` and `bond.return` (not `bond.mark_lost`); the treasurer gets `collector.ledger.view`; read-only gets `commission.view`; the collector gets `campaign.view`. Other cross-domain needs are not covered by the rule. The pgTAP test `017_role_view_permissions` checks the rule for every role, so a later grant cannot break it silently.
+
+### Sales are readable through `bond.view`
+
+`sale_can_read()` (the SELECT policy of `sales` and its lines) accepts `sale.view`, `sale.create`, `sale.correct` or `bond.view`, because a bond's commercial state is derived from its sale. Product decision: `read-only` MAY read sales. It holds `bond.view` but not `sale.view`, so the matrix above keeps `no` in the `sale.view` row for `read-only` (the matrix lists permission codes, not what RLS lets through), while RLS lets it read sales. The same holds for `treasurer`, which holds `bond.view`. Writing sales still needs `sale.create` (or the own-collector rule). The pgTAP test `058_rls_audit` asserts this: read-only sees bonds, delivery notes, assignments, commission rules and sales, and nothing else.
 
 ### Operational reports (SAN-86)
 
