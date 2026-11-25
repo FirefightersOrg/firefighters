@@ -25,6 +25,7 @@ export const PERMISSIONS = [
 	'sale.view',
 	'sale.create',
 	'sale.correct',
+	'sale.mark_uncollectible',
 	'payment.view',
 	'payment.create',
 	'payment.annul',
