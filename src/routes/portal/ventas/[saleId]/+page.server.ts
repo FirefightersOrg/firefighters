@@ -38,12 +38,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (payments.error) loadFailed(locals, 'los pagos', payments.error);
 	if (submissions.error) loadFailed(locals, 'los cobros enviados', submissions.error);
 	if (reserved.error) loadFailed(locals, 'los cobros enviados', reserved.error);
+	const submissionIds = new Set((submissions.data ?? []).map((x) => x.id));
 	return {
 		collector,
 		sale: sale.data,
 		installments: installments.data,
-		// Unconfirmed drafts are listed under "Cobros enviados", not as applied payments.
-		payments: (payments.data ?? []).filter((p) => p.status !== 'draft'),
+		// Collections the collector sent are listed (with their state) under "Cobros enviados", not twice.
+		payments: (payments.data ?? []).filter((p) => !submissionIds.has(p.id)),
 		submissions: submissions.data,
 		/** Balance already covered by unconfirmed drafts, per installment id. */
 		reserved: reserved.data,

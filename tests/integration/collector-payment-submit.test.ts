@@ -409,7 +409,8 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		const after = await load(pageEvent(collectorA, saleA, 'load'));
 		expect(after.submissions[0].status).toBe('confirmed');
 		expect(after.sale).toMatchObject({ paidAmount: '100.00' });
-		expect(after.payments.map((p: any) => p.id)).toEqual([includedId]);
+		// Listed once, under "Cobros enviados".
+		expect(after.payments).toEqual([]);
 	});
 
 	it('a closed settlement no longer accepts submissions', async () => {

@@ -128,7 +128,7 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 		for (const s of [noPermission, inactive, unlinked]) expect(submitCalls(s.rpc)).toHaveLength(0);
 	});
 
-	it('load exposes the register flag, Buenos Aires today and hides unconfirmed drafts from applied payments', async () => {
+	it('load exposes the register flag, Buenos Aires today and does not list sent collections twice', async () => {
 		const saleRow = {
 			sale_id: SALE,
 			campaign_id: 'k',
@@ -164,6 +164,19 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 						amount: 20,
 						payment_method: 'cash',
 						status: 'confirmed'
+					}
+				],
+				portal_my_sale_submissions: [
+					{
+						payment_id: 'd',
+						payment_date: '2026-11-01',
+						amount: 10,
+						payment_method: 'cash',
+						status: 'draft',
+						rejection_reason: null,
+						note: null,
+						created_at: '2026-11-01T00:00:00Z',
+						installment_numbers: [1]
 					}
 				],
 				portal_my_sale_reserved: [{ installment_id: INSTALLMENT, submitted_amount: 30 }]
