@@ -7,12 +7,19 @@ import { createBuyer, createCollector } from '$lib/server/services/parties';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
-import { load as salesLoad } from '../../src/routes/portal/ventas/+page.server';
-import { load as saleLoad } from '../../src/routes/portal/ventas/[saleId]/+page.server';
-import { load as buyersLoad } from '../../src/routes/portal/compradores/+page.server';
-import { load as buyerLoad } from '../../src/routes/portal/compradores/[buyerId]/+page.server';
-import { load as dueLoad } from '../../src/routes/portal/por-cobrar/+page.server';
+import { load as salesLoadRaw } from '../../src/routes/portal/ventas/+page.server';
+import { load as saleLoadRaw } from '../../src/routes/portal/ventas/[saleId]/+page.server';
+import { load as buyersLoadRaw } from '../../src/routes/portal/compradores/+page.server';
+import { load as buyerLoadRaw } from '../../src/routes/portal/compradores/[buyerId]/+page.server';
+import { load as dueLoadRaw } from '../../src/routes/portal/por-cobrar/+page.server';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Loader = (event: never) => any;
+const salesLoad = salesLoadRaw as unknown as Loader;
+const saleLoad = saleLoadRaw as unknown as Loader;
+const buyersLoad = buyersLoadRaw as unknown as Loader;
+const buyerLoad = buyerLoadRaw as unknown as Loader;
+const dueLoad = dueLoadRaw as unknown as Loader;
 vi.mock('$env/dynamic/private', async () => {
 	const { inject } = await import('vitest');
 	const env = inject('integrationEnv');
@@ -263,10 +270,10 @@ beforeAll(async () => {
 describe('collector portal: buyers and sales (local Supabase)', () => {
 	it('lists only the own sales, newest first, with their totals', async () => {
 		const a = (await salesLoad(event(collectorA, '/portal/ventas')))!;
-		expect(a.sales.map((s) => s.saleId)).toEqual([saleA2, saleA1]);
+		expect(a.sales.map((s: any) => s.saleId)).toEqual([saleA2, saleA1]);
 		const b = (await salesLoad(event(collectorB, '/portal/ventas')))!;
-		expect(b.sales.map((s) => s.saleId)).toEqual([saleB2, saleB1]);
-		const own = a.sales.find((s) => s.saleId === saleA1)!;
+		expect(b.sales.map((s: any) => s.saleId)).toEqual([saleB2, saleB1]);
+		const own = a.sales.find((s: any) => s.saleId === saleA1)!;
 		expect(own).toMatchObject({
 			pendingAmount: '40.00',
 			paidAmount: '0.00',
@@ -296,7 +303,7 @@ describe('collector portal: buyers and sales (local Supabase)', () => {
 		const data = (await saleLoad(
 			event(collectorA, `/portal/ventas/${saleA1}`, { saleId: saleA1 })
 		))!;
-		expect(data.installments.map((i) => i.status)).toEqual(['overdue', 'pending', 'pending']);
+		expect(data.installments.map((i: any) => i.status)).toEqual(['overdue', 'pending', 'pending']);
 		expect(data.installments[0]).toMatchObject({ pendingAmount: '40.00', balance: '60.00' });
 		expect(data.payments).toMatchObject([{ status: 'pending_in_settlement', amount: '40.00' }]);
 		expect(data.sale.buyerAddress).toBe(`Calle Ana 1`);
@@ -317,7 +324,7 @@ describe('collector portal: buyers and sales (local Supabase)', () => {
 
 	it('lists the buyers of the own sales only, with bounded columns', async () => {
 		const a = (await buyersLoad(event(collectorA, '/portal/compradores')))!;
-		expect(a.buyers.map((b) => b.id).sort()).toEqual([buyerOnlyA, buyerShared].sort());
+		expect(a.buyers.map((b: any) => b.id).sort()).toEqual([buyerOnlyA, buyerShared].sort());
 		expect(Object.keys(a.buyers[0]).sort()).toEqual(
 			['address', 'balance', 'displayName', 'id', 'phone', 'saleCount'].sort()
 		);
@@ -329,7 +336,7 @@ describe('collector portal: buyers and sales (local Supabase)', () => {
 		const own = (await buyerLoad(
 			event(collectorA, `/portal/compradores/${buyerShared}`, { buyerId: buyerShared })
 		))!;
-		expect(own.sales.map((s) => s.saleId)).toEqual([saleA2]);
+		expect(own.sales.map((s: any) => s.saleId)).toEqual([saleA2]);
 		expect(
 			await status(() =>
 				buyerLoad(event(collectorA, `/portal/compradores/${buyerOnlyB}`, { buyerId: buyerOnlyB }))
@@ -339,13 +346,13 @@ describe('collector portal: buyers and sales (local Supabase)', () => {
 
 	it('"Por cobrar" holds the own overdue and soon-due installments only', async () => {
 		const a = (await dueLoad(event(collectorA, '/portal/por-cobrar')))!;
-		expect(a.due.map((d) => [d.saleId, d.installmentNumber, d.status])).toEqual([
+		expect(a.due.map((d: any) => [d.saleId, d.installmentNumber, d.status])).toEqual([
 			[saleA1, 1, 'overdue'],
 			[saleA2, 1, 'pending']
 		]);
 		expect(a.due[0].balance).toBe('60.00');
 		const b = (await dueLoad(event(collectorB, '/portal/por-cobrar')))!;
-		expect(b.due.every((d) => [saleB1, saleB2].includes(d.saleId))).toBe(true);
+		expect(b.due.every((d: any) => [saleB1, saleB2].includes(d.saleId))).toBe(true);
 	});
 
 	it('an unlinked collector sees empty lists and 404 on any sale; others are denied', async () => {

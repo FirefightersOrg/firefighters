@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { load as salesLoad } from './ventas/+page.server';
-import { load as saleLoad } from './ventas/[saleId]/+page.server';
-import { load as buyersLoad } from './compradores/+page.server';
-import { load as buyerLoad } from './compradores/[buyerId]/+page.server';
-import { load as dueLoad } from './por-cobrar/+page.server';
+import { load as salesLoadRaw } from './ventas/+page.server';
+import { load as saleLoadRaw } from './ventas/[saleId]/+page.server';
+import { load as buyersLoadRaw } from './compradores/+page.server';
+import { load as buyerLoadRaw } from './compradores/[buyerId]/+page.server';
+import { load as dueLoadRaw } from './por-cobrar/+page.server';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Loader = (event: never) => any;
+const salesLoad = salesLoadRaw as unknown as Loader;
+const saleLoad = saleLoadRaw as unknown as Loader;
+const buyersLoad = buyersLoadRaw as unknown as Loader;
+const buyerLoad = buyerLoadRaw as unknown as Loader;
+const dueLoad = dueLoadRaw as unknown as Loader;
 const SALE = '11111111-1111-4111-8111-111111111111';
 const BUYER = '22222222-2222-4222-8222-222222222222';
 
@@ -94,7 +101,7 @@ describe('portal sales and buyers loads', () => {
 			p_limit: 20,
 			p_offset: 40
 		});
-		expect(out.sales.map((s) => s.saleId)).toEqual(['s2', 's1']);
+		expect(out.sales.map((s: any) => s.saleId)).toEqual(['s2', 's1']);
 		expect(out.sales[0]).toMatchObject({ totalAmount: '300.00', balance: '200.00' });
 		expect(out.pagination).toEqual({ page: 3, pageCount: 3 });
 	});
