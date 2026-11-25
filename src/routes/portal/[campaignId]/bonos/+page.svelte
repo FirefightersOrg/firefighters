@@ -1,0 +1,149 @@
+<script lang="ts">
+	import { resolve } from '$app/paths';
+	import type { ResolvedPathname } from '$app/types';
+	import {
+		Button,
+		EmptyState,
+		Field,
+		PageHeader,
+		Select,
+		StatusBadge,
+		Table,
+		type TableColumn
+	} from '$lib/components/ui';
+	import { BOND_COMMERCIAL_STATUS_LABELS, BOND_FINANCIAL_STATUS_LABELS } from '$lib/domain/bonds';
+	import { formatMoney, formatNumber } from '$lib/format';
+	import type { PageProps } from './$types';
+
+	/** "Mis bonos": the collector's own bonds. Read only; filters live in the query string. */
+	let { data }: PageProps = $props();
+
+	const filters = $derived(data.filters);
+	const pagination = $derived(data.pagination);
+	const listHref = $derived(
+		resolve('/portal/[campaignId]/bonos', { campaignId: data.campaign.id })
+	);
+	const filtered = $derived(Boolean(filters.status || filters.financial));
+
+	const statusOptions = [
+		{ value: '', label: 'Todos' },
+		...Object.entries(BOND_COMMERCIAL_STATUS_LABELS).map(([value, label]) => ({ value, label }))
+	];
+	const financialOptions = [
+		{ value: '', label: 'Todos' },
+		...Object.entries(BOND_FINANCIAL_STATUS_LABELS).map(([value, label]) => ({ value, label }))
+	];
+
+	function pageLink(page: number): ResolvedPathname {
+		const pairs: [string, string][] = [];
+		if (filters.status) pairs.push(['status', filters.status]);
+		if (filters.financial) pairs.push(['financial', filters.financial]);
+		if (page > 1) pairs.push(['page', String(page)]);
+		const search = pairs.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+		return (search ? `${listHref}?${search}` : listHref) as ResolvedPathname;
+	}
+	const detailHref = (bondId: string) =>
+		resolve('/portal/[campaignId]/bonos/[bondId]', { campaignId: data.campaign.id, bondId });
+
+	type Row = (typeof data.bonds)[number] & Record<string, unknown>;
+	const columns: TableColumn<Row>[] = [
+		{ key: 'base', header: 'Número base', mono: true },
+		{ key: 'associated', header: 'Número asociado', mono: true },
+		{ key: 'type', header: 'Tipo' },
+		{ key: 'status', header: 'Estado comercial' },
+		{ key: 'financial', header: 'Estado financiero' },
+		{ key: 'value', header: 'Valor', align: 'right' },
+		{ key: 'detail', header: 'Detalle' }
+	];
+	const join = (values: string[]) => (values.length ? values.join(', ') : '—');
+</script>
+
+<svelte:head>
+	<title>Mis bonos - Firefighters</title>
+</svelte:head>
+
+<PageHeader
+	title="Mis bonos"
+	description={`Campaña ${data.campaign.name}`}
+	breadcrumbs={[{ label: 'Mi portal', href: resolve('/portal') }, { label: 'Mis bonos' }]}
+/>
+
+{#if !data.collector}
+	<EmptyState title="Tu usuario todavía no está vinculado a un cobrador">
+		Pedir a un administrador que vincule el usuario con la ficha de cobrador.
+	</EmptyState>
+{:else}
+	<div class="flex flex-col gap-6">
+		<form method="GET" action={listHref} class="flex flex-wrap items-end gap-4">
+			<Field label="Estado comercial" id="filter-status">
+				<Select name="status" value={filters.status} options={statusOptions} />
+			</Field>
+			<Field label="Estado financiero" id="filter-financial">
+				<Select name="financial" value={filters.financial} options={financialOptions} />
+			</Field>
+			<Button type="submit">Filtrar</Button>
+			{#if filtered}
+				<Button href={listHref}>Quitar filtros</Button>
+			{/if}
+		</form>
+
+		<p class="m-0 text-body-sm text-muted" aria-live="polite">
+			{formatNumber(pagination.total)}
+			{pagination.total === 1 ? 'bono' : 'bonos'}
+		</p>
+
+		<Table {columns} rows={data.bonds as Row[]} caption="Bonos asignados">
+			{#snippet cell({ row, column })}
+				{#if column.key === 'base'}
+					{join(row.baseNumbers)}
+				{:else if column.key === 'associated'}
+					{join(row.associatedNumbers)}
+				{:else if column.key === 'type'}
+					{row.typeLabel}
+				{:else if column.key === 'status'}
+					<StatusBadge kind="bondCommercial" status={row.commercialStatus} />
+				{:else if column.key === 'financial'}
+					<StatusBadge kind="bondFinancial" status={row.financialStatus} />
+				{:else if column.key === 'value'}
+					{formatMoney(row.totalValue)}
+				{:else}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved above -->
+					<a
+						href={detailHref(row.id)}
+						class="rounded-sm text-primary underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+						>Ver detalle</a
+					>
+				{/if}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState
+					title={filtered
+						? 'Ningún bono coincide con los filtros'
+						: 'Todavía no hay bonos asignados'}
+				>
+					{filtered
+						? 'Probar con otros estados o quitar los filtros.'
+						: 'Cuando se entreguen bonos a este cobrador, van a aparecer acá.'}
+				</EmptyState>
+			{/snippet}
+		</Table>
+
+		{#if pagination.pageCount > 1 || pagination.page > 1}
+			<nav aria-label="Paginación" class="flex items-center justify-between gap-3 text-body-sm">
+				{#if pagination.page > 1}
+					<Button href={pageLink(pagination.page - 1)} rel="prev">← Anterior</Button>
+				{:else}
+					<span></span>
+				{/if}
+				<span class="text-muted tabular-nums"
+					>Página {formatNumber(pagination.page)} de {formatNumber(pagination.pageCount)}</span
+				>
+				{#if pagination.page < pagination.pageCount}
+					<Button href={pageLink(pagination.page + 1)} rel="next">Siguiente →</Button>
+				{:else}
+					<span></span>
+				{/if}
+			</nav>
+		{/if}
+	</div>
+{/if}
