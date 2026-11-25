@@ -72,6 +72,10 @@ describe('exports', () => {
 		expect(BACKUP_EXPORTS.payments.select).toContain('replaces_payment_id');
 		expect(header('collector-ledger')).toContain('corrects_sale_id');
 		expect(BACKUP_EXPORTS['collector-ledger'].select).toContain('corrects_sale_id');
+		// SAN-107/108: reference entries and compensation links survive a backup.
+		expect(header('collector-ledger')).toEqual(
+			expect.arrayContaining(['affects_balance', 'original_entry_id'])
+		);
 		const def = BACKUP_EXPORTS['settlement-corrections'];
 		expect(def.order).toEqual(['created_at', 'id']);
 		expect(def.campaignColumn).toBe('settlements.campaign_id');

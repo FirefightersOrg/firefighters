@@ -13,7 +13,7 @@ const buyerLabel = (snapshot: unknown) => {
 	return (
 		text(row.business_name) ||
 		[text(row.first_name), text(row.last_name)].filter(Boolean).join(' ') ||
-		'No buyer'
+		'Sin comprador'
 	);
 };
 
@@ -92,10 +92,10 @@ const mapPrize = (row: Row): PrizeListItem => {
 					eligible: entry ? Boolean(entry.eligible) : null,
 					ineligibilityReason: entry ? (entry.ineligibility_reason as string | null) : null,
 					bondId: entry ? (entry.bond_id as string) : null,
-					bondLabel: entry ? text(bond?.internal_code) || (entry.bond_id as string) : null,
+					bondLabel: entry ? text(bond?.internal_code) || null : null,
 					buyerLabel: entry ? buyerLabel(entry.buyer_snapshot) : null,
 					collectorLabel: entry
-						? text(((entry.collector_snapshot ?? {}) as Row).display_name) || 'No collector'
+						? text(((entry.collector_snapshot ?? {}) as Row).display_name) || 'Sin cobrador'
 						: null
 				}
 			: null

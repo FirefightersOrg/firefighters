@@ -179,7 +179,7 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 		label: 'Cuentas corrientes de cobradores',
 		table: 'collector_ledger_entries',
 		select:
-			'id, collector_id, settlement_id, payment_id, corrects_sale_id, entry_type, direction, amount::text, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
+			'id, collector_id, settlement_id, payment_id, corrects_sale_id, original_entry_id, entry_type, direction, amount::text, affects_balance, status, occurred_at, reason, annulled_at, annul_reason, collectors(display_name)',
 		order: ['collector_id', 'occurred_at', 'id'],
 		permissions: ['collector.ledger.view'],
 		periodColumn: 'occurred_at',
@@ -191,10 +191,12 @@ export const BACKUP_EXPORTS: Record<BackupExportKind, BackupExportDefinition> = 
 			col('entry_type', 'entry_type'),
 			col('direction', 'direction'),
 			col('amount', 'amount'),
+			col('affects_balance', 'affects_balance'),
 			col('status', 'status'),
 			col('settlement_id', 'settlement_id'),
 			col('payment_id', 'payment_id'),
 			col('corrects_sale_id', 'corrects_sale_id'),
+			col('original_entry_id', 'original_entry_id'),
 			col('reason', 'reason', true),
 			col('annulled_at', 'annulled_at'),
 			col('annul_reason', 'annul_reason', true)

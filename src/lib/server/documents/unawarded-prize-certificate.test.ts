@@ -79,4 +79,10 @@ describe('unawarded prize certificate', () => {
 			rosterStatus: 'No habilitado — Bono sin pago total'
 		});
 	});
+	it('never prints the bond UUID when the bond has no label', () => {
+		expect(
+			buildPrintableUnawardedPrizeCertificate(campaign, { ...source, bondLabel: null })
+				.associatedBond
+		).toBe('—');
+	});
 });

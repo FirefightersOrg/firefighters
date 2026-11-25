@@ -168,10 +168,12 @@
 							<p class="mt-1">El premio queda no adjudicado.</p>
 						{:else}
 							<p class="mt-2">
-								<strong>Bono:</strong>
-								{prize.winningNumber.bondLabel} ·
+								{#if prize.winningNumber.bondLabel}
+									<strong>Código interno:</strong>
+									{prize.winningNumber.bondLabel},
+								{/if}
 								<strong>Comprador:</strong>
-								{prize.winningNumber.buyerLabel} ·
+								{prize.winningNumber.buyerLabel},
 								<strong>Cobrador:</strong>
 								{prize.winningNumber.collectorLabel}
 							</p>

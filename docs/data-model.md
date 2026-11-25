@@ -640,6 +640,11 @@ Rule:
   immutable. Optional settlement/payment references must match the entry campaign and collector.
   Readers need `collector.ledger.view` or `collector.ledger.adjust`, while a collector login can
   read only its own rows. Future SAN-68/69 audited functions own all writes.
+- SAN-107/108 (`20270113000000_ledger_memo_entries.sql`): `affects_balance boolean` (false only for
+  the `cash_settled` / `transfer_received_by_firefighters` reference entries and their annulments,
+  which every balance leaves out) and `original_entry_id` (the entry a compensation offsets: same
+  campaign and collector, opposite direction, never more than what is left of it). See
+  `docs/commissions.md`.
 
 ### draws
 

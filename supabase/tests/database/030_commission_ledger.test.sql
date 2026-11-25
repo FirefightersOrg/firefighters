@@ -42,7 +42,7 @@ with x as (insert into public.payments(campaign_id,sale_id,collector_id,buyer_id
     'b6300000-0000-0000-0000-000000000001') returning id) insert into ids select 'pay',id from x;
 
 select columns_are('public','commission_adjustments',array['id','campaign_id','collector_id','settlement_id','payment_id','amount','direction','reason','created_by','created_at'],'adjustment columns');
-select columns_are('public','collector_ledger_entries',array['id','campaign_id','collector_id','settlement_id','payment_id','entry_type','direction','amount','status','occurred_at','created_by','created_at','reason','annulled_by','annulled_at','annul_reason','corrects_sale_id'],'ledger columns');
+select columns_are('public','collector_ledger_entries',array['id','campaign_id','collector_id','settlement_id','payment_id','entry_type','direction','amount','status','occurred_at','created_by','created_at','reason','annulled_by','annulled_at','annul_reason','corrects_sale_id','affects_balance','original_entry_id'],'ledger columns');
 select fk_ok('public','commission_adjustments','campaign_id','public','campaigns','id','adjustment campaign FK');
 select fk_ok('public','commission_adjustments','collector_id','public','collectors','id','adjustment collector FK');
 select fk_ok('public','commission_adjustments','settlement_id','public','settlements','id','adjustment settlement FK');
@@ -106,7 +106,9 @@ select throws_ok($$update public.collector_ledger_entries set status='compensate
 select lives_ok($$update public.collector_ledger_entries set status='annulled',annulled_by='b6300000-0000-0000-0000-000000000001',annulled_at=now(),annul_reason=repeat('x',1000) where id=pg_temp.id('nullable')$$,'entry without original reason can annul with maximum length reason');
 select is((select reason from public.collector_ledger_entries where id=pg_temp.id('nullable')),null::text,'null original reason stays null');
 with x as (insert into public.collector_ledger_entries(campaign_id,collector_id,entry_type,direction,amount,created_by) values(pg_temp.id('c'),pg_temp.id('ana'),'commission_generated','collector_credit',1,'b6300000-0000-0000-0000-000000000001') returning id) insert into ids select 'compensate',id from x;
-select lives_ok($$update public.collector_ledger_entries set status='compensated' where id=pg_temp.id('compensate')$$,'recorded entry can still compensate without annul metadata');
+select lives_ok($$insert into public.collector_ledger_entries(campaign_id,collector_id,entry_type,direction,amount,created_by,original_entry_id)
+  select campaign_id,collector_id,'adjustment_in_favor_of_firefighters','collector_debit',amount,created_by,id
+  from public.collector_ledger_entries where id=pg_temp.id('compensate')$$,'a full compensating entry marks the recorded entry compensated (SAN-108)');
 select throws_ok($$update public.collector_ledger_entries set status='annulled',annul_reason='Invalid',annulled_at=now(),annulled_by='b6300000-0000-0000-0000-000000000001' where id=pg_temp.id('compensate')$$,'23514',null,'compensated entry is final');
 select * from finish();
 rollback;

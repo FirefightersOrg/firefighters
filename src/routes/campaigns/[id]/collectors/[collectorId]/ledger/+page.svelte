@@ -60,9 +60,18 @@
 	];
 	const LEDGER_FIELDS = [
 		{ name: 'direction', label: 'Tipo de ajuste', id: 'ledger-direction' },
+		{ name: 'originalEntryId', label: 'Compensa el movimiento', id: 'ledger-original' },
 		{ name: 'amount', label: 'Monto', id: 'ledger-amount' },
 		{ name: 'reason', label: 'Motivo', id: 'ledger-reason' }
 	];
+
+	const byId = $derived(new Map(data.entries.map((entry) => [entry.id, entry])));
+	function describe(id: string | null) {
+		const entry = id ? byId.get(id) : undefined;
+		if (!entry) return null;
+		const type = LEDGER_ENTRY_TYPE_LABELS[entry.entryType as LedgerEntryType] ?? entry.entryType;
+		return `${type} del ${formatDate(entry.occurredAt)} (${money(entry.amount)})`;
+	}
 
 	const rows = $derived(
 		data.entries.map((entry) => ({
@@ -78,7 +87,13 @@
 			status: entry.status as LedgerStatus,
 			reason: entry.reason,
 			annulReason: entry.annulReason,
-			canAnul: entry.status === 'recorded' && !entry.settlementId
+			reference: !entry.affectsBalance,
+			compensates: describe(entry.originalEntryId),
+			canAnul:
+				entry.status === 'recorded' &&
+				!entry.settlementId &&
+				!entry.originalEntryId &&
+				!entry.hasCompensations
 		}))
 	);
 	type Row = (typeof rows)[number];
@@ -105,6 +120,11 @@
 			collectorId: data.collector.id
 		})
 	);
+	/** A compensation goes the opposite way of its original, so only those entries are offered. */
+	let ledgerDirection = $state('collector_credit');
+	const compensableForDirection = $derived(
+		data.compensable.filter((entry) => entry.direction !== ledgerDirection)
+	);
 </script>
 
 <svelte:head>
@@ -115,7 +135,7 @@
 
 <PageHeader
 	title="Cuenta corriente"
-	description="Movimientos del cobrador en esta campaña. El saldo se reconstruye con los movimientos no anulados."
+	description="Movimientos del cobrador en esta campaña. El saldo se reconstruye con los movimientos no anulados; los de referencia (efectivo rendido y transferencias recibidas) se muestran pero no cambian el saldo."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
@@ -142,9 +162,14 @@
 		<Table {columns} {rows} caption="Movimientos de la cuenta corriente">
 			{#snippet cell({ row, column })}
 				{#if column.key === 'type'}
-					<span class={row.status !== 'recorded' ? 'text-muted line-through' : undefined}
+					<span class={row.status === 'annulled' ? 'text-muted line-through' : undefined}
 						>{row.type}</span
 					>
+					{#if row.reference}
+						<p class="m-0 mt-1 text-body-sm text-muted">Referencia: no cambia el saldo.</p>
+					{/if}
+				{:else if (column.key === 'debit' || column.key === 'credit') && row.reference}
+					<span class="text-muted">{row[column.key]}</span>
 				{:else if column.key === 'settlement'}
 					{#if row.settlementId}
 						<!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -170,6 +195,11 @@
 					{#if row.reason}<p class="m-0 mt-1 max-w-xs text-body-sm break-words">
 							{row.reason}
 						</p>{/if}
+					{#if row.compensates}
+						<p class="m-0 mt-1 max-w-xs text-body-sm break-words">
+							Compensa: {row.compensates}
+						</p>
+					{/if}
 					{#if row.annulReason}
 						<p class="m-0 mt-1 max-w-xs text-body-sm break-words">
 							Motivo de la anulación: {row.annulReason}
@@ -284,9 +314,25 @@
 					>
 						<Select
 							name="direction"
+							bind:value={ledgerDirection}
 							options={[
 								{ value: 'collector_credit', label: 'Crédito (a favor del cobrador)' },
 								{ value: 'collector_debit', label: 'Débito (a favor de Firefighters)' }
+							]}
+						/>
+					</Field>
+					<Field
+						label="Compensa el movimiento"
+						id="ledger-original"
+						optional
+						hint="Para corregir un movimiento: el ajuste va en sentido contrario y no supera lo que queda."
+						error={errorsFor('ledger').originalEntryId?.[0]}
+					>
+						<Select
+							name="originalEntryId"
+							options={[
+								{ value: '', label: 'Ninguno' },
+								...compensableForDirection.map((entry) => ({ value: entry.id, label: entry.label }))
 							]}
 						/>
 					</Field>

@@ -152,6 +152,8 @@ export interface CollectorLedgerRow {
 	settlementNumber: number | null;
 	reason: string | null;
 	runningBalance: string;
+	/** False for reference entries (SAN-107), which do not move the running balance. */
+	affectsBalance: boolean;
 }
 
 export interface DrawRosterSummaryRow {
