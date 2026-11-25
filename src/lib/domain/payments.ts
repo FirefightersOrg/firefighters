@@ -24,7 +24,7 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 	adjusted: 'Ajustado'
 };
 export const PAYMENT_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[]> = {
-	draft: ['pending_in_settlement'],
+	draft: ['pending_in_settlement', 'annulled'],
 	pending_in_settlement: ['confirmed', 'annulled'],
 	confirmed: ['annulled', 'adjusted'],
 	annulled: [],

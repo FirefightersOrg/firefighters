@@ -13,6 +13,10 @@
 -- Lock order everywhere: settlement -> payment -> installments (same as settlement_add_payment / settlement_close).
 
 alter table public.payments add column submitted_by_collector boolean not null default false;
+alter table public.payments add column collector_note text;
+alter table public.payments add constraint payments_collector_note_format check (
+  collector_note is null or (submitted_by_collector and collector_note = btrim(collector_note)
+    and collector_note <> '' and char_length(collector_note) <= 500));
 create index payments_collector_submitted_idx on public.payments (collector_id, campaign_id)
   where status = 'draft' and submitted_by_collector;
 
@@ -24,8 +28,8 @@ begin
     if new.submitted_by_collector and (new.status <> 'draft' or new.settlement_id is not null) then
       raise exception 'a collector submission must start as a draft without settlement' using errcode = 'check_violation';
     end if;
-  elsif new.submitted_by_collector is distinct from old.submitted_by_collector then
-    raise exception 'payment origin is immutable' using errcode = 'restrict_violation';
+  elsif (new.submitted_by_collector, new.collector_note) is distinct from (old.submitted_by_collector, old.collector_note) then
+    raise exception 'payment origin and collector note are immutable' using errcode = 'restrict_violation';
   end if;
   return new;
 end $$;
@@ -67,7 +71,7 @@ end; $$;
 -- 1. Submit (collector). Everything about "who" comes from the session; the sale must be the caller's own.
 create function public.portal_payment_submit(
   p_sale_id uuid, p_amount numeric, p_payment_method text, p_applications jsonb,
-  p_payment_date date default null, p_request_id text default null
+  p_payment_date date default null, p_request_id text default null, p_note text default null
 ) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -81,6 +85,7 @@ declare
   v_installment uuid;
   v_applied numeric;
   v_existing uuid;
+  v_note text := nullif(btrim(p_note), '');
   x jsonb;
 begin
   if v_actor is null or not public.has_permission('payment.create_own') then
@@ -118,15 +123,18 @@ begin
   if jsonb_typeof(p_applications) <> 'array' or jsonb_array_length(p_applications) = 0 then
     raise exception 'applications are required' using errcode = 'invalid_parameter_value';
   end if;
+  if char_length(coalesce(v_note, '')) > 500 then
+    raise exception 'note is too long' using errcode = 'invalid_parameter_value';
+  end if;
   if p_payment_date > v_today then
     raise exception 'payment date cannot be in the future' using errcode = 'invalid_parameter_value';
   end if;
   insert into public.payments (
     campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount, payment_method, payment_date,
-    status, created_by, submitted_by_collector
+    status, created_by, submitted_by_collector, collector_note
   ) values (
     v_sale.campaign_id, p_sale_id, v_collector, v_sale.buyer_id, null, p_amount, p_payment_method,
-    coalesce(p_payment_date, v_today), 'draft', v_actor, true
+    coalesce(p_payment_date, v_today), 'draft', v_actor, true, v_note
   ) returning id into v_id;
   -- Stable installment order so concurrent submissions cannot deadlock; the guard locks each installment and
   -- counts every non-annulled payment (drafts included), so the remaining balance is never exceeded.
@@ -234,12 +242,12 @@ end $$;
 -- 4. Portal reads: the collector's own submissions (with rejection reason) and the balance reserved by drafts.
 create function public.portal_my_sale_submissions(p_sale_id uuid)
 returns table (payment_id uuid, payment_date date, amount numeric, payment_method text, status text,
-               rejection_reason text, created_at timestamptz, installment_numbers integer[])
+               rejection_reason text, note text, created_at timestamptz, installment_numbers integer[])
 language plpgsql stable security definer set search_path = '' as $$
 begin
   perform public.portal_require_sale_view_own();
   return query
-  select p.id, p.payment_date, p.amount, p.payment_method, p.status, p.annulment_reason, p.created_at,
+  select p.id, p.payment_date, p.amount, p.payment_method, p.status, p.annulment_reason, p.collector_note, p.created_at,
          coalesce((select array_agg(i.installment_number order by i.installment_number)
                    from public.payment_installments pi join public.installments i on i.id = pi.installment_id
                    where pi.payment_id = p.id), '{}'::integer[])
@@ -268,7 +276,7 @@ revoke all on function public.payments_collector_submission_guard() from public,
 revoke all on function public.payments_guard_update() from public, anon, authenticated, service_role;
 do $$ declare f text; begin
   foreach f in array array[
-    'portal_payment_submit(uuid, numeric, text, jsonb, date, text)',
+    'portal_payment_submit(uuid, numeric, text, jsonb, date, text, text)',
     'settlement_attach_collector_payment(uuid, uuid, text)',
     'settlement_reject_collector_payment(uuid, text, text)',
     'portal_my_sale_submissions(uuid)',

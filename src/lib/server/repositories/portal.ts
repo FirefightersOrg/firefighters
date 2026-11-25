@@ -371,3 +371,62 @@ export async function listMyDueInstallments(
 		error: null
 	};
 }
+
+/** A collection the collector registered (SAN-147). `rejectionReason` is set when the operator rejected it. */
+export interface PortalSubmission {
+	id: string;
+	paymentDate: string;
+	amount: string;
+	method: 'cash' | 'transfer';
+	status: PaymentStatus;
+	rejectionReason: string | null;
+	note: string | null;
+	createdAt: string;
+	installmentNumbers: number[];
+}
+
+export async function listMySaleSubmissions(
+	supabase: SupabaseClient,
+	saleId: string
+): Promise<RepositoryResult<PortalSubmission[]>> {
+	const { data, error } = await supabase.rpc('portal_my_sale_submissions', { p_sale_id: saleId });
+	if (error) return { data: null, error };
+	const rows = (data ?? []) as {
+		payment_id: string;
+		payment_date: string;
+		amount: Money;
+		payment_method: 'cash' | 'transfer';
+		status: PaymentStatus;
+		rejection_reason: string | null;
+		note: string | null;
+		created_at: string;
+		installment_numbers: number[] | null;
+	}[];
+	return {
+		data: rows.map((r) => ({
+			id: r.payment_id,
+			paymentDate: r.payment_date,
+			amount: money(r.amount),
+			method: r.payment_method,
+			status: r.status,
+			rejectionReason: r.rejection_reason,
+			note: r.note,
+			createdAt: r.created_at,
+			installmentNumbers: r.installment_numbers ?? []
+		})),
+		error: null
+	};
+}
+
+/** Balance of each installment already reserved by unconfirmed drafts: `installment id -> amount`. */
+export async function listMySaleReserved(
+	supabase: SupabaseClient,
+	saleId: string
+): Promise<RepositoryResult<Record<string, string>>> {
+	const { data, error } = await supabase.rpc('portal_my_sale_reserved', { p_sale_id: saleId });
+	if (error) return { data: null, error };
+	const out: Record<string, string> = {};
+	for (const r of (data ?? []) as { installment_id: string; submitted_amount: Money }[])
+		out[r.installment_id] = money(r.submitted_amount);
+	return { data: out, error: null };
+}

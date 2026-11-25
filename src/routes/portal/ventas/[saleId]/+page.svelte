@@ -1,14 +1,25 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Card, EmptyState, PageHeader, Stat, StatusBadge, Table } from '$lib/components/ui';
+	import {
+		Alert,
+		Badge,
+		Card,
+		EmptyState,
+		PageHeader,
+		Stat,
+		StatusBadge,
+		Table
+	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import InstallmentsTable from '$lib/components/portal/InstallmentsTable.svelte';
+	import RegisterPaymentForm from '$lib/components/portal/RegisterPaymentForm.svelte';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
-	import { bondLabel } from '$lib/portal/labels';
+	import { bondLabel, submissionStatusLabel } from '$lib/portal/labels';
+	import { parseMoneyInput, centsToDecimalString } from '$lib/domain/money';
 	import { formatDate, formatMoney } from '$lib/format';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 
 	const sale = $derived(data.sale);
 	const bond = $derived(bondLabel(sale.bondNumbers, sale.numberDigits));
@@ -16,6 +27,25 @@
 	const paymentRows = $derived(data.payments.map((payment) => ({ ...payment })));
 	const paymentColumns: TableColumn<(typeof paymentRows)[number]>[] = [
 		{ key: 'paymentDate', header: 'Fecha' },
+		{ key: 'amount', header: 'Monto', align: 'right' },
+		{ key: 'method', header: 'Medio' },
+		{ key: 'status', header: 'Estado' }
+	];
+	// What can still be sent per installment: balance minus the drafts already waiting for a settlement.
+	const availableFor = (installment: (typeof data.installments)[number]) =>
+		centsToDecimalString(
+			Math.max(
+				0,
+				(parseMoneyInput(installment.balance) ?? 0) -
+					(parseMoneyInput(data.reserved[installment.id] ?? '0') ?? 0)
+			)
+		);
+	const submissionTone = (status: string) =>
+		status === 'confirmed' ? 'success' : status === 'annulled' ? 'danger' : 'warning';
+	const submissionRows = $derived(data.submissions.map((s) => ({ ...s })));
+	const submissionColumns: TableColumn<(typeof submissionRows)[number]>[] = [
+		{ key: 'paymentDate', header: 'Fecha' },
+		{ key: 'installmentNumbers', header: 'Cuotas' },
 		{ key: 'amount', header: 'Monto', align: 'right' },
 		{ key: 'method', header: 'Medio' },
 		{ key: 'status', header: 'Estado' }
@@ -35,6 +65,12 @@
 />
 
 <div class="space-y-6">
+	{#if data.submitted && !form?.message}
+		<Alert tone="success" title="Cobro enviado">
+			Quedó pendiente de rendición. Se confirma cuando el operador lo incluye en tu rendición y la
+			cierra.
+		</Alert>
+	{/if}
 	<div class="grid gap-4 sm:grid-cols-4">
 		<Stat label="Total" value={formatMoney(sale.totalAmount, { decimals: 'always' })} />
 		<Stat label="Cobrado" value={formatMoney(sale.paidAmount, { decimals: 'always' })} />
@@ -78,8 +114,57 @@
 	</Card>
 
 	<Card title="Cuotas" flush>
-		<InstallmentsTable installments={data.installments} />
+		<InstallmentsTable installments={data.installments}>
+			{#snippet actions(installment)}
+				{#if data.canRegister && ['pending', 'overdue'].includes(installment.status) && Number(availableFor(installment)) > 0}
+					<RegisterPaymentForm
+						installmentId={installment.id}
+						installmentNumber={installment.number}
+						available={availableFor(installment)}
+						today={data.today}
+						noteMax={data.noteMax}
+						requestKey={data.requestKey}
+						result={form?.form === 'registrar' && form.installmentId === installment.id
+							? form
+							: null}
+					/>
+				{:else}
+					—
+				{/if}
+			{/snippet}
+		</InstallmentsTable>
 	</Card>
+
+	{#if data.submissions.length}
+		<Card title="Cobros enviados" flush>
+			<Table
+				columns={submissionColumns}
+				rows={submissionRows}
+				rowKey="id"
+				caption="Cobros registrados desde el portal"
+			>
+				{#snippet cell({ row, column })}
+					{#if column.key === 'paymentDate'}
+						{formatDate(row.paymentDate)}
+					{:else if column.key === 'installmentNumbers'}
+						{row.installmentNumbers.join(', ') || '—'}
+					{:else if column.key === 'amount'}
+						<span class="tabular-nums">{formatMoney(row.amount, { decimals: 'always' })}</span>
+					{:else if column.key === 'method'}
+						{methodLabel[row.method]}
+					{:else if column.key === 'status'}
+						<Badge tone={submissionTone(row.status)}>{submissionStatusLabel(row.status)}</Badge>
+						{#if row.status === 'annulled' && row.rejectionReason}
+							<p class="m-0 mt-1 text-body-sm text-muted">Motivo: {row.rejectionReason}</p>
+						{/if}
+						{#if row.note}
+							<p class="m-0 mt-1 text-body-sm text-muted">Nota: {row.note}</p>
+						{/if}
+					{/if}
+				{/snippet}
+			</Table>
+		</Card>
+	{/if}
 
 	<Card title="Pagos aplicados" flush>
 		<Table columns={paymentColumns} rows={paymentRows} rowKey="id" caption="Pagos de la venta">

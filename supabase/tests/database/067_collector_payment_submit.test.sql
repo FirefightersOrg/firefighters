@@ -1,7 +1,7 @@
 -- SAN-147: the collector registers a collection (draft); the operator includes it in a settlement or rejects it.
 begin;
 set local timezone = 'America/Argentina/Buenos_Aires';
-select plan(51);
+select plan(52);
 
 insert into auth.users(id, email)
 select ('a6700000-0000-0000-0000-00000000000' || n)::uuid, 'san147-' || n || '@example.com' from generate_series(1, 4) n;
@@ -87,8 +87,9 @@ select is(public.portal_payment_submit(pg_temp.id('sale_a'), 60, 'cash', pg_temp
   (select id from ids where k = 's1'), 'the same request id is idempotent (double click)');
 select throws_ok($$ select public.portal_payment_submit(pg_temp.id('sale_a'), 10, 'cash', pg_temp.app('i_a1', 10), pg_temp.today() + 1) $$,
   '22023', 'payment date cannot be in the future', 'a future date (Buenos Aires today) is rejected');
-select lives_ok($$ select public.portal_payment_submit(pg_temp.id('sale_a'), 10, 'cash', pg_temp.app('i_a1', 10), pg_temp.today()) $$,
-  'today is accepted');
+select lives_ok($$ select public.portal_payment_submit(pg_temp.id('sale_a'), 10, 'cash', pg_temp.app('i_a1', 10), pg_temp.today(), null, ' Entregado en mano ') $$,
+  'today is accepted, with a note');
+select is((select note from public.portal_my_sale_submissions(pg_temp.id('sale_a')) where amount = 10), 'Entregado en mano', 'the note is trimmed and returned');
 select throws_ok($$ select public.portal_payment_submit(pg_temp.id('sale_a'), 40, 'transfer', pg_temp.app('i_a1', 40)) $$,
   '23514', 'payment applications exceed installment amount', 'other drafts reserve the installment balance (60 + 10 + 40 > 100)');
 select lives_ok($$ select public.portal_payment_submit(pg_temp.id('sale_a'), 30, 'transfer', pg_temp.app('i_a1', 30)) $$,
