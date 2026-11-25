@@ -269,7 +269,7 @@ Fields:
 - `id`
 - `campaign_id`, `bond_id`: composite FK to `bonds (id, campaign_id)`, so a number always belongs to its bond's campaign
 - `number_value` (integer, >= 0)
-- `number_kind`: `base`, `associated`, `extraordinary`
+- `number_kind`: `base`, `associated`, `extraordinary` (`extraordinary` is legacy only: SAN-152 stopped creating it; old rows and frozen rosters that reference it stay valid)
 - `source_base_number_id`: for `associated`, the base number it derives from (required, same bond: composite FK to `bond_numbers (id, bond_id)`); null for `base`
 - `created_at` (set by the database)
 - `released_at`, `released_by` (profile): set together when the number is released (see below)
@@ -279,7 +279,7 @@ Rules (constraints and the `bond_numbers_guard_write` trigger):
 
 - `number_value <= campaigns.max_number` (`overflow_policy = reject`), `23514` otherwise.
 - `associated` number = its base number + `campaigns.associated_number_offset`; at most one associated number per base.
-- A bond has at most `commercial_unit_count` base and `commercial_unit_count` associated numbers (a simple bond: 1 + 1; a printed pata of N: N + N). Extraordinary numbers are not limited.
+- A bond has at most `commercial_unit_count` base and `commercial_unit_count` associated numbers (a simple bond: 1 + 1; a printed pata of N: N + N). Legacy extraordinary numbers (created before SAN-152) are not limited; no new ones are created.
 - A manually grouped pata has no numbers of its own: its members (simple bonds) keep theirs.
 - Numbers cannot be added to an annulled bond. Every column but the release is immutable (`23001`); a released number is immutable (`55000`).
 - Never deleted.
@@ -681,7 +681,7 @@ SECURITY DEFINER RPCs must write the audit row in the same transaction.
   an installment; any non-null installment is in 1..campaign.installment_count. Other types may
   supply one (notably consolation) or leave it null. Eligibility configuration is a JSON object,
   default `{}`: draw type and installment define the documented baseline, while future generation
-  code interprets optional configuration for consolation exclusions/extraordinary numbers. This
+  code interprets optional configuration for consolation exclusions. The extraordinary draw (SAN-152) uses each bond's own base and associated numbers. This
   migration does not compute eligibility, generate extra numbers, or validate a configuration schema.
 - Draws start scheduled and follow exactly the Draw state machine. Only scheduled rules can be
   edited. Closed and annulled rows are wholly immutable. Scheduled annulment requires

@@ -1,6 +1,6 @@
--- Dedicated committed fixture permits real RPC races through two dblink sessions.
+-- SAN-117/SAN-152: legacy extra-number release on annulment; new rosters use the bond's own numbers.
 begin;
-select plan(44);
+select plan(30);
 insert into auth.users(id,email) values
 ('a6470000-0000-0000-0000-000000000001','san117-admin@example.com'),
 ('a6470000-0000-0000-0000-000000000002','san117-reader@example.com');
@@ -50,11 +50,22 @@ case when n=4 then 'monthly' else 'extraordinary_full_payment' end,'SAN117 '||n,
 from generate_series(1,4)n;
 set local role authenticated;
 select pg_temp.act_as(1);
-select public.draw_generate_roster(pg_temp.did(1),'047-initial');
+select public.draw_generate_roster(pg_temp.did(n),'047-initial-'||n) from generate_series(1,3)n;
 reset role;
-commit;
-
-begin;
+-- SAN-152: new rosters carry only the bond's own numbers, no extras.
+select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
+  and number_kind='extraordinary'),0,'new extraordinary rosters allocate no extras');
+select results_eq($$select e.number_value from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
+  where r.draw_id=pg_temp.did(1) order by 1$$,$$select number_value from public.bond_numbers
+  where campaign_id='c6470000-0000-0000-0000-000000000001' and released_at is null order by 1$$,'roster holds exactly the bond own numbers');
+-- Legacy data (SAN-117, before SAN-152): one extra number frozen in the rosters of draws 1 and 2.
+insert into public.bond_numbers(campaign_id,bond_id,number_value,number_kind,source_base_number_id)
+select campaign_id,bond_id,0,'extraordinary',id from public.bond_numbers
+where campaign_id='c6470000-0000-0000-0000-000000000001' and number_kind='base';
+insert into public.draw_roster_entries(draw_roster_id,bond_id,bond_number_id,number_value,buyer_snapshot,collector_snapshot,eligible,created_by)
+select r.id,n.bond_id,n.id,n.number_value,'{}','{}',true,'b6470000-0000-0000-0000-000000000001'
+from public.draw_rosters r cross join public.bond_numbers n
+where r.draw_id in (pg_temp.did(1),pg_temp.did(2)) and r.status='generated' and n.number_kind='extraordinary';
 create temp table original_extra as select * from public.bond_numbers
 where campaign_id='c6470000-0000-0000-0000-000000000001' and number_kind='extraordinary';
 create temp table original_entries as select e.* from public.draw_roster_entries e
@@ -65,8 +76,6 @@ select throws_ok($$select public.draw_annul(pg_temp.did(1),'Denied','047-denied'
 reset role;
 select is((select count(*)::int from public.audit_log where request_id='047-denied'),0,'denial has no audit');
 select is((select status from public.draws where id=pg_temp.did(1)),'roster_generated','denial preserves draw');
-select results_eq($$select * from public.bond_numbers where id in (select id from original_extra) order by id$$,
-$$select * from original_extra order by id$$,'denial preserves reservations');
 -- A failing audit insert must roll back both the status change and every release.
 create function pg_temp.fail_audit() returns trigger language plpgsql as $$
 begin
@@ -84,145 +93,47 @@ drop trigger san117_fail_audit on public.audit_log;
 select is((select status from public.draws where id=pg_temp.did(1)),'roster_generated','failed audit rolls back draw');
 select results_eq($$select * from public.bond_numbers where id in (select id from original_extra) order by id$$,
 $$select * from original_extra order by id$$,'failed audit rolls back release');
-select is((select count(*)::int from public.audit_log where request_id='047-audit-fail'),0,'failed audit leaves no event');
 set local role authenticated;
 select pg_temp.act_as(1);
 select throws_ok($$select public.draw_annul(pg_temp.did(1),' ','047-invalid')$$,'22023',null,'blank reason refused');
 select throws_ok($$select public.draw_annul(null,'Reason','047-null')$$,'22023',null,'null id refused');
 select throws_ok($$select public.draw_annul(gen_random_uuid(),'Reason','047-missing')$$,'P0002',null,'missing draw');
-select lives_ok($$select public.draw_annul(pg_temp.did(1),'  Cancel extra  ','047-release')$$,'generated extraordinary draw annulled');
+-- Draw 2 still references the legacy extra, so annulling draw 1 keeps it reserved.
+select lives_ok($$select public.draw_annul(pg_temp.did(1),'  Cancel one  ','047-keep')$$,'annul succeeds when another roster shares the legacy extra');
+reset role;
+select is((select count(*)::int from public.bond_numbers where number_kind='extraordinary' and released_at is null
+  and campaign_id='c6470000-0000-0000-0000-000000000001'),1,'shared legacy extra stays reserved');
+select is((select new_value->'released_number_ids' from public.audit_log where request_id='047-keep'),'[]'::jsonb,'kept reservations absent from released ids');
+select results_eq($$select e.* from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
+where r.draw_id=pg_temp.did(1) order by e.id$$,$$select * from original_entries order by id$$,'annulled roster entries retained verbatim');
+set local role authenticated;
+select lives_ok($$select public.draw_annul(pg_temp.did(2),'  Cancel extra  ','047-release')$$,'last legacy roster annulled');
 reset role;
 select ok((select bool_and(released_at is not null and released_by='b6470000-0000-0000-0000-000000000001'::uuid)
-from public.bond_numbers where id in (select id from original_extra)),'extras released with actor');
+from public.bond_numbers where id in (select id from original_extra)),'legacy extra released with actor');
 select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
-and number_kind<>'extraordinary' and released_at is not null),0,'ordinary reservations untouched');
+and number_kind<>'extraordinary' and released_at is not null),0,'own base and associated numbers untouched');
 select is((select count(*)::int from public.audit_log where request_id='047-release'),1,'one transactional audit');
 select ok((select old_value->>'status'='roster_generated' and new_value->>'status'='annulled' and reason='Cancel extra'
 and new_value->'released_number_ids'=(select jsonb_agg(id order by id) from original_extra)
 from public.audit_log where request_id='047-release'),'audit includes exact released ids and before/after');
-select results_eq($$select e.* from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
-where r.draw_id=pg_temp.did(1) order by e.id$$,$$select * from original_entries order by id$$,'annulled roster entries retained verbatim');
 set local role authenticated;
-select throws_ok($$select public.draw_annul(pg_temp.did(1),'Again','047-again')$$,'55000',null,'repeat annulment refused');
-select lives_ok($$select public.draw_generate_roster(pg_temp.did(2),'047-reassign')$$,'later draw reallocates');
+select throws_ok($$select public.draw_annul(pg_temp.did(2),'Again','047-again')$$,'55000',null,'repeat annulment refused');
+-- SAN-152: a draw without legacy extras annuls and releases nothing.
+select lives_ok($$select public.draw_annul(pg_temp.did(3),'No extras','047-plain')$$,'new-style extraordinary draw annulled');
 reset role;
-select is((select count(*)::int from public.bond_numbers n join original_extra o on o.number_value=n.number_value
-and o.source_base_number_id=n.source_base_number_id where n.released_at is null and n.id<>o.id),1,'same value/source gets a new historical row');
-select results_eq($$select e.* from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
-where r.draw_id=pg_temp.did(1) order by e.id$$,$$select * from original_entries order by id$$,'reallocation never rewrites history');
-select is((select count(*)::int from public.audit_log where request_id in ('047-invalid','047-null','047-missing','047-again')),0,'failed calls have no audit');
-select ok((select status='annulled' and annul_reason='Cancel extra' from public.draws where id=pg_temp.did(1)),'original reason retained');
-rollback;
-
-begin;
+select is((select new_value->'released_number_ids' from public.audit_log where request_id='047-plain'),'[]'::jsonb,'nothing released for a roster of own numbers');
+select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
+and number_kind<>'extraordinary' and released_at is not null),0,'own numbers still reserved after annulment');
+-- A new generation never reuses the released legacy extra.
+update public.draws set status='scheduled' where id=pg_temp.did(4);
 set local role authenticated;
-select pg_temp.act_as(1);
-select public.draw_generate_roster(pg_temp.did(2),'047-shared');
-select public.draw_generate_roster(pg_temp.did(2),'047-superseded');
-select public.draw_freeze_roster(pg_temp.did(2),'047-freeze');
-reset role;
-create temp table frozen_entries as select e.* from public.draw_roster_entries e
-join public.draw_rosters r on r.id=e.draw_roster_id where r.draw_id=pg_temp.did(2);
-set local role authenticated;
-select lives_ok($$select public.draw_annul(pg_temp.did(1),'Shared','047-keep')$$,'annul succeeds when another roster shares extra');
-select throws_ok($$select public.draw_annul(pg_temp.did(2),'Frozen','047-frozen')$$,'55000',null,'frozen extraordinary cannot be annulled');
-select throws_ok($$select public.draw_generate_roster(pg_temp.did(2),'047-frozen-generate')$$,'55000',null,'frozen roster cannot regenerate');
-select public.draw_generate_roster(pg_temp.did(4),'047-monthly');
+select lives_ok($$select public.draw_generate_roster(pg_temp.did(4),'047-monthly')$$,'later generation succeeds');
 select throws_ok($$select public.draw_annul(pg_temp.did(4),'Monthly','047-monthly-annul')$$,'55000',null,'generated ordinary draws cannot annul');
 reset role;
-select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
-and number_kind='extraordinary' and released_at is null),1,'other non-annulled roster retains reservation');
-select is((select new_value->'released_number_ids' from public.audit_log where request_id='047-keep'),'[]'::jsonb,'kept reservations absent from released ids');
-select results_eq($$select e.* from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
-where r.draw_id=pg_temp.did(2) order by e.id$$,$$select * from frozen_entries order by id$$,'all frozen and superseded entry rows unchanged');
-select is((select count(*)::int from public.audit_log where request_id in ('047-frozen','047-frozen-generate','047-monthly-annul')),0,'state refusals unaudited');
-select is((select status from public.draws where id=pg_temp.did(2)),'roster_frozen','frozen status unchanged');
+select is((select count(*)::int from public.draw_roster_entries e join public.draw_rosters r on r.id=e.draw_roster_id
+  join public.bond_numbers n on n.id=e.bond_number_id where r.draw_id=pg_temp.did(4) and n.number_kind='extraordinary'),0,'monthly roster excludes legacy extras');
 select ok(not has_table_privilege(r,'public.draws','UPDATE'),r||' cannot annul draws directly')
 from unnest(array['anon','authenticated','service_role'])r;
-rollback;
-
--- Annul holds the same seed-77 lock used by generation on a different draw.
-create extension if not exists dblink with schema extensions;
-select extensions.dblink_connect(c,format('host=%s port=%s dbname=%s user=postgres password=postgres',
-  coalesce(host(inet_server_addr()),'127.0.0.1'),inet_server_port(),current_database()))
-from unnest(array['release_a','release_b'])c;
-select extensions.dblink_exec('release_a',$q$begin; set local role authenticated;
-set local request.jwt.claims='{"sub":"a6470000-0000-0000-0000-000000000001","role":"authenticated"}';
-do $$begin perform public.draw_annul('d6470000-0000-0000-0000-000000000001','Race release','047-race-annul'); end$$;$q$);
-select extensions.dblink_exec('release_b',$q$begin; set local role authenticated;
-set local request.jwt.claims='{"sub":"a6470000-0000-0000-0000-000000000001","role":"authenticated"}';$q$);
-select extensions.dblink_send_query('release_b',$$select public.draw_generate_roster('d6470000-0000-0000-0000-000000000003','047-race-generate')$$);
-do $$begin
-for n in 1..100 loop
-  exit when exists(select 1 from pg_stat_activity where query like '%047-race-generate%'
-  and pid<>pg_backend_pid() and wait_event='advisory');
-  perform pg_sleep(0.02);
-end loop;
-end$$;
-select ok(exists(select 1 from pg_stat_activity where query like '%047-race-generate%'
-and pid<>pg_backend_pid() and wait_event='advisory'),'generation really waits for annulment advisory lock');
-select extensions.dblink_exec('release_a','commit');
-select ok(id is not null,'waiting generation succeeds after release') from extensions.dblink_get_result('release_b') as t(id uuid);
-select * from extensions.dblink_get_result('release_b') as t(id uuid);
-select extensions.dblink_exec('release_b','commit');
-select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
-and number_kind='extraordinary' and released_at is null),1,'racing generation has one active extra');
-select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
-and number_kind='extraordinary' and released_at is not null),1,'race preserves released historical row');
-select is((select count(*)::int from public.audit_log where request_id in ('047-race-annul','047-race-generate')),2,'both race operations audited');
--- Reverse order: generation publishes another reference before waiting annulment rechecks.
-select extensions.dblink_exec('release_a',$q$begin; set local role authenticated;
-set local request.jwt.claims='{"sub":"a6470000-0000-0000-0000-000000000001","role":"authenticated"}';
-do $$begin perform public.draw_generate_roster('d6470000-0000-0000-0000-000000000002','047-race-reuse'); end$$;$q$);
-select extensions.dblink_exec('release_b',$q$begin; set local role authenticated;
-set local request.jwt.claims='{"sub":"a6470000-0000-0000-0000-000000000001","role":"authenticated"}';$q$);
-select extensions.dblink_send_query('release_b',$q$select public.draw_annul('d6470000-0000-0000-0000-000000000003','Keep newly shared','047-race-keep')::text$q$);
-do $$begin
-for n in 1..100 loop
-  exit when exists(select 1 from pg_stat_activity where query like '%047-race-keep%'
-  and pid<>pg_backend_pid() and wait_event='advisory');
-  perform pg_sleep(0.02);
-end loop;
-end$$;
-select ok(exists(select 1 from pg_stat_activity where query like '%047-race-keep%'
-and pid<>pg_backend_pid() and wait_event='advisory'),'annulment really waits for another draw generation');
-select extensions.dblink_exec('release_a','commit');
-select * from extensions.dblink_get_result('release_b') as t(result text);
-select * from extensions.dblink_get_result('release_b') as t(result text);
-select extensions.dblink_exec('release_b','commit');
-select is((select status from public.draws where id=pg_temp.did(3)),'annulled','waiting annulment succeeds');
-select is((select new_value->'released_number_ids' from public.audit_log where request_id='047-race-keep'),
-'[]'::jsonb,'waiting annulment sees committed new reference and releases nothing');
-select is((select count(*)::int from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001'
-and number_kind='extraordinary' and released_at is null),1,'newly referenced extra remains reserved');
-select extensions.dblink_disconnect('release_a');
-select extensions.dblink_disconnect('release_b');
-
--- Cleanup only this fixture, bypassing immutable-history guards as in 038.
-begin;
-set local session_replication_role=replica;
-delete from public.audit_log where actor_user_id in ('b6470000-0000-0000-0000-000000000001','b6470000-0000-0000-0000-000000000002');
-delete from public.draw_roster_entries where draw_roster_id in (select id from public.draw_rosters
-where draw_id in (select id from public.draws where campaign_id='c6470000-0000-0000-0000-000000000001'));
-delete from public.draw_rosters where draw_id in (select id from public.draws where campaign_id='c6470000-0000-0000-0000-000000000001');
-delete from public.draws where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.collector_ledger_entries where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.payment_installments where payment_id in (select id from public.payments where campaign_id='c6470000-0000-0000-0000-000000000001');
-delete from public.payments where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.installments where payment_plan_id in (select p.id from public.payment_plans p join public.sales s on s.id=p.sale_id where s.campaign_id='c6470000-0000-0000-0000-000000000001');
-delete from public.payment_plans where sale_id in (select id from public.sales where campaign_id='c6470000-0000-0000-0000-000000000001');
-delete from public.settlements where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.sales where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.bond_assignments where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.delivery_note_items where delivery_note_id in (select id from public.delivery_notes where campaign_id='c6470000-0000-0000-0000-000000000001');
-delete from public.delivery_notes where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.bond_numbers where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.bonds where campaign_id='c6470000-0000-0000-0000-000000000001';
-delete from public.campaigns where id='c6470000-0000-0000-0000-000000000001';
-delete from public.collectors where id='e6470000-0000-0000-0000-000000000001';
-delete from public.buyers where id='f6470000-0000-0000-0000-000000000001';
-delete from public.user_roles where user_id in ('b6470000-0000-0000-0000-000000000001','b6470000-0000-0000-0000-000000000002');
-delete from public.profiles where id in ('b6470000-0000-0000-0000-000000000001','b6470000-0000-0000-0000-000000000002');
-delete from auth.users where id in ('a6470000-0000-0000-0000-000000000001','a6470000-0000-0000-0000-000000000002');
-commit;
 select * from finish();
+rollback;

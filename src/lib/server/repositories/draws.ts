@@ -113,6 +113,18 @@ export async function getCurrentDrawRoster(
 		.overrideTypes<Row | null, { merge: false }>();
 	return error || !data ? { data: null, error } : { data: mapRoster(data), error: null };
 }
+/** SAN-152: legacy rosters frozen before the change may hold extra ('extraordinary') numbers. */
+export async function rosterHasLegacyExtras(
+	client: SupabaseClient,
+	rosterId: string
+): Promise<RepositoryResult<boolean>> {
+	const { count, error } = await client
+		.from('draw_roster_entries')
+		.select('id, bond_numbers!inner(number_kind)', { count: 'exact', head: true })
+		.eq('draw_roster_id', rosterId)
+		.eq('bond_numbers.number_kind', 'extraordinary');
+	return error ? { data: null, error } : { data: (count ?? 0) > 0, error: null };
+}
 const mapEntry = (row: Row): DrawRosterListEntry => {
 	const number = (row.bond_numbers ?? {}) as Row;
 	const bond = (row.bonds ?? {}) as Row;

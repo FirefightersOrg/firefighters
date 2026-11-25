@@ -36,16 +36,43 @@ const addDays = (date: string, days: number) => {
 	const [year, month, day] = date.split('-').map(Number);
 	return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 };
-export const _firstDueDateBounds = (today = argentinaToday()) => ({
-	min: addDays(today, -31),
-	max: addDays(today, 365)
+/** SAN-106: the first due date falls within [sale date, sale date + 1 year]. */
+export const _firstDueDateBounds = (saleDate = argentinaToday()) => ({
+	min: saleDate,
+	max: addDays(saleDate, 365)
 });
-const saleFormSchema = (campaignId: string, today = argentinaToday()) => {
-	const { min, max } = _firstDueDateBounds(today);
+/** Buenos Aires calendar date of an instant. */
+const argentinaDate = (iso: string) =>
+	new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(
+		new Date(iso)
+	);
+/** SAN-106: a sale may be dated back to the campaign start, never in the future. */
+export const _saleDateBounds = (startsAt: string | null, today = argentinaToday()) => {
+	const start = startsAt ? argentinaDate(startsAt) : today;
+	return { min: start < today ? start : today, max: today };
+};
+const saleFormSchema = (campaignId: string, startsAt: string | null, today = argentinaToday()) => {
+	const saleBounds = _saleDateBounds(startsAt, today);
 	return saleRegisterSchema
-		.extend({ campaignId: z.literal(campaignId), firstDueDate: z.string().optional() })
-		.superRefine(({ paymentMode, firstDueDate }, context) => {
+		.extend({
+			campaignId: z.literal(campaignId),
+			firstDueDate: z.string().optional(),
+			saleDate: z.string().optional()
+		})
+		.superRefine(({ paymentMode, firstDueDate, saleDate }, context) => {
+			const sold = saleDate || today;
+			// The campaign start only bounds an earlier date (a sale of today works as before).
+			const tooEarly = sold < today && sold < saleBounds.min;
+			if (!z.iso.date().safeParse(sold).success || tooEarly || sold > saleBounds.max) {
+				context.addIssue({
+					code: 'custom',
+					path: ['saleDate'],
+					message: `Elegir una fecha de venta entre el ${formatDate(saleBounds.min)} y hoy.`
+				});
+				return;
+			}
 			if (paymentMode === 'full_payment') return;
+			const { min, max } = _firstDueDateBounds(sold);
 			if (!z.iso.date().safeParse(firstDueDate).success) {
 				context.addIssue({
 					code: 'custom',
@@ -83,6 +110,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		buyerTotal: buyers.data?.total ?? 0,
 		canCreateBuyer: hasPermissionIn(locals.permissions, 'buyer.manage'),
 		today: argentinaToday(),
+		saleDateBounds: _saleDateBounds(campaign.data.startsAt),
 		firstDueDateBounds: _firstDueDateBounds()
 	};
 };
@@ -214,9 +242,14 @@ export const actions: Actions = {
 			bondId: field(form, 'bondId'),
 			buyerId: field(form, 'buyerId'),
 			paymentMode: field(form, 'paymentMode'),
-			firstDueDate: field(form, 'firstDueDate')
+			firstDueDate: field(form, 'firstDueDate'),
+			saleDate: field(form, 'saleDate')
 		};
-		const parsed = saleFormSchema(params.id).safeParse({ campaignId: params.id, ...values });
+		const loaded = await getCampaignById(locals.supabase, params.id);
+		const parsed = saleFormSchema(params.id, loaded.data?.startsAt ?? null).safeParse({
+			campaignId: params.id,
+			...values
+		});
 		const errors: Record<string, string[]> = {};
 		if (!parsed.success)
 			for (const issue of parsed.error.issues) {
@@ -234,7 +267,7 @@ export const actions: Actions = {
 				errors,
 				message: 'Revisar los campos marcados.'
 			});
-		const campaign = await getCampaignById(locals.supabase, params.id);
+		const campaign = loaded;
 		if (campaign.error)
 			return fail(500, {
 				form: 'sale',
@@ -284,7 +317,9 @@ export const actions: Actions = {
 					campaignId: params.id,
 					...values,
 					paymentMode: values.paymentMode as PaymentMode,
-					firstDueDate: values.paymentMode === 'full_payment' ? null : values.firstDueDate
+					firstDueDate: values.paymentMode === 'full_payment' ? null : values.firstDueDate,
+					// Today (or empty) stays null: the database stamps the real instant.
+					saleDate: values.saleDate && values.saleDate !== argentinaToday() ? values.saleDate : null
 				},
 				{ requestId: locals.requestId, permissions: locals.permissions }
 			);

@@ -294,6 +294,8 @@ async function sell(campaign: string, collectorId: string, buyerId: string, labe
 		p_buyer_id: buyerId,
 		p_payment_mode: 'installments',
 		p_first_due_date: daysFromToday(-10),
+		// SAN-106: past due dates need an earlier sale date.
+		p_sale_date: daysFromToday(-10),
 		p_request_id: rid(`sale-${label}`)
 	});
 	return { saleId, bondId };
@@ -813,11 +815,11 @@ describe('4. a submitted collection goes through the settlement until confirmed'
 		expect(await ledgerCount(idA)).toBe(ledgerBefore);
 		const page = await L.sale(ev(collectorA, `ventas/${sale.A}`, { saleId: sale.A }));
 		expect(page.submissions[0]).toMatchObject({ id: paymentId, status: 'draft' });
-		expect(submissionStatusLabel(page.submissions[0].status)).toBe('Pendiente de rendición');
+		expect(submissionStatusLabel(page.submissions[0].status)).toBe('Enviado');
 		expect(page.sale.paidAmount).toBe('0.00');
 	});
 
-	it('the operator includes it in a settlement of A: still pending for the collector', async () => {
+	it('the operator includes it in a settlement of A: "En rendición" for the collector', async () => {
 		settlementId = await rpcId(admin.client, 'settlement_open', {
 			p_campaign_id: campaignId,
 			p_collector_id: idA,
@@ -834,7 +836,7 @@ describe('4. a submitted collection goes through the settlement until confirmed'
 			settlement_id: settlementId
 		});
 		const page = await L.sale(ev(collectorA, `ventas/${sale.A}`, { saleId: sale.A }));
-		expect(submissionStatusLabel(page.submissions[0].status)).toBe('Pendiente de rendición');
+		expect(submissionStatusLabel(page.submissions[0].status)).toBe('En rendición');
 		expect(await ledgerCount(idA)).toBe(ledgerBefore);
 	});
 
