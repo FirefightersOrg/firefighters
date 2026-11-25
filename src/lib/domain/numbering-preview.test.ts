@@ -114,6 +114,7 @@ describe('buildNumberingPreview', () => {
 			numberDigits: 0,
 			maxNumber: Number.NaN,
 			associatedNumberOffset: -1,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'wrap' as 'reject'
 		});
 		expect(many.ok).toBe(false);

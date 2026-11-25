@@ -359,12 +359,14 @@ describe('Phase 7: sales, payment plans and installments', () => {
 							numberDigits: 4,
 							maxNumber: 9999,
 							associatedNumberOffset: 4871,
+							associatedNumberMode: 'linear',
 							overflowPolicy: 'reject'
 						}),
 						formatCampaignNumber(associated, {
 							numberDigits: 4,
 							maxNumber: 9999,
 							associatedNumberOffset: 4871,
+							associatedNumberMode: 'linear',
 							overflowPolicy: 'reject'
 						})
 					])

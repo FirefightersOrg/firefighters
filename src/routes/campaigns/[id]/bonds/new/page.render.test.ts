@@ -23,6 +23,7 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
 		numberDigits: 4,
 		maxNumber: 9999,
 		associatedNumberOffset: 4871,
+		associatedNumberMode: 'linear',
 		overflowPolicy: 'reject',
 		barcodeMode: 'base_number',
 		barcodePattern: null,
@@ -70,6 +71,7 @@ describe('BaseNumberPreview', () => {
 			numberDigits: 5,
 			maxNumber: 99999,
 			associatedNumberOffset: 48710,
+			associatedNumberMode: 'linear',
 			overflowPolicy: 'reject'
 		});
 		expect(body).toContain('00068');

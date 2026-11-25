@@ -63,6 +63,7 @@ describe('previewPata', () => {
 				numberDigits: 5,
 				maxNumber: 99999,
 				associatedNumberOffset: 48710,
+				associatedNumberMode: 'linear',
 				overflowPolicy: 'reject'
 			},
 			'60000.50'

@@ -36,6 +36,7 @@ export function campaignRow(overrides: Partial<CampaignRow> = {}): CampaignRow {
 		number_digits: 4,
 		max_number: 9999,
 		associated_number_offset: 4871,
+		associated_number_mode: 'linear',
 		overflow_policy: 'reject',
 		barcode_mode: 'base_number',
 		barcode_pattern: null,
