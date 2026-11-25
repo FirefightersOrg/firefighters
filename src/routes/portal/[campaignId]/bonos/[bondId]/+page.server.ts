@@ -1,7 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import { hasPermissionIn } from '$lib/server/auth/permissions';
 import { requireOwnCollector } from '$lib/server/auth/own-collector';
 import { getMyBond } from '$lib/server/portal/my-bonds';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
@@ -35,12 +34,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (detail.error) fail500(detail.error);
 	if (!detail.data) error(404, { message: NOT_FOUND });
 
-	const permissions = locals.permissions ?? [];
 	return {
 		campaign: { id: campaignResult.data.id, name: campaignResult.data.name },
-		...detail.data,
-		// The printable note lives under /campaigns and needs `campaign.view` + `bond.view`.
-		canPrintNotes:
-			hasPermissionIn(permissions, 'bond.view') && hasPermissionIn(permissions, 'campaign.view')
+		...detail.data
 	};
 };

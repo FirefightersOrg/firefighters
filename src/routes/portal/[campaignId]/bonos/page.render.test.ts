@@ -86,20 +86,20 @@ describe('Mis bonos detail', () => {
 		]
 	};
 
-	it('shows history and notes, with the print link only when allowed', () => {
-		const withLink = render(DetailPage, { props: props({ ...detail, canPrintNotes: true }) }).body;
+	it('shows history and notes, with the link to the portal print route', () => {
+		const withLink = render(DetailPage, { props: props(detail) }).body;
 		expect(withLink).toContain('Historial de asignaciones');
 		expect(withLink).toContain('Entrega');
 		expect(withLink).toContain('Vigente');
 		expect(withLink).toContain('Remito 0007');
-		expect(withLink).toContain(`/campaigns/${CAMPAIGN.id}/deliveries/n1/print`);
-		const without = render(DetailPage, { props: props({ ...detail, canPrintNotes: false }) }).body;
-		expect(without).not.toContain('/print');
+		expect(withLink).toContain(`/portal/${CAMPAIGN.id}/remitos/n1/imprimir`);
+		expect(withLink).toContain('Ver remito');
+		expect(withLink).not.toContain('/campaigns/');
 	});
 
 	it('shows empty states without history', () => {
 		const body = render(DetailPage, {
-			props: props({ ...detail, assignments: [], notes: [], canPrintNotes: false })
+			props: props({ ...detail, assignments: [], notes: [] })
 		}).body;
 		expect(body).toContain('Sin movimientos');
 		expect(body).toContain('Sin remitos');

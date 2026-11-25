@@ -9,6 +9,7 @@ import { loadPermissions } from './permissions';
 import type { UserProfile } from '../../src/app';
 import { load as listLoad } from '../../src/routes/portal/[campaignId]/bonos/+page.server';
 import { load as detailLoad } from '../../src/routes/portal/[campaignId]/bonos/[bondId]/+page.server';
+import { load as printLoad } from '../../src/routes/portal/[campaignId]/remitos/[deliveryNoteId]/imprimir/+page.server';
 
 vi.mock('$env/dynamic/private', async () => {
 	const { inject } = await import('vitest');
@@ -198,9 +199,34 @@ describe('Mis bonos with two collectors (local Supabase)', () => {
 		expect(own.assignments).toHaveLength(1);
 		expect(own.assignments[0]).toMatchObject({ assignmentType: 'delivery', status: 'active' });
 		expect(own.notes).toHaveLength(1);
-		expect(own.canPrintNotes).toBe(false);
 		expect(await status(() => detailLoad(detailEvent(userA, campaignId, bondB)))).toBe(404);
 		expect(await status(() => detailLoad(detailEvent(userB, campaignId, bondA)))).toBe(404);
+	});
+
+	it('each collector prints only their own delivery note (SAN-153)', async () => {
+		const noteA = (await detailLoad(detailEvent(userA, campaignId, bondA)))!.notes[0].id;
+		const noteB = (await detailLoad(detailEvent(userB, campaignId, bondB)))!.notes[0].id;
+		const printEvent = (caller: Caller, id: string) =>
+			({
+				locals: locals(caller),
+				params: { campaignId, deliveryNoteId: id },
+				url: new URL(`http://localhost/portal/${campaignId}/remitos/${id}/imprimir`)
+			}) as unknown as Parameters<typeof printLoad>[0];
+
+		const own = (await printLoad(printEvent(userA, noteA)))!;
+		expect(own.document).toMatchObject({ bondCount: 1, status: 'issued' });
+		expect(own.document.collector).toContain('My bonds a');
+		expect(await status(() => printLoad(printEvent(userA, noteB)))).toBe(404);
+		expect(await status(() => printLoad(printEvent(userB, noteA)))).toBe(404);
+		expect(await status(() => printLoad(printEvent(userA, randomUUID())))).toBe(404);
+		// Another campaign id never reveals the note either.
+		const other = {
+			...printEvent(userA, noteA),
+			params: { campaignId: randomUUID(), deliveryNoteId: noteA }
+		};
+		expect(await status(() => printLoad(other as never))).toBe(404);
+		// A user holding bond.view_own without a linked collector sees nothing.
+		expect(await status(() => printLoad(printEvent(admin, noteA)))).toBe(404);
 	});
 
 	it('an admin holding bond.view_own only sees bonds assigned to their own collector', async () => {

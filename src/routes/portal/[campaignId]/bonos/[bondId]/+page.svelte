@@ -28,7 +28,10 @@
 	);
 	const join = (values: string[]) => (values.length ? values.join(', ') : '—');
 	const printHref = (noteId: string) =>
-		resolve('/campaigns/[id]/deliveries/[noteId]/print', { id: data.campaign.id, noteId });
+		resolve('/portal/[campaignId]/remitos/[deliveryNoteId]/imprimir', {
+			campaignId: data.campaign.id,
+			deliveryNoteId: noteId
+		});
 
 	type AssignmentRow = (typeof data.assignments)[number] & Record<string, unknown>;
 	type NoteRow = (typeof data.notes)[number] & Record<string, unknown>;
@@ -128,14 +131,12 @@
 					<StatusBadge kind="deliveryNote" status={row.status} />
 				{:else if column.key === 'issuedAt'}
 					{formatDateTime(row.issuedAt)}
-				{:else if data.canPrintNotes}
+				{:else}
 					<a
 						href={printHref(row.id)}
 						class="rounded-sm text-primary underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
 						>Ver remito</a
 					>
-				{:else}
-					—
 				{/if}
 			{/snippet}
 			{#snippet empty()}
