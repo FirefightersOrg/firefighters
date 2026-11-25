@@ -114,7 +114,7 @@ describe('portal sales and buyers pages', () => {
 		});
 		expect(html).toContain('Vencida');
 		expect(html).toContain('Pagada por adelantado');
-		expect(html).toContain('Pendiente de rendición');
+		expect(html).toContain('En rendición');
 		expect(html).toContain('Efectivo');
 		expect(html).toContain('Calle 1');
 		expect(html).not.toContain('<form');
@@ -270,7 +270,7 @@ describe('portal sales and buyers pages', () => {
 			expect(html).not.toContain('Acciones');
 		});
 
-		it('lists sent collections: pending, confirmed and rejected with the reason', () => {
+		it('lists sent collections: the four states, rejected with the reason', () => {
 			const html = body(SalePage, {
 				...base,
 				submissions: [
@@ -283,6 +283,17 @@ describe('portal sales and buyers pages', () => {
 						rejectionReason: null,
 						note: 'En mano',
 						createdAt: '2026-11-20T10:00:00Z',
+						installmentNumbers: [1]
+					},
+					{
+						id: 'd',
+						paymentDate: '2026-11-21',
+						amount: '15.00',
+						method: 'cash',
+						status: 'pending_in_settlement',
+						rejectionReason: null,
+						note: null,
+						createdAt: '2026-11-21T10:00:00Z',
 						installmentNumbers: [1]
 					},
 					{
@@ -310,7 +321,8 @@ describe('portal sales and buyers pages', () => {
 				]
 			});
 			expect(html).toContain('Cobros enviados');
-			expect(html).toContain('Pendiente de rendición');
+			expect(html).toContain('Enviado');
+			expect(html).toContain('En rendición');
 			expect(html).toContain('Confirmado');
 			expect(html).toContain('Rechazado');
 			expect(html).toContain('Motivo: No llegó el dinero');
