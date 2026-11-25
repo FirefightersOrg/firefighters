@@ -95,7 +95,8 @@ insert into ids select 'i' || installment_number, id from i;
 -- ---------------------------------------------------------------------------
 select columns_are('public', 'sales', array['id', 'campaign_id', 'bond_id', 'buyer_id',
   'collector_id', 'sold_at', 'payment_mode', 'total_amount', 'status', 'created_by', 'created_at',
-  'updated_at'], 'sales columns');
+  'updated_at', 'uncollectible_at', 'uncollectible_by', 'uncollectible_reason'],
+  'sales columns (uncollectible_* in SAN-106)');
 select columns_are('public', 'payment_plans', array['id', 'sale_id', 'installment_count',
   'total_amount', 'status', 'created_at'], 'payment_plans columns');
 select columns_are('public', 'installments', array['id', 'payment_plan_id', 'installment_number',

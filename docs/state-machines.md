@@ -135,6 +135,9 @@ Rules:
 - A bond can be `sold` and `overdue` at the same time.
 - Financial status precedence is: annulled sale/plan, uncollectible mark, fully paid non-annulled
   installments, overdue unpaid installment, no applied payment, up to date, then partial payments.
+- `uncollectible` is set only by hand (SAN-106): `sale_mark_uncollectible` (admin or treasurer,
+  mandatory reason, audited as `sale.mark_uncollectible`) marks an active sale once and for good.
+  Payments recorded afterwards keep the sale `uncollectible`.
 
 ## Sale
 

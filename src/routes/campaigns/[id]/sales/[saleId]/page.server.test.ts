@@ -11,6 +11,7 @@ vi.mock('$lib/server/services/sale-corrections', async (original) => ({
 	correctSaleBuyer: vi.fn(),
 	correctSaleCollector: vi.fn()
 }));
+vi.mock('$lib/server/services/sale-uncollectible', () => ({ markSaleUncollectible: vi.fn() }));
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { getSaleDetail } from '$lib/server/repositories/sales';
@@ -22,6 +23,8 @@ import {
 	correctSaleCollectorSchema,
 	SaleCorrectionServiceError
 } from '$lib/server/services/sale-corrections';
+import { markSaleUncollectible } from '$lib/server/services/sale-uncollectible';
+import { SaleServiceError } from '$lib/server/services/sales';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
 const SALE = 'a0000000-0000-0000-0000-000000000009',
 	url = `http://localhost/campaigns/${CAMPAIGN_ID}/sales/${SALE}`;
@@ -38,7 +41,8 @@ beforeEach(() => {
 			plan: { status: 'active' },
 			installments: [
 				{ installmentNumber: 1, dueDate: '2020-01-01', amount: '10.00', status: 'pending' }
-			]
+			],
+			uncollectible: null
 		},
 		error: null
 	} as never);
@@ -46,6 +50,7 @@ beforeEach(() => {
 	vi.mocked(listActiveCollectorOptions).mockResolvedValue({ data: [], error: null });
 	vi.mocked(correctSaleBuyer).mockReset();
 	vi.mocked(correctSaleCollector).mockReset();
+	vi.mocked(markSaleUncollectible).mockReset();
 });
 describe('sale detail', () => {
 	it('requires sale or bond viewing', async () => {
@@ -71,7 +76,7 @@ describe('sale detail', () => {
 });
 
 const run = async (
-	action: 'correctBuyer' | 'correctCollector',
+	action: 'correctBuyer' | 'correctCollector' | 'markUncollectible',
 	permissions: string[] | null,
 	fields: Record<string, string>
 ) => {
@@ -161,4 +166,68 @@ describe('sale correction actions', () => {
 			expect(correctSaleCollector).not.toHaveBeenCalled();
 		}
 	);
+});
+
+describe('mark uncollectible (SAN-106)', () => {
+	const marked = {
+		sale: { status: 'active' },
+		plan: { status: 'active' },
+		installments: [],
+		uncollectible: { markedAt: '2026-11-25T12:00:00Z', reason: 'Se mudó' }
+	};
+	it('offers the form only with sale.mark_uncollectible, on an active unmarked sale', async () => {
+		const loadWith = async (permissions: string[]) =>
+			((await load(event(permissions) as never)) as any).canMarkUncollectible;
+		expect(await loadWith(['campaign.view', 'sale.view'])).toBe(false);
+		expect(await loadWith(['campaign.view', 'sale.view', 'sale.mark_uncollectible'])).toBe(true);
+		vi.mocked(getSaleDetail).mockResolvedValueOnce({ data: marked, error: null } as never);
+		expect(await loadWith(['campaign.view', 'sale.view', 'sale.mark_uncollectible'])).toBe(false);
+		vi.mocked(getSaleDetail).mockResolvedValueOnce({
+			data: { ...marked, sale: { status: 'annulled' }, uncollectible: null },
+			error: null
+		} as never);
+		expect(await loadWith(['campaign.view', 'sale.view', 'sale.mark_uncollectible'])).toBe(false);
+	});
+	it('computes the uncollectible financial status from the mark', async () => {
+		vi.mocked(getSaleDetail).mockResolvedValueOnce({ data: marked, error: null } as never);
+		const out = (await load(event(['campaign.view', 'sale.view']) as never)) as any;
+		expect(out.financialStatus).toBe('uncollectible');
+	});
+	it('fails closed at 500 and denies missing permission at 403 before service work', async () => {
+		expect(await run('markUncollectible', null, { reason: 'x' })).toMatchObject({ status: 500 });
+		expect(
+			await run('markUncollectible', ['campaign.view', 'sale.view'], { reason: 'x' })
+		).toMatchObject({ status: 403 });
+		expect(markSaleUncollectible).not.toHaveBeenCalled();
+	});
+	it('passes the trimmed reason and maps service errors to the reason field', async () => {
+		const perms = ['campaign.view', 'sale.view', 'sale.mark_uncollectible'];
+		vi.mocked(markSaleUncollectible).mockResolvedValueOnce();
+		expect(await run('markUncollectible', perms, { reason: '  Se mudó  ' })).toMatchObject({
+			form: 'markUncollectible',
+			success: true,
+			message: 'Venta marcada como incobrable.'
+		});
+		expect(markSaleUncollectible).toHaveBeenLastCalledWith(
+			expect.anything(),
+			{ saleId: SALE, reason: 'Se mudó' },
+			expect.objectContaining({ permissions: perms })
+		);
+		vi.mocked(markSaleUncollectible).mockRejectedValueOnce(
+			new SaleServiceError('validation', 'Ingresar el motivo.', { field: 'reason' })
+		);
+		expect(await run('markUncollectible', perms, { reason: '' })).toMatchObject({
+			status: 400,
+			data: { errors: { reason: ['Ingresar el motivo.'] }, values: { reason: '' } }
+		});
+		vi.mocked(markSaleUncollectible).mockRejectedValueOnce(
+			new SaleServiceError('conflict', 'La venta ya está marcada como incobrable.')
+		);
+		expect(await run('markUncollectible', perms, { reason: 'Otra vez' })).toMatchObject({
+			status: 409,
+			data: { message: 'La venta ya está marcada como incobrable.' }
+		});
+		vi.mocked(markSaleUncollectible).mockRejectedValueOnce(new Error('boom'));
+		expect(await run('markUncollectible', perms, { reason: 'x' })).toMatchObject({ status: 500 });
+	});
 });
