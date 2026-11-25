@@ -1,6 +1,7 @@
 -- SAN-93 invariant: a role that holds an action permission on a domain also holds that domain's
 -- `<domain>.view` permission (`sale`, `payment` and `settlement` have one since SAN-93). The domain is the code
--- without its last segment; codes whose last segment is `view` or `view_*` are not actions.
+-- without its last segment; codes whose last segment is `view` or `view_*` are not actions, and neither are the
+-- own-scope codes ending in `_own` (SAN-143), which open only the caller's own rows.
 begin;
 select plan(4);
 
@@ -10,7 +11,7 @@ from public.role_permissions rp
 join public.roles r on r.id = rp.role_id
 join public.permissions a on a.id = rp.permission_id
 join public.permissions v on v.code = regexp_replace(a.code, '\.[^.]+$', '') || '.view'
-where substring(a.code from '[^.]+$') !~ '^view(_|$)'
+where substring(a.code from '[^.]+$') !~ '^view(_|$)' and a.code !~ '_own$'
   and not exists (
     select 1 from public.role_permissions rp2
     where rp2.role_id = rp.role_id and rp2.permission_id = v.id

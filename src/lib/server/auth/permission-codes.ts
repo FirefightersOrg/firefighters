@@ -1,5 +1,5 @@
 /**
- * Canonical list of all 51 granular permission codes defined in docs/permissions.md
+ * Canonical list of all 55 granular permission codes defined in docs/permissions.md
  * and seeded in the database.
  */
 export const PERMISSIONS = [
@@ -16,18 +16,22 @@ export const PERMISSIONS = [
 	'bond.return',
 	'bond.mark_lost',
 	'bond.annul',
+	'bond.view_own',
 	'buyer.view',
 	'buyer.manage',
 	'collector.view',
 	'collector.manage',
 	'collector.ledger.view',
 	'collector.ledger.adjust',
+	'collector.ledger.view_own',
 	'sale.view',
 	'sale.create',
 	'sale.correct',
+	'sale.view_own',
 	'payment.view',
 	'payment.create',
 	'payment.annul',
+	'payment.create_own',
 	'settlement.view',
 	'settlement.create',
 	'settlement.update_open',
