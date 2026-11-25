@@ -21,7 +21,7 @@ join public.permissions p on p.id = rp.permission_id;
 
 select is((select count(*)::int from _rp where role_name = 'admin'), 51, 'admin has all 51 permissions');
 select is((select count(*)::int from _rp where role_name = 'operator'), 21, 'operator has 21 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
-select is((select count(*)::int from _rp where role_name = 'treasurer'), 19, 'treasurer has 19 permissions (SAN-93 view and matrix decisions)');
+select is((select count(*)::int from _rp where role_name = 'treasurer'), 20, 'treasurer has 20 permissions (SAN-93 view and matrix decisions, SAN-105 sale.view)');
 select is((select count(*)::int from _rp where role_name = 'read-only'), 6, 'read-only has 6 permissions (commission.view in SAN-93)');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'collector'),
@@ -47,7 +47,7 @@ select is(
   (select array_agg(code order by code) from _rp where role_name = 'treasurer'),
   array['audit.view', 'bond.view', 'campaign.view', 'collector.ledger.view', 'commission.adjust',
         'commission.view', 'draw.freeze_roster', 'draw.load_winner', 'draw.view', 'payment.annul',
-        'payment.create', 'payment.view', 'report.export', 'report.view_financial', 'report.view_operational', 'settlement.close', 'settlement.correct',
+        'payment.create', 'payment.view', 'report.export', 'report.view_financial', 'report.view_operational', 'sale.view', 'settlement.close', 'settlement.correct',
         'settlement.create', 'settlement.view'],
   'treasurer grants match the matrix'
 );

@@ -99,7 +99,7 @@ insert into expected_matrix values
   'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner',
   'report.view_operational','report.export']),
 ('treasurer', array[
-  'campaign.view','bond.view','collector.ledger.view','payment.view','payment.create','payment.annul',
+  'campaign.view','bond.view','sale.view','collector.ledger.view','payment.view','payment.create','payment.annul',
   'settlement.view','settlement.create','settlement.close','settlement.correct',
   'commission.view','commission.adjust','draw.view','draw.freeze_roster','draw.load_winner',
   'report.view_operational','report.view_financial','report.export','audit.view']),
