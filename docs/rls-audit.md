@@ -72,3 +72,7 @@ The only direct writes, `profiles` and `user_roles`, are intentional and gated b
 ## Collector own scope (SAN-143)
 
 The collector role reads rows through policies of the form `global permission OR (*_own permission AND is_own_collector(collector_id))`: `bonds`, `bond_numbers`, `bond_groups`, `delivery_notes`, `bond_assignments`, `sales` (plans and installments follow the sale), `payments`, `settlements`, `collector_ledger_entries` and `commission_adjustments`. `buyers_select` stays closed; buyers reach the portal only through `portal_my_buyers`. pgTAP `060_collector_portal_scope` checks two collectors, an unlinked profile, an inactive collector and the unchanged roles; `058_rls_audit` fixes the permission matrix.
+
+## Mi cuenta corriente (SAN-146)
+
+`portal_my_ledger_summary` and `portal_my_ledger` (SECURITY DEFINER, empty search_path, `authenticated` only) read the ledger of the caller's own collector, resolved from the session; they take no collector id, need `collector.ledger.view_own`, and return no reasons or notes. Reference entries (`affects_balance = false`, #130) are listed but never counted; the functions detect the column at run time. pgTAP `066_portal_my_ledger`.
