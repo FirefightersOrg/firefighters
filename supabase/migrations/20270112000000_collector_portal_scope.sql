@@ -8,7 +8,8 @@
 --    They are NOT bond.view / sale.view / ...: those are global grants used all over policies and
 --    functions. A `*_own` code only ever opens rows whose collector is the caller's own collector.
 -- 2. One helper, `is_own_collector(uuid)`. The four per-domain copies stay as thin wrappers because
---    SECURITY DEFINER function bodies (settlement and ledger services) call them; they now hold no logic.
+--    SECURITY DEFINER function bodies (settlement and ledger services) call them; they add the matching
+--    `*_own` permission so those functions cannot be reached without it.
 -- 3. Own-scope RLS on bonds, bond_numbers, bond_groups and commission_adjustments (new), and every
 --    existing own-scope policy now also requires its `*_own` permission (permission AND ownership).
 -- 4. `buyers_select` stays closed: the portal reads buyers through `portal_my_buyers`, a read-only
@@ -48,14 +49,29 @@ $$;
 revoke all on function public.is_own_collector(uuid) from public, anon, service_role;
 grant execute on function public.is_own_collector(uuid) to authenticated;
 
+-- The wrappers carry the `*_own` permission: SECURITY DEFINER functions skip RLS and only call these, so the
+-- permission has to live here or a linked profile without it could read through the RPCs.
 create or replace function public.delivery_is_own_collector(p_collector_id uuid) returns boolean
-language sql stable security definer set search_path = '' as $$ select public.is_own_collector(p_collector_id); $$;
+language sql stable security definer set search_path = '' as $$
+  select public.has_permission('bond.view_own') and public.is_own_collector(p_collector_id); $$;
 create or replace function public.sale_is_own_collector(p_collector_id uuid) returns boolean
-language sql stable security definer set search_path = '' as $$ select public.is_own_collector(p_collector_id); $$;
+language sql stable security definer set search_path = '' as $$
+  select public.has_permission('sale.view_own') and public.is_own_collector(p_collector_id); $$;
+-- Used by settlement_totals and the settlement services: settlements belong to the collector account.
 create or replace function public.payment_settlement_is_own_collector(p_collector_id uuid) returns boolean
-language sql stable security definer set search_path = '' as $$ select public.is_own_collector(p_collector_id); $$;
+language sql stable security definer set search_path = '' as $$
+  select public.has_permission('collector.ledger.view_own') and public.is_own_collector(p_collector_id); $$;
 create or replace function public.collector_ledger_is_own_collector(p_collector_id uuid) returns boolean
-language sql stable security definer set search_path = '' as $$ select public.is_own_collector(p_collector_id); $$;
+language sql stable security definer set search_path = '' as $$
+  select public.has_permission('collector.ledger.view_own') and public.is_own_collector(p_collector_id); $$;
+
+-- delivery_can_read(p_collector_id): the inline ownership clause also requires bond.view_own.
+create or replace function public.delivery_can_read(p_collector_id uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_permission('bond.view') or public.has_permission('bond.assign')
+    or public.has_permission('bond.return') or public.has_permission('bond.mark_lost')
+    or (public.has_permission('bond.view_own') and public.is_own_collector(p_collector_id));
+$$;
 
 -- ---------------------------------------------------------------------------
 -- RLS: permission AND ownership. The permission lookups are scalar subqueries (initPlan).
