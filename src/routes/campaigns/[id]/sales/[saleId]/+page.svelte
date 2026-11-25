@@ -14,7 +14,7 @@
 	import type { TableColumn } from '$lib/components/ui';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
 	import type { BondFinancialStatus } from '$lib/domain/bonds';
-	import { formatDate, formatMoney } from '$lib/format';
+	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import type { PageProps } from './$types';
@@ -57,6 +57,16 @@
 		{ value: '', label: 'Elegir…' },
 		...(data.correction?.collectors ?? []).map((c) => ({ value: c.id, label: c.displayName }))
 	]);
+	/** The markUncollectible action's result, typed loosely like the other form results. */
+	const markForm = $derived(
+		form?.form === 'markUncollectible'
+			? (form as {
+					success?: boolean;
+					values?: { reason?: string };
+					errors?: Record<string, string[] | undefined>;
+				})
+			: null
+	);
 	const link = 'rounded-sm text-primary-text underline-offset-2 hover:underline';
 </script>
 
@@ -139,6 +149,32 @@
 			</div>
 		</dl>
 	</Card>
+
+	{#if data.sale.uncollectible}
+		<Alert tone="warning" title="Venta incobrable">
+			Marcada el {formatDateTime(data.sale.uncollectible.markedAt)}. Motivo: {data.sale
+				.uncollectible.reason}
+		</Alert>
+	{:else if data.canMarkUncollectible}
+		<Card title="Marcar como incobrable">
+			<p class="text-body text-muted">
+				Pasa la venta a estado financiero «Incobrable» aunque después se registren pagos. Queda
+				auditado y no se puede deshacer.
+			</p>
+			<form method="POST" action="?/markUncollectible" class="mt-4 space-y-3">
+				<Field
+					label="Motivo"
+					id="uncollectible-reason"
+					required
+					hint="Hasta 1000 caracteres."
+					error={markForm && !markForm.success ? markForm.errors?.reason?.[0] : undefined}
+				>
+					<Textarea name="reason" value={markForm?.values?.reason ?? ''} />
+				</Field>
+				<Button type="submit" variant="danger">Marcar como incobrable</Button>
+			</form>
+		</Card>
+	{/if}
 
 	{#if data.correction}
 		<Card title="Correcciones auditadas">
