@@ -31,6 +31,8 @@ const summary = {
 	commission_generated: '15.00',
 	commission_adjusted: '0',
 	commission_settled: '0',
+	commission_annulments: '0',
+	other_movements: '0',
 	entry_count: 60
 };
 

@@ -1,7 +1,9 @@
 -- SAN-146: collector portal, "Mi cuenta corriente" (Phase 16). Read-only.
 --
 -- Two bounded read functions for the caller's OWN collector (resolved from the session, never from an argument):
---   portal_my_ledger_summary(campaign)           balance and commission totals (generated / adjusted / settled)
+--   portal_my_ledger_summary(campaign)           balance and commission totals (generated / adjusted / settled /
+--                                                annulments and corrections / other movements); the lines add up
+--                                                to the balance: generated + adjusted - settled + annulments + other
 --   portal_my_ledger(campaign, limit, offset)    one page of entries, newest first, with the running balance
 -- Both need `collector.ledger.view_own` (permission AND ownership), reuse the ordering of the treasury view
 -- (`collector_ledger_entries_with_balance`) so balances match, and never return internal notes: no `reason`,
@@ -26,7 +28,8 @@ revoke all on function public.portal_ledger_affects_balance_expr() from public, 
 
 create function public.portal_my_ledger_summary(p_campaign_id uuid)
 returns table (balance numeric, commission_generated numeric, commission_adjusted numeric,
-               commission_settled numeric, entry_count bigint)
+               commission_settled numeric, commission_annulments numeric, other_movements numeric,
+               entry_count bigint)
 language plpgsql stable security definer set search_path = '' as $$
 declare
   v_collector uuid;
@@ -49,6 +52,13 @@ begin
                              when e.entry_type = 'adjustment_in_favor_of_firefighters' then -e.amount else 0 end)
                     filter (where e.status <> 'annulled' and %1$s), 0),
            coalesce(sum(e.amount) filter (where e.status <> 'annulled' and %1$s and e.entry_type = 'commission_settled'), 0),
+           -- annulment entries (payment annulments, method changes, sale and settlement corrections) carry their sign
+           coalesce(sum(case when e.direction = 'collector_credit' then e.amount else -e.amount end)
+                    filter (where e.status <> 'annulled' and %1$s and e.entry_type = 'annulment'), 0),
+           -- any other entry type that moves the balance (cash settled, transfer received), signed
+           coalesce(sum(case when e.direction = 'collector_credit' then e.amount else -e.amount end)
+                    filter (where e.status <> 'annulled' and %1$s
+                              and e.entry_type in ('cash_settled', 'transfer_received_by_firefighters')), 0),
            count(*)
     from public.collector_ledger_entries e
     where e.campaign_id = $1 and e.collector_id = $2

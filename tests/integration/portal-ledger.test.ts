@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { isHttpError } from '@sveltejs/kit';
 import { createAdminManagedUser } from '$lib/server/services/user-admin';
-import { createCollector } from '$lib/server/services/parties';
+import { createBuyer, createCollector } from '$lib/server/services/parties';
 import type { PortalLedgerEntry } from '$lib/server/services/portal-ledger';
 import { listCollectorLedger } from '$lib/server/services/commission-ledger';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
@@ -86,9 +86,11 @@ let admin: Caller;
 let operator: Caller;
 let linkedA: Caller;
 let linkedB: Caller;
+let linkedC: Caller;
 let unlinked: Caller;
 let collectorA: string;
 let collectorB: string;
+let collectorC: string;
 let campaignId: string;
 
 async function adjust(collector: string, direction: string, amount: string, label: string) {
@@ -102,6 +104,90 @@ async function adjust(collector: string, direction: string, amount: string, labe
 	});
 	if (error) throw new Error(`${label}: ${error.message}`);
 	return data as string;
+}
+
+/** A real sale, one confirmed cash payment in a closed settlement, then the payment annulled: the ledger gets `annulment` entries. */
+async function annulledPaymentFor(collector: string) {
+	const rpc = async <T>(name: string, args: Record<string, unknown>) => {
+		const { data, error } = await admin.client.rpc(name, args);
+		if (error) throw new Error(`${name}: ${error.message}`);
+		return data as T;
+	};
+	const rid = (label: string) => `it-ledger-annul-flow-${label}-${RUN_ID}`;
+	const buyer = await createBuyer(
+		admin.client,
+		{
+			type: 'individual',
+			firstName: 'Buyer',
+			lastName: `Ledger ${RUN_ID}`,
+			businessName: null,
+			documentNumber: `L-${RUN_ID}`,
+			taxId: null,
+			phone: null,
+			address: null,
+			usualCollectorId: null,
+			notes: null
+		},
+		{ requestId: rid('buyer'), permissions: admin.permissions }
+	);
+	await rpc('commission_rule_create', {
+		p_campaign_id: campaignId,
+		p_rule_type: 'installment_first',
+		p_installment_number: null,
+		p_percentage: '10',
+		p_fixed_amount: null,
+		p_valid_from: '2026-01-01',
+		p_valid_to: null,
+		p_request_id: rid('rule')
+	});
+	const bondId = await rpc<string>('bond_create', {
+		p_campaign_id: campaignId,
+		p_base_numbers: [4100],
+		p_request_id: rid('bond')
+	});
+	await rpc('bond_deliver', {
+		p_campaign_id: campaignId,
+		p_collector_id: collector,
+		p_bond_ids: [bondId],
+		p_notes: null,
+		p_request_id: rid('deliver')
+	});
+	const saleId = await rpc<string>('sale_register', {
+		p_campaign_id: campaignId,
+		p_bond_id: bondId,
+		p_buyer_id: buyer,
+		p_payment_mode: 'installments',
+		p_first_due_date: new Date().toISOString().slice(0, 10),
+		p_request_id: rid('sale')
+	});
+	const { data: inst, error } = await admin.client
+		.from('installments')
+		.select('id, payment_plans!inner(sale_id)')
+		.eq('payment_plans.sale_id', saleId)
+		.order('installment_number')
+		.limit(1)
+		.single();
+	if (error || !inst) throw new Error(error?.message ?? 'Missing installment');
+	const settlementId = await rpc<string>('settlement_open', {
+		p_campaign_id: campaignId,
+		p_collector_id: collector,
+		p_request_id: rid('open')
+	});
+	const paymentId = await rpc<string>('settlement_add_payment', {
+		p_settlement_id: settlementId,
+		p_sale_id: saleId,
+		p_amount: 100,
+		p_payment_method: 'cash',
+		p_payment_date: new Date().toISOString().slice(0, 10),
+		p_applications: [{ installment_id: inst.id, amount_applied: 100 }],
+		p_request_id: rid('pay')
+	});
+	await rpc('settlement_close', { p_settlement_id: settlementId, p_request_id: rid('close') });
+	await rpc('payment_annul', {
+		p_payment_id: paymentId,
+		p_reason: 'cash entered twice',
+		p_request_id: rid('annul-payment')
+	});
 }
 
 async function makeCollectorUser(tag: string, name: string) {
@@ -145,6 +231,7 @@ beforeAll(async () => {
 	unlinked = await signIn(unlinkedEmail, PASSWORD);
 	({ caller: linkedA, id: collectorA } = await makeCollectorUser('a', 'A'));
 	({ caller: linkedB, id: collectorB } = await makeCollectorUser('b', 'B'));
+	({ caller: linkedC, id: collectorC } = await makeCollectorUser('c', 'C'));
 
 	const { data, error } = await admin.client.rpc('campaign_create', {
 		p_name: `[it-ledger ${RUN_ID}]`,
@@ -179,6 +266,7 @@ beforeAll(async () => {
 		p_request_id: `it-ledger-annul-${RUN_ID}`
 	});
 	if (annul.error) throw new Error(annul.error.message);
+	await annulledPaymentFor(collectorC);
 });
 
 describe('portal "Mi cuenta corriente" (local Supabase)', () => {
@@ -193,6 +281,39 @@ describe('portal "Mi cuenta corriente" (local Supabase)', () => {
 		expect(b.collector).toMatchObject({ id: collectorB });
 		expect(b.ledger?.summary.balance).toBe(7);
 		expect(b.ledger?.entries.map((e: PortalLedgerEntry) => e.amount)).toEqual([7]);
+	});
+
+	it('the summary lines add up to the balance, annulment entries included', async () => {
+		for (const caller of [linkedA, linkedB, linkedC]) {
+			const { summary } = (await cuentaLoad(event(caller)))!.ledger!;
+			expect(
+				summary.commissionGenerated +
+					summary.commissionAdjusted -
+					summary.commissionSettled +
+					summary.commissionAnnulments +
+					summary.otherMovements
+			).toBeCloseTo(summary.balance, 2);
+		}
+	});
+
+	it('an annulled payment produces annulment entries that the summary and the treasury both count', async () => {
+		const c = (await cuentaLoad(event(linkedC)))!.ledger!;
+		expect(c.entries.some((e: PortalLedgerEntry) => e.entryType === 'annulment')).toBe(true);
+		const treasury = await listCollectorLedger(admin.client, {
+			campaignId,
+			collectorId: collectorC
+		});
+		expect(c.summary.balance).toBe(treasury[treasury.length - 1].runningBalance);
+		const signed = c.entries
+			.filter((e: PortalLedgerEntry) => e.entryType === 'annulment' && e.status !== 'annulled')
+			.reduce(
+				(sum: number, e: PortalLedgerEntry) =>
+					sum + (e.direction === 'collector_credit' ? e.amount : -e.amount),
+				0
+			);
+		expect(c.summary.commissionAnnulments).toBeCloseTo(signed, 2);
+		// Without the annulment line the lines would not reproduce the balance when the net is not 0.
+		expect(c.summary.commissionGenerated).toBeGreaterThan(0);
 	});
 
 	it('lists the annulled entry without counting it, and leaks no internal notes', async () => {

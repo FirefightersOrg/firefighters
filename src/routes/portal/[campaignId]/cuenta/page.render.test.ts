@@ -73,6 +73,8 @@ const full = (overrides = {}) => ({
 		commissionGenerated: 15,
 		commissionAdjusted: 2.5,
 		commissionSettled: 0,
+		commissionAnnulments: 0,
+		otherMovements: 0,
 		entryCount: 3
 	},
 	entries,
@@ -91,6 +93,7 @@ describe('Mi cuenta corriente page', () => {
 		expect(body).toContain('Comisiones');
 		expect(body).toContain('Generadas');
 		expect(body).toContain('Liquidadas');
+		expect(body).toContain('Anulaciones y correcciones');
 		for (const column of ['Fecha', 'Concepto', 'Débito', 'Crédito', 'Saldo', 'Estado'])
 			expect(body).toMatch(new RegExp(`>\\s*${column}\\s*</th>`));
 		expect(body).toContain('19/11/2026');
@@ -130,10 +133,13 @@ describe('Mi cuenta corriente page', () => {
 					commissionGenerated: 0,
 					commissionAdjusted: 0,
 					commissionSettled: 0,
+					commissionAnnulments: 0,
+					otherMovements: 0,
 					entryCount: 0
 				}
 			})
 		);
+		expect(body).toContain('Sin saldo');
 		expect(body).toContain('Todavía no hay movimientos');
 		expect(body).toContain('Todavía no hay rendiciones');
 	});

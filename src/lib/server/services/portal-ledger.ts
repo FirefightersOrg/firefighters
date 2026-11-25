@@ -33,6 +33,10 @@ export interface PortalLedgerSummary {
 	commissionGenerated: number;
 	commissionAdjusted: number;
 	commissionSettled: number;
+	/** Signed total of the annulment entries (payment annulments and corrections); they do move the balance. */
+	commissionAnnulments: number;
+	/** Signed total of any other balance-moving entry (cash settled, transfer received). */
+	otherMovements: number;
 	entryCount: number;
 }
 
@@ -97,6 +101,8 @@ export async function getPortalLedgerSummary(
 		commissionGenerated: Number(r?.commission_generated ?? 0),
 		commissionAdjusted: Number(r?.commission_adjusted ?? 0),
 		commissionSettled: Number(r?.commission_settled ?? 0),
+		commissionAnnulments: Number(r?.commission_annulments ?? 0),
+		otherMovements: Number(r?.other_movements ?? 0),
 		entryCount: Number(r?.entry_count ?? 0)
 	};
 }

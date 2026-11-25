@@ -2,7 +2,7 @@
 -- but not counted, pages are stable and newest first, balances match the treasury view, no internal notes leak,
 -- and callers without collector.ledger.view_own are refused.
 begin;
-select plan(26);
+select plan(31);
 
 -- Users: 1 collector A, 2 collector B, 3 collector role but unlinked, 4 operator (no own-scope permission), 5 admin (actor).
 insert into auth.users(id, email)
@@ -45,11 +45,16 @@ insert into public.collector_ledger_entries(campaign_id, collector_id, entry_typ
 update public.collector_ledger_entries set status = 'annulled', annulled_by = pg_temp.actor(), annulled_at = '2026-11-03T11:00:00Z',
   annul_reason = 'internal annul note' where amount = 500 and collector_id = pg_temp.id('ca');
 insert into public.collector_ledger_entries(campaign_id, collector_id, entry_type, direction, amount, occurred_at, created_by) values
-  (pg_temp.id('camp'), pg_temp.id('ca'), 'commission_settled', 'collector_debit', 20, '2026-11-04T10:00:00Z', pg_temp.actor());
+  (pg_temp.id('camp'), pg_temp.id('ca'), 'commission_settled', 'collector_debit', 20, '2026-11-04T10:00:00Z', pg_temp.actor()),
+  -- B: an annulment (e.g. an annulled payment) compensates 40 of the 999 commission: balance 959.
+  (pg_temp.id('camp'), pg_temp.id('cb'), 'annulment', 'collector_debit', 40, '2026-11-05T10:00:00Z', pg_temp.actor());
 
 -- 1. Collector A ----------------------------------------------------------------------------------------
 select pg_temp.act(1);
 set local role authenticated;
+select is((select commission_generated + commission_adjusted - commission_settled + commission_annulments + other_movements
+           from public.portal_my_ledger_summary(pg_temp.id('camp'))),
+          (select balance from public.portal_my_ledger_summary(pg_temp.id('camp'))), 'A: the summary lines add up to the balance');
 select is((select balance from public.portal_my_ledger_summary(pg_temp.id('camp'))), 50.00, 'A: balance excludes the annulled entry');
 select is((select commission_generated from public.portal_my_ledger_summary(pg_temp.id('camp'))), 100.00, 'A: commissions generated');
 select is((select commission_adjusted from public.portal_my_ledger_summary(pg_temp.id('camp'))), -30.00, 'A: commissions adjusted (annulled adjustment not counted)');
@@ -78,9 +83,15 @@ select throws_ok(format('select * from public.portal_my_ledger(%L, 25, -1)', pg_
 
 -- 2. Collector B only sees B -------------------------------------------------------------------------------
 select pg_temp.act(2);
-select is((select balance from public.portal_my_ledger_summary(pg_temp.id('camp'))), 999.00, 'B: its own balance');
-select is((select count(*)::int from public.portal_my_ledger(pg_temp.id('camp'))), 1, 'B: one entry, none of A');
-select is((select settlement_number from public.portal_my_ledger(pg_temp.id('camp'))), 2, 'B: its own settlement number');
+select is((select balance from public.portal_my_ledger_summary(pg_temp.id('camp'))), 959.00, 'B: its own balance (the annulment counts)');
+select is((select commission_generated from public.portal_my_ledger_summary(pg_temp.id('camp'))), 999.00, 'B: commissions generated ignore the annulment');
+select is((select commission_annulments from public.portal_my_ledger_summary(pg_temp.id('camp'))), -40.00, 'B: the annulment is its own signed line');
+select is((select commission_generated + commission_adjusted - commission_settled + commission_annulments + other_movements
+           from public.portal_my_ledger_summary(pg_temp.id('camp'))),
+          (select balance from public.portal_my_ledger_summary(pg_temp.id('camp'))), 'B: the summary lines add up to the balance');
+select is((select count(*)::int from public.portal_my_ledger(pg_temp.id('camp'))), 2, 'B: two entries, none of A');
+select is((select settlement_number from public.portal_my_ledger(pg_temp.id('camp')) where entry_type = 'commission_generated'), 2, 'B: its own settlement number');
+select is((select running_balance from public.portal_my_ledger(pg_temp.id('camp')) order by occurred_at desc limit 1), 959.00, 'B: the running balance ends at the balance');
 
 -- 3. Unlinked collector login and operator ----------------------------------------------------------------
 select pg_temp.act(3);

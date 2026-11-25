@@ -92,15 +92,23 @@
 			<Stat
 				label="Saldo"
 				value={money(ledger.summary.balance)}
-				detail={ledger.summary.balance >= 0 ? 'A tu favor' : 'A tu cargo'}
+				detail={ledger.summary.balance > 0
+					? 'A tu favor'
+					: ledger.summary.balance < 0
+						? 'A tu cargo'
+						: 'Sin saldo'}
 			/>
 		</div>
 
 		<Section id="commissions" title="Comisiones">
-			<div data-testid="commission-summary" class="grid gap-4 sm:grid-cols-3">
+			<div data-testid="commission-summary" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Stat label="Generadas" value={money(ledger.summary.commissionGenerated)} />
 				<Stat label="Ajustadas" value={money(ledger.summary.commissionAdjusted)} />
 				<Stat label="Liquidadas" value={money(ledger.summary.commissionSettled)} />
+				<Stat
+					label="Anulaciones y correcciones"
+					value={money(ledger.summary.commissionAnnulments + ledger.summary.otherMovements)}
+				/>
 			</div>
 		</Section>
 
