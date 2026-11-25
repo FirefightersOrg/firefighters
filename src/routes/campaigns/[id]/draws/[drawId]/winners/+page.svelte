@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BondStub from '$lib/components/draws/BondStub.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Alert,
@@ -83,37 +84,44 @@
 	{#if immediateResult}
 		<div aria-live="polite">
 			<Card title="Resultado de la validación del {immediateResult.formattedNumber}">
-				{#if immediateResult.resultStatus === 'no_match'}
-					<p class="text-body"><strong>No habilitado:</strong> el número no está en el padrón.</p>
-					<p class="mt-1 text-body">El premio queda no adjudicado.</p>
-				{:else}
-					<dl class="grid gap-2 text-body sm:grid-cols-2">
-						<div>
-							<dt class="text-muted">Bono</dt>
-							<dd>{immediateResult.bondLabel}</dd>
-						</div>
-						<div>
-							<dt class="text-muted">Comprador</dt>
-							<dd>{immediateResult.buyerLabel}</dd>
-						</div>
-						<div>
-							<dt class="text-muted">Cobrador</dt>
-							<dd>{immediateResult.collectorLabel}</dd>
-						</div>
-						<div>
-							<dt class="text-muted">Elegibilidad</dt>
-							<dd>{immediateResult.eligible ? 'Habilitado' : 'No habilitado'}</dd>
-						</div>
-					</dl>
-					{#if !immediateResult.eligible}
-						<p class="mt-2 text-body"><strong>Motivo:</strong> {immediateResult.reasonLabel}</p>
-					{/if}
-					<p class="mt-1 text-body">
-						{immediateResult.eligible
-							? 'Pendiente de resolución.'
-							: 'El premio queda no adjudicado.'}
-					</p>
-				{/if}
+				<div class="grid items-center gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+					<BondStub caption="Número ganador" number={immediateResult.formattedNumber} />
+					<div>
+						{#if immediateResult.resultStatus === 'no_match'}
+							<p class="text-body">
+								<strong>No habilitado:</strong> el número no está en el padrón.
+							</p>
+							<p class="mt-1 text-body">El premio queda no adjudicado.</p>
+						{:else}
+							<dl class="grid gap-2 text-body sm:grid-cols-2">
+								<div>
+									<dt class="text-muted">Bono</dt>
+									<dd>{immediateResult.bondLabel}</dd>
+								</div>
+								<div>
+									<dt class="text-muted">Comprador</dt>
+									<dd>{immediateResult.buyerLabel}</dd>
+								</div>
+								<div>
+									<dt class="text-muted">Cobrador</dt>
+									<dd>{immediateResult.collectorLabel}</dd>
+								</div>
+								<div>
+									<dt class="text-muted">Elegibilidad</dt>
+									<dd>{immediateResult.eligible ? 'Habilitado' : 'No habilitado'}</dd>
+								</div>
+							</dl>
+							{#if !immediateResult.eligible}
+								<p class="mt-2 text-body"><strong>Motivo:</strong> {immediateResult.reasonLabel}</p>
+							{/if}
+							<p class="mt-1 text-body">
+								{immediateResult.eligible
+									? 'Pendiente de resolución.'
+									: 'El premio queda no adjudicado.'}
+							</p>
+						{/if}
+					</div>
+				</div>
 			</Card>
 		</div>
 	{/if}
@@ -157,38 +165,47 @@
 				</p>
 
 				{#if prize.winningNumber}
-					<div class="mt-4 rounded-md border border-border p-3 text-body">
-						<p>
-							<strong>Número ganador:</strong>
-							<span class="font-mono">{prize.winningNumber.formattedNumber}</span>
-							— {WINNING_NUMBER_STATUS_LABELS[prize.winningNumber.resultStatus]}
-						</p>
-						{#if prize.winningNumber.resultStatus === 'no_match'}
-							<p class="mt-2"><strong>Motivo:</strong> el número no está en el padrón</p>
-							<p class="mt-1">El premio queda no adjudicado.</p>
-						{:else}
-							<p class="mt-2">
-								{#if prize.winningNumber.bondLabel}
-									<strong>Código interno:</strong>
-									{prize.winningNumber.bondLabel},
-								{/if}
-								<strong>Comprador:</strong>
-								{prize.winningNumber.buyerLabel},
-								<strong>Cobrador:</strong>
-								{prize.winningNumber.collectorLabel}
+					<!-- Redesign: the winning number as the bond's stub, next to the verdict and details. -->
+					<div class="mt-4 grid items-center gap-6 text-body sm:grid-cols-[auto_minmax(0,1fr)]">
+						<BondStub
+							caption="Premio {prize.position}"
+							number={prize.winningNumber.formattedNumber}
+						/>
+						<div>
+							<p
+								class="font-semibold {prize.winningNumber.resultStatus === 'eligible_winner'
+									? 'text-success-text'
+									: 'text-warning-text'}"
+							>
+								{WINNING_NUMBER_STATUS_LABELS[prize.winningNumber.resultStatus]}
 							</p>
-							<p class="mt-1">
-								{prize.winningNumber.eligible ? 'Habilitado' : 'No habilitado'}
-								{#if prize.winningNumber.reasonLabel}— {prize.winningNumber.reasonLabel}{/if}
-							</p>
-							<p class="mt-1">
-								{prize.winningNumber.eligible && prize.status === 'pending_validation'
-									? 'Pendiente de resolución.'
-									: prize.winningNumber.eligible
-										? 'Resolución registrada.'
-										: 'El premio queda no adjudicado.'}
-							</p>
-						{/if}
+							{#if prize.winningNumber.resultStatus === 'no_match'}
+								<p class="mt-2"><strong>Motivo:</strong> el número no está en el padrón</p>
+								<p class="mt-1">El premio queda no adjudicado.</p>
+							{:else}
+								<p class="mt-2">
+									{#if prize.winningNumber.bondLabel}
+										<strong>Código interno:</strong>
+										{prize.winningNumber.bondLabel},
+									{/if}
+									<strong>Comprador:</strong>
+									{prize.winningNumber.buyerLabel},
+									<strong>Cobrador:</strong>
+									{prize.winningNumber.collectorLabel}
+								</p>
+								<p class="mt-1">
+									{prize.winningNumber.eligible ? 'Habilitado' : 'No habilitado'}
+									{#if prize.winningNumber.reasonLabel}— {prize.winningNumber.reasonLabel}{/if}
+								</p>
+								<p class="mt-1">
+									{prize.winningNumber.eligible && prize.status === 'pending_validation'
+										? 'Pendiente de resolución.'
+										: prize.winningNumber.eligible
+											? 'Resolución registrada.'
+											: 'El premio queda no adjudicado.'}
+								</p>
+							{/if}
+						</div>
 					</div>
 				{/if}
 
