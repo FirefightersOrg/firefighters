@@ -251,8 +251,17 @@ describe('financial and draw reports (local Supabase)', () => {
 			totalCash: '100.00',
 			totalAmount: '100.00'
 		});
-		// No commission rule exists in this campaign, so the current account has no entries.
-		expect(data.accounts.rows).toEqual([]);
+		// No commission rule exists in this campaign: the account only has the cash reference entry
+		// of the close (SAN-107), which does not move the balance.
+		expect(data.accounts.rows).toEqual([
+			expect.objectContaining({
+				collectorId,
+				entryCount: 1,
+				creditTotal: '0.00',
+				debitTotal: '0.00',
+				balance: '0.00'
+			})
+		]);
 		expect(data.draws).toEqual([]);
 		expect(data.prizes.rows).toEqual([]);
 		expect(data.ledger).toBeNull();
@@ -261,7 +270,14 @@ describe('financial and draw reports (local Supabase)', () => {
 
 	it('loads the account detail when a collector is chosen and applies filters', async () => {
 		const detail = (await load(event(users.admin, { search: `?collector=${collectorId}` })))!;
-		expect(detail.ledger).toEqual([]);
+		expect(detail.ledger).toEqual([
+			expect.objectContaining({
+				entryType: 'cash_settled',
+				amount: '100.00',
+				runningBalance: '0.00',
+				affectsBalance: false
+			})
+		]);
 		const transfer = (await load(event(users.admin, { search: '?method=transfer' })))!;
 		expect(transfer.payments.days).toEqual([]);
 		const past = (await load(event(users.admin, { search: '?to=2000-01-01' })))!;

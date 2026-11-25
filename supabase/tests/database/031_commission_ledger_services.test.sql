@@ -71,9 +71,9 @@ select lives_ok($$select public.settlement_close(pg_temp.id('settlement'))$$,'cl
 select throws_ok($$select public.settlement_close(pg_temp.id('settlement'))$$,'55000','settlement must be open','second close fails by state');
 reset role;
 select is((select count(*)::int from public.collector_ledger_entries where settlement_id=pg_temp.id('settlement') and entry_type='commission_generated'),1,'generated entry posted');
-select is((select count(*)::int from public.collector_ledger_entries where settlement_id=pg_temp.id('settlement')),2,'second close does not duplicate any ledger postings');
+select is((select count(*)::int from public.collector_ledger_entries where settlement_id=pg_temp.id('settlement') and affects_balance),2,'second close does not duplicate any ledger postings');
 select is((select count(*)::int from public.collector_ledger_entries where settlement_id=pg_temp.id('settlement') and entry_type='commission_settled'),1,'cash settled entry posted');
-select is((select sum(case when direction='collector_credit' then amount else -amount end) from public.collector_ledger_entries where collector_id=pg_temp.id('collector')),16::numeric,'transfer commission remains in balance');
+select is((select sum(case when direction='collector_credit' then amount else -amount end) from public.collector_ledger_entries where collector_id=pg_temp.id('collector') and affects_balance),16::numeric,'transfer commission remains in balance');
 
 set local role authenticated;
 select throws_ok($$select public.commission_settle('00000000-0000-4000-8000-000000000068',pg_temp.id('collector'),1,'missing campaign')$$,'P0002','campaign 00000000-0000-4000-8000-000000000068 not found','missing campaign is explicitly not found');

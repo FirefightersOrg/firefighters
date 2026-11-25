@@ -98,7 +98,8 @@ describe('Excel cell values', () => {
 		status: 'recorded',
 		settlementNumber: 3,
 		reason: '=1+1',
-		runningBalance: '-4.25'
+		runningBalance: '-4.25',
+		affectsBalance: true
 	};
 
 	it('writes amounts and counts as numbers', () => {

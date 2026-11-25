@@ -73,7 +73,9 @@ const balance = (collectorId: string) =>
 async function ledger(where: Record<string, string>) {
 	let query = users.admin.client
 		.from('collector_ledger_entries')
-		.select('id, payment_id, corrects_sale_id, entry_type, direction, amount, reason')
+		.select(
+			'id, payment_id, corrects_sale_id, entry_type, direction, amount, reason, affects_balance'
+		)
 		.eq('campaign_id', campaignId);
 	for (const [key, value] of Object.entries(where)) query = query.eq(key, value);
 	const { data, error } = await query.order('id');
@@ -424,6 +426,24 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 			['annulment', 'collector_credit', 10],
 			['annulment', 'collector_debit', 10]
 		]);
+		// SAN-109: each compensation references the settlement entry it offsets.
+		const { data: links, error: linksError } = await users.admin.client
+			.from('collector_ledger_entries')
+			.select('direction, original:original_entry_id(entry_type, settlement_id)')
+			.eq('payment_id', payments['cash-annul'])
+			.eq('affects_balance', true);
+		if (linksError) throw new Error(linksError.message);
+		expect(
+			(links ?? [])
+				.map((row) => {
+					const original = row.original as unknown as { entry_type: string; settlement_id: string };
+					return [row.direction, original.entry_type, original.settlement_id === settlementId];
+				})
+				.sort()
+		).toEqual([
+			['collector_credit', 'commission_settled', true],
+			['collector_debit', 'commission_generated', true]
+		]);
 		expect(
 			(
 				await users.admin.client
@@ -516,17 +536,33 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 			replaces_payment_id: payments['cash-to-transfer']
 		});
 		expect(
-			await ledger({ payment_id: payments['cash-to-transfer'] }).then((r) =>
-				r.map((x) => [x.direction, x.amount])
+			await ledger({ payment_id: payments['cash-to-transfer'], affects_balance: 'true' }).then(
+				(r) => r.map((x) => [x.direction, x.amount])
 			)
 		).toEqual([['collector_credit', 10]]);
+		// SAN-107: the closed settlement's cash reference entry is compensated for the moved amount.
+		expect(
+			await ledger({ payment_id: payments['cash-to-transfer'], affects_balance: 'false' }).then(
+				(r) => r.map((x) => [x.entry_type, x.direction])
+			)
+		).toEqual([['annulment', 'collector_debit']]);
+		expect(
+			await ledger({ payment_id: c2t, affects_balance: 'false' }).then((r) =>
+				r.map((x) => [x.entry_type, x.direction])
+			)
+		).toEqual([['transfer_received_by_firefighters', 'collector_credit']]);
 		await expectCorrectionAudit(
 			c2tRequest,
 			'payment.correct_method',
 			payments['cash-to-transfer'],
 			{ type: 'payment', id: c2t },
 			'cash should be transfer',
-			(await ledger({ payment_id: payments['cash-to-transfer'] })).map((x) => x.id)
+			// The commission compensation and the reference annulment are on the old payment; the new
+			// transfer reference entry (SAN-107) is on the replacement.
+			[
+				...(await ledger({ payment_id: payments['cash-to-transfer'] })),
+				...(await ledger({ payment_id: c2t, affects_balance: 'false' }))
+			].map((x) => x.id)
 		);
 		const t2cRequest = rid('t2c');
 		const t2c = await rpc<string>(users.admin, 'payment_correct_method', {
@@ -536,7 +572,9 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 			p_request_id: t2cRequest
 		});
 		expect(
-			await ledger({ payment_id: t2c }).then((r) => r.map((x) => [x.direction, x.amount]))
+			await ledger({ payment_id: t2c, affects_balance: 'true' }).then((r) =>
+				r.map((x) => [x.direction, x.amount])
+			)
 		).toEqual([['collector_debit', 10]]);
 		await expectCorrectionAudit(
 			t2cRequest,
@@ -544,7 +582,10 @@ describe('Phase 10: audited corrections and closed settlement immutability', () 
 			payments['transfer-to-cash'],
 			{ type: 'payment', id: t2c },
 			'transfer should be cash',
-			(await ledger({ payment_id: t2c })).map((x) => x.id)
+			[
+				...(await ledger({ payment_id: t2c })),
+				...(await ledger({ payment_id: payments['transfer-to-cash'], affects_balance: 'false' }))
+			].map((x) => x.id)
 		);
 		const reassociateRequest = rid('reassociate');
 		const reassociate = await rpc<string>(users.admin, 'payment_reassociate_transfer', {

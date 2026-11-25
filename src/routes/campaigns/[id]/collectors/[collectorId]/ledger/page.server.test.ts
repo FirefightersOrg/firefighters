@@ -186,8 +186,27 @@ describe('/campaigns/[id]/collectors/[collectorId]/ledger actions', () => {
 		).toMatchObject({ form: 'ledger', success: true });
 		expect(rpc).toHaveBeenLastCalledWith(
 			'collector_ledger_adjust',
-			expect.objectContaining({ p_direction: 'collector_debit' })
+			expect.objectContaining({ p_direction: 'collector_debit', p_original_entry_id: null })
 		);
+		// SAN-108: an adjustment can name the entry it compensates.
+		expect(
+			await act('adjustLedger', locals, {
+				...adjustment,
+				direction: 'collector_debit',
+				originalEntryId: ENTRY_ID
+			})
+		).toMatchObject({ form: 'ledger', success: true });
+		expect(rpc).toHaveBeenLastCalledWith(
+			'collector_ledger_adjust',
+			expect.objectContaining({ p_original_entry_id: ENTRY_ID })
+		);
+		expect(
+			await act('adjustLedger', locals, {
+				...adjustment,
+				direction: 'collector_debit',
+				originalEntryId: 'not-an-id'
+			})
+		).toMatchObject({ status: 400, data: { errors: { originalEntryId: expect.any(Array) } } });
 		expect(await act('annul', locals, { entryId: ENTRY_ID, reason: 'Twice' })).toMatchObject({
 			form: 'annul',
 			success: true

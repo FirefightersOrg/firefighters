@@ -175,4 +175,49 @@ describe('listCollectorLedger', () => {
 		});
 		expect(rows[0].annulReason).toBeNull();
 	});
+
+	it('passes the compensated entry and translates the compensation refusals (SAN-108)', async () => {
+		const original = '00000000-0000-4000-8000-0000000000aa';
+		const { rpc, client: c } = client({ data: 'entry' });
+		await adjustCollectorLedger(c, {
+			campaignId,
+			collectorId,
+			amount: 4,
+			direction: 'collector_debit',
+			reason: 'Bonus was lower',
+			originalEntryId: original
+		});
+		expect(rpc).toHaveBeenLastCalledWith(
+			'collector_ledger_adjust',
+			expect.objectContaining({ p_original_entry_id: original })
+		);
+		for (const [code, message, kind, text] of [
+			[
+				'22023',
+				'the compensation exceeds what is left of the original entry',
+				'validation',
+				'supera lo que queda'
+			],
+			[
+				'23514',
+				'a compensation must have the opposite direction of the entry it compensates',
+				'validation',
+				'sentido contrario'
+			],
+			[
+				'55000',
+				'a compensating or compensated entry cannot be annulled; record a compensation instead',
+				'conflict',
+				'otro ajuste'
+			]
+		] as const) {
+			const failing = client({ error: { code, message } }).client;
+			await expect(
+				annulCollectorLedgerEntry(failing, { entryId, reason: 'x' })
+			).rejects.toMatchObject({
+				kind,
+				message: expect.stringContaining(text)
+			});
+		}
+	});
 });

@@ -67,7 +67,7 @@ values (pg_temp.id('c'), (select sale from sale_ids where bond = 'b3'), pg_temp.
 -- Ledger of Ana: +20 (Mar 12), -5 (Mar 20), an annulled +7 (Mar 21, no effect). Balance 15.
 insert into public.collector_ledger_entries(campaign_id, collector_id, settlement_id, entry_type, direction, amount, occurred_at, created_by)
 values (pg_temp.id('c'), pg_temp.id('ca'), pg_temp.id('set1'), 'commission_generated', 'collector_credit', 20, '2020-03-12 10:00-03', pg_temp.actor()),
-       (pg_temp.id('c'), pg_temp.id('ca'), null, 'cash_settled', 'collector_debit', 5, '2020-03-20 10:00-03', pg_temp.actor()),
+       (pg_temp.id('c'), pg_temp.id('ca'), null, 'adjustment_in_favor_of_firefighters', 'collector_debit', 5, '2020-03-20 10:00-03', pg_temp.actor()),
        (pg_temp.id('c'), pg_temp.id('ca'), null, 'adjustment_in_favor_of_collector', 'collector_credit', 7, '2020-03-21 10:00-03', pg_temp.actor());
 update public.collector_ledger_entries set status = 'annulled', annulled_by = pg_temp.actor(), annulled_at = now(), annul_reason = 'mistake'
 where entry_type = 'adjustment_in_favor_of_collector' and collector_id = pg_temp.id('ca');
@@ -172,7 +172,7 @@ select results_eq($$select collector_name, entry_count::int, credit_total, debit
 select is((select count(*)::int from public.report_collector_accounts(pg_temp.id('c'), pg_temp.id('cb'))), 0, 'collector accounts filter by collector');
 select results_eq($$select occurred_on::text, occurred_time, entry_type, amount, status, settlement_number, running_balance from public.report_collector_ledger(pg_temp.id('c'), pg_temp.id('ca'))$$,
   $$values ('2020-03-12'::text, '10:00'::text, 'commission_generated'::text, '20.00'::text, 'recorded'::text, 1, '20.00'::text),
-           ('2020-03-20', '10:00', 'cash_settled', '5.00', 'recorded', null, '15.00'),
+           ('2020-03-20', '10:00', 'adjustment_in_favor_of_firefighters', '5.00', 'recorded', null, '15.00'),
            ('2020-03-21', '10:00', 'adjustment_in_favor_of_collector', '7.00', 'annulled', null, '15.00')$$,
   'account detail lists the entries with the running balance (annulled kept, no effect)');
 select results_eq($$select running_balance from public.report_collector_ledger(pg_temp.id('c'), pg_temp.id('ca'), '2020-03-20', '2020-03-20')$$,

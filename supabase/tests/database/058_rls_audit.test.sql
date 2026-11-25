@@ -185,7 +185,7 @@ values ('c6580000-0000-0000-0000-000000000009', 'c6580000-0000-0000-0000-0000000
   'c6580000-0000-0000-0000-000000000008');
 insert into public.collector_ledger_entries(id, campaign_id, collector_id, entry_type, direction, amount, created_by)
 values ('c6580000-0000-0000-0000-000000000010', 'c6580000-0000-0000-0000-000000000001', 'c6580000-0000-0000-0000-000000000002',
-  'cash_settled', 'collector_credit', 10, 'b6580000-0000-0000-0000-000000000001');
+  'adjustment_in_favor_of_collector', 'collector_credit', 10, 'b6580000-0000-0000-0000-000000000001');
 insert into public.audit_log(action, entity_type) values ('san91.probe', 'san91');
 insert into public.commission_rules(id, campaign_id, rule_type, valid_from, percentage)
 values ('c6580000-0000-0000-0000-000000000011', 'c6580000-0000-0000-0000-000000000001', 'cash_full_payment', current_date, 10);

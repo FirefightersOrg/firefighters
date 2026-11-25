@@ -345,7 +345,10 @@
 								<tr>
 									<td class={td}>{e.occurredOn} {e.occurredTime}</td>
 									<td class={td}
-										>{LEDGER_ENTRY_TYPE_LABELS[e.entryType as LedgerEntryType] ?? e.entryType}</td
+										>{LEDGER_ENTRY_TYPE_LABELS[e.entryType as LedgerEntryType] ??
+											e.entryType}{#if !e.affectsBalance}<span class="block text-body-sm text-muted"
+												>Referencia: no cambia el saldo.</span
+											>{/if}</td
 									>
 									<td class={td}
 										>{LEDGER_DIRECTION_LABELS[e.direction as LedgerDirection] ?? e.direction}</td

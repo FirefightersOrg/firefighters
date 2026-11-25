@@ -34,7 +34,7 @@ select ok(not has_function_privilege('anon','public.commission_adjust(uuid,uuid,
 select ok(has_function_privilege('authenticated','public.collector_ledger_entries_with_balance(uuid,uuid)','execute'),'ledger view granted');
 -- Structural check only: this asserts lock presence, not execution or concurrency safety.
 -- It does not prove the lock is reached on each branch; concurrent RPC execution is not tested here.
-select ok(lower(pg_get_functiondef('public.collector_ledger_adjust(uuid,uuid,numeric,text,text,text)'::regprocedure)) like '%pg_advisory_xact_lock%'
+select ok(lower(pg_get_functiondef('public.collector_ledger_adjust(uuid,uuid,numeric,text,text,text,uuid)'::regprocedure)) like '%pg_advisory_xact_lock%'
   and lower(pg_get_functiondef('public.collector_ledger_annul_entry(uuid,text,text)'::regprocedure)) like '%pg_advisory_xact_lock%'
   and lower(pg_get_functiondef('public.commission_adjust(uuid,uuid,numeric,text,text,uuid,uuid,text)'::regprocedure)) like '%pg_advisory_xact_lock%',
   'structural: balance-lowering write definitions contain the SAN-68 ledger lock');

@@ -37,10 +37,21 @@ export const LEDGER_STATUS_LABELS: Record<LedgerStatus, string> = {
 
 export const LEDGER_REASON_MAX = 1000;
 
+/**
+ * Reference (memo) entries (SAN-107): `cash_settled` and `transfer_received_by_firefighters`
+ * record what a settlement handed in. They appear in the account but never move its balance.
+ */
+export const LEDGER_REFERENCE_ENTRY_TYPES = [
+	'cash_settled',
+	'transfer_received_by_firefighters'
+] as const;
+
 export interface LedgerBalanceEntry {
 	direction: LedgerDirection;
 	amount: string | number;
 	status: LedgerStatus;
+	/** False for reference entries (SAN-107); missing means true. */
+	affectsBalance?: boolean;
 }
 
 /**
@@ -50,8 +61,29 @@ export interface LedgerBalanceEntry {
  */
 export const calculateLedgerBalance = (entries: readonly LedgerBalanceEntry[]) =>
 	entries.reduce((balance, entry) => {
-		if (entry.status === 'annulled') return balance;
+		if (entry.status === 'annulled' || entry.affectsBalance === false) return balance;
 		const amount = typeof entry.amount === 'string' ? Number(entry.amount) : entry.amount;
 		const cents = Math.round(amount * 100);
 		return balance + (entry.direction === 'collector_credit' ? cents : -cents);
 	}, 0) / 100;
+
+export interface LedgerCompensationEntry {
+	id: string;
+	amount: string | number;
+	status: LedgerStatus;
+	originalEntryId: string | null;
+}
+
+/**
+ * What is left of each entry after the entries that compensate it (SAN-108), in currency units.
+ * Mirrors `collector_ledger_uncompensated`; the database stays authoritative.
+ */
+export function ledgerUncompensated(entries: readonly LedgerCompensationEntry[]) {
+	const cents = (amount: string | number) =>
+		Math.round((typeof amount === 'string' ? Number(amount) : amount) * 100);
+	const used = new Map<string, number>();
+	for (const entry of entries)
+		if (entry.originalEntryId && entry.status !== 'annulled')
+			used.set(entry.originalEntryId, (used.get(entry.originalEntryId) ?? 0) + cents(entry.amount));
+	return new Map(entries.map((e) => [e.id, (cents(e.amount) - (used.get(e.id) ?? 0)) / 100]));
+}
