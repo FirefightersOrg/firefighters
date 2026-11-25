@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import {
-		cardClass,
-		inputClass,
-		labelClass,
-		primaryButtonClass,
-		secondaryButtonClass
-	} from '$lib/components/campaigns/styles';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Field from '$lib/components/ui/Field.svelte';
+	import Section from '$lib/components/ui/Section.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import TextInput from '$lib/components/ui/TextInput.svelte';
 	import {
 		BOND_COMMERCIAL_STATUSES,
 		BOND_COMMERCIAL_STATUS_LABELS,
@@ -33,111 +31,94 @@
 		BOND_COMMERCIAL_STATUS_LABELS[s as BondCommercialStatus] ?? s;
 	const financialLabel = (s: string) => BOND_FINANCIAL_STATUS_LABELS[s as BondFinancialStatus] ?? s;
 
-	const th = 'px-3 py-2 text-left font-semibold text-slate-700';
-	const thRight = 'px-3 py-2 text-right font-semibold text-slate-700';
-	const td = 'px-3 py-2 text-slate-800';
-	const tdRight = 'px-3 py-2 text-right tabular-nums text-slate-800';
+	const th = 'px-3 py-2 text-left text-label text-muted';
+	const thRight = 'px-3 py-2 text-right text-label text-muted';
+	const td = 'px-3 py-2 text-text';
+	const tdRight = 'px-3 py-2 text-right tabular-nums text-text';
+	const withAll = (options: { value: string; label: string }[]) => [
+		{ value: '', label: 'Todos' },
+		...options
+	];
+	const collectorOptions = $derived(
+		withAll([
+			...data.collectors.map((c) => ({ value: c.id, label: c.displayName })),
+			...(filters.collectorId && !data.collectors.some((c) => c.id === filters.collectorId)
+				? [{ value: filters.collectorId, label: 'Cobrador seleccionado' }]
+				: [])
+		])
+	);
+	const kindOptions = withAll(BOND_KINDS.map((k) => ({ value: k, label: BOND_KIND_LABELS[k] })));
+	const commercialOptions = withAll(
+		BOND_COMMERCIAL_STATUSES.map((s) => ({ value: s, label: BOND_COMMERCIAL_STATUS_LABELS[s] }))
+	);
+	const financialOptions = withAll(
+		BOND_FINANCIAL_STATUSES.map((s) => ({ value: s, label: BOND_FINANCIAL_STATUS_LABELS[s] }))
+	);
 </script>
 
-<svelte:head><title>Operational reports - {campaign.name} - Firefighters</title></svelte:head>
+<svelte:head><title>Reportes operativos - {campaign.name} - Firefighters</title></svelte:head>
 
 <div class="space-y-6">
 	<div>
 		<a
 			href={resolve('/campaigns/[id]', { id: campaign.id })}
-			class="text-sm text-blue-700 hover:underline">← {campaign.name}</a
+			class="text-body-sm text-primary-text hover:underline">← {campaign.name}</a
 		>
-		<h1 class="mt-2 text-2xl font-bold tracking-tight">Operational reports</h1>
-		<p class="mt-1 text-sm text-slate-600">
-			Read-only views of the current data. Financial status is the bond's last recalculated status
-			(updated when a settlement closes). Dates are Buenos Aires dates.
+		<h1 class="mt-2 text-heading-1">Reportes operativos</h1>
+		<p class="mt-1 text-body-sm text-muted">
+			Vistas de solo lectura de los datos actuales. El estado financiero es el último estado
+			recalculado del bono (se actualiza al cerrar una liquidación). Las fechas son de Buenos Aires.
 		</p>
 	</div>
 
-	<form method="GET" class="{cardClass} grid gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:items-end">
-		<div>
-			<label class={labelClass} for="collector">Collector</label>
-			<select class={inputClass} id="collector" name="collector">
-				<option value="">All</option>
-				{#each data.collectors as c (c.id)}
-					<option value={c.id} selected={filters.collectorId === c.id}>{c.displayName}</option>
-				{/each}
-				{#if filters.collectorId && !data.collectors.some((c) => c.id === filters.collectorId)}
-					<option value={filters.collectorId} selected>Selected collector</option>
-				{/if}
-			</select>
-		</div>
-		<div>
-			<label class={labelClass} for="kind">Bond type</label>
-			<select class={inputClass} id="kind" name="kind">
-				<option value="">All</option>
-				{#each BOND_KINDS as k (k)}
-					<option value={k} selected={filters.kind === k}>{BOND_KIND_LABELS[k]}</option>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label class={labelClass} for="status">Commercial status</label>
-			<select class={inputClass} id="status" name="status">
-				<option value="">All</option>
-				{#each BOND_COMMERCIAL_STATUSES as s (s)}
-					<option value={s} selected={filters.commercialStatus === s}
-						>{BOND_COMMERCIAL_STATUS_LABELS[s]}</option
-					>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label class={labelClass} for="financial">Financial status</label>
-			<select class={inputClass} id="financial" name="financial">
-				<option value="">All</option>
-				{#each BOND_FINANCIAL_STATUSES as s (s)}
-					<option value={s} selected={filters.financialStatus === s}
-						>{BOND_FINANCIAL_STATUS_LABELS[s]}</option
-					>
-				{/each}
-			</select>
-		</div>
-		<div>
-			<label class={labelClass} for="month">Month (monthly summary)</label>
-			<input class={inputClass} id="month" name="month" type="month" value={filters.month} />
-		</div>
-		<div>
-			<label class={labelClass} for="from">Installments due from</label>
-			<input class={inputClass} id="from" name="from" type="date" value={filters.from ?? ''} />
-		</div>
-		<div>
-			<label class={labelClass} for="to">Installments due to</label>
-			<input class={inputClass} id="to" name="to" type="date" value={filters.to ?? ''} />
-		</div>
+	<form
+		method="GET"
+		class="grid gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm sm:grid-cols-3 sm:items-end lg:grid-cols-4"
+	>
+		<Field label="Cobrador" id="collector">
+			<Select name="collector" options={collectorOptions} value={filters.collectorId ?? ''} />
+		</Field>
+		<Field label="Tipo de bono" id="kind">
+			<Select name="kind" options={kindOptions} value={filters.kind ?? ''} />
+		</Field>
+		<Field label="Estado comercial" id="status">
+			<Select name="status" options={commercialOptions} value={filters.commercialStatus ?? ''} />
+		</Field>
+		<Field label="Estado financiero" id="financial">
+			<Select name="financial" options={financialOptions} value={filters.financialStatus ?? ''} />
+		</Field>
+		<Field label="Mes (resumen mensual)" id="month">
+			<TextInput name="month" type="month" value={filters.month} />
+		</Field>
+		<Field label="Cuotas con vencimiento desde" id="from">
+			<TextInput name="from" type="date" value={filters.from ?? ''} />
+		</Field>
+		<Field label="Cuotas con vencimiento hasta" id="to">
+			<TextInput name="to" type="date" value={filters.to ?? ''} />
+		</Field>
 		<div class="flex gap-2">
-			<button type="submit" class={primaryButtonClass}>Apply</button>
-			<a href={resolve('/campaigns/[id]/reports', { id: campaign.id })} class={secondaryButtonClass}
-				>Clear</a
-			>
+			<Button type="submit" variant="primary">Aplicar</Button>
+			<Button href={resolve('/campaigns/[id]/reports', { id: campaign.id })}>Limpiar</Button>
 		</div>
 	</form>
 
-	<section class={cardClass} aria-labelledby="by-status-title">
-		<h2 id="by-status-title" class="mb-3 text-base font-semibold">
-			Bonds by commercial and financial status
-		</h2>
+	<Section id="by-status" title="Bonos por estado comercial y financiero">
 		{#if matrix.bondCount === 0}
-			<p class="text-sm text-slate-500">No bonds match the filters.</p>
+			<p class="text-body-sm text-muted">Ningún bono coincide con los filtros.</p>
 		{:else}
 			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
+				<table class="min-w-full divide-y divide-border text-body-sm">
 					<thead>
 						<tr>
-							<th class={th}>Commercial status</th>
+							<th class={th}>Estado comercial</th>
 							{#each matrix.financialStatuses as f (f)}
 								<th class={thRight}>{financialLabel(f)}</th>
 							{/each}
-							<th class={thRight}>Bonds</th>
-							<th class={thRight}>Value</th>
+							<th class={thRight}>Bonos</th>
+							<th class={thRight}>Valor</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-slate-100">
+					<tbody class="divide-y divide-border">
 						{#each matrix.commercialStatuses as c (c)}
 							<tr>
 								<td class={td}>{commercialLabel(c)}</td>
@@ -162,40 +143,39 @@
 				</table>
 			</div>
 		{/if}
-	</section>
+	</Section>
 
-	<section class={cardClass} aria-labelledby="by-collector-title">
-		<h2 id="by-collector-title" class="mb-3 text-base font-semibold">Bonds by collector</h2>
+	<Section id="by-collector" title="Bonos por cobrador">
 		{#if data.bondsByCollector.rows.length === 0}
-			<p class="text-sm text-slate-500">No bonds match the filters.</p>
+			<p class="text-body-sm text-muted">Ningún bono coincide con los filtros.</p>
 		{:else}
 			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
+				<table class="min-w-full divide-y divide-border text-body-sm">
 					<thead>
 						<tr>
-							<th class={th}>Collector</th>
-							<th class={thRight}>Bonds</th>
-							<th class={thRight}>Delivered</th>
-							<th class={thRight}>Sold</th>
-							<th class={thRight}>Returned</th>
-							<th class={thRight}>Value</th>
-							<th class={thRight}>Sold value</th>
+							<th class={th}>Cobrador</th>
+							<th class={thRight}>Bonos</th>
+							<th class={thRight}>Entregados</th>
+							<th class={thRight}>Vendidos</th>
+							<th class={thRight}>Devueltos</th>
+							<th class={thRight}>Valor</th>
+							<th class={thRight}>Valor vendido</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-slate-100">
+					<tbody class="divide-y divide-border">
 						{#each data.bondsByCollector.rows as r (r.collectorId ?? 'unassigned')}
 							<tr>
 								<td class={td}>
 									{#if r.collectorId}
 										<a
-											class="text-blue-700 hover:underline"
+											class="text-primary-text hover:underline"
 											href={resolve('/campaigns/[id]/collectors/[collectorId]', {
 												id: campaign.id,
 												collectorId: r.collectorId
-											})}>{r.collectorName ?? 'Collector'}</a
+											})}>{r.collectorName ?? 'Cobrador'}</a
 										>
 									{:else}
-										<span class="text-slate-500">Unassigned</span>
+										<span class="text-muted">Sin asignar</span>
 									{/if}
 								</td>
 								<td class={tdRight}>{formatInteger(r.bondCount)}</td>
@@ -221,30 +201,27 @@
 				</table>
 			</div>
 		{/if}
-	</section>
+	</Section>
 
-	<section class={cardClass} aria-labelledby="installments-title">
-		<h2 id="installments-title" class="mb-1 text-base font-semibold">
-			Installments: pending, paid, advance and overdue
-		</h2>
-		<p class="mb-3 text-xs text-slate-500">
-			Active sales only. Overdue includes pending installments past their due date. Each cell shows
-			count and amount.
+	<Section id="installments" title="Cuotas: pendientes, pagadas, adelantadas y vencidas">
+		<p class="mb-3 text-body-sm text-muted">
+			Solo ventas activas. Las vencidas incluyen cuotas pendientes con fecha de vencimiento pasada.
+			Cada celda muestra cantidad e importe.
 		</p>
 		{#if data.installments.collectors.length === 0}
-			<p class="text-sm text-slate-500">No installments match the filters.</p>
+			<p class="text-body-sm text-muted">Ninguna cuota coincide con los filtros.</p>
 		{:else}
 			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
+				<table class="min-w-full divide-y divide-border text-body-sm">
 					<thead>
 						<tr>
-							<th class={th}>Collector</th>
+							<th class={th}>Cobrador</th>
 							{#each INSTALLMENT_BUCKETS as b (b)}
 								<th class={thRight}>{INSTALLMENT_BUCKET_LABELS[b]}</th>
 							{/each}
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-slate-100">
+					<tbody class="divide-y divide-border">
 						{#each data.installments.collectors as c (c.collectorId)}
 							<tr>
 								<td class={td}>{c.collectorName}</td>
@@ -271,41 +248,39 @@
 				</table>
 			</div>
 		{/if}
-	</section>
+	</Section>
 
-	<section class={cardClass} aria-labelledby="monthly-title">
-		<h2 id="monthly-title" class="mb-1 text-base font-semibold">
-			Monthly summary per collector: {formatMonthLabel(filters.month)}
-		</h2>
-		<p class="mb-3 text-xs text-slate-500">
-			Assigned bonds are those held today. Sold = sales registered in the month. Installments are
-			those due in the month and still unpaid. Payments exclude drafts and annulled payments.
+	<Section id="monthly" title={`Resumen mensual por cobrador: ${formatMonthLabel(filters.month)}`}>
+		<p class="mb-3 text-body-sm text-muted">
+			Los bonos asignados son los que se tienen hoy. Vendidos son las ventas registradas en el mes.
+			Las cuotas son las que vencen en el mes y siguen impagas. Los pagos excluyen borradores y
+			pagos anulados.
 		</p>
 		{#if data.monthly.rows.length === 0}
-			<p class="text-sm text-slate-500">No collector activity in this month.</p>
+			<p class="text-body-sm text-muted">No hubo actividad de cobradores en este mes.</p>
 		{:else}
 			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-slate-200 text-sm">
+				<table class="min-w-full divide-y divide-border text-body-sm">
 					<thead>
 						<tr>
-							<th class={th}>Collector</th>
-							<th class={thRight}>Assigned</th>
-							<th class={thRight}>Sold</th>
-							<th class={thRight}>Sold value</th>
-							<th class={thRight}>Pending inst.</th>
-							<th class={thRight}>Overdue inst.</th>
-							<th class={thRight}>Payments</th>
-							<th class={thRight}>Cash</th>
-							<th class={thRight}>Transfer</th>
-							<th class={thRight}>Collected</th>
+							<th class={th}>Cobrador</th>
+							<th class={thRight}>Asignados</th>
+							<th class={thRight}>Vendidos</th>
+							<th class={thRight}>Valor vendido</th>
+							<th class={thRight}>Cuotas pendientes</th>
+							<th class={thRight}>Cuotas vencidas</th>
+							<th class={thRight}>Pagos</th>
+							<th class={thRight}>Efectivo</th>
+							<th class={thRight}>Transferencia</th>
+							<th class={thRight}>Cobrado</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-slate-100">
+					<tbody class="divide-y divide-border">
 						{#each data.monthly.rows as r (r.collectorId)}
 							<tr>
 								<td class={td}>
 									<a
-										class="text-blue-700 hover:underline"
+										class="text-primary-text hover:underline"
 										href={resolve('/campaigns/[id]/collectors/[collectorId]', {
 											id: campaign.id,
 											collectorId: r.collectorId
@@ -353,5 +328,5 @@
 				</table>
 			</div>
 		{/if}
-	</section>
+	</Section>
 </div>

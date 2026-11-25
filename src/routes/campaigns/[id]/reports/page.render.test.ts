@@ -85,12 +85,12 @@ function page(overrides: Record<string, unknown> = {}) {
 describe('/campaigns/[id]/reports page', () => {
 	it('renders the four reports with Argentine money formatting', () => {
 		const body = page();
-		expect(body).toContain('Bonds by commercial and financial status');
-		expect(body).toContain('Bonds by collector');
-		expect(body).toContain('Installments: pending, paid, advance and overdue');
-		expect(body).toContain('Monthly summary per collector: March 2027');
+		expect(body).toContain('Bonos por estado comercial y financiero');
+		expect(body).toContain('Bonos por cobrador');
+		expect(body).toContain('Cuotas: pendientes, pagadas, adelantadas y vencidas');
+		expect(body).toContain('Resumen mensual por cobrador: marzo de 2027');
 		expect(body).toContain('120.000,00');
-		expect(body).toContain('Overdue');
+		expect(body).toContain('Vencidas');
 		expect(body).toContain(`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}`);
 	});
 
@@ -107,8 +107,8 @@ describe('/campaigns/[id]/reports page', () => {
 			installments: pivotInstallments([]),
 			monthly: { rows: [], totals: totalCollectorMonthly([]) }
 		});
-		expect(body).toContain('No bonds match the filters.');
-		expect(body).toContain('No installments match the filters.');
-		expect(body).toContain('No collector activity in this month.');
+		expect(body).toContain('Ningún bono coincide con los filtros.');
+		expect(body).toContain('Ninguna cuota coincide con los filtros.');
+		expect(body).toContain('No hubo actividad de cobradores en este mes.');
 	});
 });

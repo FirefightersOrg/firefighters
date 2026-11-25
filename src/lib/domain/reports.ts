@@ -131,10 +131,10 @@ export const INSTALLMENT_BUCKETS = ['pending', 'overdue', 'paid', 'advance'] as 
 export type InstallmentBucket = (typeof INSTALLMENT_BUCKETS)[number];
 
 export const INSTALLMENT_BUCKET_LABELS: Record<InstallmentBucket, string> = {
-	pending: 'Pending',
-	overdue: 'Overdue',
-	paid: 'Paid',
-	advance: 'Paid in advance'
+	pending: 'Pendientes',
+	overdue: 'Vencidas',
+	paid: 'Pagadas',
+	advance: 'Pagadas por adelantado'
 };
 
 export interface InstallmentBucketRow {
@@ -316,7 +316,7 @@ export function totalCollectorMonthly(rows: readonly CollectorMonthlyRow[]) {
 /** `2026-03` -> `March 2026`. */
 export function formatMonthLabel(month: string): string {
 	const [year, m] = month.split('-').map(Number);
-	return new Intl.DateTimeFormat('en-US', {
+	return new Intl.DateTimeFormat('es-AR', {
 		month: 'long',
 		year: 'numeric',
 		timeZone: 'UTC'
