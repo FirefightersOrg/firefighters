@@ -22,7 +22,9 @@ import { DomainError } from './errors';
 import { centsToDecimalString, MAX_MONEY_CENTS, parseMoneyToCents } from './money';
 import {
 	assertValidNumberingConfig,
+	associatedNumberFor,
 	formatCampaignNumber,
+	getMaxValidBaseNumber,
 	type CampaignNumberingConfig
 } from './numbering';
 
@@ -173,13 +175,23 @@ function pairFor(base: number, config: CampaignNumberingConfig): BaseNumberPair 
 			{ number: show(base, config) }
 		);
 	}
-	const associated = base + config.associatedNumberOffset;
+	const associated = associatedNumberFor(base, config);
+	if (associated === null) {
+		// Circular mode: bases are 0..B-1 (B = (max + 1) / 2), so the associated numbers fill B..2B-1.
+		const highest = getMaxValidBaseNumber(config);
+		throw new BondError(
+			'overflow',
+			`El número base ${show(base, config)} no entra en el modo circular: ` +
+				`el número base más alto permitido es ${show(highest, config)}`,
+			{ number: show(base, config) }
+		);
+	}
 	if (associated > config.maxNumber) {
 		throw new BondError(
 			'overflow',
 			`El número base ${show(base, config)} desborda: su número asociado ${show(associated, config)} ` +
 				`supera el número máximo de la campaña ${show(config.maxNumber, config)} ` +
-				`(el número base más alto permitido es ${show(config.maxNumber - config.associatedNumberOffset, config)})`,
+				`(el número base más alto permitido es ${show(getMaxValidBaseNumber(config), config)})`,
 			{ number: show(base, config) }
 		);
 	}

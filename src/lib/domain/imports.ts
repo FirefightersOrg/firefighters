@@ -35,7 +35,7 @@ import type { BarcodeRules } from './barcodes';
 import type { BondKind } from './bonds';
 import { MIN_PATA_SIZE } from './bonds';
 import { DomainError } from './errors';
-import type { CampaignNumberingConfig } from './numbering';
+import { associatedNumberFor, type CampaignNumberingConfig } from './numbering';
 
 /** Most data rows in one file. */
 export const IMPORT_MAX_ROWS = 5000;
@@ -130,7 +130,7 @@ export interface ImportIssue<Code extends string = string> {
 }
 
 export type ImportRules = BarcodeRules &
-	Pick<CampaignNumberingConfig, 'maxNumber' | 'associatedNumberOffset'>;
+	Pick<CampaignNumberingConfig, 'maxNumber' | 'associatedNumberOffset' | 'associatedNumberMode'>;
 
 /**
  * Trims spaces, tabs and line breaks (the same set as SQL `btrim(x, E' \t\r\n')`); blank → null.
@@ -343,19 +343,28 @@ export interface ValidateImportOptions {
  */
 export function validateImportBatch(
 	items: readonly ImportBatchItem[],
-	rules: Pick<ImportRules, 'numberDigits' | 'maxNumber' | 'associatedNumberOffset'>,
+	rules: Pick<
+		ImportRules,
+		'numberDigits' | 'maxNumber' | 'associatedNumberOffset' | 'associatedNumberMode'
+	>,
 	existing?: ExistingCampaignData,
 	options: ValidateImportOptions = {}
 ): { items: ImportItemResult[]; summary: ImportSummary } {
 	const { checkGroups = true } = options;
-	const offset = rules.associatedNumberOffset;
+	// The one formula of `public.bond_associated_number`; null = circular base outside 0..B-1.
+	const associatedOf = (base: number) => associatedNumberFor(base, rules);
 	const fmt = (v: number) => padNumber(v, rules.numberDigits);
+
+	const participatingOf = (base: number): number[] => {
+		const associated = associatedOf(base);
+		return associated === null ? [base] : [base, associated];
+	};
 
 	// Participating numbers of every live row with a base number (rows in error included).
 	const numberOwners = new Map<number, Set<string>>();
 	for (const item of items) {
 		if (item.baseNumber === null) continue;
-		for (const n of [item.baseNumber, item.baseNumber + offset]) {
+		for (const n of participatingOf(item.baseNumber)) {
 			numberOwners.set(n, (numberOwners.get(n) ?? new Set()).add(item.key));
 		}
 	}
@@ -368,8 +377,8 @@ export function validateImportBatch(
 	}
 	const baseRepeated = (base: number) => (baseCount.get(base) ?? 0) > 1;
 	const numberRepeated = (base: number) =>
-		offset === 0 || // its base and associated numbers are the same number
-		[base, base + offset].some((n) => (numberOwners.get(n)?.size ?? 0) > 1);
+		associatedOf(base) === base || // its base and associated numbers are the same number
+		participatingOf(base).some((n) => (numberOwners.get(n)?.size ?? 0) > 1);
 
 	// Row barcodes of the live rows without a parser error.
 	const barcodeCount = new Map<string, number>();
@@ -402,10 +411,14 @@ export function validateImportBatch(
 		if (item.itemType === 'pata' && item.groupKey === null) {
 			return { code: 'missing_group', message: 'Every row of a pata needs its grupo_pata.' };
 		}
-		if (base > rules.maxNumber || base + offset > rules.maxNumber) {
+		const associated = associatedOf(base);
+		if (base > rules.maxNumber || associated === null || associated > rules.maxNumber) {
 			return {
 				code: 'number_out_of_range',
-				message: `Number ${fmt(base)} does not fit the campaign (maximum ${fmt(rules.maxNumber)}).`
+				message:
+					rules.associatedNumberMode === 'circular' && base <= rules.maxNumber
+						? `Number ${fmt(base)} does not fit the campaign (circular mode: base numbers go up to ${fmt((rules.maxNumber + 1) / 2 - 1)}).`
+						: `Number ${fmt(base)} does not fit the campaign (maximum ${fmt(rules.maxNumber)}).`
 			};
 		}
 		if (baseRepeated(base)) {
@@ -420,7 +433,7 @@ export function validateImportBatch(
 				message: 'This number (or its associated number) is repeated in the import.'
 			};
 		}
-		const used = existing ? [base, base + offset].filter((n) => existing.numbers.has(n)) : [];
+		const used = existing ? participatingOf(base).filter((n) => existing.numbers.has(n)) : [];
 		if (used.length > 0) {
 			return {
 				code: 'number_in_use',
@@ -476,7 +489,7 @@ export function validateImportBatch(
 		};
 	});
 
-	return { items: results, summary: summarizeImportItems(results, offset) };
+	return { items: results, summary: summarizeImportItems(results, rules) };
 }
 
 /** The counts of `import_session_summary` over the given live rows. */
@@ -485,7 +498,7 @@ export function summarizeImportItems(
 		ImportItemResult,
 		'status' | 'itemType' | 'groupKey' | 'baseNumber' | 'errorCode'
 	>[],
-	associatedNumberOffset: number
+	rules: Pick<ImportRules, 'maxNumber' | 'associatedNumberOffset' | 'associatedNumberMode'>
 ): ImportSummary {
 	const count = (pred: (i: (typeof items)[number]) => boolean) => items.filter(pred).length;
 	const bases = new Set<number>();
@@ -493,7 +506,9 @@ export function summarizeImportItems(
 	for (const i of items) {
 		if (i.baseNumber === null) continue;
 		bases.add(i.baseNumber);
-		participating.add(i.baseNumber).add(i.baseNumber + associatedNumberOffset);
+		participating.add(i.baseNumber);
+		const associated = associatedNumberFor(i.baseNumber, rules);
+		if (associated !== null) participating.add(associated);
 	}
 	return {
 		liveItems: items.length,

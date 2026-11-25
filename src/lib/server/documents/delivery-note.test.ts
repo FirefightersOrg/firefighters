@@ -17,6 +17,7 @@ const campaign = (digits: 4 | 5): Campaign => ({
 	numberDigits: digits,
 	maxNumber: digits === 4 ? 9999 : 99999,
 	associatedNumberOffset: digits === 4 ? 4871 : 48710,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject',
 	barcodeMode: 'base_number',
 	barcodePattern: null,

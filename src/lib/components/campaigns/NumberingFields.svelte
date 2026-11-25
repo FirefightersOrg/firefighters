@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { OVERFLOW_POLICY_LABELS } from '$lib/domain/campaigns';
-	import { OVERFLOW_POLICIES } from '$lib/domain/numbering';
+	import { ASSOCIATED_NUMBER_MODE_LABELS, OVERFLOW_POLICY_LABELS } from '$lib/domain/campaigns';
+	import { ASSOCIATED_NUMBER_MODES, OVERFLOW_POLICIES } from '$lib/domain/numbering';
 	import {
 		MAX_NUMBER_DIGITS,
 		previewNumberingInput,
@@ -18,18 +18,26 @@
 		numberDigits = $bindable(''),
 		maxNumber = $bindable(''),
 		associatedNumberOffset = $bindable(''),
+		associatedNumberMode = $bindable('linear'),
 		overflowPolicy = $bindable('reject'),
 		errors = {}
 	}: {
 		numberDigits?: string;
 		maxNumber?: string;
 		associatedNumberOffset?: string;
+		associatedNumberMode?: string;
 		overflowPolicy?: string;
 		errors?: CampaignFieldErrors;
 	} = $props();
 
 	const preview = $derived(
-		previewNumberingInput({ numberDigits, maxNumber, associatedNumberOffset, overflowPolicy })
+		previewNumberingInput({
+			numberDigits,
+			maxNumber,
+			associatedNumberOffset,
+			associatedNumberMode,
+			overflowPolicy
+		})
 	);
 	const previewIssueFields = $derived(
 		new Set(preview.state === 'invalid' ? preview.issues.map((issue) => issue.field) : [])
@@ -93,7 +101,9 @@
 		<Field
 			label="Desfase del número asociado"
 			id="associatedNumberOffset"
-			hint="Número asociado = número base + desfase."
+			hint={associatedNumberMode === 'circular'
+				? 'Menor que B (la mitad del rango). Número asociado = B + ((base + desfase) mod B).'
+				: 'Número asociado = número base + desfase.'}
 			error={errors.associatedNumberOffset?.[0]}
 			required
 		>
@@ -109,6 +119,25 @@
 			/>
 		</Field>
 	</div>
+
+	<Field
+		label="Modo del número asociado"
+		id="associatedNumberMode"
+		hint="Lineal: número base + desfase. Circular: da la vuelta dentro de la segunda mitad del rango, así los números base y los asociados cubren todo el rango sin repetirse (el número máximo más 1 debe ser par)."
+		error={errors.associatedNumberMode?.[0]}
+		required
+	>
+		<Select
+			name="associatedNumberMode"
+			invalid={previewInvalid('associatedNumberMode')}
+			aria-describedby={previewDescription('associatedNumberMode')}
+			options={ASSOCIATED_NUMBER_MODES.map((mode) => ({
+				value: mode,
+				label: ASSOCIATED_NUMBER_MODE_LABELS[mode]
+			}))}
+			bind:value={associatedNumberMode}
+		/>
+	</Field>
 
 	<Field
 		label="Política de desborde"

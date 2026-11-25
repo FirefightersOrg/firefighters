@@ -8,6 +8,7 @@ const campaign = {
 	numberDigits: 5,
 	maxNumber: 99999,
 	associatedNumberOffset: 100,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject'
 } as Campaign;
 const source = {

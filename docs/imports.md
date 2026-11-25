@@ -227,6 +227,7 @@ Schema: `20261123000000_campaign_barcode_pattern.sql`, `20261124000000_import_se
   base number. `number_conflict`: the base number only meets another row's associated number (or
   its own, when the offset is 0). `number_in_use`: a bond of the campaign already holds the number.
   `duplicate_number` is checked first. The summary counts all three among its duplicates.
+- **Associated number by mode (SAN-151).** The staging validation, the summary and the confirmation use `public.bond_associated_number`: `base + offset` in `linear` mode, `B + ((base + offset) mod B)` in `circular` mode. In circular mode a base number from B up (`B = (max_number + 1) / 2`) fails as `number_out_of_range`, and the stored associated number of a base such as 0068 is 9939 (B = 5000, offset 4871).
 
 ## App layer (SAN-45)
 

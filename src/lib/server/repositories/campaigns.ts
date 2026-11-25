@@ -6,7 +6,12 @@ import {
 	type Campaign,
 	type CampaignStatus
 } from '$lib/domain/campaigns';
-import { OVERFLOW_POLICIES, type OverflowPolicy } from '$lib/domain/numbering';
+import {
+	ASSOCIATED_NUMBER_MODES,
+	OVERFLOW_POLICIES,
+	type AssociatedNumberMode,
+	type OverflowPolicy
+} from '$lib/domain/numbering';
 import { toDecimalString } from '$lib/domain/money';
 
 /**
@@ -28,6 +33,7 @@ export const CAMPAIGN_COLUMNS = [
 	'number_digits',
 	'max_number',
 	'associated_number_offset',
+	'associated_number_mode',
 	'overflow_policy',
 	'barcode_mode',
 	'barcode_pattern',
@@ -48,6 +54,7 @@ export interface CampaignRow {
 	number_digits: number;
 	max_number: number;
 	associated_number_offset: number;
+	associated_number_mode: string;
 	overflow_policy: string;
 	barcode_mode: string;
 	barcode_pattern: string | null;
@@ -77,6 +84,11 @@ export function mapCampaignRow(row: CampaignRow): Campaign {
 		numberDigits: row.number_digits,
 		maxNumber: row.max_number,
 		associatedNumberOffset: row.associated_number_offset,
+		associatedNumberMode: oneOf<AssociatedNumberMode>(
+			ASSOCIATED_NUMBER_MODES,
+			row.associated_number_mode,
+			'associated_number_mode'
+		),
 		overflowPolicy: oneOf<OverflowPolicy>(
 			OVERFLOW_POLICIES,
 			row.overflow_policy,

@@ -5,7 +5,7 @@
  * SQL functions). These helpers mirror it so the UI only offers actions that can succeed;
  * the server always re-checks.
  */
-import type { CampaignNumberingConfig, OverflowPolicy } from './numbering';
+import type { AssociatedNumberMode, CampaignNumberingConfig, OverflowPolicy } from './numbering';
 
 export const CAMPAIGN_STATUSES = ['draft', 'active', 'closing', 'closed', 'annulled'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
@@ -33,6 +33,12 @@ export const BARCODE_MODE_LABELS: Record<BarcodeMode, string> = {
 	internal_code: 'Código interno',
 	external_legacy_code: 'Código externo o heredado',
 	manual_mapping: 'Asignación manual'
+};
+
+/** Spanish labels of the associated number modes (neutral voice, docs/copy.md). */
+export const ASSOCIATED_NUMBER_MODE_LABELS: Record<AssociatedNumberMode, string> = {
+	linear: 'Lineal (número base + desfase)',
+	circular: 'Circular (cubre todo el rango sin repetir)'
 };
 
 /** Spanish labels of the overflow policies. */
@@ -142,6 +148,8 @@ export interface Campaign {
 	numberDigits: number;
 	maxNumber: number;
 	associatedNumberOffset: number;
+	/** `linear` (base + offset, the default) or `circular` (B + ((base + offset) mod B)). */
+	associatedNumberMode: AssociatedNumberMode;
 	overflowPolicy: OverflowPolicy;
 	barcodeMode: BarcodeMode;
 	/** Regex extracting the base number (first capture group); only for BARCODE_PATTERN_MODES. */
@@ -154,13 +162,18 @@ export interface Campaign {
 export function campaignNumberingConfig(
 	campaign: Pick<
 		Campaign,
-		'numberDigits' | 'maxNumber' | 'associatedNumberOffset' | 'overflowPolicy'
+		| 'numberDigits'
+		| 'maxNumber'
+		| 'associatedNumberOffset'
+		| 'associatedNumberMode'
+		| 'overflowPolicy'
 	>
 ): CampaignNumberingConfig {
 	return {
 		numberDigits: campaign.numberDigits,
 		maxNumber: campaign.maxNumber,
 		associatedNumberOffset: campaign.associatedNumberOffset,
+		associatedNumberMode: campaign.associatedNumberMode,
 		overflowPolicy: campaign.overflowPolicy
 	};
 }

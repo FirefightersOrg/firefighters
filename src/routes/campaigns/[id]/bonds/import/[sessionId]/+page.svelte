@@ -19,6 +19,7 @@
 		type TableColumn
 	} from '$lib/components/ui';
 	import { translateImportMessage } from '$lib/domain/import-messages';
+	import { associatedNumberFor } from '$lib/domain/numbering';
 	import {
 		IMPORT_ITEM_FILTERS,
 		IMPORT_SOURCE_LABELS,
@@ -78,7 +79,7 @@
 	const number = (value: number | null) => formatImportNumber(value, campaign.numberDigits);
 	const associated = (value: number | null) =>
 		formatImportNumber(
-			value === null ? null : value + campaign.associatedNumberOffset,
+			value === null ? null : associatedNumberFor(value, campaign),
 			campaign.numberDigits
 		);
 

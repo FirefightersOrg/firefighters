@@ -58,7 +58,7 @@ select has_table('public', 'campaigns', 'campaigns table exists');
 select columns_are('public', 'campaigns', array[
   'id', 'name', 'status', 'starts_at', 'ends_at', 'simple_bond_value', 'installment_count',
   'installment_value', 'number_digits', 'max_number', 'associated_number_offset', 'overflow_policy',
-  'barcode_mode', 'barcode_pattern', 'created_by', 'created_at', 'updated_at', 'overdue_warning_threshold'
+  'barcode_mode', 'barcode_pattern', 'associated_number_mode', 'created_by', 'created_at', 'updated_at', 'overdue_warning_threshold'
 ], 'campaigns has exactly the expected columns');
 select col_type_is('public', 'campaigns', 'id', 'uuid', 'id is uuid');
 select col_type_is('public', 'campaigns', 'name', 'text', 'name is text');

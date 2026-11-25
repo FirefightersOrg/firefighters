@@ -8,9 +8,13 @@
  * Numbers are stored internally as integers; leading zeros are a presentation concern
  * handled by {@link formatCampaignNumber} and {@link parseCampaignNumber}.
  *
- * Rule: `associated_number = base_number + associated_number_offset`. With the MVP
- * overflow policy (`reject`), a base number whose associated number would exceed
- * `max_number` is blocked.
+ * Rule, by `associated_number_mode` (the SQL twin is `public.bond_associated_number`):
+ *   - `linear` (default): `associated = base + associated_number_offset`. With the MVP
+ *     overflow policy (`reject`), a base number whose associated number would exceed
+ *     `max_number` is blocked.
+ *   - `circular`: with `B = (max_number + 1) / 2` bonds, `associated = B + ((base + offset) mod B)`
+ *     for bases `0..B-1` and `0 <= offset < B`. The associated numbers cover `B..2B-1` exactly once,
+ *     so bases and associated numbers together cover `0..2B-1` without collisions or gaps.
  *
  * The config checks in {@link validateNumberingConfig} mirror the `campaigns` table
  * constraints and column type (1 <= number_digits <= 10, 0 < max_number <= 2147483647 — the
@@ -23,6 +27,11 @@ import { DomainError } from './errors';
 export type OverflowPolicy = 'reject';
 
 export const OVERFLOW_POLICIES: readonly OverflowPolicy[] = ['reject'];
+
+/** How the associated number is derived from the base number (see the module comment). */
+export type AssociatedNumberMode = 'linear' | 'circular';
+
+export const ASSOCIATED_NUMBER_MODES: readonly AssociatedNumberMode[] = ['linear', 'circular'];
 
 /**
  * Widest supported digit count. `max_number` is a Postgres `integer` (at most 2147483647,
@@ -44,7 +53,17 @@ export interface CampaignNumberingConfig {
 	maxNumber: number;
 	/** Added to a base number to obtain its associated number. */
 	associatedNumberOffset: number;
+	/** `linear`: base + offset. `circular`: B + ((base + offset) mod B), B = (maxNumber + 1) / 2. */
+	associatedNumberMode: AssociatedNumberMode;
 	overflowPolicy: OverflowPolicy;
+}
+
+/**
+ * Circular mode block size `B = (maxNumber + 1) / 2`: the number of bonds (bases `0..B-1`).
+ * Only meaningful when `maxNumber + 1` is even (checked by {@link validateNumberingConfig}).
+ */
+export function circularBlockSize(maxNumber: number): number {
+	return Math.floor((maxNumber + 1) / 2);
 }
 
 /** MVP configuration: 4 digits, 0000–9999, associated number = base + 4871. */
@@ -52,6 +71,7 @@ export const DEFAULT_NUMBERING_CONFIG: Readonly<CampaignNumberingConfig> = Objec
 	numberDigits: 4,
 	maxNumber: 9999,
 	associatedNumberOffset: 4871,
+	associatedNumberMode: 'linear',
 	overflowPolicy: 'reject'
 });
 
@@ -77,6 +97,7 @@ export interface NumberingConfigIssue {
 export function validateNumberingConfig(config: CampaignNumberingConfig): NumberingConfigIssue[] {
 	const issues: NumberingConfigIssue[] = [];
 	const { numberDigits, maxNumber, associatedNumberOffset, overflowPolicy } = config;
+	const mode: unknown = config.associatedNumberMode;
 
 	const digitsIsPositiveInt = Number.isSafeInteger(numberDigits) && numberDigits > 0;
 	const digitsOk = digitsIsPositiveInt && numberDigits <= MAX_NUMBER_DIGITS;
@@ -114,6 +135,29 @@ export function validateNumberingConfig(config: CampaignNumberingConfig): Number
 			field: 'associatedNumberOffset',
 			message: `associatedNumberOffset must not exceed maxNumber (${maxNumber})`
 		});
+	}
+
+	if (!(ASSOCIATED_NUMBER_MODES as readonly unknown[]).includes(mode)) {
+		issues.push({
+			field: 'associatedNumberMode',
+			message: `associatedNumberMode must be one of: ${ASSOCIATED_NUMBER_MODES.join(', ')}`
+		});
+	} else if (mode === 'circular' && maxIsPositiveInt && maxNumber <= MAX_CAMPAIGN_NUMBER) {
+		if ((maxNumber + 1) % 2 !== 0) {
+			issues.push({
+				field: 'maxNumber',
+				message: 'maxNumber + 1 must be even in circular mode (maxNumber + 1 = 2 x B)'
+			});
+		} else if (
+			Number.isSafeInteger(associatedNumberOffset) &&
+			associatedNumberOffset >= 0 &&
+			associatedNumberOffset >= circularBlockSize(maxNumber)
+		) {
+			issues.push({
+				field: 'associatedNumberOffset',
+				message: `associatedNumberOffset must be below B (${circularBlockSize(maxNumber)}) in circular mode`
+			});
+		}
 	}
 
 	if (!OVERFLOW_POLICIES.includes(overflowPolicy)) {
@@ -163,13 +207,37 @@ export function validateNumberRange(value: number, config: CampaignNumberingConf
 }
 
 /**
- * Highest base number whose associated number still fits (`maxNumber - offset`).
- * For the MVP config this is 5128 (5128 + 4871 = 9999).
+ * Highest valid base number: `maxNumber - offset` in linear mode (for the MVP config 5128, as
+ * 5128 + 4871 = 9999) and `B - 1` in circular mode (every base `0..B-1` is valid).
  * @throws NumberingError('invalid_config') if the config itself is invalid.
  */
 export function getMaxValidBaseNumber(config: CampaignNumberingConfig): number {
 	assertValidNumberingConfig(config);
-	return config.maxNumber - config.associatedNumberOffset;
+	return config.associatedNumberMode === 'circular'
+		? circularBlockSize(config.maxNumber) - 1
+		: config.maxNumber - config.associatedNumberOffset;
+}
+
+/**
+ * Raw associated number of `baseNumber` by mode, mirroring `public.bond_associated_number`
+ * (the one SQL formula). No range check: linear may return a value above `maxNumber` (the
+ * caller applies the overflow policy) and circular returns `null` for a base outside `0..B-1`.
+ * Also `null` for a non-integer or negative base. Assumes a valid config.
+ */
+export function associatedNumberFor(
+	baseNumber: number,
+	config: Pick<
+		CampaignNumberingConfig,
+		'maxNumber' | 'associatedNumberOffset' | 'associatedNumberMode'
+	>
+): number | null {
+	if (!Number.isSafeInteger(baseNumber) || baseNumber < 0) return null;
+	if (config.associatedNumberMode === 'circular') {
+		const block = circularBlockSize(config.maxNumber);
+		if (baseNumber >= block) return null;
+		return block + ((baseNumber + config.associatedNumberOffset) % block);
+	}
+	return baseNumber + config.associatedNumberOffset;
 }
 
 /**
@@ -182,7 +250,24 @@ export function validateNoOverflow(baseNumber: number, config: CampaignNumbering
 }
 
 /**
- * `associated_number = base_number + associated_number_offset`.
+ * The associated number formula as text for the UI: `base + 4871` (linear) or
+ * `5000 + ((base + 4871) mod 5000)` (circular). Assumes a valid config.
+ */
+export function associatedNumberRuleText(
+	config: Pick<
+		CampaignNumberingConfig,
+		'maxNumber' | 'associatedNumberOffset' | 'associatedNumberMode'
+	>
+): string {
+	if (config.associatedNumberMode === 'circular') {
+		const block = circularBlockSize(config.maxNumber);
+		return `${block} + ((base + ${config.associatedNumberOffset}) mod ${block})`;
+	}
+	return `base + ${config.associatedNumberOffset}`;
+}
+
+/**
+ * Associated number by mode: `base + offset` (linear) or `B + ((base + offset) mod B)` (circular).
  *
  * @throws NumberingError with code `not_integer`, `negative_number` or `out_of_range` for an
  *   invalid base number; `overflow` when the associated number would exceed `maxNumber`
@@ -195,7 +280,13 @@ export function calculateAssociatedNumber(
 	assertValidNumberingConfig(config);
 	assertNumberInRange(baseNumber, config, 'Base number');
 
-	const associated = baseNumber + config.associatedNumberOffset;
+	const associated = associatedNumberFor(baseNumber, config);
+	if (associated === null) {
+		throw new NumberingError(
+			'out_of_range',
+			`Base number ${baseNumber} must be below ${circularBlockSize(config.maxNumber)} in circular mode`
+		);
+	}
 	if (associated > config.maxNumber) {
 		switch (config.overflowPolicy) {
 			case 'reject':
