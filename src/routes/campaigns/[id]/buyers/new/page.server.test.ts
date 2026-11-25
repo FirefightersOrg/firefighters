@@ -71,7 +71,7 @@ describe('/campaigns/[id]/buyers/new', () => {
 			event(setup().locals, fields(), 'nope')
 		)) as ActionFailure;
 		expect(missing.status).toBe(404);
-		expect(missing.data.message).toBe('Campaign not found.');
+		expect(missing.data.message).toBe('Campaña no encontrada.');
 	});
 
 	it('loads only for managers and creates an individual, discarding business fields', async () => {

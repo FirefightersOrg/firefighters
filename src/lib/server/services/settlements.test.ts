@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	addPaymentToSettlement,
 	addPaymentToSettlementSchema,
+	closeSettlement,
 	mapSettlementRpcError,
 	removePaymentFromSettlementSchema,
 	SettlementServiceError
@@ -102,5 +103,51 @@ describe('settlement service review hardening (SAN-63)', () => {
 	it('maps restrict and guard raises to conflicts', () => {
 		expect(mapSettlementRpcError({ code: '23001' }).kind).toBe('conflict');
 		expect(mapSettlementRpcError({ code: 'P0001' }).kind).toBe('conflict');
+	});
+	// SAN-91 minimum testing contract: closeSettlement.
+	describe('closeSettlement', () => {
+		it('requires settlement.close and validates the id before any RPC', async () => {
+			const rpc = vi.fn();
+			await expect(
+				closeSettlement(
+					{ rpc } as never,
+					{ settlementId: id },
+					{ permissions: ['settlement.view'] }
+				)
+			).rejects.toMatchObject({ status: 403 });
+			await expect(
+				closeSettlement(
+					{ rpc } as never,
+					{ settlementId: 'bad' },
+					{ permissions: ['settlement.close'] }
+				)
+			).rejects.toMatchObject({ status: 400 });
+			expect(rpc).not.toHaveBeenCalled();
+		});
+		it('calls settlement_close with the request id', async () => {
+			const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+			await closeSettlement(
+				{ rpc } as never,
+				{ settlementId: id },
+				{ permissions: ['settlement.close'], requestId: 'req-close' }
+			);
+			expect(rpc).toHaveBeenCalledWith('settlement_close', {
+				p_settlement_id: id,
+				p_request_id: 'req-close'
+			});
+		});
+		it('maps a settlement that can no longer be closed to a 409', async () => {
+			const rpc = vi.fn().mockResolvedValue({
+				data: null,
+				error: { code: '55000', message: 'settlement has no pending payments' }
+			});
+			await expect(
+				closeSettlement(
+					{ rpc } as never,
+					{ settlementId: id },
+					{ permissions: ['settlement.close'] }
+				)
+			).rejects.toMatchObject({ status: 409 });
+		});
 	});
 });

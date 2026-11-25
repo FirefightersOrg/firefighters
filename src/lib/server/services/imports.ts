@@ -26,6 +26,7 @@ import type {
 	ImportUpdateItemInput,
 	StagedImportRowInput
 } from '$lib/schemas/import';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 /**
  * Import staging use cases (SAN-45). Every write calls one audited `import_session_*` SQL function
@@ -82,7 +83,7 @@ export const IMPORT_MESSAGES = {
 	campaignNotFound: 'No se encontró la campaña.',
 	sessionNotFound: 'No se encontró la sesión de importación.',
 	itemNotFound: 'No se encontró la fila de la importación.',
-	internal: 'Algo salió mal. Volver a intentar.',
+	internal: GENERIC_ERROR_MESSAGE,
 	invalid: 'Hay valores no válidos. Revisarlos.',
 	campaignLocked:
 		'Los bonos solo se pueden importar mientras la campaña es un borrador o está activa.',

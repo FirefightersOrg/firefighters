@@ -12,6 +12,7 @@ import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/serv
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { canTransitionDraw, DRAW_REASON_MAX } from '$lib/domain/draws';
 import { field, readDrawFields, uuid, validateDrawFields } from '$lib/server/draws/route-helpers';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 const canRead = (permissions: readonly string[] | null | undefined) =>
 	[
@@ -28,7 +29,7 @@ const serviceFailure = (cause: unknown, form: string, values: Record<string, str
 		form,
 		values,
 		errors: {},
-		message: serviceError?.message ?? 'Something went wrong. Please try again.'
+		message: serviceError?.message ?? GENERIC_ERROR_MESSAGE
 	});
 };
 async function scopedDraw(

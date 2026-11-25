@@ -86,7 +86,7 @@ describe('/campaigns/new', () => {
 			expect(result.data).toMatchObject({
 				form: 'create',
 				success: false,
-				message: 'You do not have permission to perform this action.'
+				message: 'No hay permiso para esta acción.'
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -100,7 +100,7 @@ describe('/campaigns/new', () => {
 			expect(result.data).toMatchObject({
 				form: 'create',
 				success: false,
-				message: 'Something went wrong. Please try again.'
+				message: 'Algo salió mal. Volver a intentar.'
 			});
 			expect(rpc).not.toHaveBeenCalled();
 		});
@@ -193,7 +193,7 @@ describe('/campaigns/new', () => {
 				actionEvent(makeLocals({ supabase }), validForm)
 			)) as ActionFailure;
 			expect(result.status).toBe(403);
-			expect(result.data.message).toBe('You do not have permission to perform this action.');
+			expect(result.data.message).toBe('No hay permiso para esta acción.');
 		});
 
 		it('maps a database rule violation to a field error', async () => {
@@ -226,7 +226,7 @@ describe('/campaigns/new', () => {
 				actionEvent(makeLocals({ supabase }), validForm)
 			)) as ActionFailure;
 			expect(result.status).toBe(500);
-			expect(result.data.message).toBe('Something went wrong. Please try again.');
+			expect(result.data.message).toBe('Algo salió mal. Volver a intentar.');
 		});
 	});
 });

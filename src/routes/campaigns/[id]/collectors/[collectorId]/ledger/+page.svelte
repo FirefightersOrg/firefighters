@@ -19,7 +19,7 @@
 	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import {
-		LEDGER_ENTRY_TYPE_LABELS_ES,
+		LEDGER_ENTRY_TYPE_LABELS,
 		type LedgerEntryType,
 		type LedgerStatus
 	} from '$lib/domain/ledger';
@@ -68,7 +68,7 @@
 		data.entries.map((entry) => ({
 			id: entry.id,
 			date: formatDate(entry.occurredAt),
-			type: LEDGER_ENTRY_TYPE_LABELS_ES[entry.entryType as LedgerEntryType] ?? entry.entryType,
+			type: LEDGER_ENTRY_TYPE_LABELS[entry.entryType as LedgerEntryType] ?? entry.entryType,
 			source: source(entry),
 			settlementId: entry.settlementId,
 			paymentId: entry.paymentId,

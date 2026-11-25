@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { LEDGER_REASON_MAX } from '$lib/domain/ledger';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 const uuid = z.guid();
 export const commissionSettleSchema = z.object({
@@ -31,7 +32,7 @@ export class CommissionLedgerServiceError extends Error {
 type RpcError = { code?: string; message?: string };
 
 /** Spanish copy for the messages the SQL functions raise (English, internal). */
-const DB_MESSAGES_ES: [RegExp, string][] = [
+const DB_MESSAGES: [RegExp, string][] = [
 	[
 		/closed-settlement entries must be corrected/,
 		'Los movimientos de una rendición cerrada se corrigen desde la rendición.'
@@ -53,7 +54,7 @@ const DB_MESSAGES_ES: [RegExp, string][] = [
 	[/settlement must be open|settlement has no pending/, 'La rendición no admite esta operación.']
 ];
 function dbMessage(message: string | undefined, fallback: string) {
-	return DB_MESSAGES_ES.find(([re]) => re.test(message ?? ''))?.[1] ?? fallback;
+	return DB_MESSAGES.find(([re]) => re.test(message ?? ''))?.[1] ?? fallback;
 }
 
 function mapError(error: RpcError) {
@@ -77,7 +78,7 @@ function mapError(error: RpcError) {
 			'conflict',
 			dbMessage(error.message, 'No se puede realizar esta operación en el estado actual.')
 		);
-	return new CommissionLedgerServiceError('internal', 'Algo salió mal. Volver a intentar.', {
+	return new CommissionLedgerServiceError('internal', GENERIC_ERROR_MESSAGE, {
 		cause: error
 	});
 }
@@ -90,7 +91,7 @@ async function rpc<T>(
 	try {
 		result = await client.rpc(name, args);
 	} catch (cause) {
-		throw new CommissionLedgerServiceError('internal', 'Algo salió mal. Volver a intentar.', {
+		throw new CommissionLedgerServiceError('internal', GENERIC_ERROR_MESSAGE, {
 			cause
 		});
 	}

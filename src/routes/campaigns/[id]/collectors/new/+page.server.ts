@@ -9,6 +9,7 @@ import { PartyServiceError, createCollector } from '$lib/server/services/parties
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import { COLLECTOR_FORM_FIELDS, collectorSchema } from '$lib/schemas/collector';
 import { readFormFields } from '$lib/schemas/campaign';
+import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
 const uuid = (value: string) => z.guid().safeParse(value).success;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -48,7 +49,7 @@ export const actions: Actions = {
 			return fail(party?.status ?? 500, {
 				values,
 				errors: party?.field ? { [party.field]: [party.message] } : {},
-				message: party?.message ?? 'Algo salió mal. Volver a intentar.'
+				message: party?.message ?? GENERIC_ERROR_MESSAGE
 			});
 		}
 		redirect(303, `/campaigns/${params.id}/collectors/${collectorId}`);
