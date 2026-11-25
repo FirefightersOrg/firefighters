@@ -14,7 +14,7 @@
 	import InstallmentsTable from '$lib/components/portal/InstallmentsTable.svelte';
 	import RegisterPaymentForm from '$lib/components/portal/RegisterPaymentForm.svelte';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
-	import { bondLabel, submissionStatusLabel } from '$lib/portal/labels';
+	import { bondLabel, submissionStatusLabel, submissionStatusTone } from '$lib/portal/labels';
 	import { parseMoneyInput, centsToDecimalString } from '$lib/domain/money';
 	import { formatDate, formatMoney } from '$lib/format';
 	import type { PageProps } from './$types';
@@ -40,8 +40,6 @@
 					(parseMoneyInput(data.reserved[installment.id] ?? '0') ?? 0)
 			)
 		);
-	const submissionTone = (status: string) =>
-		status === 'confirmed' ? 'success' : status === 'annulled' ? 'danger' : 'warning';
 	const submissionRows = $derived(data.submissions.map((s) => ({ ...s })));
 	const submissionColumns: TableColumn<(typeof submissionRows)[number]>[] = [
 		{ key: 'paymentDate', header: 'Fecha' },
@@ -86,8 +84,7 @@
 <div class="space-y-6">
 	{#if data.submitted && !form?.message}
 		<Alert tone="success" title="Cobro enviado">
-			Quedó pendiente de rendición. Se confirma cuando el operador lo incluye en la rendición y la
-			cierra.
+			Quedó enviado. Se confirma cuando el operador lo incluye en una rendición y la cierra.
 		</Alert>
 	{/if}
 	<div class="grid gap-4 sm:grid-cols-4">
@@ -159,7 +156,9 @@
 					{:else if column.key === 'method'}
 						{methodLabel[row.method]}
 					{:else if column.key === 'status'}
-						<Badge tone={submissionTone(row.status)}>{submissionStatusLabel(row.status)}</Badge>
+						<Badge tone={submissionStatusTone(row.status)}
+							>{submissionStatusLabel(row.status)}</Badge
+						>
 						{#if row.status === 'annulled' && row.rejectionReason}
 							<p class="m-0 mt-1 text-body-sm text-muted">Motivo: {row.rejectionReason}</p>
 						{/if}
@@ -182,7 +181,7 @@
 				{:else if column.key === 'method'}
 					{methodLabel[row.method]}
 				{:else if column.key === 'status'}
-					<StatusBadge kind="payment" status={row.status} />
+					<Badge tone={submissionStatusTone(row.status)}>{submissionStatusLabel(row.status)}</Badge>
 				{/if}
 			{/snippet}
 			{#snippet empty()}

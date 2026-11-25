@@ -44,6 +44,18 @@ export function mapSaleRpcError(error: RpcError): SaleServiceError {
 				field: /^buyer/.test(message) ? 'buyerId' : /^bond/.test(message) ? 'bondId' : 'campaignId'
 			}
 		);
+	if (error.code === '22023' && /sale date/.test(message))
+		return new SaleServiceError(
+			'validation',
+			'La fecha de venta no puede ser futura ni anterior al inicio de la campaña.',
+			{ field: 'saleDate' }
+		);
+	if (error.code === '22023' && /due date/.test(message))
+		return new SaleServiceError(
+			'validation',
+			'El primer vencimiento tiene que estar entre la fecha de venta y un año después.',
+			{ field: 'firstDueDate' }
+		);
 	if (error.code === '22023')
 		return new SaleServiceError(
 			'validation',
@@ -93,7 +105,8 @@ export async function registerSale(
 			p_buyer_id: parsed.data.buyerId,
 			p_payment_mode: parsed.data.paymentMode,
 			p_first_due_date: parsed.data.firstDueDate ?? null,
-			p_request_id: ctx.requestId ?? null
+			p_request_id: ctx.requestId ?? null,
+			p_sale_date: parsed.data.saleDate ?? null
 		});
 	} catch (cause) {
 		throw new SaleServiceError('internal', GENERIC_ERROR_MESSAGE, { cause });

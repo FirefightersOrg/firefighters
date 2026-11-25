@@ -40,7 +40,7 @@ export interface PortalLedgerSummary {
 	entryCount: number;
 }
 
-/** One entry of the collector's own account. No internal notes: only type, amounts and status. */
+/** One entry of the collector's own account. No internal notes: type, amounts, status and the manual adjustment reason only. */
 export interface PortalLedgerEntry {
 	id: string;
 	occurredAt: string;
@@ -53,6 +53,8 @@ export interface PortalLedgerEntry {
 	/** False for reference entries (they are listed but never change the balance). */
 	affectsBalance: boolean;
 	runningBalance: number;
+	/** Operator's reason, only for manual adjustments; null for any other entry (never the annul reason). */
+	adjustmentReason: string | null;
 }
 
 export interface PortalLedgerPage {
@@ -134,7 +136,8 @@ export async function listPortalLedger(
 			settlementId: (r.settlement_id as string | null) ?? null,
 			settlementNumber: r.settlement_number == null ? null : Number(r.settlement_number),
 			affectsBalance: r.affects_balance !== false,
-			runningBalance: Number(r.running_balance)
+			runningBalance: Number(r.running_balance),
+			adjustmentReason: (r.adjustment_reason as string | null)?.trim() || null
 		}))
 	};
 }

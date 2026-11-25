@@ -8,6 +8,7 @@ import {
 	attachCollectorPayment,
 	rejectCollectorPayment
 } from '$lib/server/services/collector-payments';
+import { submissionStatusLabel } from '$lib/portal/labels';
 import { closeSettlement } from '$lib/server/services/settlements';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { loadPermissions } from './permissions';
@@ -187,6 +188,8 @@ async function sell(collectorId: string, label: string) {
 		p_buyer_id: buyerId,
 		p_payment_mode: 'installments',
 		p_first_due_date: daysFromToday(-10),
+		// SAN-106: past due dates need an earlier sale date.
+		p_sale_date: daysFromToday(-10),
 		p_request_id: rid(`sale-${label}`)
 	});
 }
@@ -383,9 +386,10 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		});
 		const during = await admin.client.rpc('settlement_totals', { p_settlement_id: settlementId });
 		expect(Number(during.data[0].total_amount)).toBe(100);
-		// Pending in a settlement: the collector still reads it as "Pendiente de rendición".
+		// Pending in a settlement: the collector reads it as "En rendición".
 		const pending = await load(pageEvent(collectorA, saleA, 'load'));
 		expect(pending.submissions[0].status).toBe('pending_in_settlement');
+		expect(submissionStatusLabel(pending.submissions[0].status)).toBe('En rendición');
 
 		await closeSettlement(admin.client, { settlementId }, ctx);
 		expect(await paymentRow(includedId)).toMatchObject({ status: 'confirmed' });
@@ -408,6 +412,7 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		expect(closed).toMatchObject({ status: 'closed', total_cash: 100, total_amount: 100 });
 		const after = await load(pageEvent(collectorA, saleA, 'load'));
 		expect(after.submissions[0].status).toBe('confirmed');
+		expect(submissionStatusLabel(after.submissions[0].status)).toBe('Confirmado');
 		expect(after.sale).toMatchObject({ paidAmount: '100.00' });
 		// Listed once, under "Cobros enviados".
 		expect(after.payments).toEqual([]);
@@ -439,6 +444,7 @@ describe('collector portal: Registrar cobro end to end (local Supabase)', () => 
 		});
 		const data = await load(pageEvent(collectorA, saleA, 'load'));
 		const rejected = data.submissions.find((s: any) => s.id === draft);
+		expect(submissionStatusLabel(rejected.status)).toBe('Rechazado');
 		expect(rejected).toMatchObject({
 			status: 'annulled',
 			rejectionReason: 'No llegó la transferencia'

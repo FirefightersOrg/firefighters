@@ -35,6 +35,7 @@ describe('sales service', () => {
 	it.each([
 		[{ code: '42501', message: 'no' }, 'permission', undefined],
 		[{ code: '22023', message: 'first due date invalid' }, 'validation', 'firstDueDate'],
+		[{ code: '22023', message: 'sale date cannot be in the future' }, 'validation', 'saleDate'],
 		[{ code: '22023', message: 'bad payment mode' }, 'validation', 'paymentMode'],
 		[{ code: '22023', message: 'bond belongs to another campaign' }, 'validation', 'bondId'],
 		[{ code: 'P0002', message: 'buyer x not found' }, 'not_found', 'buyerId'],

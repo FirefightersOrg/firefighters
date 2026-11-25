@@ -1,9 +1,8 @@
 /**
- * Draw eligibility and extraordinary-number assignment (SAN-76).
+ * Draw eligibility (SAN-76). The extraordinary draw uses each bond's own numbers (SAN-152).
  *
  * Pure domain logic only: SAN-77 owns roster generation and persistence.
  */
-import { DomainError } from './errors';
 import { parseMoneyToCents } from './money';
 
 /**
@@ -260,87 +259,4 @@ export function evaluateDrawEligibility(input: DrawEligibilityInput): DrawEligib
 				: { eligible: false, reason: 'installments_not_covered' };
 		}
 	}
-}
-
-/**
- * Locale-independent tie-breaker for ids: plain code-unit comparison, the same order PostgreSQL
- * uses for lowercase canonical uuid text, keeping TS/SQL parity (review of #77).
- */
-export function compareBinary(a: string, b: string): number {
-	return a < b ? -1 : a > b ? 1 : 0;
-}
-
-export interface ExtraordinaryEligibleBond {
-	bondId: string;
-	kind: 'simple' | 'pata';
-	baseNumbers: readonly { id: string; value: number }[];
-}
-
-export interface ExtraordinaryNumberAssignment {
-	bondId: string;
-	sourceBaseNumberId: string;
-	value: number;
-}
-
-export type ExtraordinaryNumberAssignmentErrorCode = 'not_enough_free_numbers';
-
-export class ExtraordinaryNumberAssignmentError extends DomainError<ExtraordinaryNumberAssignmentErrorCode> {
-	readonly required: number;
-	readonly available: number;
-
-	constructor(required: number, available: number) {
-		super(
-			'not_enough_free_numbers',
-			`Not enough free campaign numbers: ${required} required, ${available} available`
-		);
-		this.required = required;
-		this.available = available;
-	}
-}
-
-function sortedBaseNumbers(bond: ExtraordinaryEligibleBond) {
-	return bond.baseNumbers.slice().sort((a, b) => a.value - b.value || compareBinary(a.id, b.id));
-}
-
-/**
- * Assigns the lowest free values first. Bonds are ordered by their lowest base value, then id;
- * each pata's bases are ordered by value, then id. A simple bond receives one number sourced
- * from its lowest (normally only) base; a pata receives one per base.
- *
- * The function checks capacity before producing assignments, so exhaustion never yields a
- * partial result.
- */
-export function assignExtraordinaryNumbers(input: {
-	eligibleBonds: readonly ExtraordinaryEligibleBond[];
-	takenNumbers: readonly number[];
-	maxNumber: number;
-}): ExtraordinaryNumberAssignment[] {
-	if (!Number.isSafeInteger(input.maxNumber) || input.maxNumber < 0) {
-		throw new RangeError('maxNumber must be a non-negative safe integer');
-	}
-
-	const bonds = input.eligibleBonds
-		.map((bond) => ({ bond, bases: sortedBaseNumbers(bond) }))
-		.sort(
-			(a, b) =>
-				(a.bases[0]?.value ?? Number.POSITIVE_INFINITY) -
-					(b.bases[0]?.value ?? Number.POSITIVE_INFINITY) ||
-				compareBinary(a.bond.bondId, b.bond.bondId)
-		);
-	const sources = bonds.flatMap(({ bond, bases }) =>
-		(bond.kind === 'simple' ? bases.slice(0, 1) : bases).map((base) => ({
-			bondId: bond.bondId,
-			sourceBaseNumberId: base.id
-		}))
-	);
-	const taken = new Set(input.takenNumbers);
-	const available: number[] = [];
-	for (let value = 0; value <= input.maxNumber && available.length < sources.length; value += 1) {
-		if (!taken.has(value)) available.push(value);
-	}
-	if (available.length < sources.length) {
-		throw new ExtraordinaryNumberAssignmentError(sources.length, available.length);
-	}
-
-	return sources.map((source, index) => ({ ...source, value: available[index] }));
 }

@@ -5,7 +5,9 @@ export const saleRegisterSchema = z.object({
 	bondId: z.guid({ message: 'Unknown bond' }),
 	buyerId: z.guid({ message: 'Unknown buyer' }),
 	paymentMode: z.enum(['full_payment', 'installments']),
-	firstDueDate: z.iso.date().nullable().optional()
+	firstDueDate: z.iso.date().nullable().optional(),
+	/** SAN-106: an earlier sale date (YYYY-MM-DD, Buenos Aires); null or absent means today. */
+	saleDate: z.iso.date().nullable().optional()
 });
 
 export type SaleRegisterInput = z.output<typeof saleRegisterSchema>;

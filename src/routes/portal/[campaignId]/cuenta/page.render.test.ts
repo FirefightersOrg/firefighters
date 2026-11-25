@@ -15,7 +15,8 @@ const entries = [
 		settlementId: null,
 		settlementNumber: null,
 		affectsBalance: false,
-		runningBalance: 17.5
+		runningBalance: 17.5,
+		adjustmentReason: 'Bonus <b>por</b> cobranza extraordinaria'
 	},
 	{
 		id: 'e2',
@@ -26,7 +27,8 @@ const entries = [
 		status: 'annulled',
 		settlementId: null,
 		settlementNumber: null,
-		runningBalance: 15
+		runningBalance: 15,
+		adjustmentReason: null
 	},
 	{
 		id: 'e1',
@@ -37,7 +39,8 @@ const entries = [
 		status: 'recorded',
 		settlementId: 's1',
 		settlementNumber: 7,
-		runningBalance: 15
+		runningBalance: 15,
+		adjustmentReason: null
 	}
 ];
 const settlements = [
@@ -106,7 +109,16 @@ describe('Mi cuenta corriente page', () => {
 		const body = page(full());
 		expect(body).toContain('Anulado');
 		expect(body).toContain('line-through');
-		expect(body).not.toContain('Motivo');
+		expect(body).not.toContain('Motivo interno');
+	});
+
+	it('shows the adjustment reason escaped, and no text for an adjustment without one', () => {
+		const body = page(full());
+		expect(body).toContain('Motivo: ');
+		expect(body).toContain('Bonus &lt;b>por&lt;/b> cobranza extraordinaria');
+		expect(body).not.toContain('<b>por</b>');
+		expect(body.match(/data-testid="adjustment-reason"/g)).toHaveLength(1);
+		expect(body).not.toMatch(/undefined|null/);
 	});
 
 	it('marks reference entries as not changing the balance', () => {
