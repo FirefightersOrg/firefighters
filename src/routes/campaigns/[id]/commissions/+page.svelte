@@ -7,7 +7,7 @@
 		Alert,
 		Badge,
 		Button,
-		Card,
+		Disclosure,
 		EmptyState,
 		PageHeader,
 		StatusBadge,
@@ -24,6 +24,7 @@
 		type CommissionRule,
 		type CommissionRuleTiming
 	} from '$lib/domain/commissions';
+	import { formatMoney } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -86,7 +87,10 @@
 			rule,
 			collector: rule.collectorName ?? '',
 			type: describeCommissionRuleType(rule),
-			commission: describeCommissionValue(rule),
+			commission:
+				rule.fixedAmount === null
+					? describeCommissionValue(rule)
+					: formatMoney(Math.round(Number(rule.fixedAmount))),
 			validity: describeValidity(rule),
 			annulled: rule.status === 'annulled',
 			timing: commissionRuleTiming(rule, data.today)
@@ -99,14 +103,14 @@
 		data.can.manage ? [{ key: 'actions', header: 'Acciones', align: 'right' }] : []
 	);
 	const generalColumns = $derived<TableColumn<RuleRow>[]>([
-		{ key: 'type', header: 'Tipo' },
-		{ key: 'commission', header: 'Comisión', align: 'right' },
+		{ key: 'type', header: 'Tipo', stack: 'primary' },
+		{ key: 'commission', header: 'Comisión', align: 'right', stack: 'trailing' },
 		{ key: 'validity', header: 'Vigencia' },
 		{ key: 'status', header: 'Estado' },
 		...actionsColumn
 	]);
 	const specialColumns = $derived<TableColumn<RuleRow>[]>([
-		{ key: 'collector', header: 'Cobrador' },
+		{ key: 'collector', header: 'Cobrador', stack: 'secondary' },
 		...generalColumns
 	]);
 	const statusLabel = $derived(statusMeta('campaign', campaign.status).label.toLowerCase());
@@ -171,6 +175,9 @@
 </PageHeader>
 
 <div class="flex flex-col gap-6">
+	{#if ruleFormResult?.success}
+		<Alert tone="success">{ruleFormResult.message}</Alert>
+	{/if}
 	{#if annulResult}
 		<Alert tone={annulResult.success ? 'success' : 'danger'}>{annulMessage}</Alert>
 	{/if}
@@ -186,8 +193,9 @@
 		</Alert>
 	{/if}
 
-	<Card title="Reglas generales" id="rules" flush>
-		<Table columns={generalColumns} rows={generalRows} selectedKey={editRule?.id}>
+	<section id="rules" class="space-y-3">
+		<h2 class="text-heading-2">Reglas generales</h2>
+		<Table stack columns={generalColumns} rows={generalRows} selectedKey={editRule?.id}>
 			{#snippet cell({ row, column })}
 				{@render ruleCell(row, column)}
 			{/snippet}
@@ -195,15 +203,14 @@
 				<EmptyState title="Todavía no hay reglas de comisión" />
 			{/snippet}
 		</Table>
-	</Card>
+	</section>
 
-	<Card
-		title="Reglas especiales por cobrador"
-		description="Una regla especial para un cobrador tiene prioridad sobre las reglas generales para ese cobrador."
-		id="special-rules"
-		flush
-	>
-		<Table columns={specialColumns} rows={specialRows} selectedKey={editRule?.id}>
+	<section id="special-rules" class="space-y-3">
+		<h2 class="text-heading-2">Reglas especiales por cobrador</h2>
+		<p class="text-body-sm text-muted">
+			Una regla especial tiene prioridad sobre las reglas generales para ese cobrador.
+		</p>
+		<Table stack columns={specialColumns} rows={specialRows} selectedKey={editRule?.id}>
 			{#snippet cell({ row, column })}
 				{@render ruleCell(row, column)}
 			{/snippet}
@@ -211,19 +218,24 @@
 				<EmptyState title="No hay reglas especiales por cobrador" />
 			{/snippet}
 		</Table>
-	</Card>
+	</section>
 
 	{#if data.can.manage}
 		<!-- Re-mount when switching between create and edit, between rules, or when a load brings a
 		     new version of the edited rule: its values and version must come from the same load. -->
 		{#key editRule ? `${editRule.id}@${editRule.updatedAt}` : 'new'}
-			<CommissionRuleForm
-				rule={editRule}
-				installmentCount={campaign.installmentCount}
-				result={formResult}
-				campaignId={campaign.id}
-				collectors={data.collectors}
-			/>
+			<Disclosure
+				summary={editRule ? 'Editar regla' : 'Agregar una regla'}
+				defaultOpen={!!editRule || !!(formResult && !formResult.success)}
+			>
+				<CommissionRuleForm
+					rule={editRule}
+					installmentCount={campaign.installmentCount}
+					result={formResult?.success ? null : formResult}
+					campaignId={campaign.id}
+					collectors={data.collectors}
+				/>
+			</Disclosure>
 		{/key}
 	{:else if campaign.status === 'draft' || campaign.status === 'active'}
 		<p class="m-0 text-body-sm text-muted">

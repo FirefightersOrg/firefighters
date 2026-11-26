@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import {
 		Button,
-		Card,
+		Dialog,
 		Field,
 		FormResult,
 		RadioGroup,
@@ -18,6 +18,7 @@
 		type CommissionRule
 	} from '$lib/domain/commissions';
 	import { formatMoneyInput } from '$lib/domain/money';
+	import { formatDate } from '$lib/format';
 	import { formatPercentInput } from '$lib/domain/percent';
 	import {
 		COMMISSION_REASON_MAX_LENGTH,
@@ -120,10 +121,39 @@
 			{ name: 'reason', label: 'Nota' }
 		].map((field) => ({ ...field, id: fieldId(field.name) }))
 	);
+	function initialValues() {
+		return { ...initial };
+	}
+	let values = $state(initialValues());
+	let review = $state<Record<string, string>>({});
+	let confirmOpen = $state(false);
+	let confirmationAccepted = false;
+	let formElement: HTMLFormElement | undefined;
+	function confirmBeforeSubmit(node: HTMLFormElement) {
+		formElement = node;
+		const onSubmit = (event: SubmitEvent) => {
+			if (!confirmationAccepted) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				review = Object.fromEntries(
+					[...new FormData(node)].map(([key, value]) => [key, String(value)])
+				);
+				confirmOpen = true;
+			} else confirmationAccepted = false;
+		};
+		node.addEventListener('submit', onSubmit, true);
+		return {
+			destroy() {
+				node.removeEventListener('submit', onSubmit, true);
+			}
+		};
+	}
 </script>
 
-<Card title={editing ? 'Editar regla' : 'Agregar una regla'} id="{prefix}-rule">
+<section id="{prefix}-rule" class="space-y-4">
+	<h2 class="text-heading-2">{editing ? 'Editar regla' : 'Agregar una regla'}</h2>
 	<form
+		use:confirmBeforeSubmit
 		method="POST"
 		action={editing ? '?/update' : '?/create'}
 		class="rule-form flex flex-col gap-5"
@@ -168,7 +198,7 @@
 					<Select
 						name="ruleType"
 						placeholder="Elegir un tipo…"
-						value={initial.ruleType}
+						bind:value={values.ruleType}
 						options={COMMISSION_RULE_TYPES.map((type) => ({
 							value: type,
 							label: COMMISSION_RULE_TYPE_LABELS[type]
@@ -191,7 +221,7 @@
 						pattern="[0-9]*"
 						autocomplete="off"
 						placeholder="1"
-						value={initial.installmentNumber}
+						bind:value={values.installmentNumber}
 					/>
 				</Field>
 			</div>
@@ -222,7 +252,7 @@
 						inputmode="decimal"
 						autocomplete="off"
 						placeholder="12,5"
-						value={initial.percentage}
+						bind:value={values.percentage}
 					/>
 				</Field>
 			</div>
@@ -240,7 +270,7 @@
 						autocomplete="off"
 						prefix="$"
 						placeholder="1.500"
-						value={initial.fixedAmount}
+						bind:value={values.fixedAmount}
 					/>
 				</Field>
 			</div>
@@ -248,7 +278,7 @@
 
 		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
 			<Field label="Vigente desde" id={fieldId('validFrom')} error={errors.validFrom?.[0]} required>
-				<TextInput name="validFrom" type="date" value={initial.validFrom} />
+				<TextInput name="validFrom" type="date" bind:value={values.validFrom} />
 			</Field>
 			<Field
 				label="Vigente hasta"
@@ -257,7 +287,7 @@
 				error={errors.validTo?.[0]}
 				optional
 			>
-				<TextInput name="validTo" type="date" value={initial.validTo} />
+				<TextInput name="validTo" type="date" bind:value={values.validTo} />
 			</Field>
 			{#if !editing && collectors.length > 0}
 				<Field
@@ -290,7 +320,7 @@
 					name="reason"
 					type="text"
 					maxlength={COMMISSION_REASON_MAX_LENGTH}
-					value={initial.reason}
+					bind:value={values.reason}
 				/>
 			</Field>
 		</div>
@@ -310,7 +340,28 @@
 			{/if}
 		</div>
 	</form>
-</Card>
+</section>
+
+<Dialog
+	open={confirmOpen}
+	onClose={() => (confirmOpen = false)}
+	title="¿Guardar esta regla de comisión?"
+	description="Las reglas nuevas se aplican a los pagos que correspondan a su vigencia. Los pagos ya confirmados conservan su comisión."
+	confirmLabel="Guardar regla"
+	onConfirm={() => {
+		confirmationAccepted = true;
+		confirmOpen = false;
+		formElement?.requestSubmit();
+	}}
+>
+	<p>
+		{review.ruleType
+			? COMMISSION_RULE_TYPE_LABELS[review.ruleType as keyof typeof COMMISSION_RULE_TYPE_LABELS]
+			: 'Regla de comisión'}. {review.valueKind === 'percentage'
+			? `${review.percentage}% del pago`
+			: `$ ${review.fixedAmount}`}. Vigencia desde {formatDate(review.validFrom)}.
+	</p>
+</Dialog>
 
 <style>
 	/* Without JavaScript too: show the installment number only for "Specific installment", and

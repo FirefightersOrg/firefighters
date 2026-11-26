@@ -13,6 +13,7 @@
 		Alert,
 		Button,
 		Card,
+		Dialog,
 		Checkbox,
 		Field,
 		FormResult,
@@ -37,9 +38,11 @@
 	 */
 	let {
 		campaign,
-		result
+		result,
+		confirmChanges = false
 	}: {
 		campaign: Campaign;
+		confirmChanges?: boolean;
 		/** This form's last action result, if any. */
 		result?: {
 			success: boolean;
@@ -84,6 +87,25 @@
 		];
 	}
 	let changeReason = $state(initialReason());
+	let confirmOpen = $state(false);
+	let confirmationAccepted = false;
+	let formElement: HTMLFormElement | undefined;
+	function confirmBeforeSubmit(node: HTMLFormElement) {
+		formElement = node;
+		const onSubmit = (event: SubmitEvent) => {
+			if (confirmChanges && !confirmationAccepted) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				confirmOpen = true;
+			} else confirmationAccepted = false;
+		};
+		node.addEventListener('submit', onSubmit, true);
+		return {
+			destroy() {
+				node.removeEventListener('submit', onSubmit, true);
+			}
+		};
+	}
 </script>
 
 <Card title="Reglas" id="rules">
@@ -94,6 +116,7 @@
 			<strong>Activar la campaña congela las reglas.</strong>
 		</Alert>
 		<form
+			use:confirmBeforeSubmit
 			method="POST"
 			action="?/rules"
 			class="flex flex-col gap-5"
@@ -187,3 +210,23 @@
 		</form>
 	</div>
 </Card>
+{#if confirmChanges}
+	<Dialog
+		open={confirmOpen}
+		onClose={() => (confirmOpen = false)}
+		title="¿Guardar las reglas de la campaña?"
+		description="Los cambios quedan registrados en la auditoría. Activar la campaña congela estas reglas."
+		confirmLabel="Guardar reglas"
+		onConfirm={() => {
+			confirmationAccepted = true;
+			confirmOpen = false;
+			formElement?.requestSubmit();
+		}}
+	>
+		<ul>
+			{#each changes as change (change.field)}<li>
+					{change.label}: {change.from} → {change.to}
+				</li>{/each}
+		</ul>
+	</Dialog>
+{/if}

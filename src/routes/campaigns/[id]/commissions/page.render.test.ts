@@ -72,3 +72,11 @@ describe('/campaigns/[id]/commissions page (SAN-69 special rules)', () => {
 		expect(page(false, { specialRules: [] })).toContain('No hay reglas especiales por cobrador');
 	});
 });
+
+it('shows fixed commissions in whole pesos, stacked rows and a save confirmation', () => {
+	const body = page(true, { rules: [rule({ fixedAmount: '1500.50', percentage: null })] });
+	expect(body).toContain('1.501');
+	expect(body).toContain('data-stack="true"');
+	expect(body).toContain('¿Guardar esta regla de comisión?');
+	expect(body).toContain('action="?/create"');
+});
