@@ -34,13 +34,16 @@ function setup(
 		campaign?: QueryResult;
 		list?: QueryResult & { count?: number | null };
 		permissions?: string[];
+		/** Extra tables (bonds, collectors, buyers) for the names on each row. */
+		tables?: Record<string, QueryResult>;
 	} = {}
 ) {
 	const list: QueryResult = options.list ?? { data: [listRow()], error: null, count: 1 };
 	const mock = mockSupabase({
 		tables: {
 			campaigns: options.campaign ?? { data: campaignRow({ status: 'active' }), error: null },
-			bond_list: list
+			bond_list: list,
+			...options.tables
 		}
 	});
 	const locals = makeLocals({
@@ -115,7 +118,9 @@ describe('/campaigns/[id]/bonds', () => {
 				financialStatus: 'no_payments',
 				unitCount: 1,
 				totalValue: '60000.00',
-				inPata: null
+				inPata: null,
+				collectorName: null,
+				buyerName: null
 			}
 		]);
 		expect(data.filtered).toBe(false);
@@ -218,9 +223,95 @@ describe('/campaigns/[id]/bonds', () => {
 				count: 1
 			}
 		});
-		const data = (await load(loadEvent(locals, '?base=00068')))!;
+		// With a second filter, so the single match stays in the list (see the redirect below).
+		const data = (await load(loadEvent(locals, '?base=00068&status=available')))!;
 		expect(chains.bond_list[0].contains).toHaveBeenCalledWith('base_numbers', [68]);
 		expect(data.bonds[0].baseFormatted).toEqual(['00068']);
 		expect(data.bonds[0].associatedFormatted).toEqual(['48778']);
+	});
+
+	describe('a search by number alone (UX plan PR 9)', () => {
+		const one = { data: [listRow()], error: null, count: 1 };
+
+		it('goes straight to the record when exactly one bond matches', async () => {
+			await expect(load(loadEvent(setup({ list: one }).locals, '?base=68'))).rejects.toMatchObject({
+				status: 303,
+				location: `/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}`
+			});
+			// An empty filter left in the form does not count as another filter.
+			await expect(
+				load(loadEvent(setup({ list: one }).locals, '?base=0068&associated=&type='))
+			).rejects.toMatchObject({ status: 303 });
+		});
+
+		it.each([
+			['another filter', '?base=68&status=available'],
+			['a page', '?base=68&page=1'],
+			['a different filter alone', '?associated=4939'],
+			['no filter', '']
+		])('keeps the list with %s', async (_case, search) => {
+			const data = (await load(loadEvent(setup({ list: one }).locals, search)))!;
+			expect(data.bonds).toHaveLength(1);
+		});
+
+		it('keeps the list when nothing or more than one bond matches', async () => {
+			const none = (await load(
+				loadEvent(setup({ list: { data: [], error: null, count: 0 } }).locals, '?base=68')
+			))!;
+			expect(none.bonds).toEqual([]);
+			const several = (await load(
+				loadEvent(
+					setup({
+						list: { data: [listRow(), listRow({ id: PATA_ID })], error: null, count: 2 }
+					}).locals,
+					'?base=68'
+				)
+			))!;
+			expect(several.bonds).toHaveLength(2);
+		});
+	});
+
+	describe('who has each bond and who bought it (audit A7)', () => {
+		const COLLECTOR = 'c0000000-0000-0000-0000-000000000001';
+		const BUYER = 'd0000000-0000-0000-0000-000000000001';
+		const holders = {
+			bonds: {
+				data: [{ id: BOND_ID, current_collector_id: COLLECTOR, current_buyer_id: BUYER }],
+				error: null
+			},
+			collectors: { data: [{ id: COLLECTOR, display_name: 'Héctor Acosta' }], error: null },
+			buyers: {
+				data: [{ id: BUYER, first_name: 'Stella', last_name: 'Rodríguez', business_name: null }],
+				error: null
+			}
+		};
+
+		it('names them on the row', async () => {
+			const data = (await load(loadEvent(setup({ tables: holders }).locals)))!;
+			expect(data.bonds[0]).toMatchObject({
+				collectorName: 'Héctor Acosta',
+				buyerName: 'Stella Rodríguez'
+			});
+		});
+
+		it('leaves the names out when they cannot be read, and still lists the bonds', async () => {
+			const hidden = setup({
+				tables: {
+					...holders,
+					collectors: { data: null, error: { message: 'permission denied' } },
+					buyers: { data: [], error: null }
+				}
+			});
+			const data = (await load(loadEvent(hidden.locals)))!;
+			expect(data.bonds[0]).toMatchObject({ collectorName: null, buyerName: null });
+			expect(data.bonds).toHaveLength(1);
+		});
+
+		it('reads no names for an empty page', async () => {
+			const { locals, from } = setup({ list: { data: [], error: null, count: 0 } });
+			await load(loadEvent(locals));
+			const tables = from.mock.calls.map((call: unknown[]) => call[0]);
+			for (const table of ['bonds', 'collectors', 'buyers']) expect(tables).not.toContain(table);
+		});
 	});
 });
