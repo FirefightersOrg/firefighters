@@ -1,26 +1,18 @@
 import { expect, test } from '@playwright/test';
-import {
-	baDay,
-	createActiveCampaign,
-	createBond,
-	createCollector,
-	deliverSellAndSettle,
-	login,
-	open,
-	runId
-} from './helpers';
+import { apiActiveCampaign, apiBond, apiCollector, apiDeliverSellAndSettle } from './api';
+import { baDay, open, runId } from './helpers';
 
 /** SAN-91 critical flow 2: generate & freeze roster → load & validate winner. */
 test('generate and freeze a roster, then load and validate the winning number', async ({
 	page
 }) => {
 	const run = runId();
-	await login(page);
-	const campaignId = await createActiveCampaign(page, `E2E sorteo ${run}`);
-	await createCollector(page, campaignId, `Cobrador ${run}`);
-	await createBond(page, campaignId, 100);
-	await createBond(page, campaignId, 200);
-	await deliverSellAndSettle(page, campaignId, `Cobrador ${run}`, 100);
+	// Setup through the API: the money flow has its own UI test; this one starts at the draw.
+	const campaignId = await apiActiveCampaign(`E2E sorteo ${run}`);
+	const collector = await apiCollector(`Cobrador ${run}`);
+	const bond = await apiBond(campaignId, 100);
+	await apiBond(campaignId, 200);
+	await apiDeliverSellAndSettle(campaignId, collector, bond);
 
 	// Final draw whose cutoff (today, Buenos Aires) covers today's confirmed payment.
 	await open(page, `/campaigns/${campaignId}/draws/new`);
