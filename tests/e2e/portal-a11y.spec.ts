@@ -12,6 +12,7 @@ import {
 	open,
 	runId
 } from './helpers';
+import { STATE } from './auth-state';
 
 /**
  * SAN-148 accessibility pass of the collector portal (same method as SAN-137, `a11y.spec.ts`). A collector
@@ -75,7 +76,6 @@ async function linkedId(page: Page, path: string, segment: string) {
 
 async function seed(page: Page, browser: Browser) {
 	const run = runId();
-	await login(page);
 	const campaignId = await createActiveCampaign(page, `E2E portal ${run}`);
 	const collectorName = `Cobrador portal ${run}`;
 	await createCollector(page, campaignId, collectorName);
@@ -267,6 +267,7 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		const adminCtx = await browser.newContext({
 			baseURL,
 			serviceWorkers: 'block',
+			storageState: STATE.admin,
 			locale: 'es-AR',
 			timezoneId: 'America/Argentina/Buenos_Aires'
 		});

@@ -30,6 +30,17 @@ export default defineConfig({
 		serviceWorkers: 'block',
 		...devices['Desktop Chrome']
 	},
+	projects: [
+		// Signs in once per role and saves the sessions (tests/e2e/auth.setup.ts, SAN-166).
+		{ name: 'setup', testMatch: /auth\.setup\.ts/ },
+		{
+			name: 'e2e',
+			dependencies: ['setup'],
+			// Every test starts signed in as the admin (same path as `STATE.admin` in auth-state.ts).
+			// Tests of the login itself, or of another role, override it with `test.use`.
+			use: { storageState: 'tests/e2e/.auth/admin.json' }
+		}
+	],
 	webServer: {
 		command: dev
 			? `pnpm exec vite dev ${host}`

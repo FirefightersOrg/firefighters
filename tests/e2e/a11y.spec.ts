@@ -14,10 +14,10 @@ import {
 	createCollector,
 	createDraftCampaign,
 	deliverSellAndSettle,
-	login,
 	open,
 	runId
 } from './helpers';
+import { ANONYMOUS, STATE } from './auth-state';
 
 /**
  * SAN-137 accessibility and mobile pass. Builds one campaign with data on every screen (bond,
@@ -71,7 +71,6 @@ async function linkedId(page: Page, path: string, segment: string) {
 
 async function seed(page: Page): Promise<Ids> {
 	const run = runId();
-	await login(page);
 	const draftId = await createDraftCampaign(page, `E2E a11y borrador ${run}`);
 	const campaignId = await createActiveCampaign(page, `E2E a11y ${run}`);
 	const c = `/campaigns/${campaignId}`;
@@ -290,11 +289,7 @@ async function inPage(ctx: BrowserContext, scheme: Scheme, fn: (page: Page) => P
 	}
 }
 
-function newContext(
-	browser: Browser,
-	state: Awaited<ReturnType<BrowserContext['storageState']>>,
-	phoneSize: boolean
-) {
+function newContext(browser: Browser, state: string, phoneSize: boolean) {
 	return browser.newContext({
 		baseURL,
 		serviceWorkers: 'block',
@@ -368,15 +363,15 @@ test.describe.serial('a11y and mobile pass', () => {
 		const seedCtx = await browser.newContext({
 			baseURL,
 			serviceWorkers: 'block',
+			storageState: STATE.admin,
 			locale: 'es-AR',
 			timezoneId: 'America/Argentina/Buenos_Aires'
 		});
 		const page = await seedCtx.newPage();
 		ids = await seed(page);
-		const state = await seedCtx.storageState();
 		await seedCtx.close();
-		desktop = await newContext(browser, state, false);
-		phone = await newContext(browser, state, true);
+		desktop = await newContext(browser, STATE.admin, false);
+		phone = await newContext(browser, STATE.admin, true);
 	});
 	test.afterAll(async () => {
 		await desktop?.close();
@@ -449,17 +444,19 @@ test.describe.serial('a11y and mobile pass', () => {
 			});
 });
 
-test('the login page passes axe in light and dark', async ({ page }) => {
-	for (const scheme of SCHEMES) {
-		await page.emulateMedia({ colorScheme: scheme });
-		await open(page, '/login');
-		await expectNoSeriousViolations(page, `login [${scheme}]`);
-	}
+test.describe('login page', () => {
+	test.use({ storageState: ANONYMOUS });
+	test('the login page passes axe in light and dark', async ({ page }) => {
+		for (const scheme of SCHEMES) {
+			await page.emulateMedia({ colorScheme: scheme });
+			await open(page, '/login');
+			await expectNoSeriousViolations(page, `login [${scheme}]`);
+		}
+	});
 });
 
 /** Keyboard-only: Tab reaches the page's controls and every focused element shows a focus ring. */
 test('keyboard focus is always visible on the main screens', async ({ page }) => {
-	await login(page);
 	const campaignId = await createActiveCampaign(page, `E2E teclado ${runId()}`);
 	const c = `/campaigns/${campaignId}`;
 	const problems: string[] = [];

@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { login, open } from './helpers';
+import { STATE } from './auth-state';
+import { open } from './helpers';
 
 /**
  * UX plan, PR 4. The list components of the UI kit, exercised on the dev showcase (`/dev/ui`): what
@@ -21,10 +22,7 @@ async function showcase(context: BrowserContext): Promise<Page> {
 
 test.describe.serial('UI kit: list components', () => {
 	test.beforeAll(async ({ browser }) => {
-		const signIn = await browser.newContext({ baseURL, serviceWorkers: 'block', locale: 'es-AR' });
-		await login(await signIn.newPage());
-		const storageState = await signIn.storageState();
-		await signIn.close();
+		const storageState = STATE.admin;
 		desktop = await browser.newContext({
 			baseURL,
 			serviceWorkers: 'block',

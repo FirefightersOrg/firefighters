@@ -5,7 +5,6 @@ import {
 	createBond,
 	createCollector,
 	deliverSellAndSettle,
-	login,
 	open,
 	runId
 } from './helpers';
@@ -15,7 +14,6 @@ test('generate and freeze a roster, then load and validate the winning number', 
 	page
 }) => {
 	const run = runId();
-	await login(page);
 	const campaignId = await createActiveCampaign(page, `E2E sorteo ${run}`);
 	await createCollector(page, campaignId, `Cobrador ${run}`);
 	await createBond(page, campaignId, 100);

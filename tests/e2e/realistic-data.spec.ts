@@ -8,7 +8,8 @@ import {
 } from '../../scripts/demo-screens';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { seedDemo } from '../../scripts/seed-demo';
-import { login, open } from './helpers';
+import { STATE } from './auth-state';
+import { open } from './helpers';
 
 /**
  * Realistic-data sweep (UX plan, PR 1). The a11y sweep builds a campaign with two bonds and
@@ -39,11 +40,7 @@ let portal: Screen[];
 let adminPhone: BrowserContext;
 let collectorPhone: BrowserContext;
 
-async function phone(browser: Browser, user: { email: string; password: string }) {
-	const signIn = await browser.newContext({ baseURL, serviceWorkers: 'block', locale: 'es-AR' });
-	await login(await signIn.newPage(), user);
-	const storageState = await signIn.storageState();
-	await signIn.close();
+function phone(browser: Browser, storageState: string) {
 	return browser.newContext({
 		baseURL,
 		serviceWorkers: 'block',
@@ -87,15 +84,13 @@ test.describe.serial('realistic data at 375 px', () => {
 		const config = resolveSeedConfig();
 		const anonKey = process.env.PUBLIC_SUPABASE_ANON_KEY?.trim();
 		if (!anonKey) throw new Error('PUBLIC_SUPABASE_ANON_KEY is required for the demo campaign.');
-		const collector = config.fixtures.find((user) => user.roleNames.includes('collector'));
-		if (!collector) throw new Error('The fixture collector is missing: run seed:admin first.');
 
 		await seedDemo();
 		const ids = await findDemoIds(await signedInClient(config.supabaseUrl, anonKey, config.admin));
 		staff = staffScreens(ids);
 		portal = portalScreens(ids);
-		adminPhone = await phone(browser, config.admin);
-		collectorPhone = await phone(browser, collector);
+		adminPhone = await phone(browser, STATE.admin);
+		collectorPhone = await phone(browser, STATE.collector);
 	});
 
 	test.afterAll(async () => {
