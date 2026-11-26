@@ -18,6 +18,7 @@
 		"test:pwa": "playwright test --config playwright.pwa.config.ts",
 		"db:reset": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" db reset",
 		"db:test": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" test db",
+		"db:test:parallel": "scripts/with-db-lock.sh scripts/test-db-parallel.sh",
 		"seed:admin": "scripts/with-db-lock.sh tsx scripts/seed-admin.ts",
 		"seed:demo": "scripts/with-db-lock.sh tsx scripts/seed-demo.ts",
 		"format": "prettier --write .",

@@ -12,7 +12,7 @@ Santi approved the plan on 2026-11-26 and answered its three open points (see [D
 - Interface text in Spanish, no voseo, following `docs/copy.md`. Amounts in whole pesos on screens, with cents on documents and ledgers.
 - Checked in the browser by the author at 375 px and 1280 px, in light and dark, with the demo campaign (`pnpm seed:demo`). Before and after screenshots in the PR.
 - Tests: render tests for what changes, E2E for the flows it touches, the axe sweep in light and dark, 375 px and keyboard.
-- Before pushing, from a clean database and with `origin/main` merged in: `pnpm check`, `pnpm lint`, `pnpm test`, `pnpm db:test`, `pnpm test:integration`, `pnpm test:e2e`, all passing. The PR states the numbers.
+- Before pushing, from a clean database and with `origin/main` merged in: `pnpm check`, `pnpm lint`, `pnpm test`, `pnpm db:test` (or `pnpm db:test:parallel`), `pnpm test:integration`, `pnpm test:e2e`, all passing. The PR states the numbers.
 - The PR links the audit items it closes and asks `juanigm` for review. It merges when he approves the last commit and the PR is clean.
 - The four questions, answered on the real screen before asking for review: does a treasurer in a hurry understand it in 5 seconds; can a collector use it one-handed on the sidewalk; is it impossible to mix up an amount or a bond number; does it look made for this fire station.
 
