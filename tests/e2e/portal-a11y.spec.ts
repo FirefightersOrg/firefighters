@@ -370,6 +370,14 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		test.setTimeout(60_000);
 		await inPage(phone, 'light', async (page) => {
 			await open(page, '/portal');
+			// With one campaign in course the landing redirects (asserted in page.server.test.ts). In a
+			// full run other specs leave their own active campaigns in this database, and then the
+			// landing lists them: either way the way in is «Por cobrar», never «Mis bonos».
+			if (!/\/por-cobrar$/.test(new URL(page.url()).pathname)) {
+				await expect(page.getByRole('heading', { name: 'Elegir la campaña' })).toBeVisible();
+				await expect(page.locator('main a[href$="/bonos"]')).toHaveCount(0);
+				await page.locator(`main a[href="/portal/${ids.campaignId}/por-cobrar"]`).click();
+			}
 			await expect(page).toHaveURL(new RegExp(`/portal/${ids.campaignId}/por-cobrar$`));
 			await expect(page.getByRole('heading', { name: 'Por cobrar', level: 1 })).toBeVisible();
 			// On a phone the five sections are a bar at the bottom, with «Por cobrar» current.
