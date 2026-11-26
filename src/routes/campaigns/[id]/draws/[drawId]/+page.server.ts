@@ -12,9 +12,11 @@ import {
 	getDraw,
 	rosterHasLegacyExtras
 } from '$lib/server/repositories/draws';
+import { listDrawPrizes } from '$lib/server/repositories/prizes';
 import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { canTransitionDraw, DRAW_REASON_MAX } from '$lib/domain/draws';
+import { countDrawPrizes } from '$lib/domain/draw-steps';
 import { field, readDrawFields, uuid, validateDrawFields } from '$lib/server/draws/route-helpers';
 import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
 
@@ -82,6 +84,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	// SAN-152: new extraordinary rosters use the bonds' own numbers; only legacy rosters hold extras.
 	const legacy = roster.data ? await rosterHasLegacyExtras(locals.supabase, roster.data.id) : null;
 	if (legacy?.error) error(500, { message: 'No se pudo cargar el padrón del sorteo.' });
+	// UX plan PR 16: how many prizes are resolved decides the next step of a frozen draw (load the
+	// winners, or complete it). Read with the caller's client; a failure only leaves it unknown.
+	const prizes = await listDrawPrizes(locals.supabase, draw.data.id);
 	const scheduled = draw.data.status === 'scheduled';
 	const generated = draw.data.status === 'roster_generated';
 	return {
@@ -89,6 +94,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		draw: draw.data,
 		roster: roster.data,
 		hasLegacyExtras: legacy?.data ?? false,
+		prizes: prizes.error || !prizes.data ? null : countDrawPrizes(prizes.data),
 		reasonMax: DRAW_REASON_MAX,
 		can: {
 			edit: scheduled && hasPermissionIn(locals.permissions, 'draw.update'),
@@ -99,7 +105,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			regenerate: generated && hasPermissionIn(locals.permissions, 'draw.generate_roster'),
 			freeze: generated && hasPermissionIn(locals.permissions, 'draw.freeze_roster'),
 			complete:
-				draw.data.status === 'roster_frozen' && hasPermissionIn(locals.permissions, 'draw.complete')
+				draw.data.status === 'roster_frozen' &&
+				hasPermissionIn(locals.permissions, 'draw.complete'),
+			loadWinner: hasPermissionIn(locals.permissions, 'draw.load_winner')
 		}
 	};
 };

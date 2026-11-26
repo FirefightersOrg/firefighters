@@ -278,9 +278,10 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.getByText('agregados.').waitFor();
 			await r.choose(r.page.locator('#collectorId'), { label: 'Raúl Sosa' }, 'Cobrador');
 			await r.screen('Entrega lista');
+			// UX plan PR 16: the button says how many bonds go to whom.
 			await r.tap(
-				r.page.getByRole('button', { name: 'Entregar y emitir remito' }),
-				'Entregar y emitir remito'
+				r.page.getByRole('button', { name: 'Entregar 5 bonos a Raúl Sosa' }),
+				'Entregar 5 bonos a Raúl Sosa'
 			);
 			await r.page.waitForURL(/\/deliveries\/[0-9a-f-]{36}$/);
 			await r.screen('Remito emitido');
@@ -319,9 +320,10 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.tap(r.page.getByRole('button', { name: 'Congelar padrón' }), 'Congelar padrón');
 			await r.page.getByText('Padrón congelado.').waitFor();
 			await r.screen('Padrón congelado');
-			await r.tap(r.page.locator('main a[href$="/winners"]').first(), 'Ganadores y premios');
+			// UX plan PR 16: the next step of a frozen roster is a button, and with no prizes yet the form
+			// of the first prize is already open.
+			await r.tap(r.page.getByRole('link', { name: 'Cargar ganadores' }), 'Cargar ganadores');
 			await r.screen('Ganadores, sin premios');
-			await r.tap(r.page.getByText('Configurar un premio'), 'Configurar un premio');
 			await r.type(r.page.locator('#create-position'), '1', 'Puesto');
 			await r.type(r.page.locator('#create-name'), 'Televisor', 'Nombre del premio');
 			await r.tap(r.page.getByRole('button', { name: 'Crear premio' }), 'Crear premio');
@@ -335,8 +337,8 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.getByText('Resultado de la validación').waitFor();
 			await r.screen('Número validado');
 			await r.tap(
-				r.page.getByRole('button', { name: 'Registrar resolución' }),
-				'Registrar resolución'
+				r.page.getByRole('button', { name: 'Adjudicar el premio' }),
+				'Adjudicar el premio'
 			);
 			await r.page.getByText('Premio resuelto.').waitFor();
 			await r.screen('Premio adjudicado');

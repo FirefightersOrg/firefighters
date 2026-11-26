@@ -150,8 +150,7 @@ describe('deliveries render (SAN-135)', () => {
 		expect(body).toContain('?/deliver');
 		expect(body).toContain('escanear el código de barras');
 		expect(body).toContain('Solo un administrador puede ver los cobradores.');
-		expect(body).toMatch(
-			/<button[^>]*type="submit"[^>]*disabled[^>]*>[\s\S]*Entregar y emitir remito/
-		);
+		// UX plan PR 16: the button names what it records; with no bonds yet it is «Entregar bonos».
+		expect(body).toMatch(/<button[^>]*type="submit"[^>]*disabled[^>]*>[\s\S]*Entregar bonos/);
 	});
 });

@@ -32,9 +32,9 @@ async function deliver(page: Page, base: number) {
 	await open(page, `/campaigns/${campaignId}/deliveries/new`);
 	await page.locator('#query').fill(String(base));
 	await page.getByRole('button', { name: 'Agregar' }).click();
-	await expect(page.getByText('1 agregados.')).toBeVisible();
+	await expect(page.getByText('1 bono agregado.')).toBeVisible();
 	await page.locator('#collectorId').selectOption({ label: collector });
-	await page.getByRole('button', { name: 'Entregar y emitir remito' }).click();
+	await page.getByRole('button', { name: `Entregar 1 bono a ${collector}` }).click();
 	await expect(page).toHaveURL(/\/deliveries\/[0-9a-f-]{36}$/);
 }
 

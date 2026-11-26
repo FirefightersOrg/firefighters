@@ -391,7 +391,8 @@ test.describe.serial('a11y and mobile pass', () => {
 		const page = await desktop.newPage();
 		try {
 			await open(page, `${campaign(ids)}/draws/${ids.draw}/winners`);
-			await page.getByRole('button', { name: 'Registrar resolución' }).click();
+			// UX plan PR 16: the resolution is a button that names its outcome.
+			await page.getByRole('button', { name: 'Adjudicar el premio' }).click();
 			await expect(page.getByText('Premio resuelto.')).toBeVisible();
 			await page.waitForLoadState('networkidle');
 			await page.locator(`#delivery-notes-${ids.prize}`).fill('Entregado en el cuartel');
