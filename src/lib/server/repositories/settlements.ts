@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
 import type { SettlementStatus } from '$lib/domain/payments';
+import { NO_ACCESS_COLLECTOR } from '$lib/domain/parties';
 import { UNREADABLE_BUYER } from '$lib/domain/settlement-entry';
 import type { RepositoryResult } from './campaigns';
 
@@ -20,7 +21,7 @@ async function readPages(
 }
 const money = (value: unknown) => toDecimalString(value as string | number);
 const name = (party: unknown) =>
-	(party as { display_name?: string } | null)?.display_name ?? 'Unknown collector';
+	(party as { display_name?: string } | null)?.display_name ?? NO_ACCESS_COLLECTOR;
 
 export type SettlementTotals = {
 	totalCash: string;

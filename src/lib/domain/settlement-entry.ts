@@ -1,4 +1,5 @@
 import { parseMoneyInput, parseMoneyToCents } from './money';
+import { NO_ACCESS_BUYER } from './parties';
 
 /**
  * What the open settlement needs to enter a payment by bond number (UX plan PR 7): the collector's
@@ -6,8 +7,8 @@ import { parseMoneyInput, parseMoneyToCents } from './money';
  * fields again in the `add` action.
  */
 
-/** What the repository puts in `buyer` when the caller's role cannot read the buyer. Never shown. */
-export const UNREADABLE_BUYER = 'Unknown buyer';
+/** What the repository puts in `buyer` when the caller's role cannot read the buyer. */
+export const UNREADABLE_BUYER = NO_ACCESS_BUYER;
 
 /** One unpaid installment of one of the collector's active sales. */
 export interface PaymentCandidate {

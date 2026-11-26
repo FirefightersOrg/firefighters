@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const saleRegisterSchema = z.object({
-	campaignId: z.guid({ message: 'Unknown campaign' }),
-	bondId: z.guid({ message: 'Unknown bond' }),
+	campaignId: z.guid({ message: 'Campaña no encontrada.' }),
+	bondId: z.guid({ message: 'Elegir un bono entregado.' }),
 	buyerId: z.guid({ message: 'Elegir un comprador.' }),
 	paymentMode: z.enum(['full_payment', 'installments']),
 	firstDueDate: z.iso.date().nullable().optional(),

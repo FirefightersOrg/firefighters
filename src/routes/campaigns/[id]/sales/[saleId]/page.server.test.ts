@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
-vi.mock('$lib/server/repositories/sales', () => ({ getSaleDetail: vi.fn() }));
+vi.mock('$lib/server/repositories/sales', () => ({
+	getSaleDetail: vi.fn(),
+	listInstallmentPaymentsForSale: vi.fn()
+}));
 vi.mock('$lib/server/repositories/parties', () => ({
 	listBuyers: vi.fn(),
 	listActiveCollectorOptions: vi.fn()
@@ -17,7 +20,7 @@ vi.mock('$lib/server/services/sale-uncollectible', () => ({
 }));
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { getSaleDetail } from '$lib/server/repositories/sales';
+import { getSaleDetail, listInstallmentPaymentsForSale } from '$lib/server/repositories/sales';
 import { listActiveCollectorOptions, listBuyers } from '$lib/server/repositories/parties';
 import {
 	correctSaleBuyer,
@@ -52,6 +55,7 @@ beforeEach(() => {
 		},
 		error: null
 	} as never);
+	vi.mocked(listInstallmentPaymentsForSale).mockResolvedValue({ data: new Map(), error: null });
 	vi.mocked(listBuyers).mockResolvedValue({ data: { items: [] }, error: null } as never);
 	vi.mocked(listActiveCollectorOptions).mockResolvedValue({ data: [], error: null });
 	vi.mocked(correctSaleBuyer).mockReset();
@@ -78,6 +82,107 @@ describe('sale detail', () => {
 		const out = (await load(event(['campaign.view', 'sale.view']) as never)) as any;
 		expect(out.sale.installments).toHaveLength(1);
 		expect(out.financialStatus).toBe('overdue');
+	});
+	it('counts what confirmed payments applied, and reports the waiting ones apart', async () => {
+		vi.mocked(getSaleDetail).mockResolvedValueOnce({
+			data: {
+				sale: { status: 'active' },
+				plan: { status: 'active' },
+				installments: [
+					{
+						id: 'i1',
+						installmentNumber: 1,
+						dueDate: '2020-01-01',
+						amount: '10.00',
+						status: 'paid'
+					},
+					{
+						id: 'i2',
+						installmentNumber: 2,
+						dueDate: '2999-01-01',
+						amount: '10.00',
+						status: 'pending'
+					}
+				],
+				uncollectible: null
+			},
+			error: null
+		} as never);
+		const last = { date: '2020-01-01', method: 'cash', settlementId: 's', settlementNumber: 4 };
+		vi.mocked(listInstallmentPaymentsForSale).mockResolvedValueOnce({
+			data: new Map([
+				['i1', { applied: '10.00', last, waiting: '0.00', waitingPayment: null }],
+				[
+					'i2',
+					{
+						applied: '0.00',
+						last: null,
+						waiting: '10.00',
+						waitingPayment: { ...last, submittedByCollector: true }
+					}
+				]
+			]),
+			error: null
+		});
+		const out = (await load(event(['campaign.view', 'sale.view']) as never)) as any;
+		expect(listInstallmentPaymentsForSale).toHaveBeenCalledWith(expect.anything(), SALE);
+		expect(out.installments[0]).toMatchObject({ applied: '10.00', lastPayment: last });
+		// The payment that waits for its settlement is not counted as paid.
+		expect(out.installments[1]).toMatchObject({ applied: '0.00', waiting: '10.00' });
+		expect(out.installments[1].waitingPayment.submittedByCollector).toBe(true);
+		expect(out.financialStatus).toBe('up_to_date');
+		expect(out.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	});
+	it('fails with 500 when the payments cannot be read', async () => {
+		vi.mocked(listInstallmentPaymentsForSale).mockResolvedValueOnce({
+			data: null,
+			error: new Error('boom')
+		} as never);
+		await expect(load(event(['campaign.view', 'sale.view']) as never)).rejects.toMatchObject({
+			status: 500
+		});
+	});
+	it('names the buyer and the collector only when the role can read them', async () => {
+		const detail = (buyerName: string, collectorName: string) => ({
+			data: {
+				sale: { status: 'active', buyerId: 'buyer', collectorId: 'collector' },
+				plan: { status: 'active' },
+				installments: [],
+				uncollectible: null,
+				buyerName,
+				collectorName
+			},
+			error: null
+		});
+		vi.mocked(getSaleDetail).mockResolvedValueOnce(detail('Ada Gómez', 'Ana Pérez') as never);
+		const staff = (await load(
+			event(['campaign.view', 'sale.view', 'buyer.view', 'collector.manage']) as never
+		)) as any;
+		expect(staff.parties).toEqual({
+			buyer: { id: 'buyer', name: 'Ada Gómez', canOpen: true },
+			collector: { id: 'collector', name: 'Ana Pérez', canOpen: true }
+		});
+		// The repository's stand-in for a party the role cannot read is never passed on as a name.
+		vi.mocked(getSaleDetail).mockResolvedValueOnce(
+			detail('Sin acceso al comprador', 'Sin acceso al cobrador') as never
+		);
+		const limited = (await load(event(['campaign.view', 'sale.view']) as never)) as any;
+		expect(limited.parties).toEqual({
+			buyer: { id: 'buyer', name: null, canOpen: false },
+			collector: { id: 'collector', name: null, canOpen: false }
+		});
+	});
+	it('says whether the role may read payments and load one in a settlement', async () => {
+		const flags = async (...permissions: string[]) => {
+			const out = (await load(
+				event(['campaign.view', 'sale.view', ...permissions]) as never
+			)) as any;
+			return [out.canViewPayments, out.canPay];
+		};
+		expect(await flags()).toEqual([false, false]);
+		expect(await flags('payment.view')).toEqual([true, false]);
+		expect(await flags('settlement.update_open')).toEqual([false, true]);
+		expect(await flags('payment.create', 'settlement.create')).toEqual([true, true]);
 	});
 });
 
