@@ -149,8 +149,8 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.screen('Campaña');
 			await r.type(r.page.locator('input[name="base"]').first(), '57', 'Número de bono');
 			await r.tap(r.page.getByRole('button', { name: 'Buscar bono' }), 'Buscar bono');
-			await r.screen('Resultado de la búsqueda');
-			await r.tap(r.page.locator('main table a[href*="/bonds/"]').first(), 'Abrir el bono');
+			// UX plan PR 9: a number that matches one bond opens its record, with no list in between.
+			await r.page.waitForURL(/\/bonds\/[0-9a-f-]{36}$/);
 			await r.screen('Ficha del bono');
 		}
 	},

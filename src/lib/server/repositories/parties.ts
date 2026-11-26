@@ -246,6 +246,37 @@ export async function getCollectorsByIds(
 	};
 }
 
+/** Buyers' names by id («Nombre Apellido», or the business name), for lists that name a buyer. */
+export async function getBuyerNamesByIds(
+	supabase: SupabaseClient,
+	ids: readonly string[]
+): Promise<RepositoryResult<Map<string, string>>> {
+	if (ids.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('buyers')
+		.select('id, first_name, last_name, business_name')
+		.in('id', [...new Set(ids)])
+		.overrideTypes<
+			{
+				id: string;
+				first_name: string | null;
+				last_name: string | null;
+				business_name: string | null;
+			}[],
+			{ merge: false }
+		>();
+	if (error) return { data: null, error };
+	return {
+		data: new Map(
+			(data ?? []).map((buyer) => [
+				buyer.id,
+				buyer.business_name || [buyer.first_name, buyer.last_name].filter(Boolean).join(' ')
+			])
+		),
+		error: null
+	};
+}
+
 /**
  * Assigned bond counts for the collectors shown on one page: one exact `head` count per
  * collector (at most a page of them), so no row cap can make a count come out short.

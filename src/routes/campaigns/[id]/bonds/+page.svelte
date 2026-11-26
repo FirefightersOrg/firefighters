@@ -4,16 +4,18 @@
 	import type { ResolvedPathname } from '$app/types';
 	import {
 		Alert,
+		BondNumber,
 		Button,
-		Card,
 		EmptyState,
 		Field,
+		FilterBar,
 		PageHeader,
 		Select,
 		StatusBadge,
 		statusMeta,
 		Table,
 		TextInput,
+		type AppliedFilter,
 		type TableColumn
 	} from '$lib/components/ui';
 	import {
@@ -25,8 +27,10 @@
 	import type { PageProps } from './$types';
 
 	/**
-	 * Bonds list: GET filters (they live in the query string, so the page works without
-	 * JavaScript and can be bookmarked), server-side pages, quick actions and a link to each record.
+	 * Bonds list (UX plan PR 9, audit A7): the number first, the other filters folded, and each row
+	 * says who has the bond or who bought it. GET filters (they live in the query string, so the page
+	 * works without JavaScript and can be bookmarked), server-side pages. Below 720px each row is a
+	 * block of two lines instead of a strip of columns.
 	 */
 	let { data }: PageProps = $props();
 
@@ -57,14 +61,14 @@
 
 	type BondRow = (typeof data.bonds)[number] & Record<string, unknown>;
 	const columns: TableColumn<BondRow>[] = [
-		{ key: 'base', header: 'Número base' },
-		{ key: 'associated', header: 'Número asociado' },
-		{ key: 'type', header: 'Tipo' },
-		{ key: 'codes', header: 'Códigos' },
-		{ key: 'status', header: 'Estado comercial' },
-		{ key: 'financial', header: 'Estado financiero' },
-		{ key: 'value', header: 'Valor', align: 'right' },
-		{ key: 'record', header: 'Ficha', align: 'right' }
+		{ key: 'base', header: 'Número', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'who', header: 'Quién lo tiene', stack: 'secondary' },
+		{ key: 'associated', header: 'Número asociado', stack: 'hidden' },
+		{ key: 'type', header: 'Tipo', stack: 'hidden' },
+		{ key: 'financial', header: 'Pagos', stack: 'hidden' },
+		{ key: 'codes', header: 'Códigos', stack: 'hidden' },
+		{ key: 'value', header: 'Valor', align: 'right', stack: 'hidden' }
 	];
 	const rows = $derived(data.bonds as BondRow[]);
 	const anyOption = [{ value: '', label: 'Cualquiera' }];
@@ -88,6 +92,60 @@
 		}))
 	];
 	const financialLabel = (status: BondFinancialStatus) => statusMeta('bondFinancial', status).label;
+
+	/** Who has the bond, in words. Empty when nobody does, or when the role cannot read the name. */
+	const who = (row: BondRow) => {
+		if (row.commercialStatus === 'sold') {
+			const sold = row.buyerName ? `Vendido a ${row.buyerName}` : '';
+			const collects = row.collectorName ? `lo cobra ${row.collectorName}` : '';
+			return [sold, collects]
+				.filter(Boolean)
+				.join(', ')
+				.replace(/^lo cobra/, 'Lo cobra');
+		}
+		if (row.commercialStatus === 'delivered_to_collector')
+			return row.collectorName ? `Lo tiene ${row.collectorName}` : '';
+		if (row.commercialStatus === 'lost')
+			return row.collectorName ? `Lo tenía ${row.collectorName}` : '';
+		return '';
+	};
+
+	/** The folded filters that are applied, as chips; each links to the list without it. */
+	const FILTER_LABELS = {
+		associated: 'Número asociado',
+		code: 'Código',
+		type: 'Tipo',
+		status: 'Estado',
+		financial: 'Pagos'
+	} as const;
+	const optionLabel = (options: { value: string; label: string }[], value: string) =>
+		options.find((option) => option.value === value)?.label ?? value;
+	function without(key: string): ResolvedPathname {
+		const search = Object.entries(values)
+			.filter(([name, value]) => value && name !== key)
+			.map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
+			.join('&');
+		return (search ? `${listHref}?${search}` : listHref) as ResolvedPathname;
+	}
+	const applied = $derived<AppliedFilter[]>(
+		(Object.keys(FILTER_LABELS) as (keyof typeof FILTER_LABELS)[])
+			.filter((key) => values[key])
+			.map((key) => ({
+				label: `${FILTER_LABELS[key]}: ${
+					key === 'type'
+						? optionLabel(typeOptions, values.type)
+						: key === 'status'
+							? optionLabel(statusOptions, values.status)
+							: key === 'financial'
+								? optionLabel(financialOptions, values.financial)
+								: values[key]
+				}`,
+				removeHref: without(key)
+			}))
+	);
+	const foldedError = $derived(
+		(Object.keys(FILTER_LABELS) as (keyof typeof FILTER_LABELS)[]).some((key) => errors[key])
+	);
 </script>
 
 <svelte:head>
@@ -124,64 +182,55 @@
 					>Importar archivo</Button
 				>
 			{/if}
-			<Button disabled aria-describedby="assign-action-note">Asignar a cobrador</Button>
-			<span id="assign-action-note" class="text-caption text-muted">Fase 6</span>
 		</div>
 	{/snippet}
 </PageHeader>
 
 <div class="flex flex-col gap-6">
-	<Card title="Filtros" id="filters">
-		<form method="GET" action={listHref} class="flex flex-col gap-5">
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-				<Field label="Número base" id="filter-base" error={errors.base}>
-					<TextInput name="base" inputmode="numeric" autocomplete="off" mono value={values.base} />
-				</Field>
-				<Field label="Número asociado" id="filter-associated" error={errors.associated}>
-					<TextInput
-						name="associated"
-						inputmode="numeric"
-						autocomplete="off"
-						mono
-						value={values.associated}
-					/>
-				</Field>
-				<Field
-					label="Código de barras o código interno"
-					id="filter-code"
-					hint="Coincidencia exacta."
-					error={errors.code}
-				>
-					<TextInput name="code" autocomplete="off" mono value={values.code} />
-				</Field>
-				<Field label="Tipo" id="filter-type" error={errors.type}>
-					<Select name="type" value={values.type} options={typeOptions} />
-				</Field>
-				<Field label="Estado comercial" id="filter-status" error={errors.status}>
-					<Select name="status" value={values.status} options={statusOptions} />
-				</Field>
-				<Field label="Estado financiero" id="filter-financial" error={errors.financial}>
-					<Select name="financial" value={values.financial} options={financialOptions} />
-				</Field>
-				<Field
-					label="Cobrador"
-					id="filter-collector"
-					hint="Disponible con cobradores y compradores (fase 5)."
-				>
-					<Select disabled options={anyOption} />
-				</Field>
-				<Field label="Comprador" id="filter-buyer">
-					<Select disabled options={anyOption} />
-				</Field>
-			</div>
-			<div class="flex flex-wrap gap-2">
-				<Button type="submit" variant="primary">Aplicar filtros</Button>
-				{#if data.filtered}
-					<Button href={listHref}>Quitar filtros</Button>
-				{/if}
-			</div>
-		</form>
-	</Card>
+	<div id="filters">
+		<FilterBar
+			action={listHref}
+			searchName="base"
+			searchLabel="Número de bono"
+			searchValue={values.base}
+			searchError={errors.base}
+			inputmode="numeric"
+			{applied}
+			clearHref={data.filtered ? listHref : undefined}
+			open={foldedError}
+		>
+			{#snippet filters()}
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+					<Field label="Número asociado" id="filter-associated" error={errors.associated}>
+						<TextInput
+							name="associated"
+							inputmode="numeric"
+							autocomplete="off"
+							mono
+							value={values.associated}
+						/>
+					</Field>
+					<Field
+						label="Código de barras o código interno"
+						id="filter-code"
+						hint="Coincidencia exacta."
+						error={errors.code}
+					>
+						<TextInput name="code" autocomplete="off" mono value={values.code} />
+					</Field>
+					<Field label="Tipo" id="filter-type" error={errors.type}>
+						<Select name="type" value={values.type} options={typeOptions} />
+					</Field>
+					<Field label="Estado" id="filter-status" error={errors.status}>
+						<Select name="status" value={values.status} options={statusOptions} />
+					</Field>
+					<Field label="Pagos" id="filter-financial" error={errors.financial}>
+						<Select name="financial" value={values.financial} options={financialOptions} />
+					</Field>
+				</div>
+			{/snippet}
+		</FilterBar>
+	</div>
 
 	<section aria-labelledby="results-title" class="flex flex-col gap-3">
 		<h2 id="results-title" class="sr-only">Resultados</h2>
@@ -204,12 +253,28 @@
 			</EmptyState>
 		{:else}
 			<p class="m-0 text-body-sm text-muted" aria-live="polite">{showing}</p>
-			<Table {columns} {rows} caption="Bonos de la campaña" density="compact">
+			<Table {columns} {rows} caption="Bonos de la campaña" density="compact" stack>
 				{#snippet cell({ row, column })}
 					{#if column.key === 'base'}
-						<span class="font-mono font-semibold tabular-nums" data-bond-id={row.id}
-							>{row.baseFormatted.join(' + ') || '—'}</span
-						>
+						<span data-bond-id={row.id} class="inline-flex items-baseline gap-2">
+							{#if row.baseFormatted.length}
+								<BondNumber
+									number={row.baseFormatted.join(' + ')}
+									size="sm"
+									href={recordHref(row.id)}
+								/>
+							{:else}
+								<a
+									href={recordHref(row.id)}
+									class="font-medium text-primary-text underline underline-offset-2">Ver ficha</a
+								>
+							{/if}
+							{#if row.kind === 'pata'}
+								<span class="text-caption text-muted min-[720px]:hidden">pata</span>
+							{/if}
+						</span>
+					{:else if column.key === 'who'}
+						{who(row) || '—'}
 					{:else if column.key === 'associated'}
 						<span class="font-mono tabular-nums text-muted"
 							>{row.associatedFormatted.join(' + ') || '—'}</span
@@ -243,12 +308,6 @@
 						{financialLabel(row.financialStatus)}
 					{:else if column.key === 'value'}
 						<span class="whitespace-nowrap tabular-nums">{formatMoney(row.totalValue)}</span>
-					{:else if column.key === 'record'}
-						<a
-							href={recordHref(row.id)}
-							class="font-medium text-primary-text underline-offset-2 hover:underline"
-							>Ver ficha<span class="sr-only"> del bono {row.baseFormatted.join(' + ')}</span></a
-						>
 					{/if}
 				{/snippet}
 			</Table>
@@ -257,7 +316,7 @@
 		{#if pagination.pageCount > 1 || pagination.page > 1}
 			<nav aria-label="Paginación" class="flex items-center justify-between gap-3 text-body-sm">
 				{#if pagination.page > 1}
-					<Button href={pageLink(pagination.page - 1)} rel="prev">← Anterior</Button>
+					<Button href={pageLink(pagination.page - 1)} rel="prev">Anterior</Button>
 				{:else}
 					<span></span>
 				{/if}
@@ -265,7 +324,7 @@
 					>Página {formatNumber(pagination.page)} de {formatNumber(pagination.pageCount)}</span
 				>
 				{#if pagination.page < pagination.pageCount}
-					<Button href={pageLink(pagination.page + 1)} rel="next">Siguiente →</Button>
+					<Button href={pageLink(pagination.page + 1)} rel="next">Siguiente</Button>
 				{:else}
 					<span></span>
 				{/if}

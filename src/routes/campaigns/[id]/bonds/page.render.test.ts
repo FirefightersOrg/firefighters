@@ -32,8 +32,12 @@ const campaign: Campaign = {
 
 const EMPTY_VALUES = { base: '', associated: '', code: '', type: '', status: '', financial: '' };
 
-function bond(overrides: Partial<BondListItem> = {}): BondListItem {
+type Row = BondListItem & { collectorName: string | null; buyerName: string | null };
+
+function bond(overrides: Partial<Row> = {}): Row {
 	return {
+		collectorName: null,
+		buyerName: null,
 		id: BOND_ID,
 		kind: 'simple',
 		origin: 'printed',
@@ -53,7 +57,7 @@ function bond(overrides: Partial<BondListItem> = {}): BondListItem {
 
 function renderPage(
 	options: {
-		bonds?: BondListItem[];
+		bonds?: Row[];
 		values?: Partial<typeof EMPTY_VALUES>;
 		errors?: Record<string, string>;
 		page?: number;
@@ -98,9 +102,14 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toContain('Disponible');
 		expect(body).toContain('Sin pagos');
 		expect(body).toContain(formatMoney('60000.00'));
-		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
-		expect(body).toContain('Ver ficha');
+		// The number is the link to the record: no separate «Ver ficha» column.
+		expect(body).toMatch(
+			new RegExp(`<a[^>]*href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"[^>]*>[\\s\\S]*?0068`)
+		);
+		expect(body).not.toContain('Ver ficha');
 		expect(body).toContain('Mostrando 1–1 de 1 bono');
+		// Below 720px the row is stacked instead of scrolled sideways.
+		expect(body).toContain('max-[719px]:');
 	});
 
 	it('a grouped member says which pata it is in, with a link', () => {
@@ -112,7 +121,29 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${PATA_ID}"`);
 	});
 
-	it('is a GET form that refills the filters; collector and buyer are disabled', () => {
+	it('says who has each bond or who bought it, and nothing when it cannot (audit A7)', () => {
+		const text = (rows: Row[]) =>
+			renderPage({ bonds: rows })
+				.replace(/<!--.*?-->/g, '')
+				.replace(/<[^>]+>/g, ' ')
+				.replace(/\s+/g, ' ');
+		const sold = bond({ commercialStatus: 'sold' });
+		expect(
+			text([{ ...sold, buyerName: 'Stella Rodríguez', collectorName: 'Héctor Acosta' }])
+		).toContain('Vendido a Stella Rodríguez, lo cobra Héctor Acosta');
+		expect(text([{ ...sold, collectorName: 'Héctor Acosta' }])).toContain('Lo cobra Héctor Acosta');
+		expect(
+			text([bond({ commercialStatus: 'delivered_to_collector', collectorName: 'Héctor Acosta' })])
+		).toContain('Lo tiene Héctor Acosta');
+		expect(text([bond({ commercialStatus: 'lost', collectorName: 'Héctor Acosta' })])).toContain(
+			'Lo tenía Héctor Acosta'
+		);
+		// No name to show: a dash, never «Unknown» or a placeholder sentence.
+		const unnamed = text([sold, bond({ id: PATA_ID })]);
+		expect(unnamed).not.toMatch(/Vendido a|Lo tiene|Unknown|undefined|null/);
+	});
+
+	it('is a GET form with the number first and the other filters folded, refilled', () => {
 		const body = renderPage({
 			values: { base: '68', code: 'BC-1', type: 'pata', status: 'sold', financial: 'overdue' }
 		});
@@ -123,22 +154,33 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(body).toMatch(/<option value="pata"\sselected="">/);
 		expect(body).toMatch(/<option value="sold"\sselected="">/);
 		expect(body).toMatch(/<option value="overdue"\sselected="">/);
-		expect(body).toMatch(/<select[^>]*id="filter-collector"[^>]*\sdisabled=""/);
-		expect(body).toMatch(/<select[^>]*id="filter-buyer"[^>]*\sdisabled=""/);
-		expect(body).toContain('Disponible con cobradores y compradores (fase 5).');
-		expect(body).toContain('Quitar filtros');
+		// The filters that never worked are gone, with their «fase 5» note.
+		expect(body).not.toContain('filter-collector');
+		expect(body).not.toContain('filter-buyer');
+		expect(body.toLowerCase()).not.toContain('fase');
+		// The number is the search field, in front; the rest is folded under «Filtrar» with a count.
+		expect(body.indexOf('name="base"')).toBeLessThan(body.indexOf('<details'));
+		expect(body.indexOf('<details')).toBeLessThan(body.indexOf('name="code"'));
+		expect(body).toMatch(/data-filter-count[^>]*>\s*(?:<!--.*?-->)*4/);
+		// What is applied shows as chips; each one links to the list without it.
+		expect(body).toContain('Quitar el filtro Estado: Vendido');
+		expect(body).toContain('Quitar el filtro Pagos: En mora');
+		expect(body).toContain('Quitar el filtro Tipo: Pata');
+		expect(body).toContain(
+			`href="/campaigns/${CAMPAIGN_ID}/bonds?base=68&amp;type=pata&amp;status=sold&amp;financial=overdue"`
+		);
+		expect(body).toContain('Quitar todos');
 	});
 
-	it('quick actions: create, scan and import only when allowed; assignment disabled with its phase', () => {
+	it('quick actions: create, scan and import only when allowed; no disabled leftovers', () => {
 		const viewer = renderPage();
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/new"`);
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/pata/new"`);
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
 		expect(viewer).not.toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/import"`);
-		expect(viewer).toMatch(
-			/<button[^>]*aria-describedby="assign-action-note"[^>]*\sdisabled=""[^>]*>[\s\S]*?Asignar a cobrador/
-		);
-		expect(viewer).toContain('Fase 6');
+		// Delivery has its own screen: the disabled «Asignar a cobrador» and its «Fase 6» are gone.
+		expect(viewer).not.toContain('Asignar a cobrador');
+		expect(viewer).not.toContain('Fase 6');
 
 		const importer = renderPage({ canScan: true, canImport: true });
 		expect(importer).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/scan"`);
