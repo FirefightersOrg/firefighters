@@ -146,7 +146,7 @@ Transiciones de 120 ms (hover, color) y 200 ms (diálogos, avisos), curva `cubic
 
 ## Marca
 
-La marca es una barra vertical `brand` (10 × 28 px, decorativa, `aria-hidden`) delante del nombre del producto, que se compone en `heading-3` con IBM Plex Sans 600 dentro del `AppHeader`. El único otro uso del rojo `brand` es el talón del bono ganador (`BondStub`). Cada producto que adopte el sistema puede cambiar `brand`, `accent` y el tono de `primary`/`primary-hover`/`primary-soft`/`primary-text`/`focus` manteniendo los contrastes.
+La marca es una barra vertical `brand` (10 × 28 px, decorativa, `aria-hidden`) delante del nombre de la institución (`PUBLIC_INSTITUTION_NAME`, el mismo que se imprime en los documentos), que se compone en `heading-3` con IBM Plex Sans 600 dentro del encabezado. Dentro de una campaña la acompaña el nombre de la campaña, y las dos juntas son un solo enlace al inicio de la campaña. El único otro uso del rojo `brand` es el talón del bono ganador (`BondStub`). Cada producto que adopte el sistema puede cambiar `brand`, `accent` y el tono de `primary`/`primary-hover`/`primary-soft`/`primary-text`/`focus` manteniendo los contrastes.
 
 ## Accesibilidad (mínimos)
 

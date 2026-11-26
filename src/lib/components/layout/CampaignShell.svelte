@@ -67,8 +67,10 @@
 	const railLink =
 		'flex min-h-control-md items-center gap-2 rounded-r-md border-l-[3px] border-transparent px-3 text-label text-muted hover:bg-surface-hover hover:text-text aria-[current=page]:border-accent aria-[current=page]:bg-surface aria-[current=page]:font-semibold aria-[current=page]:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-touch';
 	const tabItem =
-		'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 border-0 border-t-[3px] border-transparent bg-transparent px-1 text-caption text-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus';
+		'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 border-0 border-t-[3px] bg-transparent px-1 text-caption focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus';
+	// One or the other: two border colours on the same element would leave the result to CSS order.
 	const tabCurrent = 'border-accent font-semibold text-text';
+	const tabIdle = 'border-transparent text-muted';
 	const sheetLink =
 		'flex min-h-touch items-center gap-2 rounded-md px-3 text-body text-text hover:bg-surface-hover aria-[current=page]:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
@@ -128,9 +130,9 @@
 			class="inline-flex shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface text-label text-text hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus {wide
 				? 'h-12 px-4'
 				: 'size-control-md'}"
-			aria-label={wide ? undefined : 'Buscar'}
+			aria-label={wide ? undefined : 'Buscar bono'}
 		>
-			{#if wide}Buscar{:else}
+			{#if wide}Buscar bono{:else}
 				<svg
 					width="18"
 					height="18"
@@ -282,7 +284,7 @@
 				<a
 					href={href(item)}
 					aria-current={item.current ? 'page' : undefined}
-					class="{tabItem} {item.current ? tabCurrent : ''}"
+					class="{tabItem} {item.current ? tabCurrent : tabIdle}"
 					>{@render icon(item.key)}{item.tabLabel ?? item.label}</a
 				>
 			</li>
@@ -292,7 +294,11 @@
 			<button
 				bind:this={moreButton}
 				type="button"
-				class="{tabItem} cursor-pointer {moreCurrent || moreOpen ? tabCurrent : ''}"
+				class="{tabItem} cursor-pointer {moreCurrent
+					? tabCurrent
+					: moreOpen
+						? 'border-transparent font-semibold text-text'
+						: tabIdle}"
 				aria-expanded={moreOpen}
 				aria-controls="{uid}-more"
 				onclick={() => (moreOpen = !moreOpen)}
