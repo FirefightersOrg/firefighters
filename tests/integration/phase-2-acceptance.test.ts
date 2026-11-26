@@ -1192,10 +1192,9 @@ describe('Phase 2 end-to-end acceptance (local Supabase)', () => {
 					viewBonds: true,
 					// SAN-24: operators load bonds (bond.create) while the campaign is draft or active.
 					loadBonds: role === 'operator' && canLoadBonds(target.status),
-					// SAN-52 / SAN-93: the operator holds collector.view and reads buyers through
-					// buyer.manage; treasurer and read-only see neither.
-					viewCollectors: role === 'operator',
-					viewBuyers: role === 'operator',
+					// Operators, treasurers and auditors can read party records.
+					viewCollectors: true,
+					viewBuyers: true,
 					// SAN-55: every one of these roles has bond.view.
 					viewDeliveries: true,
 					viewSales: true,

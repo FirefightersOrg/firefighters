@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { resolveSeedConfig } from './seed-admin';
 
@@ -19,7 +20,7 @@ import { resolveSeedConfig } from './seed-admin';
  * clean database give the same campaign.
  */
 
-const CAMPAIGN_NAME = 'Bono Contribución 2026';
+export const DEMO_CAMPAIGN_NAME = 'Bono Contribución 2026';
 const BOND_VALUE = 60_000;
 const INSTALLMENTS = 6;
 const BOND_COUNT = 240;
@@ -164,7 +165,11 @@ interface Sale {
 	pending: Installment[];
 }
 
-async function main() {
+/**
+ * Seeds the demo campaign. Safe to call again: it does nothing when the campaign already exists.
+ * Exported for the realistic-data E2E sweep, which needs the campaign before it starts.
+ */
+export async function seedDemo(): Promise<void> {
 	const envPath = resolve(process.cwd(), '.env');
 	if (existsSync(envPath)) process.loadEnvFile(envPath);
 	const config = resolveSeedConfig();
@@ -182,10 +187,10 @@ async function main() {
 		config.admin.password
 	);
 
-	const existing = await service.from('campaigns').select('id').eq('name', CAMPAIGN_NAME);
+	const existing = await service.from('campaigns').select('id').eq('name', DEMO_CAMPAIGN_NAME);
 	if (existing.error) throw new Error(existing.error.message);
 	if (existing.data.length > 0) {
-		console.log(`"${CAMPAIGN_NAME}" already exists (${existing.data[0].id}). Nothing to do.`);
+		console.log(`"${DEMO_CAMPAIGN_NAME}" already exists (${existing.data[0].id}). Nothing to do.`);
 		return;
 	}
 
@@ -201,7 +206,7 @@ async function main() {
 	};
 	const campaignId = await call(admin, 'campaign_create', {
 		...campaignArgs,
-		p_name: CAMPAIGN_NAME,
+		p_name: DEMO_CAMPAIGN_NAME,
 		p_starts_at: `${baDay(-150)}T03:00:00Z`,
 		p_ends_at: `${baDay(215)}T03:00:00Z`,
 		p_request_id: requestId('campaign')
@@ -248,7 +253,7 @@ async function main() {
 	if (profile.error) throw new Error(`Collector profile: ${profile.error.message}`);
 	const collectorIds: string[] = [];
 	for (const collector of COLLECTORS) {
-		let id: string | null = null;
+		let existing: string | null = null;
 		if (collector.linked) {
 			const linked = await service
 				.from('collectors')
@@ -256,16 +261,17 @@ async function main() {
 				.eq('user_profile_id', profile.data.id)
 				.maybeSingle();
 			if (linked.error) throw new Error(linked.error.message);
-			id = linked.data?.id ?? null;
+			existing = linked.data?.id ?? null;
 		}
-		id ??= await call(admin, 'collector_create', {
-			p_display_name: collector.name,
-			p_phone: collector.phone,
-			p_address: `${pick(STREETS)} ${between(100, 1900)}`,
-			p_user_profile_id: collector.linked ? profile.data.id : null,
-			p_request_id: requestId('collector')
-		});
-		collectorIds.push(id);
+		const created = () =>
+			call(admin, 'collector_create', {
+				p_display_name: collector.name,
+				p_phone: collector.phone,
+				p_address: `${pick(STREETS)} ${between(100, 1900)}`,
+				p_user_profile_id: collector.linked ? profile.data.id : null,
+				p_request_id: requestId('collector')
+			});
+		collectorIds.push(existing ?? (await created()));
 	}
 
 	// Buyers: people, plus a few local businesses.
@@ -561,9 +567,16 @@ async function main() {
 	console.log(`Demo data ready: http://localhost:5173/campaigns/${campaignId}`);
 }
 
-main()
-	.then(() => process.exit(0))
-	.catch((err) => {
-		console.error('seed-demo failed:', err);
-		process.exit(1);
-	});
+function isCliEntry(): boolean {
+	const entry = process.argv[1];
+	return !!entry && import.meta.url === pathToFileURL(resolve(entry)).href;
+}
+
+if (isCliEntry()) {
+	seedDemo()
+		.then(() => process.exit(0))
+		.catch((err) => {
+			console.error('seed-demo failed:', err);
+			process.exit(1);
+		});
+}

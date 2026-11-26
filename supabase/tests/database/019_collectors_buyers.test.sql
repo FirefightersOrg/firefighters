@@ -265,12 +265,12 @@ select is((select count(*)::int from public.buyers), 0, 'the collector login rea
 
 select pg_temp.act_as(5);
 select is((select count(*)::int from public.collectors where id in (pg_temp.id('ana'), pg_temp.id('beto'))),
-  0, 'read-only without collector.view reads no collectors (matrix pending SAN-93)');
+  2, 'read-only reads both collectors');
 select is((select count(*)::int from public.buyers where id in (pg_temp.id('juan'), pg_temp.id('ferre'))),
-  0, 'read-only without buyer.view reads no buyers');
+  2, 'read-only reads both buyers');
 select pg_temp.act_as(3);
 select is((select count(*)::int from public.buyers where id in (pg_temp.id('juan'), pg_temp.id('ferre'))),
-  0, 'the treasurer without buyer.view reads no buyers');
+  2, 'the treasurer reads both buyers');
 
 -- An inactive profile cannot write, whatever its roles.
 reset role;

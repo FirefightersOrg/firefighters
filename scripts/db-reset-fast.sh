@@ -17,15 +17,15 @@
 # a template does not carry (database-level settings such as app.settings.jwt_secret, and the
 # database ACL), then `NOTIFY pgrst, 'reload schema'`.
 #
-# Env (nothing assumes a single stack; defaults are today's single local instance):
+# Env, as exported by scripts/with-db-lock.sh for the slot it took (defaults = the single legacy stack):
 #   SUPABASE_PROJECT_ID     project_id of the target stack (default: from supabase/config.toml)
 #   SUPABASE_DB_CONTAINER   DB container (default: supabase_db_<project_id>)
-#   SUPABASE_BIN            Supabase CLI (default: supabase)
-#   SUPABASE_RESET_ARGS     extra args for `db reset` (e.g. --workdir of another stack)
-#   DB_TEMPLATE_NAME        template database name (default: ff_template_<project_id>, per instance)
+#   SUPABASE_WORKDIR        slot workdir, applied to the CLI by scripts/supabase-cli.sh
+#   PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY  seed:admin and the health check
+# Own knobs:
+#   DB_TEMPLATE_NAME        template database name (default: ff_template_<project_id>: one per slot, each
+#                           inside its own stack's Postgres, so slots never share or clobber a template)
 #   DB_RESET_FAST_REBUILD=1 ignore the existing template and rebuild it
-#   API_URL / ANON_KEY / SERVICE_ROLE_KEY  exported per stack, used for the post-restore health check
-#                           and by seed:admin when set (as PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)
 # This script does not take the DB lock itself: run it through `pnpm db:reset:fast`.
 set -eu
 
@@ -33,7 +33,6 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 project_id=${SUPABASE_PROJECT_ID:-$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' supabase/config.toml | head -1)}
 container=${SUPABASE_DB_CONTAINER:-supabase_db_$project_id}
-supabase_bin=${SUPABASE_BIN:-supabase}
 template=${DB_TEMPLATE_NAME:-ff_template_$project_id}
 start=$(date +%s)
 
@@ -73,13 +72,11 @@ close_database() { # close_database <db>
 
 full_reset_and_snapshot() {
 	echo "db-reset-fast: full reset (supabase db reset + seed:admin), then snapshot as $template"
-	# shellcheck disable=SC2086
-	"$supabase_bin" db reset ${SUPABASE_RESET_ARGS:-}
+	"$root/scripts/supabase-cli.sh" db reset
 	# PostgREST needs a moment to load its schema cache after the restart; retry the seed meanwhile.
 	local try
 	for try in 1 2 3 4 5 6 7 8; do
-		if env APP_ENV="${APP_ENV:-local}" ${API_URL:+PUBLIC_SUPABASE_URL=$API_URL} \
-			${SERVICE_ROLE_KEY:+SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY} pnpm exec tsx scripts/seed-admin.ts; then
+		if env APP_ENV="${APP_ENV:-local}" pnpm exec tsx scripts/seed-admin.ts; then
 			break
 		fi
 		[ "$try" = "8" ] && return 1
@@ -123,17 +120,24 @@ restore() {
 	echo "db-reset-fast: restored postgres from $template in $(($(date +%s) - start))s"
 }
 
+# After a restore the services reconnect on their own, with a backoff. Starting a test run before they
+# are back makes it slow (they compete for locks while retrying), so wait until PostgREST, auth and
+# storage hold connections again and answer.
 wait_healthy() {
-	[ -n "${API_URL:-}" ] || return 0
-	local i
-	for i in $(seq 1 60); do
-		if curl -fsS -o /dev/null "$API_URL/auth/v1/health" -H "apikey: ${ANON_KEY:-}" &&
-			curl -fsS -o /dev/null "$API_URL/rest/v1/" -H "apikey: ${ANON_KEY:-}"; then
+	local i n
+	for i in $(seq 1 90); do
+		n=$(sql postgres -c "select count(distinct usename) from pg_stat_activity where datname = 'postgres' and usename in ('authenticator', 'supabase_auth_admin', 'supabase_storage_admin')" 2>/dev/null || echo 0)
+		if [ "$n" -ge 3 ] && {
+			[ -z "${PUBLIC_SUPABASE_URL:-}" ] ||
+				{ curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/auth/v1/health" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}" &&
+					curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/rest/v1/" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}"; }
+		}; then
+			sleep 1
 			return 0
 		fi
 		sleep 1
 	done
-	echo "db-reset-fast: auth/rest did not become healthy" >&2
+	echo "db-reset-fast: auth/rest/storage did not reconnect" >&2
 	return 1
 }
 
