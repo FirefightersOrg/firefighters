@@ -21,6 +21,7 @@ Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `p
 pnpm db:reset            # supabase db reset
 pnpm db:test             # supabase test db (pgTAP)
 APP_ENV=local pnpm seed:admin
+APP_ENV=local pnpm seed:demo   # optional: one realistic campaign for manual testing (docs/ux/README.md)
 APP_ENV=local pnpm test:integration
 ```
 
