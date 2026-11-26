@@ -106,7 +106,6 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - `AppHeader`: the institution's name from `PUBLIC_INSTITUTION_NAME` (P1), the campaign as context, a bond search (a GET to `/campaigns/[id]/bonds?base=`, as the campaign page does today), the session.
   - A new `campaigns/[id]/+layout.svelte` (and its `+layout.server.ts`, which loads the campaign name, its status and the count of open settlements with the caller's permissions) that renders the left rail from 1024 px and the bottom tab bar below it, with «Más» opening the remaining sections.
   - `src/lib/navigation.ts`: the campaign sections and their permissions move here from `campaigns/[id]/+page.svelte`, which stops rendering them.
-  - Page titles use the institution's name.
 - **Screens.** Every screen under `/campaigns/[id]`.
 - **Acceptance.**
   - From any campaign screen, any section the role may open is one tap away at 375 px and one click away at 1280 px.
@@ -124,6 +123,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - `+error.svelte` at the root, under `/campaigns/[id]` and under `/portal`: what happened, in Spanish, inside the shell, with the way back. A 403 says which area it is («Esta sección es de tesorería»), from a map of route to label.
   - `/`: signed-in staff go to the active campaign when there is exactly one, otherwise to `/campaigns`. The session card moves to a «Mi cuenta» entry in the top bar.
   - `PageHeader`: one back link to the parent section instead of the breadcrumb trail (the `breadcrumbs` prop stays accepted, and the last parent becomes the link, so pages do not all change in this PR).
+  - Page titles and the ledger's labels name the institution instead of «Firefighters» (moved here from PR 5 to keep the shell PR to the shell: it is a mechanical change in about forty pages).
 - **Screens.** Home, every 403 and 404, every page header.
 - **Acceptance.**
   - A 403 and a 404 under a campaign render the shell, a message in Spanish and a link that works; none contains the words «Forbidden» or «Not Found».

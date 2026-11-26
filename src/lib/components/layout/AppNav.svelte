@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import AppHeader from '$lib/components/ui/AppHeader.svelte';
+	import { institutionName } from '$lib/institution';
 	import { mainNavItems } from '$lib/navigation';
 
 	/** The signed-in app shell header: main navigation by permission, person and «Cerrar sesión». */
@@ -23,7 +24,7 @@
 </script>
 
 <AppHeader
-	product="Firefighters"
+	product={institutionName()}
 	homeHref={resolve('/')}
 	{links}
 	user={fullName ?? undefined}

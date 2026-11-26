@@ -260,10 +260,11 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 		run: async (r, campaign, eligibleNumber) => {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}`);
 			await r.screen('Campaña');
-			await r.tap(
-				r.page.locator(`a[href="/campaigns/${campaign}/draws"]:visible`).first(),
-				'Sorteos'
-			);
+			// On a phone «Sorteos» is under «Más» in the tab bar.
+			const draws = r.page.locator(`a[href="/campaigns/${campaign}/draws"]:visible`);
+			if ((await draws.count()) === 0)
+				await r.tap(r.page.getByRole('button', { name: 'Más' }), 'Más');
+			await r.tap(draws.first(), 'Sorteos');
 			await r.screen('Sorteos');
 			await r.tap(r.page.locator('main a[href$="/draws/new"]').first(), 'Nuevo sorteo');
 			await r.screen('Nuevo sorteo');

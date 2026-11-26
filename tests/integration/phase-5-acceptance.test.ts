@@ -19,6 +19,7 @@ import { load as campaignLoad } from '../../src/routes/campaigns/[id]/+page.serv
 import CampaignPage from '../../src/routes/campaigns/[id]/+page.svelte';
 import CollectorPage from '../../src/routes/campaigns/[id]/collectors/[collectorId]/+page.svelte';
 import BuyerPage from '../../src/routes/campaigns/[id]/buyers/[buyerId]/+page.svelte';
+import { campaignNav, type CampaignSectionKey } from '../../src/lib/navigation';
 import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -708,25 +709,43 @@ describe('Phase 5: collectors and buyers', () => {
 		);
 	});
 
-	it('shows campaign party links only for the permissions available now', async () => {
-		const adminData = await campaignLoad(
-			event(users.admin, `/campaigns/${campaignId}`, { id: campaignId })
-		);
-		const adminHtml = render(CampaignPage, { props: { data: adminData } as never }).body;
-		expect(adminHtml).toContain('>Cobradores</a>');
-		expect(adminHtml).toContain('>Compradores</a>');
-		const operatorData = await campaignLoad(
-			event(users.operator, `/campaigns/${campaignId}`, { id: campaignId })
-		);
-		const operatorHtml = render(CampaignPage, { props: { data: operatorData } as never }).body;
-		// SAN-93 (#44): the operator has collector.view and buyer.manage.
-		expect(operatorHtml).toContain('>Compradores</a>');
-		expect(operatorHtml).toContain('>Cobradores</a>');
-		for (const user of [users.treasurer, users['read-only']]) {
+	it('shows the campaign sections only for the permissions available now', async () => {
+		// The sections moved from the campaign page to the shell (UX plan PR 5): `campaignNav` decides
+		// them from the same permissions. Checked here with each role's live permissions.
+		const sections = (caller: Caller) =>
+			campaignNav(caller.permissions, campaignId, `/campaigns/${campaignId}`)
+				.groups.flatMap((group) => group.items)
+				.map((item) => item.key);
+		// SAN-93 (#44): the operator has collector.view and buyer.manage. SAN-158: treasurer and
+		// read-only read collectors and buyers too.
+		for (const user of [users.admin, users.operator, users.treasurer, users['read-only']]) {
+			expect(sections(user)).toContain('collectors');
+			expect(sections(user)).toContain('buyers');
+		}
+
+		// The shell and the page's own flags come from the same rules: they never disagree.
+		const flags: [CampaignSectionKey, string][] = [
+			['bonds', 'viewBonds'],
+			['deliveries', 'viewDeliveries'],
+			['sales', 'viewSales'],
+			['settlements', 'viewSettlements'],
+			['collectors', 'viewCollectors'],
+			['buyers', 'viewBuyers'],
+			['draws', 'viewDraws'],
+			['reports', 'viewReports'],
+			['commissions', 'viewCommissions'],
+			['audit', 'viewAudit'],
+			['backups', 'exportBackups']
+		];
+		for (const user of [users.admin, users.operator, users.treasurer, users['read-only']]) {
 			const data = await campaignLoad(event(user, `/campaigns/${campaignId}`, { id: campaignId }));
+			const can = (data as { can: Record<string, unknown> }).can;
+			for (const [section, flag] of flags)
+				expect(sections(user).includes(section), `${section} vs can.${flag}`).toBe(can[flag]);
+			// And the page itself no longer lists them.
 			const html = render(CampaignPage, { props: { data } as never }).body;
-			expect(html).toContain('>Cobradores</a>');
-			expect(html).toContain('>Compradores</a>');
+			expect(html).not.toContain('>Cobradores</a>');
+			expect(html).not.toContain('>Compradores</a>');
 		}
 	});
 });

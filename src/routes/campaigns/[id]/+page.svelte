@@ -85,49 +85,6 @@
 			[data.can.loadBonds, 'Cargar una pata', resolve('/campaigns/[id]/bonds/pata/new', { id })]
 		])
 	);
-
-	/** Campaign sections, grouped. Administración stays collapsed. */
-	const groups = $derived(
-		[
-			{
-				title: 'Operación',
-				links: allowed([
-					[data.can.viewBonds, 'Bonos', resolve('/campaigns/[id]/bonds', { id })],
-					[data.can.viewDeliveries, 'Entregas', resolve('/campaigns/[id]/deliveries', { id })],
-					[data.can.viewSales, 'Ventas', resolve('/campaigns/[id]/sales', { id })],
-					[data.can.viewSettlements, 'Rendiciones', resolve('/campaigns/[id]/settlements', { id })]
-				])
-			},
-			{
-				title: 'Personas',
-				links: allowed([
-					[data.can.viewCollectors, 'Cobradores', resolve('/campaigns/[id]/collectors', { id })],
-					[data.can.viewBuyers, 'Compradores', resolve('/campaigns/[id]/buyers', { id })]
-				])
-			},
-			{
-				title: 'Sorteos y reportes',
-				links: allowed([
-					[data.can.viewDraws, 'Sorteos', resolve('/campaigns/[id]/draws', { id })],
-					[data.can.viewReports, 'Reportes', resolve('/campaigns/[id]/reports', { id })]
-				])
-			}
-		].filter((g) => g.links.length)
-	);
-	const adminLinks = $derived(
-		allowed([
-			[true, 'Datos y reglas', resolve('/campaigns/[id]/configuracion', { id })],
-			[
-				data.can.viewCommissions,
-				'Reglas de comisión',
-				resolve('/campaigns/[id]/commissions', { id })
-			],
-			[data.can.viewAudit, 'Registro de auditoría', resolve('/campaigns/[id]/audit', { id })],
-			[data.can.exportBackups, 'Copias de seguridad', resolve('/campaigns/[id]/backups', { id })]
-		])
-	);
-	const navLink =
-		'-ml-2.5 flex min-h-touch items-center rounded-md px-2.5 text-body text-text hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 </script>
 
 {#snippet figure(label: string, value: string, detail?: string)}
@@ -286,231 +243,208 @@
 		>
 	{/if}
 
-	<div class="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
-		<div class="flex min-w-0 flex-col gap-5 lg:order-2">
-			{#if campaign.status === 'draft'}
-				{@render status()}
-			{/if}
+	<!-- The campaign's sections are in the shell (rail and tab bar), not on this page. -->
+	<div class="flex min-w-0 flex-col gap-5">
+		{#if campaign.status === 'draft'}
+			{@render status()}
+		{/if}
 
-			{#if operational && operational.submitted.count > 0}
+		{#if operational && operational.submitted.count > 0}
+			<Card
+				title="Cobros enviados sin procesar"
+				id="dash-submitted"
+				description="{operational.submitted.count === 1
+					? '1 cobro enviado'
+					: `${formatNumber(operational.submitted.count)} cobros enviados`} por cobradores desde su portal, por {formatMoney(
+					operational.submitted.amount
+				)}. No cuentan en ninguna rendición hasta que se incluyan o se rechacen, y bloquean el cierre de la rendición de su cobrador."
+			>
+				<table class="w-full border-collapse text-body-sm">
+					<caption class="sr-only">Cobros enviados sin procesar por cobrador</caption>
+					<thead>
+						<tr class="border-b border-border text-left text-muted">
+							<th scope="col" class="py-2 font-medium">Cobrador</th>
+							<th scope="col" class="py-2 text-right font-medium">Cobros</th>
+							<th scope="col" class="py-2 text-right font-medium">Importe</th>
+							<th scope="col" class="py-2 pl-4 font-medium">Dónde procesarlos</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each operational.submitted.byCollector as row (row.collectorId)}
+							<tr class="border-b border-border last:border-0">
+								<td class="py-2.5">{row.collectorName}</td>
+								<td class="py-2.5 text-right tabular-nums">{formatNumber(row.count)}</td>
+								<td class="py-2.5 text-right tabular-nums">{formatMoney(row.amount)}</td>
+								<td class="py-2.5 pl-4">
+									{#if !data.can.viewSettlements}
+										<span class="text-muted">Sin acceso a rendiciones</span>
+									{:else if row.openSettlementId}
+										<a
+											href={resolve('/campaigns/[id]/settlements/[settlementId]', {
+												id: campaign.id,
+												settlementId: row.openSettlementId
+											})}
+											class="text-primary-text underline-offset-2 hover:underline"
+											>Abrir la rendición</a
+										>
+									{:else}
+										<a
+											href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
+											class="text-primary-text underline-offset-2 hover:underline"
+											>Ver rendiciones (no hay una abierta)</a
+										>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</Card>
+		{/if}
+
+		{#if operational}
+			<Card title="Próximo sorteo" id="dash-next-draw">
+				{#if nextDraw && countdown}
+					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+						{@render figure(
+							DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name,
+							formatDate(nextDraw.drawDate),
+							nextDraw.name
+						)}
+						{@render figure(
+							'Fecha de corte',
+							formatDateTime(nextDraw.paymentCutoffAt),
+							countdownLabel(countdown)
+						)}
+						{@render figure(
+							rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo',
+							formatNumber(nextDraw.atRiskCount),
+							nextDraw.requiredInstallmentNumber
+								? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
+								: 'Requiere el pago total'
+						)}
+					</dl>
+				{:else}
+					<p class="m-0 text-body-sm text-muted">No hay sorteos programados.</p>
+				{/if}
+			</Card>
+
+			{#if nextDraw}
 				<Card
-					title="Cobros enviados sin procesar"
-					id="dash-submitted"
-					description="{operational.submitted.count === 1
-						? '1 cobro enviado'
-						: `${formatNumber(operational.submitted.count)} cobros enviados`} por cobradores desde su portal, por {formatMoney(
-						operational.submitted.amount
-					)}. No cuentan en ninguna rendición hasta que se incluyan o se rechacen, y bloquean el cierre de la rendición de su cobrador."
+					title={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
+					id="dash-at-risk"
+					description={rosterFrozen
+						? 'Bonos vendidos que no cubrieron las cuotas requeridas antes de la fecha de corte.'
+						: 'Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte.'}
 				>
-					<table class="w-full border-collapse text-body-sm">
-						<caption class="sr-only">Cobros enviados sin procesar por cobrador</caption>
+					{#if operational.atRisk.length}
+						<Table
+							caption="Bonos en riesgo para {nextDraw.name}"
+							columns={atRiskColumns}
+							rows={operational.atRisk.map((b) => ({ ...b, id: b.bondId }))}
+							rowKey="id"
+						>
+							{#snippet cell({ row, column })}
+								{#if column.key === 'bond'}
+									<a
+										href={resolve('/campaigns/[id]/bonds/[bondId]', {
+											id: campaign.id,
+											bondId: row.bondId
+										})}
+										class="font-figure font-bold text-primary-text tabular-nums underline-offset-2 hover:underline"
+										>{row.baseNumber === null
+											? 'Sin número'
+											: formatPaddedNumber(row.baseNumber, campaign.numberDigits)}</a
+									>
+								{:else if column.key === 'collector'}
+									{row.collectorName ?? 'Sin cobrador'}
+								{:else}
+									{formatNumber(row.missingInstallments)}
+								{/if}
+							{/snippet}
+						</Table>
+						{#if operational.atRisk[0] && operational.atRisk[0].totalCount > operational.atRisk.length}
+							<p class="m-0 mt-3 text-body-sm text-muted">
+								Se muestran {formatNumber(operational.atRisk.length)} de
+								{formatNumber(operational.atRisk[0].totalCount)} bonos en riesgo.
+							</p>
+						{/if}
+					{:else}
+						<p class="m-0 text-body-sm text-muted">
+							Ningún bono vendido está en riesgo para este sorteo.
+						</p>
+					{/if}
+				</Card>
+			{/if}
+		{/if}
+
+		{#if financial}
+			<Card title="Saldos de cobradores" id="dash-balances">
+				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
+					{@render figure('Saldo neto', formatSignedMoney(financial.balances.net))}
+					{@render figure(
+						'Cobradores con saldo a favor',
+						formatNumber(financial.balances.creditors)
+					)}
+				</dl>
+				{#if financial.balances.top.length}
+					<table class="mt-4 w-full border-collapse text-body-sm">
+						<caption class="sr-only">Saldos más grandes por cobrador</caption>
 						<thead>
 							<tr class="border-b border-border text-left text-muted">
 								<th scope="col" class="py-2 font-medium">Cobrador</th>
-								<th scope="col" class="py-2 text-right font-medium">Cobros</th>
-								<th scope="col" class="py-2 text-right font-medium">Importe</th>
-								<th scope="col" class="py-2 pl-4 font-medium">Dónde procesarlos</th>
+								<th scope="col" class="py-2 text-right font-medium">Saldo</th>
 							</tr>
 						</thead>
 						<tbody>
-							{#each operational.submitted.byCollector as row (row.collectorId)}
+							{#each financial.balances.top as row (row.collectorId)}
 								<tr class="border-b border-border last:border-0">
 									<td class="py-2.5">{row.collectorName}</td>
-									<td class="py-2.5 text-right tabular-nums">{formatNumber(row.count)}</td>
-									<td class="py-2.5 text-right tabular-nums">{formatMoney(row.amount)}</td>
-									<td class="py-2.5 pl-4">
-										{#if !data.can.viewSettlements}
-											<span class="text-muted">Sin acceso a rendiciones</span>
-										{:else if row.openSettlementId}
-											<a
-												href={resolve('/campaigns/[id]/settlements/[settlementId]', {
-													id: campaign.id,
-													settlementId: row.openSettlementId
-												})}
-												class="text-primary-text underline-offset-2 hover:underline"
-												>Abrir la rendición</a
-											>
-										{:else}
-											<a
-												href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
-												class="text-primary-text underline-offset-2 hover:underline"
-												>Ver rendiciones (no hay una abierta)</a
-											>
-										{/if}
-									</td>
+									<td class="py-2.5 text-right tabular-nums">{formatSignedMoney(row.balance)}</td>
 								</tr>
 							{/each}
 						</tbody>
 					</table>
-				</Card>
-			{/if}
-
-			{#if operational}
-				<Card title="Próximo sorteo" id="dash-next-draw">
-					{#if nextDraw && countdown}
-						<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-							{@render figure(
-								DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name,
-								formatDate(nextDraw.drawDate),
-								nextDraw.name
-							)}
-							{@render figure(
-								'Fecha de corte',
-								formatDateTime(nextDraw.paymentCutoffAt),
-								countdownLabel(countdown)
-							)}
-							{@render figure(
-								rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo',
-								formatNumber(nextDraw.atRiskCount),
-								nextDraw.requiredInstallmentNumber
-									? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
-									: 'Requiere el pago total'
-							)}
-						</dl>
-					{:else}
-						<p class="m-0 text-body-sm text-muted">No hay sorteos programados.</p>
-					{/if}
-				</Card>
-
-				{#if nextDraw}
-					<Card
-						title={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
-						id="dash-at-risk"
-						description={rosterFrozen
-							? 'Bonos vendidos que no cubrieron las cuotas requeridas antes de la fecha de corte.'
-							: 'Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte.'}
-					>
-						{#if operational.atRisk.length}
-							<Table
-								caption="Bonos en riesgo para {nextDraw.name}"
-								columns={atRiskColumns}
-								rows={operational.atRisk.map((b) => ({ ...b, id: b.bondId }))}
-								rowKey="id"
-							>
-								{#snippet cell({ row, column })}
-									{#if column.key === 'bond'}
-										<a
-											href={resolve('/campaigns/[id]/bonds/[bondId]', {
-												id: campaign.id,
-												bondId: row.bondId
-											})}
-											class="font-figure font-bold text-primary-text tabular-nums underline-offset-2 hover:underline"
-											>{row.baseNumber === null
-												? 'Sin número'
-												: formatPaddedNumber(row.baseNumber, campaign.numberDigits)}</a
-										>
-									{:else if column.key === 'collector'}
-										{row.collectorName ?? 'Sin cobrador'}
-									{:else}
-										{formatNumber(row.missingInstallments)}
-									{/if}
-								{/snippet}
-							</Table>
-							{#if operational.atRisk[0] && operational.atRisk[0].totalCount > operational.atRisk.length}
-								<p class="m-0 mt-3 text-body-sm text-muted">
-									Se muestran {formatNumber(operational.atRisk.length)} de
-									{formatNumber(operational.atRisk[0].totalCount)} bonos en riesgo.
-								</p>
-							{/if}
-						{:else}
-							<p class="m-0 text-body-sm text-muted">
-								Ningún bono vendido está en riesgo para este sorteo.
-							</p>
-						{/if}
-					</Card>
-				{/if}
-			{/if}
-
-			{#if financial}
-				<Card title="Saldos de cobradores" id="dash-balances">
-					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
-						{@render figure('Saldo neto', formatSignedMoney(financial.balances.net))}
-						{@render figure(
-							'Cobradores con saldo a favor',
-							formatNumber(financial.balances.creditors)
-						)}
-					</dl>
-					{#if financial.balances.top.length}
-						<table class="mt-4 w-full border-collapse text-body-sm">
-							<caption class="sr-only">Saldos más grandes por cobrador</caption>
-							<thead>
-								<tr class="border-b border-border text-left text-muted">
-									<th scope="col" class="py-2 font-medium">Cobrador</th>
-									<th scope="col" class="py-2 text-right font-medium">Saldo</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each financial.balances.top as row (row.collectorId)}
-									<tr class="border-b border-border last:border-0">
-										<td class="py-2.5">{row.collectorName}</td>
-										<td class="py-2.5 text-right tabular-nums">{formatSignedMoney(row.balance)}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					{:else}
-						<p class="m-0 mt-4 text-body-sm text-muted">
-							Todavía no hay movimientos en las cuentas corrientes.
-						</p>
-					{/if}
-				</Card>
-
-				<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
-					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-						{@render figure('Efectivo', formatMoney(financial.cash.cash))}
-						{@render figure('Transferencias', formatMoney(financial.cash.transfer))}
-						{@render figure('Total cobrado', formatMoney(financial.cash.total))}
-					</dl>
+				{:else}
 					<p class="m-0 mt-4 text-body-sm text-muted">
-						Rendido en {formatNumber(financial.commissions.closedSettlements)}
-						{financial.commissions.closedSettlements === 1
-							? 'rendición cerrada'
-							: 'rendiciones cerradas'}:
-						{formatMoney(financial.commissions.settledCash)} en efectivo y
-						{formatMoney(financial.commissions.settledTransfer)} en transferencias.
-						{#if financial.commissions.openSettlements > 0}
-							{financial.commissions.openSettlements === 1
-								? 'Hay 1 rendición abierta.'
-								: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
-						{/if}
+						Todavía no hay movimientos en las cuentas corrientes.
 					</p>
-				</Card>
+				{/if}
+			</Card>
 
-				<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
-					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-						{@render figure('Generadas', formatMoney(financial.commissions.generated))}
-						{@render figure('Liquidadas', formatMoney(financial.commissions.settled))}
-						{@render figure('Sin liquidar', formatSignedMoney(financial.commissions.pending))}
-					</dl>
-				</Card>
-			{/if}
+			<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
+				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+					{@render figure('Efectivo', formatMoney(financial.cash.cash))}
+					{@render figure('Transferencias', formatMoney(financial.cash.transfer))}
+					{@render figure('Total cobrado', formatMoney(financial.cash.total))}
+				</dl>
+				<p class="m-0 mt-4 text-body-sm text-muted">
+					Rendido en {formatNumber(financial.commissions.closedSettlements)}
+					{financial.commissions.closedSettlements === 1
+						? 'rendición cerrada'
+						: 'rendiciones cerradas'}:
+					{formatMoney(financial.commissions.settledCash)} en efectivo y
+					{formatMoney(financial.commissions.settledTransfer)} en transferencias.
+					{#if financial.commissions.openSettlements > 0}
+						{financial.commissions.openSettlements === 1
+							? 'Hay 1 rendición abierta.'
+							: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
+					{/if}
+				</p>
+			</Card>
 
-			{#if campaign.status !== 'draft'}
-				{@render status()}
-			{/if}
-		</div>
-		<nav aria-label="Secciones de la campaña" class="lg:order-1">
-			{#each groups as group (group.title)}
-				<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted first:mt-0">{group.title}</h2>
-				<ul class="m-0 list-none p-0">
-					{#each group.links as link (link.href)}
-						<li><a href={link.href} class={navLink}>{link.label}</a></li>
-					{/each}
-				</ul>
-			{/each}
-			<h2 class="m-0 mt-5 mb-1.5 text-caption text-muted">Administración</h2>
-			<details>
-				<summary
-					class="flex min-h-touch cursor-pointer items-center rounded-sm text-body-sm text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-					>Datos y reglas, comisiones, auditoría y copias</summary
-				>
-				<ul class="m-0 list-none p-0">
-					{#each adminLinks as link (link.href)}
-						<li><a href={link.href} class={navLink}>{link.label}</a></li>
-					{/each}
-				</ul>
-			</details>
-		</nav>
+			<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
+				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
+					{@render figure('Generadas', formatMoney(financial.commissions.generated))}
+					{@render figure('Liquidadas', formatMoney(financial.commissions.settled))}
+					{@render figure('Sin liquidar', formatSignedMoney(financial.commissions.pending))}
+				</dl>
+			</Card>
+		{/if}
+
+		{#if campaign.status !== 'draft'}
+			{@render status()}
+		{/if}
 	</div>
 </div>
 <!-- eslint-enable svelte/no-navigation-without-resolve -->
