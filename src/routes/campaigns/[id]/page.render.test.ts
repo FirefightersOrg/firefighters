@@ -79,11 +79,24 @@ function renderConfig(...args: Parameters<typeof renderPage>) {
 	return render(ConfigPage, { props }).body;
 }
 
-describe('campaign draw navigation', () => {
-	it('shows Draws when any draw capability grants read access', () => {
-		const body = renderPage(campaign(), null, { can: { viewDraws: true } });
-		expect(body).toContain('/draws');
-		expect(body).toContain('Sorteos');
+describe('campaign sections (moved to the shell)', () => {
+	// The rail and the tab bar of the campaign shell list the sections now, by permission:
+	// src/lib/navigation.test.ts and CampaignShell.render.test.ts cover who sees which.
+	it('does not list the sections on the page, whatever the person can see', () => {
+		const body = renderPage(campaign(), null, {
+			can: {
+				viewBonds: true,
+				viewCollectors: true,
+				viewBuyers: true,
+				viewDraws: true
+			}
+		});
+		const base = '/campaigns/f0000000-0000-0000-0000-000000000001';
+		for (const section of ['collectors', 'buyers', 'draws', 'settlements', 'deliveries', 'sales'])
+			expect(body).not.toContain(`href="${base}/${section}"`);
+		expect(body).not.toContain('aria-label="Secciones de la campaña"');
+		for (const title of ['Operación', 'Personas', 'Administración'])
+			expect(body).not.toContain(title);
 	});
 });
 
@@ -254,21 +267,10 @@ describe('campaign page: bonds', () => {
 		expect(renderPage(campaign())).not.toContain(href);
 	});
 
-	it('links to the bonds list only with bond.view', () => {
-		const href = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"';
-		expect(renderPage(campaign(), null, { can: { viewBonds: true } })).toContain(href);
-		expect(renderPage(campaign())).not.toContain(href);
-	});
-
-	it('links to collectors and buyers only for users who can read them', () => {
-		const collectors = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/collectors"';
-		const buyers = 'href="/campaigns/f0000000-0000-0000-0000-000000000001/buyers"';
-		const none = renderPage(campaign(), null);
-		expect(none).not.toContain(collectors);
-		expect(none).not.toContain(buyers);
-		const both = renderPage(campaign(), null, { can: { viewCollectors: true, viewBuyers: true } });
-		expect(both).toContain(collectors);
-		expect(both).toContain(buyers);
+	it('reaches the bonds list through its search, only with bond.view', () => {
+		const action = 'action="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"';
+		expect(renderPage(campaign(), null, { can: { viewBonds: true } })).toContain(action);
+		expect(renderPage(campaign())).not.toContain(action);
 	});
 });
 
@@ -424,16 +426,12 @@ describe('campaign workbench (redesign)', () => {
 			expect(body).toContain(text);
 		expect(body.indexOf('Registrar venta')).toBeLessThan(body.indexOf('Abrir rendición'));
 	});
-	it('groups the sections and keeps Administración (with Datos y reglas) collapsed', () => {
+	it('keeps Datos y reglas one click away, and the rules off the workbench', () => {
 		const body = renderPage(campaign(), null, {
 			can: { viewBonds: true, viewCollectors: true, viewDraws: true }
 		});
-		for (const text of ['Operación', 'Personas', 'Sorteos y reportes', 'Administración'])
-			expect(body).toContain(text);
-		expect(body).toContain('<details');
-		expect(body).toContain('/campaigns/f0000000-0000-0000-0000-000000000001/configuracion');
-		// Also reachable from the header, not only from the collapsed Administración group.
-		expect(body.match(/\/configuracion"/g)?.length).toBeGreaterThanOrEqual(2);
+		// From the header of the page (the shell also lists it under Administración).
+		expect(body).toContain('href="/campaigns/f0000000-0000-0000-0000-000000000001/configuracion"');
 		// The rules and their forms live in Datos y reglas, not on the workbench.
 		expect(body).not.toContain('?/rules');
 		expect(body).not.toContain('Política de desborde');
