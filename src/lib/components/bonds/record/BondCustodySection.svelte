@@ -108,7 +108,9 @@
 					{:else if column.key === 'details'}
 						<span class="text-caption text-muted">
 							{#if row.assignmentType === 'lost'}
-								Responsable: {row.responsibleParty} · extraviado el {formatDate(row.lostOn)} · {row.notes}
+								Responsable: {row.responsibleParty}. Extraviado el {formatDate(
+									row.lostOn
+								)}.{row.notes ? ` ${row.notes}` : ''}
 							{:else if row.notes}{row.notes}{/if}
 						</span>
 					{/if}

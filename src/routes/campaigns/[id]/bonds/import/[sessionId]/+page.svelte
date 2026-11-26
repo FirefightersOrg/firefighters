@@ -137,7 +137,7 @@
 
 <PageHeader
 	title={isScan ? 'Lote de escaneo' : (session.fileName ?? 'Importación')}
-	description={`${IMPORT_SOURCE_LABELS[session.sourceType]} · ${campaign.name} · iniciada el ${formatDateTime(session.createdAt)}${session.notes ? ` · ${session.notes}` : ''}`}
+	description={`${IMPORT_SOURCE_LABELS[session.sourceType]} de ${campaign.name}, iniciada el ${formatDateTime(session.createdAt)}${session.notes ? `. ${session.notes}` : ''}`}
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
@@ -419,7 +419,7 @@
 			{#if pageCount > 1}
 				<nav aria-label="Páginas" class="flex items-center justify-between text-body-sm">
 					<span class="text-muted tabular-nums"
-						>Página {formatNumber(data.page)} de {formatNumber(pageCount)} · {formatNumber(
+						>Página {formatNumber(data.page)} de {formatNumber(pageCount)}, {formatNumber(
 							data.total
 						)} filas</span
 					>

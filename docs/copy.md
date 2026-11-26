@@ -14,6 +14,7 @@ Neutral Spanish that avoids second person.
 - Say what happened, then what to do. Do not blame the person and do not use exclamation marks.
 - Destructive actions name the object and ask for a reason when the rules require one: «Anular pago», never «Eliminar».
 - Sentence case everywhere (only the first word and proper nouns are capitalized). Use the same term for the same concept; never alternate synonyms.
+- On screen, facts are joined with words and punctuation, not with «·» or a spaced em dash: «Responsable: Raúl Sosa. Extraviado el 12/10/2026.», «Archivo CSV de Bono Contribución 2026, iniciada el …», «0190, Oscar Pérez, cuota 2, resta $ 10.000» in an option. The printed documents keep their own legends («ANULADO — COMPROBANTE SIN VALIDEZ»): they are stamps on paper, not interface text.
 
 ## Formatting (SAN-126, `src/lib/format.ts`)
 

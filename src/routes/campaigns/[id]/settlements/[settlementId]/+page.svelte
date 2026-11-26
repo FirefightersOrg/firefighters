@@ -301,7 +301,7 @@
 														{ value: '', label: 'Elegir…' },
 														...data.candidates.map((candidate) => ({
 															value: candidate.id,
-															label: `${candidate.bond} — ${candidate.buyer} — cuota ${candidate.number} — resta ${money(candidate.amount)}`
+															label: `${candidate.bond}, ${candidate.buyer}, cuota ${candidate.number}, resta ${money(candidate.amount)}`
 														}))
 													]}
 												/>

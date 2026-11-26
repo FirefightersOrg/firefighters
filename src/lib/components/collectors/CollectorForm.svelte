@@ -125,7 +125,7 @@
 					{ value: '', label: 'Ninguno' },
 					...profiles.map((profile) => ({
 						value: profile.id,
-						label: profile.email ? `${profile.fullName} — ${profile.email}` : profile.fullName
+						label: profile.email ? `${profile.fullName} (${profile.email})` : profile.fullName
 					}))
 				]}
 			/>

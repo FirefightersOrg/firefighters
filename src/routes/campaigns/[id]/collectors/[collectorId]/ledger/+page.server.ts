@@ -101,7 +101,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		.map((e) => ({
 			id: e.id,
 			direction: e.direction,
-			label: `${formatDate(e.occurredAt)} · ${LEDGER_ENTRY_TYPE_LABELS[e.entryType as LedgerEntryType] ?? e.entryType} · ${formatMoney(e.amount, { decimals: 'always' })} (queda ${formatMoney(remaining.get(e.id) ?? 0, { decimals: 'always' })})`
+			label: `${formatDate(e.occurredAt)}, ${LEDGER_ENTRY_TYPE_LABELS[e.entryType as LedgerEntryType] ?? e.entryType}, ${formatMoney(e.amount, { decimals: 'always' })} (queda ${formatMoney(remaining.get(e.id) ?? 0, { decimals: 'always' })})`
 		}));
 	return {
 		campaign: campaign.data,
