@@ -46,6 +46,8 @@ describe('printable delivery note page', () => {
 		]) {
 			expect(body.split(text).length - 1).toBe(2);
 		}
+		expect(body.match(/class="doc-bond-grid"/g)).toHaveLength(2);
+		expect(body.match(/class="doc-bond">0068 \/ 4939/g)).toHaveLength(2);
 		expect(body.split('Firma del cobrador').length - 1).toBe(2);
 		expect(body.split('Firma de la administración').length - 1).toBe(2);
 	});
