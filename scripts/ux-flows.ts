@@ -163,14 +163,18 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.screen('Registrar venta, vacío');
 			await r.type(r.page.locator('#query'), '35', 'Número del bono');
 			await r.tap(r.page.locator('form[action="?/lookup"] button[type="submit"]'), 'Buscar');
+			// UX plan PR 12: the one bond that matches is chosen without another action.
+			await r.page.locator('[data-chosen-bond]').waitFor();
 			await r.screen('Bono encontrado');
-			await r.check(r.page.getByRole('radio').first(), 'Elegir el bono encontrado');
-			const buyers = await r.page.locator('#buyerId option').count();
-			r.note(`The buyer <select> lists ${buyers - 1} buyers with no type-ahead.`);
-			await r.choose(r.page.locator('#buyerId'), { index: 5 }, 'Comprador');
-			await r.choose(r.page.locator('#paymentMode'), { value: 'installments' }, 'Modalidad');
+			// A tap, not `check()`: the step collapses as soon as the buyer is chosen.
+			await r.tap(r.page.locator('[data-step="buyer"] input[type="radio"]').nth(4), 'Comprador');
+			await r.page.locator('[data-chosen-buyer]').waitFor();
+			await r.tap(
+				r.page.locator('[data-step="payment"]').getByText('En cuotas', { exact: true }),
+				'Modalidad'
+			);
 			await r.screen('Venta lista para confirmar');
-			await r.tap(r.page.getByRole('button', { name: 'Confirmar venta' }), 'Confirmar venta');
+			await r.tap(r.page.locator('[data-confirm-sale]'), 'Confirmar venta');
 			await r.page.waitForURL(/\/sales\/[0-9a-f-]{36}$/);
 			await r.screen('Venta registrada');
 		}
@@ -182,14 +186,18 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}/sales/new`);
 			await r.type(r.page.locator('#query'), '34', 'Número del bono');
 			await r.tap(r.page.locator('form[action="?/lookup"] button[type="submit"]'), 'Buscar');
-			await r.check(r.page.getByRole('radio').first(), 'Elegir el bono encontrado');
+			await r.page.locator('[data-chosen-bond]').waitFor();
 			await r.screen('Bono elegido');
 			await r.type(r.page.locator('#buyer-search'), 'Gómez', 'Buscar compradores');
-			await r.tap(r.page.locator('form[method="GET"] button[type="submit"]'), 'Buscar comprador');
+			await r.tap(
+				r.page.locator('[data-step="buyer"] form[role="search"] button[type="submit"]'),
+				'Buscar comprador'
+			);
+			await r.page.waitForURL(/[?&]buyer=/);
 			await r.screen('Después de buscar el comprador');
-			const radios = await r.page.getByRole('radio').count();
+			const kept = await r.page.locator('[data-chosen-bond]').count();
 			r.note(
-				radios === 0
+				kept === 0
 					? 'Searching for a buyer reloads the page and DROPS the bond that was found: it has to be searched again.'
 					: 'The found bond survives the buyer search.'
 			);
@@ -260,7 +268,7 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}`);
 			await r.screen('Campaña');
 			await r.tap(
-				r.page.getByRole('link', { name: 'Entregar bonos a un cobrador' }),
+				r.page.getByRole('link', { name: 'Entregar bonos', exact: true }),
 				'Entregar bonos'
 			);
 			await r.screen('Nueva entrega, vacía');
@@ -270,9 +278,10 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.getByText('agregados.').waitFor();
 			await r.choose(r.page.locator('#collectorId'), { label: 'Raúl Sosa' }, 'Cobrador');
 			await r.screen('Entrega lista');
+			// UX plan PR 16: the button says how many bonds go to whom.
 			await r.tap(
-				r.page.getByRole('button', { name: 'Entregar y emitir remito' }),
-				'Entregar y emitir remito'
+				r.page.getByRole('button', { name: 'Entregar 5 bonos a Raúl Sosa' }),
+				'Entregar 5 bonos a Raúl Sosa'
 			);
 			await r.page.waitForURL(/\/deliveries\/[0-9a-f-]{36}$/);
 			await r.screen('Remito emitido');
@@ -311,9 +320,10 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.tap(r.page.getByRole('button', { name: 'Congelar padrón' }), 'Congelar padrón');
 			await r.page.getByText('Padrón congelado.').waitFor();
 			await r.screen('Padrón congelado');
-			await r.tap(r.page.locator('main a[href$="/winners"]').first(), 'Ganadores y premios');
+			// UX plan PR 16: the next step of a frozen roster is a button, and with no prizes yet the form
+			// of the first prize is already open.
+			await r.tap(r.page.getByRole('link', { name: 'Cargar ganadores' }), 'Cargar ganadores');
 			await r.screen('Ganadores, sin premios');
-			await r.tap(r.page.getByText('Configurar un premio'), 'Configurar un premio');
 			await r.type(r.page.locator('#create-position'), '1', 'Puesto');
 			await r.type(r.page.locator('#create-name'), 'Televisor', 'Nombre del premio');
 			await r.tap(r.page.getByRole('button', { name: 'Crear premio' }), 'Crear premio');
@@ -327,8 +337,8 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.getByText('Resultado de la validación').waitFor();
 			await r.screen('Número validado');
 			await r.tap(
-				r.page.getByRole('button', { name: 'Registrar resolución' }),
-				'Registrar resolución'
+				r.page.getByRole('button', { name: 'Adjudicar el premio' }),
+				'Adjudicar el premio'
 			);
 			await r.page.getByText('Premio resuelto.').waitFor();
 			await r.screen('Premio adjudicado');

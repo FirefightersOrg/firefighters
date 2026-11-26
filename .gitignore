@@ -40,3 +40,6 @@ supabase/.temp
 
 # Vitest test artifacts
 /.vitest/
+
+# Saved sessions of the E2E setup project (SAN-166)
+/tests/e2e/.auth/

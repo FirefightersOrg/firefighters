@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Installment, PaymentPlan, Sale } from '$lib/domain/sales';
 import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
+import { NO_ACCESS_BUYER, NO_ACCESS_COLLECTOR } from '$lib/domain/parties';
 import type { RepositoryResult } from './campaigns';
 import type { FinancialStatus } from '$lib/domain/financial-status';
 
@@ -235,7 +236,7 @@ type SaleBondNumber = NonNullable<SaleListRow['bonds']>['bond_numbers'][number];
 const buyerName = (buyer: SaleListRow['buyers']) =>
 	buyer?.business_name ||
 	[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
-	'Unknown buyer';
+	NO_ACCESS_BUYER;
 
 function bondNumberPairs(numbers: SaleBondNumber[] | undefined) {
 	const associatedByBase = new Map(
@@ -262,7 +263,7 @@ function mapListRow(row: SaleListRow): SaleListItem {
 			.sort((a, b) => a - b),
 		bondNumberPairs: bondNumberPairs(row.bonds?.bond_numbers),
 		buyerName: buyerName(row.buyers),
-		collectorName: row.collectors?.display_name ?? 'Unknown collector',
+		collectorName: row.collectors?.display_name ?? NO_ACCESS_COLLECTOR,
 		financialStatus: row.bonds?.financial_status_snapshot ?? 'no_payments'
 	};
 }

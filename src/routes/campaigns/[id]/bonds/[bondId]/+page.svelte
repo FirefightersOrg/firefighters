@@ -7,6 +7,7 @@
 	import BondCustodySection from '$lib/components/bonds/record/BondCustodySection.svelte';
 	import BondGeneralSection from '$lib/components/bonds/record/BondGeneralSection.svelte';
 	import BondNumbersSection from '$lib/components/bonds/record/BondNumbersSection.svelte';
+	import InstallmentsList from '$lib/components/sales/InstallmentsList.svelte';
 	import {
 		Alert,
 		Badge,
@@ -14,7 +15,6 @@
 		Button,
 		Disclosure,
 		Field,
-		Money,
 		PageHeader,
 		Select,
 		StatusBadge,
@@ -24,7 +24,6 @@
 	} from '$lib/components/ui';
 	import { bondSummary } from '$lib/domain/bond-summary';
 	import { calculateFinancialStatus } from '$lib/domain/financial-status';
-	import { centsToDecimalString } from '$lib/domain/money';
 	import { DRAW_INELIGIBILITY_REASON_LABELS } from '$lib/domain/draw-eligibility';
 	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
 	import { wonPrizeCount as wonCount } from '$lib/domain/prizes';
@@ -145,7 +144,12 @@
 		if (summary.nextStep === 'sell' && data.next.sell)
 			return {
 				label: 'Registrar venta',
-				href: resolve('/campaigns/[id]/sales/new', { id: campaign.id })
+				// The sale arrives with this bond already found.
+				href: `${resolve('/campaigns/[id]/sales/new', { id: campaign.id })}${
+					record.numbers.find((n) => n.kind === 'base')
+						? `?bond=${record.numbers.find((n) => n.kind === 'base')!.formatted}`
+						: ''
+				}`
 			};
 		if (summary.nextStep === 'pay' && data.next.pay)
 			return {
@@ -157,36 +161,7 @@
 		return null;
 	});
 	const phone = $derived(data.parties.buyer?.phone?.trim() || null);
-	const pesos = (cents: number) => centsToDecimalString(cents);
 
-	// --- Installments: what is still owed on each ---------------------------------------------------
-	const installmentOf = (number: number) =>
-		data.installments.find((item) => item.installmentNumber === number);
-	const how = (method: string) => (method === 'transfer' ? 'por transferencia' : 'en efectivo');
-	/** How an installment with nothing left to pay was paid. */
-	const paidLine = (number: number) => {
-		const last = installmentOf(number)?.lastPayment;
-		if (!last) return 'Pagada';
-		return `Pagada el ${formatDate(last.date)} ${how(last.method)}${
-			last.settlementNumber ? `, rendición ${last.settlementNumber}` : ''
-		}`;
-	};
-	/**
-	 * A payment that is not confirmed yet: the installment still owes it until the settlement closes,
-	 * and the record says where that money is.
-	 */
-	const waitingLine = (number: number) => {
-		const item = installmentOf(number);
-		const waiting = item?.waitingPayment;
-		if (!item || !waiting) return '';
-		const amount = formatMoney(item.waiting);
-		return waiting.submittedByCollector
-			? `Cobro de ${amount} enviado por el cobrador el ${formatDate(waiting.date)}, sin procesar`
-			: `Pago de ${amount} ${how(waiting.method)} cargado en la rendición ${waiting.settlementNumber ?? ''}, que sigue abierta`.replace(
-					'  ',
-					' '
-				);
-	};
 	/**
 	 * The financial state from the same installments and payments as the sentence, so the badge
 	 * never contradicts it (the stored snapshot only moves when a settlement closes).
@@ -334,61 +309,14 @@
 					})}>Ver la venta</a
 				>
 			</div>
-			<ol class="m-0 list-none p-0" aria-label="Cuotas del bono">
-				{#each summary.rows as row (row.number)}
-					<li
-						class="flex min-h-14 items-center gap-3 border-b border-border py-2"
-						data-installment={row.number}
-					>
-						<span
-							class="w-7 shrink-0 font-figure text-[20px] leading-6 font-bold tabular-nums {row.overdue
-								? 'text-danger-text'
-								: 'text-muted'}"><span class="sr-only">Cuota </span>{row.number}</span
-						>
-						<span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-body">
-							{#if row.owedCents === 0}
-								<span class="text-muted">{paidLine(row.number)}</span>
-							{:else}
-								<span>{row.overdue ? 'Venció' : 'Vence'} el {formatDate(row.dueDate)}</span>
-								{#if row.overdue}<Badge tone="danger">Vencida</Badge>{/if}
-								{#if row.owedCents < (Number(row.amount) || 0) * 100}
-									<span class="text-body-sm text-muted">pago parcial</span>
-								{/if}
-								{#if waitingLine(row.number)}
-									<span class="basis-full text-body-sm text-muted" data-waiting-payment
-										>{waitingLine(row.number)}</span
-									>
-								{/if}
-							{/if}
-						</span>
-						<Money
-							value={pesos(
-								row.owedCents === 0 ? Math.round(Number(row.amount) * 100) : row.owedCents
-							)}
-							class="shrink-0 text-body {row.owedCents === 0 ? 'text-muted' : 'font-medium'}"
-						/>
-					</li>
-				{/each}
-			</ol>
-			{#if data.canViewPayments === false}
-				<p class="m-0 pt-2 text-body-sm text-muted">
-					Sin permiso para ver los pagos: una cuota con un pago parcial figura por su importe
-					completo.
-				</p>
-			{/if}
-			<p class="m-0 flex items-baseline justify-between gap-3 pt-3">
-				<span class="text-body font-semibold">
-					{summary.debtCents > 0 ? 'Falta cobrar' : 'Pagado'}
-				</span>
-				<Money
-					value={pesos(
-						summary.debtCents > 0
-							? summary.debtCents
-							: Math.round(Number(data.sale.sale.totalAmount) * 100)
-					)}
-					class="font-figure text-figure tabular-nums"
-				/>
-			</p>
+			<InstallmentsList
+				rows={summary.rows}
+				payments={data.installments}
+				debtCents={summary.debtCents}
+				totalAmount={data.sale.sale.totalAmount}
+				canViewPayments={data.canViewPayments}
+				label="Cuotas del bono"
+			/>
 		</section>
 	{/if}
 

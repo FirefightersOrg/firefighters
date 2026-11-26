@@ -216,14 +216,16 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 
 ### PR 12. Register a sale, and the sale record (A6, A8, A9)
 
+Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale (`sales/new`); 12b, the sale record and the «Sin acceso» fallbacks.
+
 - **Scope.**
   - `sales/new/+page.svelte`: the found bond is kept in page state; the buyer is found by typing (the existing `?buyer=` search, fetched without leaving the page, matches listed under the field); answered steps collapse to a line; a single match is selected; the payment mode is a `SegmentedControl`; `?bond=` arrives with the bond searched; the button names the bond and the buyer.
-  - `sales/[saleId]/+page.svelte`: the plan first, with what is owed as the lead figure; «Marcar como incobrable» and the corrections under «Corregir o anular», each in a dialog.
-  - A buyer or a collector the role cannot read shows «Sin acceso al comprador» with no link (the Spanish fallback from A9), here and in the shared label helper.
+  - `sales/[saleId]/+page.svelte`: what is owed as the lead figure, the sale in a sentence, then the plan (the same installments list as the bond record, now one component); «Marcar como incobrable» and the corrections under «Corregir la venta», each in a dialog. (First written as «Corregir o anular»: the page has no action that annuls a sale, so the name says what is there.)
+  - A buyer or a collector the role cannot read is left out of the record's sentences, and shows as «Sin acceso al comprador» or «Sin acceso al cobrador» with no link in tables (the Spanish fallback from A9, one constant in `src/lib/domain/parties.ts` used by the repositories).
 - **Screens.** New sale, sale record.
 - **Acceptance.**
   - Searching for a buyer after choosing the bond keeps the bond (the probe flow in `ux-flows.ts` reports it kept).
-  - The sale flow is 6 actions and 4 screens or fewer (7 and 5 today).
+  - The sale flow is 6 actions or fewer (7 today). Measured: 6 actions and 5 screens. The screens stay at 5, not the 4 first written here: the bond found, with who has it, is still a state the person reads before choosing the buyer, and it is counted as before.
   - Without JavaScript the form still registers a sale (the search falls back to today's GET).
   - No screen shows «Unknown buyer» or «Unknown collector» for any role (a crawl in the E2E sweep asserts it).
   - The sale's actions and their server tests are unchanged.
@@ -238,8 +240,9 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - 2.5 screens or shorter at 375 px with the demo campaign (5.2 today); no horizontal scroll (leaves `KNOWN_OVERFLOW`).
   - Each «Para resolver» item links to the screen that resolves it and disappears when there is nothing to resolve.
   - No amount on the page has cents.
-  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions.
-- **Risk.** Medium. The page is each role's landing; a render test per role.
+  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions. As delivered, `load` did not change at all: the count of open settlements is the one the shell's layout already loads.
+  - As delivered: 2.4 screens at 375 px with the demo campaign. The bonds short of the next draw have no screen of their own, so their item opens the list in place (collapsed until asked for) and each bond links to its record. The cash and commission breakdowns left the home: they are in the financial report.
+- **Risk.** Medium. The page is each role's landing; a render test per role. As delivered, the roles are checked in an E2E with the fixture users (operator, treasurer, read-only), since what each one sees comes from its permissions in the database.
 - **Depends on.** PRs 3, 4, 5, 7 (the «Registrar pago» action).
 
 ### PR 14. Lists: sales, settlements, deliveries, people, draws (A7, A9)
@@ -249,13 +252,30 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 - **Acceptance.** At 375 px each list shows its first row in the first screenful and never scrolls sideways; every filter keeps its query string; open settlements come before closed ones; the list server tests are unchanged.
 - **Risk.** Medium by volume. If the diff passes 800 lines it is split in two (operation lists, then people and draws).
 - **Depends on.** PR 4.
+- **14a as delivered (sales, settlements, delivery notes).**
+  - Measured at 375 x 812 px with the demo campaign: the first row ends at 512 px (sales), 411 px (settlements) and 543 px (delivery notes), above the tab bar, which starts at 755 px. Before, the first row started at 749, 773 and 773 px, behind the tab bar or below it, and each table scrolled sideways inside its card (268, 159 and 219 px). Now nothing scrolls sideways, also with a 60-character collector, a 65-character buyer and a pata of six numbers.
+  - The settlements list is not paginated: `listSettlements` reads every page of its query and returns the whole list. The open ones are put first in that function, after the read, keeping the query's order (newest number first) inside each group. The query did not change, and neither did SQL. Every caller gets that order, the collector record included.
+  - The settlements list has nothing to search by, and `FilterBar` always draws a search field, so its filters are folded in a `Disclosure` with the chips drawn by the page. A `FilterBar` with an optional search would replace that: a Cimiento change, left for its own PR.
+  - The sales list drops the «Modalidad» column (it stays as a filter and on the sale record) and shows the sale date, which is what the list is ordered by: with eight columns the table scrolled inside its card at 1024 px.
+  - The three `load` functions are untouched, and so are `sales/page.server.test.ts` and `settlements/page.server.test.ts`.
+- **As delivered, 14b (collectors, buyers, draws).** The second half of the split.
+  - Measured at 375 x 812 with the demo campaign: the first row ends at 511 px on collectors, 503 px on buyers and 417 px on draws (646, 630 and 630 px before: already in the first screenful since the campaign shell of PR 5, but the tables scrolled sideways inside their cards, with the bonds of a collector, the phone of a buyer and the state of a draw off screen). No page and no table scrolls sideways, also with 60-character names (E2E).
+  - Two facts were added to the loads, each from an existing repository function under an existing permission: the collector's balance (`getCollectorAccounts`, one call per page, only with `report.view_financial`) and the buyer's bonds in the campaign (`listBuyerBonds`, one read per buyer of the page, only with `bond.view`). The assertions of the list server tests are unchanged; new cases cover both.
+  - The draws list has no search, so it does not use `FilterBar` (which requires one): its two filters are folded in a `Disclosure` with the same chips. The draws are shown as a calendar in two tables (to be held, next first; held or annulled, latest first), ordered in the page from what the load returns.
+  - Not done: the winning numbers on the draws list («what was drawn»). The only existing function that returns them for every draw of a campaign (`getPrizesReport`) needs `report.view_financial`, which the operator who loads the winners does not have; they stay on the draw record.
 
 ### PR 15. Collector and buyer records, current account (A12)
 
-- **Scope.** `collectors/[collectorId]`, its `ledger`, and `buyers/[buyerId]`: header with the sentence and the next step, the first 10 rows of each inner list with a link to the filtered list, the current account as a `MoneySheet` over its movements, bulk return and reassignment behind «Corregir o anular».
+- **Scope.** `collectors/[collectorId]`, its `ledger`, and `buyers/[buyerId]`: header with the sentence and the next step, the first rows of each inner list with the way to the rest, the current account as a `MoneySheet` over its movements, bulk return and reassignment collapsed.
+  - The way to the rest is the filtered list where one exists (the sales and the settlements filter by collector) and a collapsed block on the record where it does not. (First written as «a link to the filtered list» for every list: the bonds list has no filter by collector, the sales list filters buyers by a name search, and there is no list of installments. A filter by collector on the bonds list needs no SQL, `bond_list` already carries `current_collector_id`, but it changes a screen that is not this PR's.)
+  - The collector's unsold bonds are shown by number, up to 15 (three lines on a phone), with the delivery notes they came with; the sold ones are collapsed under «Bonos vendidos». (First written as the first 10 rows: ten rows that all say «Sin vender, remito 0002» took four times the room of the numbers.)
+  - Bulk return and reassignment stay on the collector record, under «Devolver o reasignar bonos», choosing among the unsold bonds, with a dialog that names how many and to whom. (First written as «Corregir o anular», moved to the filtered bonds list: neither action corrects or annuls, and posting from the bonds list is more than layout.)
 - **Screens.** Collector record, current account, buyer record.
-- **Acceptance.** The collector record is 3 screens or shorter at 375 px with 35 bonds and 54 pending installments (12.9 today); the balance is in the first screenful; every existing action keeps working with its tests unchanged.
-- **Risk.** Medium. The bulk actions select from a list that is now partial: they move to the filtered bonds list, which already shows the collector.
+- **Acceptance.**
+  - The collector record is 3 screens or shorter at 375 px with 35 bonds and 54 pending installments (12.9 today). Measured on the demo campaign's six collectors (32 to 35 bonds, 57 to 83 pending installments): 2.87 to 3.06 screens (2333 to 2486 px), from 12.9 to 15.1. Four of the six are 6 to 50 px over 3 screens. The audit's collector (Héctor Acosta, 35 bonds, 57 pending installments today) goes from 12.9 to 3.06; the longest before (Jorge Medina, 35 bonds, 83 pending installments) from 15.1 to 3.01.
+  - The balance is in the first screenful of the collector record and of the current account (asserted at 375 x 812 in `tests/e2e/records.spec.ts`).
+  - Every existing action keeps working with its server tests unchanged.
+- **Risk.** Medium. What is left to collect is now a figure on the first screen: it is the sum of what `listCollectorPaymentCandidates` returns (what «Registrar pago» offers), so a payment loaded in a settlement that is still open already counts, while the sale record still says «debe» until that settlement closes.
 - **Depends on.** PRs 9, 14.
 
 ### PR 16. Deliveries and draws (A15)
@@ -265,6 +285,13 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - Draws: on each state of a draw the next step is a button (generate, freeze, load winners); «Registrar resolución» names the outcome («Adjudicar el premio», «Dejar sin adjudicar»); the roster as stacked rows.
 - **Screens.** New delivery, delivery note, draw record, roster, winners.
 - **Acceptance.** Delivering 35 bonds keeps the submit button within 2 screens at 375 px; the delivery and draw flows keep their action counts (7 and 19) or lower; the draw-flow E2E passes with selectors updated.
+- **As delivered.**
+  - Measured with `scripts/ux-flows.ts` at 375 px: the delivery is 7 actions and 5 screens before and after. The draw is 19 actions and 10 screens, and it was 20 on `main` before this PR, not the 19 written above: since PR 5 «Sorteos» is under «Más» in the phone's tab bar, one tap more than when the plan was written. The tap this PR removes is «Configurar un premio»: with no prizes yet, the form of the first prize is already open.
+  - With the bonds added as one range the submit button ends 872 px down at 375 px, 1.07 screens (the E2E delivers 35 bonds and asserts 2 screens or fewer).
+  - The draw record lists the four steps of a draw in order (generate, freeze, load winners, complete) and puts the one primary button on the current one. To choose between «Cargar ganadores» and «Completar sorteo» on a frozen draw, its `load` now reads the draw's prizes (the repository function the winners page uses, with the caller's client) and counts them the way `draw_complete` does; while a prize is unresolved «Completar sorteo» is not offered and the step says what is missing.
+  - «Dejar sin adjudicar» asks in a dialog, because it cannot be changed afterwards; «Adjudicar el premio» posts directly, as «Registrar resolución» did. Both post `?/resolve` with the same fields.
+  - To group bonds into ranges the delivery screens need the numbers, so the bond the lookup and the note return gained `baseNumbers` and `associatedNumbers` beside `label`. Nothing was removed; `?/deliver` still gets one `bondIds` per bond.
+  - A range has one «Quitar»: taking one bond out of the middle of a range means removing the range and adding the two halves. Not solved here.
 - **Risk.** Low. Same actions; the draw screens were redesigned in #148.
 - **Depends on.** PRs 3, 4.
 

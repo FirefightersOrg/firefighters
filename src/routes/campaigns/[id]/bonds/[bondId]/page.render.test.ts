@@ -623,7 +623,8 @@ describe('bond sale sections', () => {
 		};
 		const body = renderPage(delivered, null, withCollector);
 		expect(body).toContain('Registrar venta');
-		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/sales/new"`);
+		// The sale arrives with this bond already found.
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/sales/new?bond=0068"`);
 		expect(body).not.toContain('Entregar a un cobrador');
 		expect(body).toContain('Héctor Acosta');
 		expect(

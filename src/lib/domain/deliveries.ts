@@ -59,3 +59,17 @@ export interface BondAssignment {
 export function deliveryNoteLabel(noteNumber: number): string {
 	return `Remito ${String(noteNumber).padStart(4, '0')}`;
 }
+
+/**
+ * Whose note it is, as it is said after the number: «Remito 0007 a Jorge Medina» for a delivery or
+ * a reassignment (the bonds go to that collector), «Remito 0013 de Lucía Fernández» for a return
+ * (they come back from that collector). Empty when the role cannot read the collector: the name is
+ * left out, never replaced.
+ */
+export function deliveryNoteParty(
+	reason: DeliveryNoteReason,
+	collectorName: string | null | undefined
+): string {
+	if (!collectorName) return '';
+	return `${reason === 'return' ? 'de' : 'a'} ${collectorName}`;
+}

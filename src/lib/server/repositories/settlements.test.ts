@@ -179,6 +179,34 @@ describe('settlement pagination', () => {
 			error: new Error('page failed')
 		});
 	});
+	it('lists open settlements first, each group newest first, also when an open one is on a later page', async () => {
+		// As the query returns them: newest number first. Two are open, one of them on the second page.
+		const rows = Array.from({ length: 502 }, (_, i) => {
+			const number = 502 - i;
+			return {
+				...snapshot,
+				id: `s${number}`,
+				settlement_number: number,
+				status: number === 500 || number === 1 ? 'open' : number === 499 ? 'corrected' : 'closed'
+			};
+		});
+		const { client, ranges, calls } = pagedClient({ settlements: rows });
+		const result = await listSettlements(client, 'campaign');
+		const numbers = result.data!.map((item) => item.settlementNumber);
+		expect(numbers).toHaveLength(502);
+		expect(numbers.slice(0, 6)).toEqual([500, 1, 502, 501, 499, 498]);
+		expect(numbers.at(-1)).toBe(2);
+		expect(result.data!.slice(0, 3).map((item) => item.status)).toEqual(['open', 'open', 'closed']);
+		// The query itself is the one it was: by number, newest first, read to the last page.
+		expect(calls).toContainEqual({
+			method: 'order',
+			args: ['settlement_number', { ascending: false }]
+		});
+		expect(ranges.settlements).toEqual([
+			[0, 499],
+			[500, 999]
+		]);
+	});
 	it('uses Buenos Aires day boundaries including the final microsecond', async () => {
 		const { client, calls } = pagedClient({});
 		await listSettlements(client, 'campaign', { from: '2026-01-01', to: '2026-01-02' });

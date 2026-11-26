@@ -424,7 +424,7 @@ export async function listBuyerBonds(
 		data: (data ?? []).map((bond) => ({
 			id: bond.id,
 			campaignId: bond.campaign_id,
-			campaignName: bond.campaigns?.name ?? 'Unknown campaign',
+			campaignName: bond.campaigns?.name ?? 'Sin acceso a la campaña',
 			campaignNumberDigits: bond.campaigns?.number_digits ?? 4,
 			baseNumbers: (bond.bond_numbers ?? [])
 				.filter((number) => number.number_kind === 'base')
