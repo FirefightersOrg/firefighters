@@ -157,6 +157,26 @@ The record leads with a figure and its name, then says the sale in sentences bui
 - «Saldo a favor de cada cobrador» lists amounts without a sign. A balance the other way says «a favor de Bomberos» under the amount: never a minus sign alone.
 - A part that could not be loaded says which: «No se pudieron cargar los bonos, lo cobrado y el próximo sorteo. Volver a intentar.»
 
+## The collectors, buyers and draws lists (`src/lib/domain/people-draw-lists.ts`)
+
+The three lists follow the bonds list: the search first, the other filters under «Filtrar», what is applied as chips, and rows that name the person or the draw and then the one or two facts people look for.
+
+- The search field is named by what it takes: «Nombre, teléfono o correo» (collectors), «Nombre, teléfono o documento» (buyers; a CUIT is found as a document). The draws list has no search, only «Filtrar». The option that does not filter is «Cualquiera»; the chips say «Estado: Inactivo», «Tipo: Empresa», «Tipo: Mensual», «Estado: Programado».
+- Collectors and buyers are shared between campaigns, the figures on their rows are not: the tables are named «Bonos y saldo en esta campaña» and «Bonos en esta campaña».
+- A count of bonds is said with its noun where there is no column header: «35 bonos», «1 bono», «Sin bonos». The columns are «Bonos asignados» (the collector record's term: it counts the bonds the collector holds and the ones they sold and collect) and «Bonos en esta campaña» (buyers).
+- A collector's balance is said in words, with the figure without a sign: «A favor del cobrador $ 41.000», «A cargo del cobrador $ 3.500», «Sin saldo». Never «$ -3.500», and never «A favor» alone, which does not say whose favour. Only the roles that read the financial reports see it; the others get no column, not «Sin saldo».
+- A collector's status is the «Estado» column; on a phone only «Inactivo» is marked, beside the name.
+- A phone number is a link that dials it. A buyer without a phone has a dash on a computer and nothing on a phone.
+- A usual collector the role cannot read is «Sin acceso al cobrador» (`src/lib/domain/parties.ts`).
+- The draws are a calendar in two tables: «Sorteos por realizar», the next one first, and «Sorteos realizados o anulados», the latest first. When every draw was held or annulled: «No queda ningún sorteo por realizar.» The state says the roster in words («Padrón generado», «Padrón congelado»); the date and the cutoff are «Fecha» and «Corte de pagos» (the label of the draw form).
+- An empty list says what to do:
+
+| List       | Nothing loaded yet                                                                                                                                                   | Nothing matches                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Collectors | «Todavía no hay cobradores» / «Cargar el primero con «Nuevo cobrador» para poder entregarle bonos.» Without the permission: «Los carga quien administra el sistema.» | «Ningún cobrador coincide con la búsqueda» / «Probar con otro nombre, teléfono o correo.» / button «Ver todos los cobradores» |
+| Buyers     | «Todavía no hay compradores» / «Se cargan al registrar una venta, o antes con «Nuevo comprador».» Without the permission: «Se cargan al registrar una venta.»        | «Ningún comprador coincide con la búsqueda» / «Probar con otro nombre, teléfono o documento.» / «Ver todos los compradores»   |
+| Draws      | «Todavía no hay sorteos» / «Crear el primero con «Nuevo sorteo».» Without the permission: «Los crea quien administra la campaña.»                                    | «Ningún sorteo coincide con los filtros» / «Probar con otro tipo u otro estado.» / «Ver todos los sorteos»                    |
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

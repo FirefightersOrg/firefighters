@@ -5,6 +5,7 @@ import { COLLECTOR_STATUSES, type CollectorStatus } from '$lib/domain/parties';
 import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
+import { getCollectorAccounts } from '$lib/server/repositories/financial-reports';
 import { countAssignedBondsByCollector, listCollectors } from '$lib/server/repositories/parties';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 
@@ -31,18 +32,40 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	});
 	if (result.error || !result.data)
 		error(500, { message: 'No se pudieron cargar los cobradores. Volver a intentar.' });
-	const counts = await countAssignedBondsByCollector(
-		locals.supabase,
-		params.id,
-		result.data.items.map((item) => item.id)
-	);
-	if (counts.error)
+	// UX plan PR 14b: each row says the collector's balance to the roles that already read it in the
+	// financial reports. One call for the campaign; the SQL function checks `report.view_financial`.
+	const canSeeBalances = hasPermissionIn(locals.permissions, 'report.view_financial');
+	const [counts, accounts] = await Promise.all([
+		countAssignedBondsByCollector(
+			locals.supabase,
+			params.id,
+			result.data.items.map((item) => item.id)
+		),
+		canSeeBalances
+			? getCollectorAccounts(locals.supabase, params.id, {
+					collectorId: null,
+					method: null,
+					settlementStatus: null,
+					from: null,
+					to: null,
+					drawId: null,
+					eligibility: null,
+					prizeStatus: null
+				})
+			: null
+	]);
+	if (counts.error || accounts?.error)
 		error(500, { message: 'No se pudieron cargar los cobradores. Volver a intentar.' });
+	const balances = accounts
+		? new Map((accounts.data ?? []).map((account) => [account.collectorId, account.balance]))
+		: null;
 	return {
 		campaign: campaignResult.data,
 		collectors: result.data.items.map((collector) => ({
 			...collector,
-			assignedBonds: counts.data?.get(collector.id) ?? 0
+			assignedBonds: counts.data?.get(collector.id) ?? 0,
+			/** Null when the role cannot read balances; a collector without movements has none. */
+			balance: balances ? (balances.get(collector.id) ?? '0.00') : null
 		})),
 		pagination: {
 			...result.data,
@@ -52,6 +75,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			q: url.searchParams.get('q') ?? '',
 			status: status(url.searchParams.get('status')) ?? ''
 		},
-		can: { manage: hasPermissionIn(locals.permissions, 'collector.manage') }
+		can: {
+			manage: hasPermissionIn(locals.permissions, 'collector.manage'),
+			balances: canSeeBalances
+		}
 	};
 };
