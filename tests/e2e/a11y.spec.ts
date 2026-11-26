@@ -8,15 +8,16 @@ import {
 	type Page
 } from '@playwright/test';
 import {
-	baDay,
-	createActiveCampaign,
-	createBond,
-	createCollector,
-	createDraftCampaign,
-	deliverSellAndSettle,
-	open,
-	runId
-} from './helpers';
+	apiActiveCampaign,
+	apiBond,
+	apiCollector,
+	apiDeliverSellAndSettle,
+	apiDraftCampaign,
+	apiDraw,
+	apiOpenSettlement,
+	rpc
+} from './api';
+import { createActiveCampaign, open, runId } from './helpers';
 import { ANONYMOUS, STATE } from './auth-state';
 
 /**
@@ -57,106 +58,67 @@ let ids: Ids;
 let desktop: BrowserContext;
 let phone: BrowserContext;
 
-/** First `/<segment>/<uuid>` link on the page at `path`: ids come from the UI, not the database. */
-async function linkedId(page: Page, path: string, segment: string) {
-	await open(page, path);
-	const hrefs = await page
-		.locator(`a[href*="/${segment}/"]`)
-		.evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''));
-	const re = new RegExp(`/${segment}/(${UUID})(?:[/?#]|$)`);
-	const found = hrefs.map((h) => h.match(re)?.[1]).find(Boolean);
-	if (!found) throw new Error(`no /${segment}/<id> link on ${path}`);
-	return found;
-}
-
-async function seed(page: Page): Promise<Ids> {
+/**
+ * Builds the data through the audited SQL functions (`api.ts`), not by clicking through the UI:
+ * this spec checks how the screens look, not the flows that create their data (those are covered
+ * by money-flow and draw-flow).
+ */
+async function seed(): Promise<Ids> {
 	const run = runId();
-	const draftId = await createDraftCampaign(page, `E2E a11y borrador ${run}`);
-	const campaignId = await createActiveCampaign(page, `E2E a11y ${run}`);
-	const c = `/campaigns/${campaignId}`;
-	await createCollector(page, campaignId, `Cobrador ${run}`);
-	await createBond(page, campaignId, 100);
-	await createBond(page, campaignId, 200);
-	const lostBond = page.url().split('/').pop()!;
-	const flow = await deliverSellAndSettle(page, campaignId, `Cobrador ${run}`, 100);
-	await open(page, `${c}/settlements/${flow.settlementId}`);
-	const paymentHref = await page.locator('a[href*="/payments/"]').first().getAttribute('href');
-	const payment = paymentHref?.match(new RegExp(`payments/(${UUID})`))?.[1] ?? '';
-	const bond = await linkedId(page, `${c}/sales/${flow.saleId}`, 'bonds');
-	const buyer = await linkedId(page, `${c}/sales/${flow.saleId}`, 'buyers');
-	const collector = await linkedId(page, `${c}/sales/${flow.saleId}`, 'collectors');
+	const draftId = await apiDraftCampaign(`E2E a11y borrador ${run}`);
+	const campaignId = await apiActiveCampaign(`E2E a11y ${run}`);
+	const collector = await apiCollector(`Cobrador ${run}`);
+	const bond = await apiBond(campaignId, 100);
+	const lostBond = await apiBond(campaignId, 200);
+	const flow = await apiDeliverSellAndSettle(campaignId, collector, bond);
 
 	// A second, still open settlement: its "Cerrar rendición" button opens a Dialog.
-	await open(page, `${c}/settlements/new`);
-	await page.locator('#collectorId').selectOption({ label: `Cobrador ${run}` });
-	await page.getByRole('button', { name: 'Abrir rendición' }).click();
-	await expect(page).toHaveURL(new RegExp(`/settlements/${UUID}$`));
-	const openSettlement = page.url().split('/').pop()!;
+	const openSettlement = await apiOpenSettlement(campaignId, collector);
 
 	// A manual ledger adjustment: its "Anular" button opens a Dialog.
-	await open(page, `${c}/collectors/${collector}/ledger`);
-	await page.locator('#ledger-amount').fill('100');
-	await page.locator('#ledger-reason').fill('Ajuste de prueba E2E');
-	await page
-		.locator('form:has(#ledger-amount)')
-		.getByRole('button', { name: 'Registrar ajuste' })
-		.click();
-	await expect(page.locator('[data-annul]').first()).toBeVisible();
+	await rpc('collector_ledger_adjust', {
+		p_campaign_id: campaignId,
+		p_collector_id: collector,
+		p_amount: '100.00',
+		p_direction: 'collector_credit',
+		p_reason: 'Ajuste de prueba E2E'
+	});
 
 	// Draw with a frozen roster and two prizes: #1 stays pending validation, #2 gets a number that is
 	// not in the roster, so it is unawarded straight away.
-	await open(page, `${c}/draws/new`);
-	await page.locator('#drawType').selectOption('final');
-	await page.locator('#name').fill(`Final ${run}`);
-	await page.locator('#drawDate').fill(baDay(1));
-	await page.locator('#paymentCutoffLocal').fill(`${baDay(0)}T23:59`);
-	await page.getByRole('button', { name: 'Crear sorteo' }).click();
-	await expect(page).toHaveURL(new RegExp(`/draws/${UUID}$`));
-	const draw = page.url().split('/').pop()!;
-	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Generar padrón' }).click();
-	await expect(page.getByText('Padrón generado.')).toBeVisible();
-	await page.waitForLoadState('networkidle');
-	await page.getByLabel('Confirmo que este padrón es el definitivo').check();
-	await page.getByRole('button', { name: 'Congelar padrón' }).click();
-	await expect(page.getByText('Padrón congelado.')).toBeVisible();
-	await open(page, `${c}/draws/${draw}/winners`);
-	for (const [position, name] of [
-		['1', 'Bicicleta'],
-		['2', 'Televisor']
-	]) {
-		await page.getByText('Configurar un premio').click();
-		await page.locator('#create-position').fill(position);
-		await page.locator('#create-name').fill(name);
-		await page.getByRole('button', { name: 'Crear premio' }).click();
-		await expect(page.getByText('Premio creado.')).toBeVisible();
-		await page.waitForLoadState('networkidle');
-	}
-	const prizeIds = await page
-		.locator('input[name="prizeId"]')
-		.evaluateAll((els) => [...new Set(els.map((e) => (e as HTMLInputElement).value))]);
-	const [prize, unawardedPrize] = prizeIds;
-	await page.locator(`#number-${unawardedPrize}`).fill('200');
-	await page
-		.locator(`form:has(#number-${unawardedPrize})`)
-		.getByRole('button', { name: 'Validar contra el padrón congelado' })
-		.click();
-	await expect(
-		page.getByRole('link', { name: 'Imprimir constancia de premio no adjudicado' })
-	).toBeVisible();
+	const draw = await apiDraw(campaignId, `Final ${run}`, null);
+	await rpc('draw_generate_roster', { p_draw_id: draw });
+	await rpc('draw_freeze_roster', { p_draw_id: draw });
+	const prize = await rpc('prize_create', {
+		p_draw_id: draw,
+		p_name: 'Bicicleta',
+		p_description: null,
+		p_position: 1
+	});
+	const unawardedPrize = await rpc('prize_create', {
+		p_draw_id: draw,
+		p_name: 'Televisor',
+		p_description: null,
+		p_position: 2
+	});
+	await rpc('draw_load_winning_number', {
+		p_prize_id: unawardedPrize,
+		p_number_value: 200,
+		p_notes: null
+	});
 
 	const result: Ids = {
 		campaignId,
 		draftId,
 		bond,
 		lostBond,
-		buyer,
+		buyer: flow.buyerId,
 		collector,
 		sale: flow.saleId,
 		note: flow.noteId,
 		settlement: flow.settlementId,
 		openSettlement,
-		payment,
+		payment: flow.paymentId,
 		draw,
 		prize,
 		unawardedPrize
@@ -360,16 +322,7 @@ const DIALOGS: DialogCase[] = [
 test.describe.serial('a11y and mobile pass', () => {
 	test.beforeAll(async ({ browser }) => {
 		test.setTimeout(300_000);
-		const seedCtx = await browser.newContext({
-			baseURL,
-			serviceWorkers: 'block',
-			storageState: STATE.admin,
-			locale: 'es-AR',
-			timezoneId: 'America/Argentina/Buenos_Aires'
-		});
-		const page = await seedCtx.newPage();
-		ids = await seed(page);
-		await seedCtx.close();
+		ids = await seed();
 		desktop = await newContext(browser, STATE.admin, false);
 		phone = await newContext(browser, STATE.admin, true);
 	});

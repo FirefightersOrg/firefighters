@@ -1,18 +1,15 @@
-import { execFileSync } from 'node:child_process';
-import { parseEnv } from 'node:util';
 import AxeBuilder from '@axe-core/playwright';
 import { createClient } from '@supabase/supabase-js';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import {
-	createActiveCampaign,
-	createBond,
-	createCollector,
-	deliverAndSell,
-	login,
-	open,
-	runId
-} from './helpers';
-import { STATE } from './auth-state';
+	apiActiveCampaign,
+	apiBond,
+	apiCollector,
+	apiDeliverAndSell,
+	localSupabase,
+	serviceClient
+} from './api';
+import { login, open, runId } from './helpers';
 
 /**
  * SAN-148 accessibility pass of the collector portal (same method as SAN-137, `a11y.spec.ts`). A collector
@@ -37,72 +34,22 @@ let ids: Ids;
 let desktop: BrowserContext;
 let phone: BrowserContext;
 
-function localSupabase() {
-	const status = (): Record<string, string | undefined> => {
-		try {
-			return parseEnv(
-				execFileSync('supabase', ['status', '-o', 'env'], {
-					encoding: 'utf8',
-					stdio: ['ignore', 'pipe', 'ignore']
-				})
-			);
-		} catch {
-			return {};
-		}
-	};
-	const fromStatus = status();
-	const url = process.env.PUBLIC_SUPABASE_URL ?? fromStatus.API_URL ?? 'http://127.0.0.1:54321';
-	if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url))
-		throw new Error(`Refusing to seed a non-local Supabase: ${url}`);
-	return {
-		url,
-		anonKey: process.env.PUBLIC_SUPABASE_ANON_KEY || fromStatus.ANON_KEY || '',
-		serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || fromStatus.SERVICE_ROLE_KEY || ''
-	};
-}
-
-/** First `/<segment>/<uuid>` link on the page at `path`: ids come from the UI, not the database. */
-async function linkedId(page: Page, path: string, segment: string) {
-	await open(page, path);
-	const hrefs = await page
-		.locator(`a[href*="/${segment}/"]`)
-		.evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''));
-	const found = hrefs
-		.map((h) => h.match(new RegExp(`/${segment}/(${UUID})(?:[/?#]|$)`))?.[1])
-		.find(Boolean);
-	if (!found) throw new Error(`no /${segment}/<id> link on ${path}`);
-	return found;
-}
-
-async function seed(page: Page, browser: Browser) {
+async function seed(browser: Browser) {
 	const run = runId();
-	const campaignId = await createActiveCampaign(page, `E2E portal ${run}`);
-	const collectorName = `Cobrador portal ${run}`;
-	await createCollector(page, campaignId, collectorName);
-	await createBond(page, campaignId, 300);
-	const bond = page.url().split('/').pop()!;
-	const { saleId } = await deliverAndSell(page, campaignId, collectorName, 300);
-	const buyer = await linkedId(page, `/campaigns/${campaignId}/sales/${saleId}`, 'buyers');
+	// The admin's part goes through the API: this spec checks the portal screens, not the staff flows.
+	const campaignId = await apiActiveCampaign(`E2E portal ${run}`);
+	const collectorId = await apiCollector(`Cobrador portal ${run}`);
+	const bond = await apiBond(campaignId, 300);
+	const {
+		saleId,
+		noteId: note,
+		buyerId: buyer
+	} = await apiDeliverAndSell(campaignId, collectorId, bond);
 
 	// A collector login linked to that collector (no admin UI creates logins, so it goes through Supabase).
-	const { url, anonKey, serviceKey } = localSupabase();
+	const { url, anonKey } = localSupabase();
 	const options = { auth: { autoRefreshToken: false, persistSession: false } };
-	const service = createClient(url, serviceKey, options);
-	// The collector that owns the sale (read from the data: the collectors list may link to other rows).
-	const { data: soldBy } = await service
-		.from('sales')
-		.select('collector_id')
-		.eq('id', saleId)
-		.single();
-	const collectorId = soldBy!.collector_id;
-	const { data: noteRow } = await service
-		.from('delivery_notes')
-		.select('id')
-		.eq('campaign_id', campaignId)
-		.eq('collector_id', collectorId)
-		.limit(1)
-		.single();
-	const note = noteRow!.id as string;
+	const service = serviceClient();
 	const email = `portal_e2e_${run}@firefighters.local`;
 	const created = await service.auth.admin.createUser({
 		email,
@@ -264,15 +211,7 @@ const newContext = (
 test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 	test.beforeAll(async ({ browser }) => {
 		test.setTimeout(300_000);
-		const adminCtx = await browser.newContext({
-			baseURL,
-			serviceWorkers: 'block',
-			storageState: STATE.admin,
-			locale: 'es-AR',
-			timezoneId: 'America/Argentina/Buenos_Aires'
-		});
-		const seeded = await seed(await adminCtx.newPage(), browser);
-		await adminCtx.close();
+		const seeded = await seed(browser);
 		ids = seeded.ids;
 		desktop = await newContext(browser, seeded.state, false);
 		phone = await newContext(browser, seeded.state, true);
