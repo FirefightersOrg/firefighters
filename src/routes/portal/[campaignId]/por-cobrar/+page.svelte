@@ -161,10 +161,14 @@
 	/>
 </div>
 
-<CollectSheet
-	target={collecting}
-	today={data.today}
-	noteMax={data.noteMax}
-	requestKey={data.requestKey}
-	onClose={() => (collecting = null)}
-/>
+{#if collecting}
+	{#key collecting.installmentId}
+		<CollectSheet
+			target={collecting}
+			today={data.today}
+			noteMax={data.noteMax}
+			requestKey={data.requestKey}
+			onClose={() => (collecting = null)}
+		/>
+	{/key}
+{/if}

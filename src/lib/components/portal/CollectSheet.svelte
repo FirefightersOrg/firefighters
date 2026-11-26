@@ -41,8 +41,11 @@
 		result = null,
 		onClose
 	}: {
-		/** The installment to collect; the sheet is open while there is one. */
-		target: CollectTarget | null;
+		/**
+		 * The installment to collect. The caller renders the sheet while there is one, keyed by the
+		 * installment, so each opening starts from that installment's values.
+		 */
+		target: CollectTarget;
 		/** Buenos Aires today, `YYYY-MM-DD`: default and upper bound of the date. */
 		today: string;
 		noteMax: number;
@@ -56,34 +59,24 @@
 		{ value: 'cash', label: PAYMENT_METHOD_LABELS.cash },
 		{ value: 'transfer', label: PAYMENT_METHOD_LABELS.transfer }
 	];
-	let amount = $state('');
-	let method = $state('cash');
-	let date = $state('');
-	let note = $state('');
+	// The initial values are intentional: what the server sent back, or the installment's defaults.
+	// svelte-ignore state_referenced_locally
+	let amount = $state(result?.values?.amount ?? target.available);
+	// svelte-ignore state_referenced_locally
+	let method = $state(result?.values?.paymentMethod ?? 'cash');
+	// svelte-ignore state_referenced_locally
+	let date = $state(result?.values?.paymentDate ?? today);
+	// svelte-ignore state_referenced_locally
+	let note = $state(result?.values?.note ?? '');
 	let touched = $state(false);
 
-	// Each time the sheet opens on an installment it starts from that installment's values (or from
-	// what the person had typed, when the server sent the form back).
-	let openedFor = '';
-	$effect.pre(() => {
-		const key = target?.installmentId ?? '';
-		if (key === openedFor) return;
-		openedFor = key;
-		if (!target) return;
-		amount = result?.values?.amount ?? target.available;
-		method = result?.values?.paymentMethod ?? 'cash';
-		date = result?.values?.paymentDate ?? today;
-		note = result?.values?.note ?? '';
-		touched = false;
-	});
-
 	const cents = $derived(parseMoneyInput(amount));
-	const availableCents = $derived(parseMoneyInput(target?.available ?? '') ?? 0);
+	const availableCents = $derived(parseMoneyInput(target.available) ?? 0);
 	const localErrors = $derived.by(() => {
 		const errors: Record<string, string> = {};
 		if (cents === null || cents <= 0) errors.amount = 'Ingresar un importe mayor que cero.';
 		else if (cents > availableCents)
-			errors.amount = `El importe no puede superar ${formatMoney(target?.available ?? '0', { decimals: 'always' })}.`;
+			errors.amount = `El importe no puede superar ${formatMoney(target.available, { decimals: 'always' })}.`;
 		if (!date) errors.paymentDate = 'Ingresar la fecha del cobro.';
 		else if (date > today) errors.paymentDate = 'La fecha del cobro no puede ser futura.';
 		if ([...note].length > noteMax) errors.note = `La nota admite hasta ${noteMax} caracteres.`;
@@ -94,62 +87,60 @@
 		(touched ? localErrors[name] : undefined) ?? (touched ? null : result?.errors?.[name]?.[0]);
 </script>
 
-{#if target}
-	<Dialog
-		open
-		{onClose}
-		action={target.action}
-		title="Cobrar la cuota {target.installmentNumber} del bono {target.bond}"
-		description="{target.buyerName}. El cobro queda enviado y se confirma cuando el operador lo incluye en una rendición y la cierra. Una vez enviado, no se puede editar."
-		confirmLabel={invalid || cents === null
-			? 'Enviar cobro'
-			: `Enviar cobro de ${formatMoney(centsToDecimalString(cents))}`}
-		confirmDisabled={invalid}
+<Dialog
+	open
+	{onClose}
+	action={target.action}
+	title="Cobrar la cuota {target.installmentNumber} del bono {target.bond}"
+	description="{target.buyerName}. El cobro queda enviado y se confirma cuando el operador lo incluye en una rendición y la cierra. Una vez enviado, no se puede editar."
+	confirmLabel={invalid || cents === null
+		? 'Enviar cobro'
+		: `Enviar cobro de ${formatMoney(centsToDecimalString(cents))}`}
+	confirmDisabled={invalid}
+>
+	<input type="hidden" name="installmentId" value={target.installmentId} />
+	<input type="hidden" name="requestKey" value={requestKey} />
+	{#if result?.message && !touched}
+		<Alert tone="danger">{result.message}</Alert>
+	{/if}
+	<Field
+		label="Importe"
+		id="collect-amount"
+		required
+		hint="Hasta {formatMoney(target.available, { decimals: 'always' })}"
+		error={err('amount')}
 	>
-		<input type="hidden" name="installmentId" value={target.installmentId} />
-		<input type="hidden" name="requestKey" value={requestKey} />
-		{#if result?.message && !touched}
-			<Alert tone="danger">{result.message}</Alert>
-		{/if}
-		<Field
-			label="Importe"
-			id="collect-amount"
-			required
-			hint="Hasta {formatMoney(target.available, { decimals: 'always' })}"
-			error={err('amount')}
-		>
-			<TextInput
-				name="amount"
-				inputmode="decimal"
-				prefix="$"
-				bind:value={amount}
-				oninput={() => (touched = true)}
-				class="text-right tabular-nums"
-			/>
-		</Field>
-		<SegmentedControl
-			legend="Medio"
-			name="paymentMethod"
-			options={methodOptions}
-			bind:value={method}
+		<TextInput
+			name="amount"
+			inputmode="decimal"
+			prefix="$"
+			bind:value={amount}
+			oninput={() => (touched = true)}
+			class="text-right tabular-nums"
 		/>
-		<Field label="Fecha del cobro" id="collect-date" required error={err('paymentDate')}>
-			<TextInput
-				name="paymentDate"
-				type="date"
-				max={today}
-				bind:value={date}
-				oninput={() => (touched = true)}
-			/>
-		</Field>
-		<Field
-			label="Nota"
-			id="collect-note"
-			optional
-			hint="Hasta {noteMax} caracteres."
-			error={err('note')}
-		>
-			<Textarea name="note" rows={2} bind:value={note} oninput={() => (touched = true)} />
-		</Field>
-	</Dialog>
-{/if}
+	</Field>
+	<SegmentedControl
+		legend="Medio"
+		name="paymentMethod"
+		options={methodOptions}
+		bind:value={method}
+	/>
+	<Field label="Fecha del cobro" id="collect-date" required error={err('paymentDate')}>
+		<TextInput
+			name="paymentDate"
+			type="date"
+			max={today}
+			bind:value={date}
+			oninput={() => (touched = true)}
+		/>
+	</Field>
+	<Field
+		label="Nota"
+		id="collect-note"
+		optional
+		hint="Hasta {noteMax} caracteres."
+		error={err('note')}
+	>
+		<Textarea name="note" rows={2} bind:value={note} oninput={() => (touched = true)} />
+	</Field>
+</Dialog>

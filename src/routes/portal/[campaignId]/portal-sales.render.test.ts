@@ -8,6 +8,7 @@ import BuyerPage from './compradores/[buyerId]/+page.svelte';
 import DuePage from './por-cobrar/+page.svelte';
 import HomePage from '../+page.svelte';
 import PortalNav from '$lib/components/portal/PortalNav.svelte';
+import CollectSheet from '$lib/components/portal/CollectSheet.svelte';
 
 const collector = { id: 'c', displayName: 'Ana', status: 'active' };
 const pagination = { page: 1, pageCount: 1 };
@@ -353,27 +354,110 @@ describe('portal sales and buyers pages', () => {
 			submitted: false
 		};
 
-		it('offers the action only on collectable installments, with the balance minus drafts as maximum', () => {
+		it('offers «Cobrar» only on collectable installments; nothing is posted from the row', () => {
 			const html = body(SalePage, base);
-			expect(html).toContain('Registrar cobro');
-			expect(html).toContain('action="?/registrar"');
+			expect(html).toMatch(/Cobrar<span[^>]*>\s*la cuota 1<\/span>/);
+			expect(html).not.toContain('la cuota 2</span>');
+			// The form lives in the sheet, which opens on a tap: the page itself has none.
+			expect(html).not.toContain('<form');
+			expect(html).not.toContain('name="collectorId"');
+		});
+
+		it('the sheet posts the same fields to the sale’s registrar action, with what is left as maximum', () => {
+			const html = render(CollectSheet, {
+				props: {
+					target: {
+						action: '?/registrar',
+						installmentId: 'i1',
+						installmentNumber: 1,
+						bond: '0068',
+						buyerName: 'Ada Lovelace',
+						available: '70.00'
+					},
+					today: '2026-11-25',
+					noteMax: 500,
+					requestKey: 'req-key',
+					onClose: () => {}
+				}
+			}).body;
+			expect(html).toMatch(/<form[^>]*method="POST"[^>]*action="\?\/registrar"/);
+			// The fields and default values the action has always received.
 			expect(html).toContain('name="installmentId" value="i1"');
-			expect(html).not.toContain('value="i2"');
 			expect(html).toContain('name="requestKey" value="req-key"');
-			expect(html).toContain('value="70.00"');
+			expect(html).toMatch(/name="amount"[^>]*value="70.00"|value="70.00"[^>]*name="amount"/);
+			expect(html).toMatch(
+				/name="paymentDate"[^>]*value="2026-11-25"|value="2026-11-25"[^>]*name="paymentDate"/
+			);
 			expect(html).toContain('max="2026-11-25"');
-			expect(html).toContain('Efectivo');
-			expect(html).toContain('Transferencia');
-			expect(html).toContain('Este cobro queda pendiente de rendición');
+			expect(html).toMatch(/<input[^>]*type="radio"[^>]*value="cash"[^>]*checked/);
+			expect(html).toMatch(
+				/<input[^>]*name="paymentMethod"[^>]*value="transfer"|value="transfer"[^>]*name="paymentMethod"/
+			);
+			expect(html).toContain('name="note"');
+			expect([...html.matchAll(/name="([a-zA-Z]+)"/g)].map((m) => m[1]).sort()).toEqual([
+				'amount',
+				'installmentId',
+				'note',
+				'paymentDate',
+				'paymentMethod',
+				'paymentMethod',
+				'requestKey'
+			]);
 			// The collector is never a form field.
 			expect(html).not.toContain('name="collectorId"');
+			expect(html).toContain('Cobrar la cuota 1 del bono 0068');
+			expect(html).toContain('Ada Lovelace');
+			expect(html).toContain('Una vez enviado, no se puede editar.');
+			expect(html.replaceAll('\u00a0', ' ')).toContain('Enviar cobro de $ 70');
+		});
+
+		it('a submission the server sent back reopens the sheet with what was typed and the error', () => {
+			const html = render(SalePage, {
+				props: {
+					data: { campaign: { id: 'k', name: 'Campaña 2027' }, ...base },
+					form: {
+						form: 'registrar',
+						installmentId: 'i1',
+						message: 'Revisar los campos marcados.',
+						errors: { paymentDate: ['La fecha del cobro no puede ser futura.'] },
+						values: {
+							installmentId: 'i1',
+							amount: '45,50',
+							paymentMethod: 'transfer',
+							paymentDate: '2026-12-01',
+							note: 'En mano'
+						}
+					},
+					params: {}
+				} as never
+			}).body;
+			expect(html).toContain('action="?/registrar"');
+			expect(html).toContain('Revisar los campos marcados.');
+			expect(html).toContain('La fecha del cobro no puede ser futura.');
+			expect(html).toContain('value="45,50"');
+			expect(html).toMatch(/<input[^>]*type="radio"[^>]*value="transfer"[^>]*checked/);
+			expect(html).toContain('En mano');
 		});
 
 		it('hides the action without payment.create_own or on an inactive sale', () => {
 			const html = body(SalePage, { ...base, canRegister: false });
-			expect(html).not.toContain('Registrar cobro');
+			expect(html).not.toContain('Cobrar<span');
 			expect(html).not.toContain('<form');
 			expect(html).not.toContain('Acciones');
+		});
+
+		it('says the totals in one line, and the phone is a call link', () => {
+			const html = body(SalePage, base)
+				.replace(/<!--.*?-->/g, '')
+				.replaceAll('\u00a0', ' ');
+			const line = html
+				.slice(html.indexOf('data-sale-totals'))
+				.replace(/<[^>]+>/g, '')
+				.replace(/\s+/g, ' ');
+			expect(line).toContain(
+				'Cobrado $ 100,00 de $ 300,00. Falta cobrar $ 160,00; hay $ 40,00 pendientes de rendición.'
+			);
+			expect(html).toContain('href="tel:115555"');
 		});
 
 		it('lists sent collections: the four states, rejected with the reason', () => {

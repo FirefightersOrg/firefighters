@@ -6,8 +6,8 @@
 	import type { PortalInstallment } from '$lib/server/repositories/portal';
 
 	/**
-	 * Installment plan of an own sale. Read-only today; SAN-147 ("Registrar cobro") passes `actions` to add a
-	 * per-installment control in a last column, without touching the rest of the table.
+	 * Installment plan of an own sale. `actions` adds a per-installment control («Cobrar») in a last
+	 * column. Below 720px each installment is a stacked block instead of a strip of columns.
 	 */
 	let {
 		installments,
@@ -17,21 +17,23 @@
 	const rows = $derived(installments.map((i) => ({ ...i })));
 	type Row = (typeof rows)[number];
 	const columns = $derived<TableColumn<Row>[]>([
-		{ key: 'number', header: 'Cuota', align: 'right' },
-		{ key: 'dueDate', header: 'Vencimiento' },
+		{ key: 'number', header: 'Cuota', align: 'right', stack: 'primary' },
+		{ key: 'balance', header: 'Saldo', align: 'right', stack: 'trailing' },
+		{ key: 'dueDate', header: 'Vencimiento', stack: 'secondary' },
+		{ key: 'status', header: 'Estado' },
 		{ key: 'amount', header: 'Monto', align: 'right' },
 		{ key: 'pendingAmount', header: 'Pendiente de rendición', align: 'right' },
-		{ key: 'balance', header: 'Saldo', align: 'right' },
-		{ key: 'status', header: 'Estado' },
-		...(actions ? [{ key: 'actions', header: 'Acciones' }] : [])
+		...(actions ? [{ key: 'actions', header: 'Acciones' } satisfies TableColumn<Row>] : [])
 	]);
 	const hasPending = (row: Row) => Number(row.pendingAmount) > 0;
 </script>
 
-<Table {columns} {rows} rowKey="id" caption="Cuotas de la venta">
+<Table {columns} {rows} rowKey="id" caption="Cuotas de la venta" stack>
 	{#snippet cell({ row, column })}
-		{#if column.key === 'dueDate'}
-			{formatDate(row.dueDate)}
+		{#if column.key === 'number'}
+			<span class="min-[720px]:hidden">Cuota </span>{row.number}
+		{:else if column.key === 'dueDate'}
+			<span class="min-[720px]:hidden">Vence el </span>{formatDate(row.dueDate)}
 		{:else if column.key === 'amount'}
 			<span class="tabular-nums">{formatMoney(row.amount, { decimals: 'always' })}</span>
 		{:else if column.key === 'pendingAmount'}
