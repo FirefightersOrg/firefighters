@@ -106,6 +106,22 @@ export async function listSettlements(
 		error: null
 	};
 }
+/**
+ * How many settlements of the campaign are open, under the caller's RLS. A count only (no rows),
+ * for the campaign shell's «Rendiciones» entry.
+ */
+export async function countOpenSettlements(
+	client: SupabaseClient,
+	campaignId: string
+): Promise<RepositoryResult<number>> {
+	const { count, error } = await client
+		.from('settlements')
+		.select('id', { count: 'exact', head: true })
+		.eq('campaign_id', campaignId)
+		.eq('status', 'open');
+	return error ? { data: null, error } : { data: count ?? 0, error: null };
+}
+
 export async function getSettlement(
 	client: SupabaseClient,
 	campaignId: string,
