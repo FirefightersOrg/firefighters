@@ -66,7 +66,8 @@ const entries: Entry[] = [
 function page(
 	can = { adjustCommission: false, adjustLedger: false },
 	list: Entry[] = entries,
-	compensable: { id: string; direction: string; label: string }[] = []
+	compensable: { id: string; direction: string; label: string }[] = [],
+	form: unknown = null
 ) {
 	return render(Page, {
 		props: {
@@ -85,43 +86,94 @@ function page(
 				reasonMax: 1000,
 				can
 			},
-			form: null,
+			form,
 			params: { id: CAMPAIGN_ID, collectorId: COLLECTOR_ID }
 		} as never
-	}).body;
+	}).body.replace(/\u00a0/g, ' ');
 }
+/** The text of a piece of the page, without tags, comments or runs of spaces. */
+const textOf = (html: string) =>
+	html
+		.replace(/<!--.*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+/** The sheet over the movements: label and amount of each row, in order. */
+const sheet = (body: string) =>
+	[
+		.../<div data-testid="ledger-balance">([\s\S]*?)<\/dl>/
+			.exec(body)![1]
+			.matchAll(/data-kind="(\w+)"><dt[^>]*>([^<]*)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/g)
+	].map(([, kind, label, value]) => [kind, label, textOf(value)]);
 
 describe('collector current account page', () => {
-	it('renders every required column, the running balance and the total', () => {
+	it('leads with the balance in words, as a sheet whose rows add up to it', () => {
 		const body = page();
-		for (const column of [
-			'Fecha',
-			'Tipo',
-			'Origen',
-			'Rendición',
-			'Pago',
-			'Débito',
-			'Crédito',
-			'Saldo',
-			'Estado'
-		])
+		expect(body).toContain('Cuenta corriente de Ada Collector');
+		expect(sheet(body)).toEqual([
+			['line', 'Comisiones generadas', '$ 15,00'],
+			['line', 'Ajustes a favor del cobrador', '$ 2,50'],
+			['lead', 'Saldo a favor del cobrador', '$ 17,50']
+		]);
+		// The sheet comes before the movements.
+		expect(body.indexOf('data-testid="ledger-balance"')).toBeLessThan(body.indexOf('<table'));
+	});
+
+	it('says a balance against the collector is in favour of Bomberos, without a minus sign', () => {
+		const body = page(undefined, [
+			entries[0],
+			{
+				...entries[1],
+				id: 'd1',
+				status: 'recorded',
+				amount: 40,
+				annulReason: undefined,
+				runningBalance: -25
+			}
+		]);
+		expect(sheet(body)).toEqual([
+			['line', 'Comisiones generadas', '$ 15,00'],
+			['deduction', 'Ajustes a favor de Bomberos', '− menos $ 40,00'],
+			['lead', 'Saldo a favor de Bomberos', '$ 25,00']
+		]);
+		expect(textOf(body)).toContain('Un importe con signo menos es a favor de Bomberos.');
+	});
+
+	it('shows the balance alone if the movements did not add up to it', () => {
+		const body = page(undefined, [{ ...entries[0], runningBalance: 99 }]);
+		expect(sheet(body)).toEqual([['lead', 'Saldo a favor del cobrador', '$ 99,00']]);
+		const against = page(undefined, [{ ...entries[0], runningBalance: -99 }]);
+		expect(sheet(against)).toEqual([['lead', 'Saldo a favor de Bomberos', '$ 99,00']]);
+	});
+
+	it('lists the movements newest first, each with its signed amount and the running balance', () => {
+		const body = page();
+		for (const column of ['Fecha', 'Movimiento', 'Importe', 'Saldo'])
 			expect(body).toMatch(new RegExp(`>\\s*${column}\\s*</th>`));
-		expect(body).toContain('Comisión generada');
-		expect(body).toContain('Ajuste a favor de Bomberos');
-		expect(body).toMatch(/data-testid="ledger-balance"[\s\S]*\$.17,50/);
-		expect(body).toContain('19/11/2026');
+		expect(body).not.toMatch(/>\s*Acciones\s*<\/th>/);
+		const rows = body.split('<tr role="row"').slice(2).map(textOf);
+		expect(rows).toHaveLength(3);
+		expect(rows[0]).toContain('Ajuste a favor del cobrador');
+		expect(rows[0]).toContain('Motivo: Bonus');
+		expect(rows[0]).toMatch(/\$ 2,50 .*\$ 17,50/);
+		expect(rows[2]).toContain('Comisión generada');
+		expect(rows[2]).toContain('19/11/2026');
 		expect(body).toContain(
 			`/campaigns/${CAMPAIGN_ID}/settlements/s0000000-0000-4000-8000-000000000001`
 		);
+		expect(body).toContain('Ver la rendición');
+		// A movement that counts says nothing about its state; only the others carry a badge.
+		expect(body).not.toContain('Registrado');
 	});
 
 	it('shows annulled adjustments struck through with both original and annulment reasons', () => {
 		const body = page();
 		expect(body).toContain('Anulado');
-		expect(body).toContain('Entered twice');
-		expect(body).toContain('Cash shortfall');
+		expect(body).toContain('Motivo: Cash shortfall');
 		expect(body).toContain('Motivo de la anulación: Entered twice');
 		expect(body).toContain('line-through');
+		// A debit is shown with its sign, read as «menos».
+		expect(body).toMatch(/line-through" data-money="">[\s\S]{0,120}menos[\s\S]{0,40}\$ 4,00/);
 	});
 
 	it('hides adjustment forms and annul actions without permissions', () => {
@@ -129,19 +181,56 @@ describe('collector current account page', () => {
 		expect(body).not.toContain('?/adjustCommission');
 		expect(body).not.toContain('?/adjustLedger');
 		expect(body).not.toContain('?/annul');
+		expect(body).not.toContain('Ajustes manuales');
 	});
 
-	it('shows forms and annul only for recorded entries without a settlement', () => {
+	it('shows the forms collapsed, and annul only for recorded entries without a settlement', () => {
 		const body = page({ adjustCommission: true, adjustLedger: true });
+		expect(body).toContain('Ajustar una comisión');
+		expect(body).toContain('Ajustar la cuenta corriente');
 		expect(body).toContain('?/adjustCommission');
 		expect(body).toContain('?/adjustLedger');
+		for (const id of ['ledger-direction', 'ledger-original', 'ledger-amount', 'ledger-reason'])
+			expect(body).toContain(`id="${id}"`);
+		expect(body.match(/Registrar ajuste/g)).toHaveLength(2);
+		expect(body).not.toMatch(/<details[^>]*\sopen/);
 		expect(body.match(/data-annul=/g)?.length).toBe(1);
 		expect(body).toContain('action="?/annul"');
+		expect(body).toContain('name="entryId"');
 		expect(body).toContain('name="reason"');
 	});
 
-	it('renders an empty state', () => {
-		expect(page(undefined, [])).toContain('Todavía no hay movimientos');
+	it('opens the form the server answered about', () => {
+		const body = page({ adjustCommission: true, adjustLedger: true }, entries, [], {
+			form: 'ledger',
+			success: false,
+			message: 'Revisar el ajuste.',
+			errors: { amount: ['Ingresar un monto positivo con hasta 2 decimales.'] }
+		});
+		expect(body.match(/<details[^>]*\sopen/g)).toHaveLength(1);
+		expect(body).toMatch(/<details[^>]*\sopen[\s\S]*Ajustar la cuenta corriente/);
+		expect(body).toContain('Ingresar un monto positivo con hasta 2 decimales.');
+	});
+
+	it('says an annulment was done, or why it was not', () => {
+		const done = page({ adjustCommission: false, adjustLedger: true }, entries, [], {
+			form: 'annul',
+			success: true,
+			message: 'Movimiento anulado.'
+		});
+		expect(done).toMatch(/role="status"[\s\S]*Movimiento anulado\./);
+		const failed = page({ adjustCommission: false, adjustLedger: true }, entries, [], {
+			form: 'annul',
+			success: false,
+			message: 'El movimiento ya estaba anulado.'
+		});
+		expect(failed).toMatch(/role="alert"[\s\S]*El movimiento ya estaba anulado\./);
+	});
+
+	it('renders an empty state and no balance to speak of', () => {
+		const body = page(undefined, []);
+		expect(body).toContain('Todavía no hay movimientos');
+		expect(sheet(body)).toEqual([['lead', 'Sin saldo', '$ 0,00']]);
 	});
 
 	// SAN-107 / SAN-108
@@ -182,6 +271,14 @@ describe('collector current account page', () => {
 		]);
 		expect(body).toContain('Efectivo rendido');
 		expect(body).toContain('Referencia: no cambia el saldo.');
+		// The reference amount is under the sheet, not one of its terms.
+		expect(sheet(body)).toEqual([
+			['line', 'Comisiones generadas', '$ 15,00'],
+			['line', 'Ajustes a favor del cobrador', '$ 2,50'],
+			['deduction', 'Ajustes a favor de Bomberos', '− menos $ 1,00'],
+			['lead', 'Saldo a favor del cobrador', '$ 16,50']
+		]);
+		expect(textOf(body)).toContain('Efectivo rendido $ 200,00');
 		expect(body).toMatch(/Compensa: Ajuste a favor del cobrador del 19\/11\/2026/);
 		expect(body).toContain('name="originalEntryId"');
 		// The default adjustment is a credit, so only debits are offered to compensate (#130).
