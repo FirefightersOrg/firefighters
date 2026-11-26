@@ -247,6 +247,35 @@ export async function seedAdmin(
 	return outcomes;
 }
 
+const SCHEMA_CACHE_ERROR = /PGRST20[25]|schema cache/i;
+
+/**
+ * Safety net for the CLI: right after a database reset PostgREST may not have reloaded its schema
+ * cache yet (PGRST205 "Could not find the table ... in the schema cache", PGRST202 for functions).
+ * Retries `run` on those errors only, with a growing delay; any other error is thrown at once.
+ */
+export async function retryOnSchemaCache<T>(
+	run: () => Promise<T>,
+	{
+		attempts = 6,
+		delayMs = 1000,
+		sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+	} = {}
+): Promise<T> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await run();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			if (attempt >= attempts || !SCHEMA_CACHE_ERROR.test(message)) throw err;
+			console.warn(
+				`PostgREST schema cache not ready (attempt ${attempt}/${attempts}), retrying...`
+			);
+			await sleep(delayMs * attempt);
+		}
+	}
+}
+
 function isCliEntry(): boolean {
 	const entry = process.argv[1];
 	return !!entry && import.meta.url === pathToFileURL(resolve(entry)).href;
@@ -259,7 +288,7 @@ if (isCliEntry()) {
 		process.loadEnvFile(envPath);
 	}
 
-	seedAdmin()
+	retryOnSchemaCache(() => seedAdmin())
 		.then(() => {
 			console.log('Seeding finished successfully.');
 			process.exit(0);
