@@ -19,13 +19,16 @@ Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `p
 
 ```bash
 pnpm db:reset            # supabase db reset
-pnpm db:test             # supabase test db (pgTAP)
+pnpm db:test             # supabase test db (pgTAP, serial)
+pnpm db:test:parallel    # same suite with pg_prove --jobs (see below)
 APP_ENV=local pnpm seed:admin
 APP_ENV=local pnpm seed:demo   # optional: one realistic campaign for manual testing (docs/ux/README.md)
 APP_ENV=local pnpm test:integration
 ```
 
 Prefer these over calling `supabase db reset` / `supabase test db` directly. A waiting run prints "waiting for local Supabase lock…" and proceeds when the holder finishes. Tune with `DB_LOCK_WAIT_SECONDS` and `DB_LOCK_STALE_SECONDS`. `pnpm seed:admin` also goes through the lock (it writes Auth users, profiles and roles). If the Supabase CLI is not on your `PATH`, set `SUPABASE_BIN` to the path of the binary (default: `supabase`).
+
+**Parallel pgTAP (`pnpm db:test:parallel`):** runs `pg_prove --jobs N` (`PGTAP_JOBS`, default: the CPU count) through `scripts/test-db-parallel.sh`. It needs the local stack running and Docker (it reuses the `pg_prove` image the Supabase CLI already pulled; set `PG_PROVE` to use a locally installed `pg_prove` against `127.0.0.1:54322` instead). Most files are one rolled-back transaction and run in parallel. Files that use dblink, or that take table-level locks (`TRUNCATE`, `ALTER TABLE`, `ENABLE/DISABLE TRIGGER`, `DROP/CREATE TRIGGER|POLICY|INDEX`), deadlock when run next to others, so the script detects them and runs them serially afterwards; a new file can force that with a `-- pgtap: serial` line. Like `supabase test db`, it expects a freshly reset database (the suite reads whole tables), so keep the order `pnpm db:reset`, then the tests; do not run it after e2e or integration runs without a reset. `pnpm db:test` stays available as the reference run.
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
