@@ -19,6 +19,7 @@
 		"db:reset": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" db reset",
 		"db:test": "scripts/with-db-lock.sh \"${SUPABASE_BIN:-supabase}\" test db",
 		"seed:admin": "scripts/with-db-lock.sh tsx scripts/seed-admin.ts",
+		"seed:demo": "scripts/with-db-lock.sh tsx scripts/seed-demo.ts",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
 	},
