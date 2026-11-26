@@ -155,7 +155,8 @@
 /* The bar of a focused task (`TaskBar`) takes the place of the campaign tabs below 1024px: one
    bar at the thumb, never two. The way out is the back link and the header. */
 @media (width < 64rem) {
-	body:has([data-taskbar]) [data-campaign-tabs] {
+	body:has([data-taskbar]) [data-campaign-tabs],
+	body:has([data-taskbar]) [data-portal-tabs] {
 		display: none;
 	}
 }

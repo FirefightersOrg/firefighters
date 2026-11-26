@@ -173,17 +173,22 @@ describe('portal sales and buyers pages', () => {
 		expect(body(DuePage, { collector, due: [], pagination })).toContain('No hay cuotas por cobrar');
 	});
 
-	it('lists the campaigns on the portal landing, each linking to its bonds', () => {
+	it('lists the campaigns on the portal landing, each linking to what there is to collect', () => {
 		const html = body(HomePage, {
 			collector,
 			campaigns: [
 				{ id: 'k', name: 'Campaña 2027', status: 'active' },
-				{ id: 'j', name: 'Campaña 2026', status: 'closed' }
+				{ id: 'j', name: 'Campaña 2026', status: 'closing' }
 			]
 		});
-		expect(html).toContain('href="/portal/k/bonos"');
-		expect(html).toContain('href="/portal/j/bonos"');
+		// Decision P5: the way into a campaign is «Por cobrar».
+		expect(html).toContain('href="/portal/k/por-cobrar"');
+		expect(html).toContain('href="/portal/j/por-cobrar"');
+		expect(html).toContain('Elegir la campaña');
+		expect(html).toContain('En cierre');
 		expect(body(HomePage, { collector: null, campaigns: [] })).toContain('no está vinculado');
+		// A linked collector with no campaign in course is told so (decision Q4).
+		expect(body(HomePage, { collector, campaigns: [] })).toContain('No hay una campaña en curso');
 	});
 
 	describe('portal sub-navigation', () => {
@@ -199,7 +204,24 @@ describe('portal sales and buyers pages', () => {
 				expect(html).toContain(`href="/portal/k/${section}"`);
 			expect(html).toContain('Mi cuenta corriente');
 			expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-			expect(html).toMatch(/aria-current="page"[^>]*>Mis ventas/);
+			expect(html).toMatch(/aria-current="page"[^>]*>[\s\S]*?Mis ventas/);
+			expect(html.indexOf('aria-current="page"')).toBeGreaterThan(html.indexOf('/portal/k/bonos'));
+			expect(html.indexOf('aria-current="page"')).toBeLessThan(
+				html.indexOf('/portal/k/compradores')
+			);
+		});
+
+		it('puts «Por cobrar» first, and is one nav for the tab bar and the strip (UX plan PR 10)', () => {
+			const html = nav(all, '/portal/k/por-cobrar');
+			const order = ['por-cobrar', 'bonos', 'ventas', 'compradores', 'cuenta'].map((section) =>
+				html.indexOf(`href="/portal/k/${section}"`)
+			);
+			expect([...order].sort((a, b) => a - b)).toEqual(order);
+			expect(html.match(/<nav /g)).toHaveLength(1);
+			expect(html).toContain('data-portal-tabs');
+			// The short word under the icon is only drawn: the link's name stays the full label.
+			expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*>Cuenta<\/span>/);
+			expect(html).toMatch(/<span class="max-lg:sr-only">Mi cuenta corriente<\/span>/);
 		});
 
 		it('hides the sections the collector has no permission for', () => {
