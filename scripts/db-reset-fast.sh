@@ -121,18 +121,29 @@ restore() {
 }
 
 # After a restore the services reconnect on their own, with a backoff. Starting a test run before they
-# are back makes it slow and flaky, so probe the slot's HTTP API until auth answers and PostgREST serves
-# a real query through its (reloaded) schema cache, twice in a row.
+# are back makes it slow and flaky, so probe the slot's HTTP API until PostgREST serves a real query
+# through its (reloaded) schema cache and auth answers a request that touches the database, twice in a row.
+# `/auth/v1/health` does not query the database, so it cannot see the dead pooled connection GoTrue keeps
+# after `pg_terminate_backend` (the first sign-in would then fail with 500 "Database error querying schema").
+# `GET /auth/v1/admin/users?per_page=1` with the service role reads auth.users, needs no seeded data (an
+# empty list is a 200) and burns that stale connection. If auth still fails after 20 probes, restart its
+# container (once) and keep probing: slower, but deterministic.
 wait_healthy() {
-	local url=${PUBLIC_SUPABASE_URL:-} key=${SUPABASE_SERVICE_ROLE_KEY:-${PUBLIC_SUPABASE_ANON_KEY:-}} i ok=0
+	local url=${PUBLIC_SUPABASE_URL:-} key=${SUPABASE_SERVICE_ROLE_KEY:-${PUBLIC_SUPABASE_ANON_KEY:-}} i ok=0 restarted=0
 	[ -n "$url" ] || return 0
 	for i in $(seq 1 120); do
 		if curl -fsS -o /dev/null "$url/auth/v1/health" -H "apikey: $key" &&
+			curl -fsS -o /dev/null "$url/auth/v1/admin/users?per_page=1" -H "apikey: $key" -H "Authorization: Bearer $key" &&
 			curl -fsS -o /dev/null "$url/rest/v1/roles?select=id&limit=1" -H "apikey: $key" -H "Authorization: Bearer $key"; then
 			ok=$((ok + 1))
 			[ "$ok" -ge 2 ] && return 0
 		else
 			ok=0
+			if [ "$i" -ge 20 ] && [ "$restarted" = "0" ]; then
+				restarted=1
+				echo "db-reset-fast: auth still failing after $i probes, restarting supabase_auth_$project_id" >&2
+				docker restart "supabase_auth_$project_id" >/dev/null || true
+			fi
 		fi
 		sleep 1
 	done
