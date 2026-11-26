@@ -138,6 +138,63 @@ The record leads with a figure and its name, then says the sale in sentences bui
 - Each one asks for its reason in a dialog whose title is the question («¿Corregir el cobrador de la venta del bono 0190?»), whose text says what figures today and what the change does, and whose button repeats the action. «Marcar como incobrable» says who can undo it: «Solo un administrador puede revertir la marca.»
 - In tables, where a sentence cannot be rebuilt, a party the role cannot read is «Sin acceso al comprador» or «Sin acceso al cobrador» (`src/lib/domain/parties.ts`), as plain text with no link. No screen says «Unknown».
 
+## The campaign home (`src/lib/domain/campaign-home.ts`)
+
+- Under the title, a campaign under way says when it ends («Hasta el 29/06/2027, 6 cuotas de $ 10.000»); a draft or a closed one says both dates («Del … al …»).
+- The day's actions are four, named by what they do: «Registrar venta», «Registrar pago», «Entregar bonos», «Cargar bonos». The search is the page's primary button («Buscar bono»); on a draft it is «Activar».
+- «Para resolver» lists what waits for someone, as a sentence with its count, a line that says why it matters, and the name of where it leads. The section is not drawn when nothing waits.
+
+| What waits                        | Sentence                                                        | Second line                                                                             | Leads to                                     |
+| --------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Payments sent by a collector      | «2 cobros enviados por Jorge Medina sin procesar»               | «$ 20.000. Su rendición no se puede cerrar hasta incluirlos o rechazarlos.»             | «Abrir la rendición»                         |
+| The same, with no open settlement | «1 cobro enviado por Marta Giménez sin procesar»                | «$ 10.000. No tiene una rendición abierta: hace falta una para incluirlo o rechazarlo.» | «Abrir una rendición» (or «Ver rendiciones») |
+| Sold bonds short of the next draw | «8 bonos vendidos pueden quedar fuera de «Sorteo de noviembre»» | «El sorteo exige la cuota 2 paga. El corte es el 05/12/2026, 23:59: faltan 9 días.»     | «Ver los bonos» (listed under the item)      |
+| The same, after the cutoff        | «9 bonos vendidos no entran en «Sorteo de octubre»»             | «El sorteo exige la cuota 1 paga. El corte fue el 25/11/2026, 23:59.»                   | «Ver los bonos»                              |
+| Open settlements                  | «3 rendiciones abiertas»                                        | «Sus pagos quedan confirmados cuando se cierran.»                                       | «Ver rendiciones»                            |
+
+- Every figure says what it is measured against on its own line: «148 de 240», «58 sin vender; 33 sin entregar», «$ 4.470.000 de $ 8.880.000 vendidos», «$ 1.010.000 de $ 4.410.000 por cobrar».
+- Every amount on the home is in whole pesos (rounded): it is a summary. The records and the reports keep the cents.
+- «Saldo a favor de cada cobrador» lists amounts without a sign. A balance the other way says «a favor de Bomberos» under the amount: never a minus sign alone.
+- A part that could not be loaded says which: «No se pudieron cargar los bonos, lo cobrado y el próximo sorteo. Volver a intentar.»
+
+## The collectors, buyers and draws lists (`src/lib/domain/people-draw-lists.ts`)
+
+The three lists follow the bonds list: the search first, the other filters under «Filtrar», what is applied as chips, and rows that name the person or the draw and then the one or two facts people look for.
+
+- The search field is named by what it takes: «Nombre, teléfono o correo» (collectors), «Nombre, teléfono o documento» (buyers; a CUIT is found as a document). The draws list has no search, only «Filtrar». The option that does not filter is «Cualquiera»; the chips say «Estado: Inactivo», «Tipo: Empresa», «Tipo: Mensual», «Estado: Programado».
+- Collectors and buyers are shared between campaigns, the figures on their rows are not: the tables are named «Bonos y saldo en esta campaña» and «Bonos en esta campaña».
+- A count of bonds is said with its noun where there is no column header: «35 bonos», «1 bono», «Sin bonos». The columns are «Bonos asignados» (the collector record's term: it counts the bonds the collector holds and the ones they sold and collect) and «Bonos en esta campaña» (buyers).
+- A collector's balance is said in words, with the figure without a sign: «A favor del cobrador $ 41.000», «A cargo del cobrador $ 3.500», «Sin saldo». Never «$ -3.500», and never «A favor» alone, which does not say whose favour. Only the roles that read the financial reports see it; the others get no column, not «Sin saldo».
+- A collector's status is the «Estado» column; on a phone only «Inactivo» is marked, beside the name.
+- A phone number is a link that dials it. A buyer without a phone has a dash on a computer and nothing on a phone.
+- A usual collector the role cannot read is «Sin acceso al cobrador» (`src/lib/domain/parties.ts`).
+- The draws are a calendar in two tables: «Sorteos por realizar», the next one first, and «Sorteos realizados o anulados», the latest first. When every draw was held or annulled: «No queda ningún sorteo por realizar.» The state says the roster in words («Padrón generado», «Padrón congelado»); the date and the cutoff are «Fecha» and «Corte de pagos» (the label of the draw form).
+- An empty list says what to do:
+
+| List       | Nothing loaded yet                                                                                                                                                   | Nothing matches                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Collectors | «Todavía no hay cobradores» / «Cargar el primero con «Nuevo cobrador» para poder entregarle bonos.» Without the permission: «Los carga quien administra el sistema.» | «Ningún cobrador coincide con la búsqueda» / «Probar con otro nombre, teléfono o correo.» / button «Ver todos los cobradores» |
+| Buyers     | «Todavía no hay compradores» / «Se cargan al registrar una venta, o antes con «Nuevo comprador».» Without the permission: «Se cargan al registrar una venta.»        | «Ningún comprador coincide con la búsqueda» / «Probar con otro nombre, teléfono o documento.» / «Ver todos los compradores»   |
+| Draws      | «Todavía no hay sorteos» / «Crear el primero con «Nuevo sorteo».» Without the permission: «Los crea quien administra la campaña.»                                    | «Ningún sorteo coincide con los filtros» / «Probar con otro tipo u otro estado.» / «Ver todos los sorteos»                    |
+
+## Operation lists: sales, settlements, delivery notes
+
+A row starts with what the record is called, and that name carries the only link of the row. Then its state, in words, and its amount in whole pesos.
+
+| List           | The row, as it is said                                                             | Second line on a phone                                             | State                                                                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sales          | «0190 Oscar Pérez»: the bond number is the sale's identifier and opens the sale    | «Lo cobra Héctor Acosta» and the total of the sale                 | How its payments stand, under «Pagos» as on the bonds list: «Sin pagos», «Al día», «En mora», «Pagado». Not active: «Corregida», «Anulada» |
+| Settlements    | «Rendición 15 de Héctor Acosta»                                                    | «Abierta el 26/11/2026», or «Cerrada el 26/11/2026» and its total  | «Abierta», «Cerrada», «Anulada», «Corregida». The open ones come first                                                                     |
+| Delivery notes | «Remito 0007 a Jorge Medina»; «Remito 0013 de Lucía Fernández» when it is a return | «Entrega del 26/11/2026», «Reasignación del …», «Devolución del …» | «5 bonos» ends the first line; an annulled note adds «Anulado» to its reason                                                               |
+
+- No «#15» and no column of ids: a settlement is «Rendición 15», a note is «Remito 0007» (four digits, as printed).
+- An open settlement has no total yet (it is computed when it closes): a dash on the desktop table, nothing on the phone. Never «$ 0».
+- The search field is named by what it takes: «Nombre del comprador» on sales, «Número de remito» on delivery notes. Settlements have no search, only «Filtrar».
+- A date filter says which date it is: «Abierta desde» and «Abierta hasta» (settlements), «Emitido desde» and «Emitido hasta» (delivery notes). Its chip writes the date as people do: «Abierta desde: 01/11/2026».
+- The count above the table: «Mostrando 1–25 de 148 ventas», «Mostrando 1–13 de 13 remitos», and for settlements, which are not paged, «16 rendiciones, 3 abiertas».
+- Empty lists say how the first record comes to be: «Una venta se registra con un bono que ya tiene un cobrador y el comprador que lo lleva.», «Abrir una rendición para cargar los pagos que entrega un cobrador.», «Un remito se emite al entregar bonos a un cobrador, al reasignarlos o al recibirlos de vuelta.» With filters: «Ninguna venta coincide con los filtros» and «Probar con otros filtros o quitarlos para ver todas las ventas.»
+- A collector or a buyer the role cannot read: the phone sentence leaves the name out («Rendición 15», «Remito 0007»); where the row would otherwise have nothing, and in the desktop column, it is «Sin acceso al comprador» or «Sin acceso al cobrador» in muted text. Names are plain text on these lists, never links.
+
 ## The collector record, the current account and the buyer record
 
 The three records open as the bond and sale records do: a figure with its name, sentences built from data by a pure function, then the one next step.

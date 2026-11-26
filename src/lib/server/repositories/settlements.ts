@@ -63,6 +63,10 @@ const totals = (row: Row): SettlementTotals => ({
 	collectorCreditBalance: money(row.collector_credit_balance)
 });
 
+/**
+ * Settlements of a campaign under the caller's RLS: work in progress first (the open ones, UX audit
+ * A7), then the rest, each group from the newest number to the oldest.
+ */
 export async function listSettlements(
 	client: SupabaseClient,
 	campaignId: string,
@@ -86,25 +90,32 @@ export async function listSettlements(
 		query.range(from, to).overrideTypes<Row[], { merge: false }>()
 	);
 	if (error) return { data: null, error };
+	const items = (data ?? []).map((row): SettlementListItem => ({
+		id: row.id as string,
+		settlementNumber: row.settlement_number as number,
+		collectorId: row.collector_id as string,
+		collectorName: name(row.collectors),
+		status: row.status as SettlementStatus,
+		openedAt: row.opened_at as string,
+		closedAt: row.closed_at as string | null,
+		totals: {
+			totalCash: money(row.total_cash),
+			totalTransfer: money(row.total_transfer),
+			totalAmount: money(row.total_amount),
+			commissionAmount: money(row.commission_amount),
+			commissionPaidAmount: money(row.commission_paid_amount),
+			netToFirefighters: money(row.net_to_firefighters),
+			collectorCreditBalance: '0.00'
+		}
+	}));
+	// Every page was read, so the whole list is here: the open ones go first without a second query
+	// (PostgREST cannot order by «is open», and ordering by the status text would also split closed,
+	// corrected and annulled). The filter keeps the query's order inside each group.
 	return {
-		data: (data ?? []).map((row) => ({
-			id: row.id as string,
-			settlementNumber: row.settlement_number as number,
-			collectorId: row.collector_id as string,
-			collectorName: name(row.collectors),
-			status: row.status as SettlementStatus,
-			openedAt: row.opened_at as string,
-			closedAt: row.closed_at as string | null,
-			totals: {
-				totalCash: money(row.total_cash),
-				totalTransfer: money(row.total_transfer),
-				totalAmount: money(row.total_amount),
-				commissionAmount: money(row.commission_amount),
-				commissionPaidAmount: money(row.commission_paid_amount),
-				netToFirefighters: money(row.net_to_firefighters),
-				collectorCreditBalance: '0.00'
-			}
-		})),
+		data: [
+			...items.filter((item) => item.status === 'open'),
+			...items.filter((item) => item.status !== 'open')
+		],
 		error: null
 	};
 }

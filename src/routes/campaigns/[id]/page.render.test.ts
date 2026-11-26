@@ -100,7 +100,16 @@ describe('campaign sections (moved to the shell)', () => {
 	});
 });
 
-describe('dashboard: collector-submitted payments waiting (SAN-156)', () => {
+/** The page's visible text, with tags, comments and no-break spaces out of the way. */
+const text = (body: string) =>
+	body
+		.replace(/<!--.*?-->/g, '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/&nbsp;|\u00a0/g, ' ')
+		.replace(/\s+/g, ' ')
+		.replace(/ ([.,;:])/g, '$1');
+
+describe('«Para resolver»: collector-submitted payments waiting (SAN-156)', () => {
 	const operational = (submitted: unknown) => ({
 		operational: {
 			bonds: { total: 1, sold: 0, available: 1, delivered: 0, returned: 0, annulled: 0 },
@@ -131,29 +140,64 @@ describe('dashboard: collector-submitted payments waiting (SAN-156)', () => {
 			{ collectorId: 'b', collectorName: 'Beto', count: 1, amount: '75.50', openSettlementId: null }
 		]
 	};
-	it('shows the count, the amount and a link to where each collector is handled', () => {
+	const base = '/campaigns/f0000000-0000-0000-0000-000000000001';
+	it('names each collector, the amount in whole pesos and the place that resolves it', () => {
+		const body = renderPage(campaign({ status: 'active' }), null, {
+			dashboard: operational(withRows),
+			can: { viewSettlements: true, openSettlement: true } as never
+		});
+		const plain = text(body);
+		expect(plain).toContain('Para resolver');
+		expect(plain).toContain('2 cobros enviados por Ana sin procesar');
+		expect(plain).toContain(
+			'$ 100. Su rendición no se puede cerrar hasta incluirlos o rechazarlos.'
+		);
+		expect(body).toContain(`href="${base}/settlements/set-1"`);
+		// Beto has no open settlement: the item opens one for him.
+		expect(plain).toContain('1 cobro enviado por Beto sin procesar');
+		expect(plain).toContain('$ 76. No tiene una rendición abierta');
+		expect(body).toContain(`href="${base}/settlements/new?intent=payment&amp;collector=b"`);
+		expect(plain).toContain('Abrir una rendición');
+	});
+	it('sends to the settlements list when the role cannot open a settlement', () => {
 		const body = renderPage(campaign({ status: 'active' }), null, {
 			dashboard: operational(withRows),
 			can: { viewSettlements: true } as never
 		});
-		expect(body).toContain('Cobros enviados sin procesar');
-		expect(body).toContain('3 cobros enviados');
-		expect(body).toContain('Ana');
-		expect(body).toContain('/settlements/set-1');
-		expect(body).toContain('Ver rendiciones (no hay una abierta)');
+		expect(body).toContain(`href="${base}/settlements?status=open"`);
+		expect(body).not.toContain('settlements/new');
 	});
-	it('says there is no access to settlements instead of linking', () => {
+	it('says what waits without a link when the role does not see settlements', () => {
 		const body = renderPage(campaign({ status: 'active' }), null, {
 			dashboard: operational(withRows)
 		});
-		expect(body).toContain('Sin acceso a rendiciones');
-		expect(body).not.toContain('/settlements/set-1');
+		expect(text(body)).toContain('2 cobros enviados por Ana sin procesar');
+		expect(body).not.toContain('/settlements');
 	});
-	it('does not render the card when nothing is waiting', () => {
+	it('does not draw the section when nothing waits', () => {
 		const body = renderPage(campaign({ status: 'active' }), null, {
 			dashboard: operational({ count: 0, amount: '0.00', byCollector: [] })
 		});
-		expect(body).not.toContain('Cobros enviados sin procesar');
+		expect(body).not.toContain('Para resolver');
+		expect(body).not.toContain('dash-todo');
+	});
+	it('lists the open settlements the shell counted, with a link to them', () => {
+		const data = {
+			campaign: campaign({ status: 'active' }),
+			dashboard: { operational: null, financial: null },
+			hasBonds: true,
+			can: { ...can, viewSettlements: true },
+			shell: { campaign: { id: 'x', name: 'x' }, openSettlements: 3 }
+		};
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+		const body = render(Page, { props: { data, form: null, params: { id: 'x' } } as any }).body;
+		expect(text(body)).toContain('3 rendiciones abiertas');
+		expect(body).toContain(`href="${base}/settlements?status=open"`);
+		// A role that does not see settlements is not told about them.
+		data.can = { ...can, viewSettlements: false };
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+		const hidden = render(Page, { props: { data, form: null, params: { id: 'x' } } as any }).body;
+		expect(hidden).not.toContain('rendiciones abiertas');
 	});
 });
 
@@ -346,70 +390,166 @@ const financial = {
 	}
 };
 
-describe('campaign dashboard', () => {
+describe('campaign home: figures, balances and the next draw', () => {
 	it('shows no figures to a viewer without report permissions', () => {
-		expect(renderPage(campaign())).not.toContain('dash-figures');
-	});
-
-	it('shows the operational groups with links to the Bond Record', () => {
-		const body = renderPage(campaign(), null, { dashboard: { operational, financial: null } });
-		for (const text of [
-			'Bonos vendidos',
-			'de 20',
-			'En manos de cobradores',
-			'10 disponibles',
-			'Cobrado',
-			'50 % de lo esperado',
-			'Cuotas vencidas',
-			'Próximo sorteo',
-			'Sorteo de diciembre',
-			'Cuota requerida: 3',
-			'Bonos en riesgo',
-			'0007',
-			'Ana',
-			'Sin cobrador',
-			'Sin número'
-		]) {
-			expect(body).toContain(text);
-		}
-		expect(body).toContain('/bonds/b0000000-0000-0000-0000-000000000001');
-		expect(body).not.toContain('Efectivo y transferencias');
-	});
-
-	it('shows the financial groups, with a signed balance', () => {
-		const body = renderPage(campaign(), null, { dashboard: { operational: null, financial } });
-		for (const text of [
-			'Efectivo y transferencias',
-			'Comisiones',
-			'Generadas',
-			'Liquidadas',
-			'Saldos de cobradores',
-			'Saldo neto'
-		]) {
-			expect(body).toContain(text);
-		}
-		expect(body).toMatch(/-\$[\s\u00a0]20,00/);
-		expect(body).toContain('Hay 1 rendición abierta.');
+		const body = renderPage(campaign());
+		expect(body).not.toContain('dash-figures');
+		expect(body).not.toContain('Estado de la campaña');
 		expect(body).not.toContain('Próximo sorteo');
 	});
 
-	it('says so when there is no draw to come', () => {
+	it('shows one line of figures, each with what it is measured against', () => {
+		const plain = text(
+			renderPage(campaign(), null, {
+				dashboard: { operational, financial: null },
+				can: { viewReports: true } as never
+			})
+		);
+		for (const piece of [
+			'Bonos vendidos 6 de 20',
+			'En manos de cobradores 4 sin vender; 10 sin entregar',
+			'Cobrado $ 1.500',
+			'de $ 3.000 vendidos',
+			'Cuotas vencidas sin cobrar $ 300 de $ 1.500 por cobrar',
+			'Reportes'
+		])
+			expect(plain).toContain(piece);
+		expect(plain).not.toContain('Efectivo y transferencias');
+	});
+
+	it('names the bonds that may miss the next draw under their item, with links to their records', () => {
+		const body = renderPage(campaign(), null, { dashboard: { operational, financial: null } });
+		const plain = text(body);
+		expect(plain).toContain('2 bonos vendidos pueden quedar fuera de «Sorteo de diciembre»');
+		expect(plain).toContain('El sorteo exige la cuota 3 paga. El corte es el 15/12/2026, 12:00');
+		expect(plain).toContain('Ver los bonos');
+		expect(body.match(/data-at-risk-bond/g)).toHaveLength(2);
+		expect(plain).toContain('0007 Lo cobra Ana faltan 2 cuotas');
+		expect(plain).toContain('Bono sin número Sin cobrador falta 1 cuota');
+		expect(body).toContain('/bonds/b0000000-0000-0000-0000-000000000001');
+		// The list is collapsed: it is inside a <details> that is not open.
+		expect(body).toMatch(/<details class="group">/);
+		expect(body).not.toMatch(/<details[^>]*open/);
+	});
+
+	it('says how many bonds are not shown when the list is cut', () => {
+		const cut = operational.atRisk.map((bond) => ({ ...bond, totalCount: 40 }));
+		const body = renderPage(campaign(), null, {
+			dashboard: { operational: { ...operational, atRisk: cut }, financial: null }
+		});
+		expect(text(body)).toContain('Se muestran 2 de 40 bonos.');
+	});
+
+	it('shows the next draw as one row, linked for who sees draws', () => {
+		const dashboard = { operational, financial: null };
+		const plain = text(renderPage(campaign(), null, { dashboard }));
+		expect(plain).toContain('Próximo sorteo');
+		expect(plain).toContain('Sorteo de diciembre Mensual, exige la cuota 3 paga 20/12/2026');
+		expect(plain).toContain('corte el 15/12/2026, 12:00');
+		expect(renderPage(campaign(), null, { dashboard })).not.toContain('/draws/d1');
+		expect(renderPage(campaign(), null, { dashboard, can: { viewDraws: true } })).toContain(
+			'href="/campaigns/f0000000-0000-0000-0000-000000000001/draws/d1"'
+		);
+	});
+
+	it('says so when there is no draw to come, and lists no bonds', () => {
 		const body = renderPage(campaign(), null, {
 			dashboard: { operational: { ...operational, nextDraw: null, atRisk: [] }, financial: null }
 		});
 		expect(body).toContain('No hay sorteos programados.');
-		expect(body).not.toContain('Ningún bono vendido está en riesgo');
+		expect(body).not.toContain('Para resolver');
 	});
 
-	it('says no sold bond is at risk when the list is empty', () => {
+	it('shows the balances in words, never with a bare sign, and the commission to pay out', () => {
 		const body = renderPage(campaign(), null, {
-			dashboard: { operational: { ...operational, atRisk: [] }, financial: null }
+			dashboard: { operational: null, financial },
+			can: { viewCollectors: true }
 		});
-		expect(body).toContain('Ningún bono vendido está en riesgo para este sorteo.');
+		const plain = text(body);
+		expect(plain).toContain('Saldo a favor de cada cobrador');
+		// Ana owes: her balance is in favour of the institution, and it says so.
+		expect(plain).toContain('Ana $ 20 a favor de Bomberos');
+		expect(body).not.toMatch(/-\$|−/);
+		expect(plain).toContain('Comisión sin liquidar $ 50');
+		expect(body).toContain('href="/campaigns/f0000000-0000-0000-0000-000000000001/collectors/c1"');
+		expect(plain).not.toContain('Próximo sorteo');
+		// The cash and commission breakdowns live in the reports, not on the home.
+		for (const gone of ['Efectivo y transferencias', 'Generadas', 'Liquidadas', 'Saldo neto'])
+			expect(plain).not.toContain(gone);
+	});
+
+	it('leaves zero balances out and says when there are none', () => {
+		const none = {
+			...financial,
+			balances: {
+				creditors: 0,
+				net: '0.00',
+				top: [{ ...financial.balances.top[0], balance: '0.00' }]
+			},
+			commissions: { ...financial.commissions, pending: '0.00' }
+		};
+		const plain = text(
+			renderPage(campaign(), null, { dashboard: { operational: null, financial: none } })
+		);
+		expect(plain).toContain('Ningún cobrador tiene saldo.');
+		expect(plain).not.toContain('Comisión sin liquidar');
+	});
+
+	it('shows no amount with cents', () => {
+		const odd = {
+			operational: {
+				...operational,
+				revenue: {
+					expected: '3000.75',
+					collected: '1500.50',
+					pending: '1500.25',
+					overdue: '300.49',
+					collectedPercent: 50
+				},
+				submitted: {
+					count: 1,
+					amount: '75.50',
+					byCollector: [
+						{
+							collectorId: 'b',
+							collectorName: 'Beto',
+							count: 1,
+							amount: '75.50',
+							openSettlementId: null
+						}
+					]
+				}
+			},
+			financial: {
+				...financial,
+				commissions: { ...financial.commissions, pending: '50.55' },
+				balances: {
+					...financial.balances,
+					top: [{ ...financial.balances.top[0], balance: '20.49' }]
+				}
+			}
+		};
+		const plain = text(
+			renderPage(campaign({ status: 'active', installmentValue: '6000.00' }), null, {
+				dashboard: odd,
+				can: { viewSettlements: true } as never
+			})
+		);
+		expect(plain).not.toMatch(/\$ [\d.]+,\d/);
+		for (const piece of ['$ 1.501', '$ 3.001', '$ 300 de $ 1.500', '$ 76', '$ 51', '$ 20'])
+			expect(plain).toContain(piece);
+	});
+
+	it('says which part could not be loaded, and keeps the rest', () => {
+		const body = renderPage(campaign(), null, {
+			dashboard: { operational: { error: true }, financial }
+		});
+		expect(body).toContain('No se pudieron cargar los bonos, lo cobrado y el próximo sorteo.');
+		expect(text(body)).toContain('Saldo a favor de cada cobrador');
 	});
 });
 
-describe('campaign workbench (redesign)', () => {
+describe('campaign home: search, actions and order', () => {
 	it('puts the bond search first, as a GET to the bonds list, only with bond.view', () => {
 		expect(renderPage(campaign())).not.toContain('role="search"');
 		const body = renderPage(campaign(), null, { can: { viewBonds: true } });
@@ -417,28 +557,72 @@ describe('campaign workbench (redesign)', () => {
 		expect(body).toContain('action="/campaigns/f0000000-0000-0000-0000-000000000001/bonds"');
 		expect(body).toContain('name="base"');
 	});
-	it("lists the day's actions by permission, the first one as the primary button", () => {
+	it("lists the four day's actions by permission; the only primary button is the search", () => {
 		expect(renderPage(campaign())).not.toContain('Registrar venta');
 		const body = renderPage(campaign({ status: 'active' }), null, {
-			can: { registerSale: true, deliverBonds: true, openSettlement: true }
+			can: {
+				viewBonds: true,
+				registerSale: true,
+				deliverBonds: true,
+				openSettlement: true,
+				loadBonds: true
+			}
 		});
-		for (const text of ['Registrar venta', 'Entregar bonos a un cobrador', 'Registrar pago'])
-			expect(body).toContain(text);
-		expect(body.indexOf('Registrar venta')).toBeLessThan(body.indexOf('Registrar pago'));
+		const actions = body.match(/<ul[^>]*data-day-actions[\s\S]*?<\/ul>/)?.[0] ?? '';
+		expect(text(actions).trim()).toBe('Registrar venta Registrar pago Entregar bonos Cargar bonos');
 		// «Registrar pago» goes through the collector: to their open settlement, or to open one.
-		expect(body).toContain('/settlements/new?intent=payment');
+		expect(actions).toContain('/settlements/new?intent=payment');
+		expect(actions).not.toContain('bg-primary');
+		// A pata is loaded from the bonds list, not from the home.
+		expect(body).not.toContain('Cargar una pata');
+		expect(body.indexOf('role="search"')).toBeLessThan(body.indexOf('data-day-actions'));
 	});
-	it('keeps Datos y reglas one click away, and the rules off the workbench', () => {
+	it('goes search, actions, «Para resolver», figures, balances and draw, then the close', () => {
+		const data = {
+			campaign: campaign({ status: 'active', startsAt: '2026-06-29', endsAt: '2027-06-29' }),
+			dashboard: { operational, financial },
+			hasBonds: true,
+			can: { ...can, viewBonds: true, registerSale: true, transitions: ['closing'] },
+			shell: null
+		};
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
+		const body = render(Page, { props: { data, form: null, params: { id: 'x' } } as any }).body;
+		const order = [
+			'role="search"',
+			'data-day-actions',
+			'id="dash-todo"',
+			'id="dash-figures"',
+			'id="dash-balances"',
+			'id="dash-next-draw"',
+			'id="status"'
+		].map((mark) => body.indexOf(mark));
+		expect(order.every((at) => at >= 0)).toBe(true);
+		expect([...order].sort((x, y) => x - y)).toEqual(order);
+	});
+	it('puts «Activar» before everything else on a draft', () => {
+		const body = renderPage(campaign(), null, {
+			can: { viewBonds: true, transitions: ['active'] } as never
+		});
+		expect(body.indexOf('id="status"')).toBeGreaterThan(-1);
+		expect(body.indexOf('id="status"')).toBeLessThan(body.indexOf('role="search"'));
+	});
+	it('keeps Datos y reglas one click away, and the rules off the home', () => {
 		const body = renderPage(campaign(), null, {
 			can: { viewBonds: true, viewCollectors: true, viewDraws: true }
 		});
 		// From the header of the page (the shell also lists it under Administración).
 		expect(body).toContain('href="/campaigns/f0000000-0000-0000-0000-000000000001/configuracion"');
-		// The rules and their forms live in Datos y reglas, not on the workbench.
+		// The rules and their forms live in Datos y reglas, not on the home.
 		expect(body).not.toContain('?/rules');
 		expect(body).not.toContain('Política de desborde');
 	});
-	it('shows dates and the installment plan under the title', () => {
-		expect(renderPage(campaign())).toMatch(/Sin fechas definidas, 10 cuotas de \$[\s\u00a0]6\.000/);
+	it('shows the dates and the installment plan under the title', () => {
+		expect(text(renderPage(campaign()))).toContain('Sin fechas definidas, 10 cuotas de $ 6.000');
+		const dated = { startsAt: '2026-06-29', endsAt: '2027-06-29' };
+		expect(text(renderPage(campaign(dated)))).toContain('Del 29/06/2026 al 29/06/2027, 10 cuotas');
+		// Under way, what matters is when it ends.
+		expect(text(renderPage(campaign({ ...dated, status: 'active' })))).toContain(
+			'Hasta el 29/06/2027, 10 cuotas'
+		);
 	});
 });
