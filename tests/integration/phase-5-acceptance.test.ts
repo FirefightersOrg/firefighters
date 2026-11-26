@@ -742,9 +742,13 @@ describe('Phase 5: collectors and buyers', () => {
 			const can = (data as { can: Record<string, unknown> }).can;
 			for (const [section, flag] of flags)
 				expect(sections(user).includes(section), `${section} vs can.${flag}`).toBe(can[flag]);
-			// And the page itself no longer lists them.
+			// And the page itself no longer lists them. Since UX plan PR 13 the balances' heading has
+			// one link to «Cobradores», for who sees collectors: a way into that list, not a menu.
 			const html = render(CampaignPage, { props: { data } as never }).body;
-			expect(html).not.toContain('>Cobradores</a>');
+			expect(html).not.toContain('aria-label="Secciones de la campaña"');
+			expect(html.match(/>Cobradores<\/a>/g) ?? []).toHaveLength(
+				html.includes('id="dash-balances"') && can.viewCollectors ? 1 : 0
+			);
 			expect(html).not.toContain('>Compradores</a>');
 		}
 	});

@@ -240,8 +240,9 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
   - 2.5 screens or shorter at 375 px with the demo campaign (5.2 today); no horizontal scroll (leaves `KNOWN_OVERFLOW`).
   - Each «Para resolver» item links to the screen that resolves it and disappears when there is nothing to resolve.
   - No amount on the page has cents.
-  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions.
-- **Risk.** Medium. The page is each role's landing; a render test per role.
+  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions. As delivered, `load` did not change at all: the count of open settlements is the one the shell's layout already loads.
+  - As delivered: 2.4 screens at 375 px with the demo campaign. The bonds short of the next draw have no screen of their own, so their item opens the list in place (collapsed until asked for) and each bond links to its record. The cash and commission breakdowns left the home: they are in the financial report.
+- **Risk.** Medium. The page is each role's landing; a render test per role. As delivered, the roles are checked in an E2E with the fixture users (operator, treasurer, read-only), since what each one sees comes from its permissions in the database.
 - **Depends on.** PRs 3, 4, 5, 7 (the «Registrar pago» action).
 
 ### PR 14. Lists: sales, settlements, deliveries, people, draws (A7, A9)
