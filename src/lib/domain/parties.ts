@@ -66,6 +66,16 @@ export interface Buyer {
 }
 
 /** How a buyer is named on screens: the business name, or "Last, First". */
+/**
+ * What a screen says in place of a name the role cannot read (audit A9): in Spanish, and never a
+ * link. Repositories return these instead of a name, so a missing name cannot leak as «Unknown».
+ */
+export const NO_ACCESS_BUYER = 'Sin acceso al comprador';
+export const NO_ACCESS_COLLECTOR = 'Sin acceso al cobrador';
+/** True when `name` is a real name, not one of the «Sin acceso» fallbacks. */
+export const isReadableName = (name: string | null | undefined): name is string =>
+	!!name && name !== NO_ACCESS_BUYER && name !== NO_ACCESS_COLLECTOR;
+
 export function buyerDisplayName(
 	buyer: Pick<Buyer, 'type' | 'firstName' | 'lastName' | 'businessName'>
 ): string {

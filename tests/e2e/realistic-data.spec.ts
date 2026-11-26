@@ -116,4 +116,29 @@ test.describe.serial('realistic data at 375 px', () => {
 	test('portal screens do not scroll sideways', async () => {
 		await sweep(collectorPhone, portal);
 	});
+
+	// UX plan PR 12b (audit A9): a party the role cannot read is left out or named in Spanish, never
+	// printed as the repositories' old English stand-ins. Every staff screen is requested as each
+	// staff role; the page's HTML also carries the data it was rendered from.
+	test('no staff screen says «Unknown», for any staff role', async ({ browser }) => {
+		test.setTimeout(300_000);
+		const config = resolveSeedConfig();
+		const roles = ['admin', 'operator', 'treasurer', 'read-only'] as const;
+		for (const role of roles) {
+			const user =
+				role === 'admin'
+					? config.admin
+					: config.fixtures.find((fixture) => fixture.roleNames.includes(role));
+			if (!user) throw new Error(`The fixture ${role} is missing: run seed:admin first.`);
+			const context = await browser.newContext({ baseURL, locale: 'es-AR' });
+			await login(await context.newPage(), user);
+			for (const screen of staff) {
+				const response = await context.request.get(screen.path);
+				expect
+					.soft(await response.text(), `${screen.slug} as ${role}`)
+					.not.toMatch(/Unknown (buyer|collector|campaign|bond)/);
+			}
+			await context.close();
+		}
+	});
 });

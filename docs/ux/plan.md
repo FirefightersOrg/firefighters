@@ -220,8 +220,8 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
 
 - **Scope.**
   - `sales/new/+page.svelte`: the found bond is kept in page state; the buyer is found by typing (the existing `?buyer=` search, fetched without leaving the page, matches listed under the field); answered steps collapse to a line; a single match is selected; the payment mode is a `SegmentedControl`; `?bond=` arrives with the bond searched; the button names the bond and the buyer.
-  - `sales/[saleId]/+page.svelte`: the plan first, with what is owed as the lead figure; «Marcar como incobrable» and the corrections under «Corregir o anular», each in a dialog.
-  - A buyer or a collector the role cannot read shows «Sin acceso al comprador» with no link (the Spanish fallback from A9), here and in the shared label helper.
+  - `sales/[saleId]/+page.svelte`: what is owed as the lead figure, the sale in a sentence, then the plan (the same installments list as the bond record, now one component); «Marcar como incobrable» and the corrections under «Corregir la venta», each in a dialog. (First written as «Corregir o anular»: the page has no action that annuls a sale, so the name says what is there.)
+  - A buyer or a collector the role cannot read is left out of the record's sentences, and shows as «Sin acceso al comprador» or «Sin acceso al cobrador» with no link in tables (the Spanish fallback from A9, one constant in `src/lib/domain/parties.ts` used by the repositories).
 - **Screens.** New sale, sale record.
 - **Acceptance.**
   - Searching for a buyer after choosing the bond keeps the bond (the probe flow in `ux-flows.ts` reports it kept).

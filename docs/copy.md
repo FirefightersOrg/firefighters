@@ -120,6 +120,24 @@ The record opens with sentences built from data, not with labels and values. Eve
 - The button says what it is about to register: «Confirmar venta del bono 0035 a Panadería La Espiga». Until there is a bond it is «Confirmar venta».
 - A collector the role cannot read is not named («Entregado a un cobrador»): never «Unknown collector».
 
+## The sale record (`src/lib/domain/sale-summary.ts`)
+
+The record leads with a figure and its name, then says the sale in sentences built from data. The last sentence is the bond record's, word for word, because both are built from the same installments.
+
+| State          | Figure                       | Sentences                                                                                                                                                            |
+| -------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| With debt      | «Falta cobrar» $ 50.000      | «{comprador} compró el bono 0190 el 16/10/2026 en 6 cuotas, por $ 60.000. Lo cobra {cobrador}. Pagó 1 cuota y debe $ 50.000, de los cuales $ 10.000 están vencidos.» |
+| In one payment | «Falta cobrar» $ 60.000      | «{comprador} compró el bono 0190 el 16/10/2026 en un pago, por $ 60.000. Lo cobra {cobrador}. Debe $ 60.000, que vence el 01/12/2026.»                               |
+| Paid           | «Pagado» $ 60.000            | «… Lo cobró {cobrador}. Está pagado.»                                                                                                                                |
+| Uncollectible  | «Quedó sin cobrar» $ 50.000  | «… Lo cobró {cobrador}. Se dio por incobrable: quedaron $ 50.000 sin cobrar.»                                                                                        |
+| Annulled       | «Total de la venta» $ 60.000 | «… La venta fue anulada: no se cobra.»                                                                                                                               |
+
+- A buyer the role cannot read turns the first sentence into «El bono 0190 se vendió el 16/10/2026 en 6 cuotas, por $ 60.000.»; a collector it cannot read drops the second. The name is a link only when the role can open that record.
+- The associated number is on its own line («Número asociado 5190»), never beside the bond's number.
+- The corrections are under «Corregir la venta», each named by the case it solves and the action it takes: «La venta figura a nombre de otro comprador.» / «Corregir el comprador»; «La vendió otro cobrador.» / «Corregir el cobrador»; «Ya no se va a poder cobrar.» / «Marcar como incobrable»; «Se marcó como incobrable por error, o se volvió a cobrar.» / «Revertir la marca».
+- Each one asks for its reason in a dialog whose title is the question («¿Corregir el cobrador de la venta del bono 0190?»), whose text says what figures today and what the change does, and whose button repeats the action. «Marcar como incobrable» says who can undo it: «Solo un administrador puede revertir la marca.»
+- In tables, where a sentence cannot be rebuilt, a party the role cannot read is «Sin acceso al comprador» or «Sin acceso al cobrador» (`src/lib/domain/parties.ts`), as plain text with no link. No screen says «Unknown».
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

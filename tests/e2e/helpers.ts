@@ -111,7 +111,8 @@ export async function deliverAndSell(
 	await page.getByRole('button', { name: /^Confirmar venta del bono/ }).click();
 	await expect(page).toHaveURL(/\/sales\/[0-9a-f-]{36}$/);
 	const saleId = page.url().split('/').pop()!;
-	await expect(page.getByText('Pago total').first()).toBeVisible();
+	// UX plan PR 12b: the sale record says the sale in a sentence.
+	await expect(page.locator('[data-sale-sentence]')).toContainText('en un pago');
 
 	return { noteId, saleId };
 }

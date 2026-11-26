@@ -8,8 +8,10 @@ import {
 } from '$lib/server/auth/permissions';
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
-import { getSaleDetail } from '$lib/server/repositories/sales';
+import { getSaleDetail, listInstallmentPaymentsForSale } from '$lib/server/repositories/sales';
 import { calculateFinancialStatus } from '$lib/domain/financial-status';
+import { isReadableName } from '$lib/domain/parties';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { listActiveCollectorOptions, listBuyers } from '$lib/server/repositories/parties';
 import {
 	correctSaleBuyer,
@@ -29,7 +31,7 @@ const correctionFailure = (cause: unknown, form: string, values: Record<string, 
 		form,
 		values,
 		errors: {},
-		message: service?.message ?? 'Could not record correction.'
+		message: service?.message ?? 'No se pudo registrar la corrección.'
 	});
 };
 async function saleForAction(
@@ -58,9 +60,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!z.guid().safeParse(params.id).success || !z.guid().safeParse(params.saleId).success)
 		error(404, { message: 'Venta no encontrada.' });
 	const canCorrect = hasPermissionIn(locals.permissions, 'sale.correct');
-	const [campaign, sale, buyers, collectors] = await Promise.all([
+	const can = (...permissions: Parameters<typeof hasPermissionIn>[1][]) =>
+		permissions.some((permission) => hasPermissionIn(locals.permissions, permission));
+	const [campaign, sale, payments, buyers, collectors] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
 		getSaleDetail(locals.supabase, params.id, params.saleId),
+		// Read with the caller's client: a role that cannot read payments gets none, and the record
+		// falls back to the installments' own statuses.
+		listInstallmentPaymentsForSale(locals.supabase, params.saleId),
 		canCorrect
 			? listBuyers(locals.supabase, { pageSize: 500 })
 			: Promise.resolve({ data: null, error: null }),
@@ -68,16 +75,45 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			? listActiveCollectorOptions(locals.supabase)
 			: Promise.resolve({ data: [], error: null })
 	]);
-	if (campaign.error || sale.error || buyers.error || collectors.error)
+	if (campaign.error || sale.error || payments.error || buyers.error || collectors.error)
 		error(500, { message: 'No se pudo cargar la venta.' });
 	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
 	if (!sale.data) error(404, { message: 'Venta no encontrada.' });
-	const today = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'America/Argentina/Buenos_Aires'
-	}).format(new Date());
+	const today = todayInBuenosAires();
+	const applied = payments.data ?? new Map();
+	const installments = sale.data.installments.map((installment) => ({
+		...installment,
+		applied: applied.get(installment.id)?.applied ?? '0.00',
+		lastPayment: applied.get(installment.id)?.last ?? null,
+		waiting: applied.get(installment.id)?.waiting ?? '0.00',
+		waitingPayment: applied.get(installment.id)?.waitingPayment ?? null
+	}));
 	return {
 		campaign: campaign.data,
 		sale: sale.data,
+		today,
+		/**
+		 * The buyer and the collector by name. `name` is null when the role cannot read them, and
+		 * `canOpen` says whether it may open their record: the page links only what opens.
+		 */
+		parties: {
+			buyer: {
+				id: sale.data.sale.buyerId,
+				name: isReadableName(sale.data.buyerName) ? sale.data.buyerName : null,
+				canOpen: can('buyer.view', 'buyer.manage')
+			},
+			collector: {
+				id: sale.data.sale.collectorId,
+				name: isReadableName(sale.data.collectorName) ? sale.data.collectorName : null,
+				canOpen: can('collector.view', 'collector.manage')
+			}
+		},
+		/** The active plan's installments, with what confirmed and waiting payments applied to each. */
+		installments,
+		/** Without it, payments cannot be read: the record says so instead of guessing balances. */
+		canViewPayments: can('payment.view', 'payment.create', 'payment.annul'),
+		/** The role may load a payment of this sale in a settlement. */
+		canPay: can('settlement.create', 'settlement.update_open'),
 		/** SAN-106: admin or treasurer, on an active sale that is not marked yet. */
 		canMarkUncollectible:
 			hasPermissionIn(locals.permissions, 'sale.mark_uncollectible') &&
@@ -102,11 +138,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			planStatus: sale.data.plan.status,
 			markedUncollectible: sale.data.uncollectible !== null,
 			today,
-			installments: sale.data.installments.map((item) => ({
+			// Only confirmed payments count, as on the bond record: the badge never runs ahead of the
+			// settlement that carries the money.
+			installments: installments.map((item) => ({
 				...item,
 				number: item.installmentNumber,
-				// TODO(Phase 8, payments): use actual applied amounts after payment allocation is implemented.
-				appliedAmount: '0.00'
+				appliedAmount: item.applied
 			}))
 		})
 	};
