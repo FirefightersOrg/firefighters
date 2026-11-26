@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { todayInBuenosAires } from '$lib/domain/reports';
 	import { enhance } from '$app/forms';
 	import {
 		Alert,
@@ -398,6 +399,25 @@
 						</table>
 					</div>
 				{/if}
+				<Field
+					label="Fecha del pago"
+					id="paymentDate"
+					error={form?.form === 'add' &&
+					form.errors &&
+					'paymentDate' in form.errors &&
+					Array.isArray(form.errors.paymentDate)
+						? form.errors.paymentDate?.[0]
+						: undefined}
+					required
+				>
+					<TextInput
+						name="paymentDate"
+						type="date"
+						value={todayInBuenosAires()}
+						max={todayInBuenosAires()}
+						required
+					/>
+				</Field>
 				<Field label="Método" id="paymentMethod">
 					<Select name="paymentMethod" options={methodOptions} value="cash" />
 				</Field>

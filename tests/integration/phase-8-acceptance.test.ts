@@ -1,3 +1,4 @@
+import { load as ledgerLoad } from '../../src/routes/campaigns/[id]/collectors/[collectorId]/ledger/+page.server';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
@@ -891,6 +892,15 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		const closedWorkspace = (await settlementLoad(
 			event(users.treasurer, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
 		)) as Exclude<Awaited<ReturnType<typeof settlementLoad>>, void>;
+		const linkedCollector = closedWorkspace.settlement.collectorId;
+		await expect(
+			ledgerLoad(
+				event(users.treasurer, `/campaigns/${campaignId}/collectors/${linkedCollector}/ledger`, {
+					id: campaignId,
+					collectorId: linkedCollector
+				})
+			)
+		).resolves.toMatchObject({ collector: { id: collectorId } });
 		expect(closedWorkspace.totals).toEqual({
 			totalCash: Number(stored!.total_cash).toFixed(2),
 			totalTransfer: Number(stored!.total_transfer).toFixed(2),

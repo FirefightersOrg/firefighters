@@ -21,8 +21,8 @@ join public.permissions p on p.id = rp.permission_id;
 
 select is((select count(*)::int from _rp where role_name = 'admin'), 57, 'admin has all 57 permissions');
 select is((select count(*)::int from _rp where role_name = 'operator'), 21, 'operator has 21 permissions (bond.scan in SAN-44; SAN-93 view and matrix decisions)');
-select is((select count(*)::int from _rp where role_name = 'treasurer'), 21, 'treasurer has 21 permissions (SAN-93 view and matrix decisions, SAN-105 sale.view, SAN-106 sale.mark_uncollectible)');
-select is((select count(*)::int from _rp where role_name = 'read-only'), 6, 'read-only has 6 permissions (commission.view in SAN-93)');
+select is((select count(*)::int from _rp where role_name = 'treasurer'), 23, 'treasurer has 23 permissions including party reads');
+select is((select count(*)::int from _rp where role_name = 'read-only'), 8, 'read-only has 8 permissions including party reads');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'collector'),
   array['bond.view_own', 'campaign.view', 'collector.ledger.view_own', 'payment.create_own', 'sale.view_own'], 'collector grants match the matrix'
@@ -33,7 +33,7 @@ select ok(exists (select 1 from _rp where role_name = 'treasurer' and code = 'pa
 select ok(not exists (select 1 from _rp where role_name = 'operator' and code = 'payment.annul'), 'operator lacks payment.annul');
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'read-only'),
-  array['bond.view', 'campaign.view', 'commission.view', 'report.export', 'report.view_financial', 'report.view_operational'],
+  array['bond.view', 'buyer.view', 'campaign.view', 'collector.view', 'commission.view', 'report.export', 'report.view_financial', 'report.view_operational'],
   'read-only grants match the matrix'
 );
 select is(
@@ -45,7 +45,7 @@ select is(
 );
 select is(
   (select array_agg(code order by code) from _rp where role_name = 'treasurer'),
-  array['audit.view', 'bond.view', 'campaign.view', 'collector.ledger.view', 'commission.adjust',
+  array['audit.view', 'bond.view', 'buyer.view', 'campaign.view', 'collector.ledger.view', 'collector.view', 'commission.adjust',
         'commission.view', 'draw.freeze_roster', 'draw.load_winner', 'draw.view', 'payment.annul',
         'payment.create', 'payment.view', 'report.export', 'report.view_financial', 'report.view_operational', 'sale.mark_uncollectible', 'sale.view', 'settlement.close', 'settlement.correct',
         'settlement.create', 'settlement.view'],

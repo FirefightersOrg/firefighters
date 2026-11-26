@@ -1,5 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { z } from 'zod';
 import {
 	hasPermissionIn,
@@ -243,6 +244,14 @@ export const actions: Actions = {
 			amountApplied: field(f, `amount-${id}`)
 		}));
 		const method = field(f, 'paymentMethod');
+		const today = todayInBuenosAires();
+		const paymentDate = f.has('paymentDate') ? field(f, 'paymentDate') : today;
+		if (!z.iso.date().safeParse(paymentDate).success || paymentDate > today)
+			return fail(400, {
+				form: 'add',
+				errors: { paymentDate: ['Ingresar una fecha válida hasta hoy.'] },
+				message: 'Revisar los campos marcados.'
+			});
 		if (!uuid.safeParse(saleId).success || !ids.length || !['cash', 'transfer'].includes(method))
 			return fail(400, {
 				form: 'add',
@@ -301,6 +310,7 @@ export const actions: Actions = {
 					settlementId: params.settlementId,
 					saleId,
 					amount,
+					paymentDate,
 					paymentMethod: method as 'cash' | 'transfer',
 					applications
 				},

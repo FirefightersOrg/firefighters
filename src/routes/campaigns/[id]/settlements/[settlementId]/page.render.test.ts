@@ -43,6 +43,8 @@ describe('settlement workspace render', () => {
 		// Every Stat value is tabular (acceptance: amounts right-aligned and tabular).
 		expect(body.match(/text-number-lg[^"]*tabular-nums/g)).toHaveLength(7);
 		expect(body).toContain('?/add');
+		expect(body).toContain('Fecha del pago');
+		expect(body).toContain('name="paymentDate"');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');
 		expect(body).toContain('31/12/2025');

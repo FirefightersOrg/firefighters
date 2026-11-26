@@ -1,3 +1,4 @@
+import { todayInBuenosAires } from '$lib/domain/reports';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
@@ -366,10 +367,36 @@ describe('settlement workspace', () => {
 		});
 		expect(addPaymentToSettlement).toHaveBeenCalledWith(
 			expect.anything(),
-			expect.objectContaining({ amount: '0.10' }),
+			expect.objectContaining({ amount: '0.10', paymentDate: todayInBuenosAires() }),
 			expect.anything()
 		);
 	});
+	it.each(['2020-01-15', '2999-01-01', '2026-02-30'])(
+		'validates payment date %s',
+		async (paymentDate) => {
+			const result = await run(
+				'add',
+				['campaign.view', 'settlement.update_open', 'payment.create'],
+				{
+					saleId: SALE,
+					installmentId: INSTALLMENT,
+					[`amount-${INSTALLMENT}`]: '1',
+					paymentMethod: 'cash',
+					paymentDate
+				}
+			);
+			if (paymentDate === '2020-01-15')
+				expect(addPaymentToSettlement).toHaveBeenCalledWith(
+					expect.anything(),
+					expect.objectContaining({ paymentDate }),
+					expect.anything()
+				);
+			else {
+				expect(result).toMatchObject({ status: 400 });
+				expect(addPaymentToSettlement).not.toHaveBeenCalled();
+			}
+		}
+	);
 	it('validates removal and maps service errors', async () => {
 		expect(
 			await run('remove', ['campaign.view', 'settlement.update_open'], { paymentId: SETTLEMENT })
