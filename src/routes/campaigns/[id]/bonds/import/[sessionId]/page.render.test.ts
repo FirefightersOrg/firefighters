@@ -131,7 +131,7 @@ describe('/campaigns/[id]/bonds/import/[sessionId] page', () => {
 			'Patas',
 			'Números base',
 			'Números participantes',
-			'Errores bloqueantes',
+			'Errores',
 			'Observaciones',
 			'Duplicados'
 		]) {
@@ -150,14 +150,15 @@ describe('/campaigns/[id]/bonds/import/[sessionId] page', () => {
 				})
 			]
 		});
-		expect(body).toContain('5500 / 10371');
+		expect(body).toContain('>5500<');
+		expect(body).toContain('/ 10371');
 		expect(body).toContain('El número 5500 no entra en la campaña (máximo 9999).');
 	});
 
 	it('disables Confirm while there are blocking errors and explains why', () => {
 		const body = renderPage();
 		expect(isDisabled(submitTag(body, 'Confirmar y crear 2 bonos'))).toBe(true);
-		expect(body).toContain('Confirmar está deshabilitado: corregir o quitar la fila con error.');
+		expect(body).toContain('Todavía no se puede confirmar: corregir o quitar la fila con error.');
 	});
 
 	it('enables Confirm on a clean validated session', () => {

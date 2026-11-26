@@ -308,3 +308,11 @@ Choices to keep in mind:
 - **Rendición vs. liquidación.** The accounting a collector hands in is a rendición; paying a commission out is a liquidación. The English «settlement» maps to rendición.
 - **Padrón** is the frozen list of eligible numbers of a draw, not «lista» or «nómina».
 - **Cobrador** and **comprador** are always distinct: the cobrador collects, the comprador owns the bono.
+
+## Loading bonds (SAN-170)
+
+- The numbering is said in sentences, from the campaign's own figures: «Los números tienen 4 dígitos y llegan hasta 9999. El número asociado se calcula como base + 4871.» In circular mode (SAN-151) it adds where the associated numbers go and that they restart: «los asociados cubren de 5000 a 9999, así que cualquier número base sirve.»
+- A bond is its number first, with the associated one after a slash (`0068 / 4939`), never an arrow. A pata preview says what it is worth in words: «2 bonos de $ 60.000».
+- Freezing the rules of a draft campaign says what stops being possible: «Al guardar el primer bono, ya no se pueden cambiar sus reglas».
+- The scanner answers every read in a line: «Leído: 0068 / 4939» or what went wrong followed by «Volver a escanear.» The recent reads are stacked rows on a phone.
+- The import preview opens with what would be created and what blocks it: «Se crearían 11 bonos (10 simples y 1 pata), con 1.284 números participantes. 1 fila tiene un error que impide confirmar.» The names of the file's columns stay in code, under «Cómo tiene que ser el archivo». Reverting an import is under its own disclosure and asks for a reason.

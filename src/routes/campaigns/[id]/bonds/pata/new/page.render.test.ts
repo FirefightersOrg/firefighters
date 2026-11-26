@@ -106,7 +106,10 @@ describe('PataNumbersPreview', () => {
 		expect(body).toContain('0068');
 		expect(body).toContain('4940');
 		expect(body).toContain(formatMoney('120000.00'));
-		expect(body).toContain(`${formatMoney('60000.00')} × 2`);
+		expect(body.replace(/\s+/g, ' ')).toContain(
+			`2 bonos de ${formatMoney('60000.00').replace(/\s+/g, ' ')}`
+		);
+		expect(body).not.toContain('→');
 		expect(body).toMatch(/Números participantes<\/dt>\s*<dd[^>]*>\s*4\s*<\/dd>/);
 	});
 
@@ -183,7 +186,7 @@ describe('/campaigns/[id]/bonds/pata/new page', () => {
 
 	it('warns that the first bond freezes a draft', () => {
 		expect(renderPage({ loaded: campaign({ status: 'draft' }) })).toContain(
-			'Guardar el primer bono congela sus reglas'
+			'Al guardar el primer bono, ya no se pueden cambiar sus reglas'
 		);
 	});
 

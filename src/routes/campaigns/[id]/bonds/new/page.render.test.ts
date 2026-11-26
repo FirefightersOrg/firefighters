@@ -102,8 +102,10 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		expect(body).toContain('name="internalCode"');
 		expect(body).toContain('name="barcode"');
 		// Usable range from the numbering preview.
-		expect(body).toContain('0000–5128');
-		expect(body).not.toContain('Guardar el primer bono congela sus reglas');
+		expect(body).toContain('Se pueden usar los números base de');
+		expect(body).toContain('5.129 en total');
+		expect(body).not.toContain('ya no se pueden cambiar sus reglas');
+		expect(body).not.toContain('→');
 		// Both buttons are enabled.
 		for (const value of ['another', 'save']) {
 			const tag = submitButton(body, value);
@@ -111,9 +113,23 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		}
 	});
 
+	it('explains the circular numbering: where the associated numbers go and restart', () => {
+		const body = renderPage(
+			campaign({
+				maxNumber: 9999,
+				associatedNumberMode: 'circular',
+				associatedNumberOffset: 4871
+			})
+		);
+		expect(body).toContain('5000 + ((base + 4871) mod 5000)');
+		expect(body).toContain('En modo circular el asociado vuelve a empezar');
+		expect(body).toContain('cualquier número base sirve');
+		expect(body).toContain('5.000 en total');
+	});
+
 	it('warns that the first bond freezes the rules of a draft', () => {
 		expect(renderPage(campaign({ status: 'draft' }))).toContain(
-			'Guardar el primer bono congela sus reglas'
+			'Al guardar el primer bono, ya no se pueden cambiar sus reglas'
 		);
 	});
 
@@ -136,7 +152,7 @@ describe('/campaigns/[id]/bonds/new page', () => {
 		});
 		expect(body).toContain('Bono 0068 / 4939 guardado.');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${BOND_ID}"`);
-		expect(body).toContain('Guardados desde esta página');
+		expect(body).toContain('Cargados en esta visita');
 		expect(inputValue(body, 'baseNumber')).toBe('');
 	});
 
