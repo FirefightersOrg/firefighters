@@ -173,7 +173,14 @@ and result).
 - Plan with automatic daily backups (Pro or higher: 7 days of retention; Point in Time Recovery
   is optional and brings RPO to minutes). Confirm in Dashboard > Database > Backups. A daily
   backup gives RPO <= 24h by construction.
-- Weekly manual export (`supabase db dump` or `pg_dump`) stored 30 days; monthly stored 6-12 months.
+- Weekly manual export stored 30 days; monthly stored 6-12 months. Take the data and the schema as
+  separate files (the schema is for reference; a restore rebuilds it from `supabase/migrations`):
+
+  ```sh
+  supabase db dump --db-url "$DATABASE_URL" --data-only --use-copy -f data.sql
+  supabase db dump --db-url "$DATABASE_URL" -f schema.sql
+  ```
+
 - At least two people with Supabase dashboard access and the production connection string in the
   password manager.
 
@@ -191,8 +198,26 @@ and result).
 2. Identify a valid backup: Dashboard > Database > Backups (or PITR timestamp). Pick the newest one
    taken before the damage; the data after it is the accepted loss (<= 24h) and is re-entered from
    the operational exports and paper records.
-3. Restore into a NEW project first (Dashboard > Backups > Restore, or load a dump with
-   `psql "$NEW_DATABASE_URL" -f dump.sql`). Do not restore over production yet.
+3. Restore into a NEW project first. Do not restore over production yet.
+   - **From a Supabase backup:** Dashboard > Database > Backups > Restore to a new project. This
+     copies the whole database, auth and storage included.
+   - **From a manual export (`data.sql`):** a plain `psql -f dump.sql` does not work on a fresh
+     project. Supabase already owns the `auth`/`storage` schemas there, and the migrations seed
+     `roles`, `permissions` and `role_permissions`, so the copy stops on duplicate keys. Use this
+     sequence instead, which the local drill below checked:
+
+     ```sh
+     supabase link --project-ref "$NEW_PROJECT_REF"
+     supabase db push                      # applies supabase/migrations in order
+     psql "$NEW_DATABASE_URL" -v ON_ERROR_STOP=1 -X --single-transaction \
+       -c 'truncate public.role_permissions, public.permissions, public.roles cascade' \
+       -f data.sql
+     ```
+
+     The truncate removes only the rows the migrations seed. The dump brings them back with their
+     original ids, so the `user_roles` rows keep pointing at the right roles. Run it in one
+     transaction: if anything fails, nothing is left half loaded. The dump does not carry the
+     migration history; `supabase db push` records it.
 4. Validate integrity on the restored project: run `scripts/reconcile-backup.sql` (see below),
    check that migrations match `supabase/migrations` (`supabase migration list`), sign in with the
    administrator and open the main reports.
@@ -223,3 +248,20 @@ It reports: bonds per campaign and status (count and value), payments per campai
 compare them with the source before reopening), prizes per draw and status with their winning
 numbers and awards (section 6b) and integrity checks that must return no rows (sections 5a-5c, 6c). Differences must be explained by the
 accepted loss window only; anything else blocks reopening.
+
+### Restore drills
+
+| Date       | Where                         | Source                                                                               | Path          | Result                          |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------ | ------------- | ------------------------------- |
+| 2026-11-26 | Local only (two local stacks) | Demo campaign: 240 bonds, 273 payments, 1,183 audit rows, 5 users; `data.sql` 1.7 MB | Manual export | Passed, after correcting step 3 |
+
+Details of the 2026-11-26 drill:
+
+- **Steps.** Dump with `supabase db dump --data-only --use-copy` (10 s for the three files). The target was a second local stack with the migrations applied. Restore as `postgres` with the sequence in step 3. The load took 1 s.
+- **Finding.** The documented `psql -f dump.sql` stopped on `duplicate key value violates unique constraint "permissions_code_key"`, because the migrations had already seeded the permissions. Step 3 now has the corrected sequence.
+- **Checks.**
+  - `scripts/reconcile-backup.sql` output identical to the source (68 lines).
+  - The administrator signs in, gets their 57 permissions and sees both campaigns.
+  - Anonymous reads are refused (42501), and every `public` table has RLS on.
+  - A new settlement continues the numbering (16 after 15).
+- **Not covered.** Storage objects: the local target runs without the storage service, and the demo has no files. The real-project drill (SAN-157) is still pending. It must restore into a Supabase project and record who gives the OK to load real data.
