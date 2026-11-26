@@ -264,3 +264,15 @@ describe('overdue warning (SAN-142)', () => {
 		});
 	});
 });
+
+describe('view URLs (UX PR 17)', () => {
+	it.each(['by-status', 'by-collector', 'installments', 'overdue-warning', 'monthly'])(
+		'accepts view %s while preserving the original query results',
+		async (view) => {
+			const { locals } = setup();
+			const legacy = (await load(event(locals)))!;
+			const selected = (await load(event(locals, `?view=${view}&page=2`)))!;
+			expect(selected).toEqual({ ...legacy, view, page: 2 });
+		}
+	);
+});

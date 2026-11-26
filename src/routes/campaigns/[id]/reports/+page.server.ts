@@ -1,6 +1,7 @@
 import { error, fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { Actions, PageServerLoad } from './$types';
+import { OPERATIONAL_VIEWS, reportPage, reportView } from '$lib/report-views';
 import {
 	buildStatusMatrix,
 	parseReportFilters,
@@ -85,6 +86,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	}
 
 	return {
+		view: reportView(url.searchParams, OPERATIONAL_VIEWS),
+		page: reportPage(url.searchParams.get('page')),
+		canViewCollectors: hasPermissionIn(locals.permissions, 'collector.view'),
 		campaign: campaign.data,
 		filters,
 		collectors: collectors.data ?? [],

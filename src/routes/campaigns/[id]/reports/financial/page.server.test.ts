@@ -237,3 +237,27 @@ describe('/campaigns/[id]/reports/financial load', () => {
 		spy.mockRestore();
 	});
 });
+
+describe('view URLs (UX PR 17)', () => {
+	it.each(['payments', 'settlements', 'accounts', 'ledger', 'rosters', 'roster', 'prizes'])(
+		'accepts view %s while preserving the original query results',
+		async (view) => {
+			const { locals } = setup();
+			const legacy = (await load(event(locals)))!;
+			const selected = (await load(event(locals, `?view=${view}&page=2`)))!;
+			expect(selected).toEqual({ ...legacy, view, page: 2 });
+		}
+	);
+});
+
+it('opens legacy collector and draw URLs in the matching detail, with all filters intact', async () => {
+	const { locals } = setup();
+	const collector = (await load(event(locals, `?collector=${COLLECTOR_ID}&method=cash`)))!;
+	expect(collector.view).toBe('ledger');
+	expect(collector.filters).toMatchObject({ collectorId: COLLECTOR_ID, method: 'cash' });
+	expect(collector.ledger).toHaveLength(1);
+	const draw = (await load(event(locals, `?draw=${DRAW_ID}&eligibility=eligible`)))!;
+	expect(draw.view).toBe('roster');
+	expect(draw.filters).toMatchObject({ drawId: DRAW_ID, eligibility: 'eligible' });
+	expect(draw.roster).toHaveLength(1);
+});

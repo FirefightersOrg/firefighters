@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { PageServerLoad } from './$types';
+import { FINANCIAL_VIEWS, reportPage, reportView } from '$lib/report-views';
 import {
 	countPrizesByStatus,
 	parseFinancialFilters,
@@ -97,6 +98,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		? (drawRows.find((d) => d.drawId === filters.drawId) ?? null)
 		: null;
 	return {
+		view: reportView(
+			url.searchParams,
+			FINANCIAL_VIEWS,
+			filters.collectorId ? 'ledger' : filters.drawId ? 'roster' : 'payments'
+		),
+		page: reportPage(url.searchParams.get('page')),
 		campaign: campaign.data,
 		filters,
 		collectors: collectors.data ?? [],
