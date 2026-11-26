@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type BrowserContext } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import {
 	findDemoIds,
 	portalScreens,
@@ -25,7 +26,6 @@ import { login, open } from './helpers';
  */
 const KNOWN_OVERFLOW: Record<string, string> = {
 	'03-campaign-workbench': 'audit A7, «pendiente $ 4.370.000» does not wrap (plan PR 13)',
-	'44-settlement-print': 'audit A7, the note is wider than the phone (plan PR 18)',
 	'81-reports-financial': 'audit A7, the export buttons do not wrap (plan PR 17)',
 	'82-reports-financial-collector': 'audit A7, the export buttons do not wrap (plan PR 17)'
 };
@@ -111,6 +111,87 @@ test.describe.serial('realistic data at 375 px', () => {
 	test('staff screens do not scroll sideways', async () => {
 		test.setTimeout(300_000);
 		await sweep(adminPhone, staff);
+	});
+
+	test('the five demo documents fit the A4 printable width', async () => {
+		const slugs = [
+			'23-delivery-note-print',
+			'44-settlement-print',
+			'45-payment-print',
+			'77-prize-delivery-certificate',
+			'78-prize-unawarded-certificate'
+		];
+		const page = await adminPhone.newPage();
+		await page.setViewportSize({ width: 702, height: 1000 });
+		await page.emulateMedia({ media: 'print' });
+		for (const slug of slugs) {
+			const screen = staff.find((item) => item.slug === slug);
+			expect(screen, `Missing demo document ${slug}`).toBeDefined();
+			await open(page, screen!.path);
+			await page.evaluate(() => document.fonts.ready);
+			const sheets = page.locator('.doc-sheet');
+			expect(await sheets.count(), slug).toBeGreaterThan(0);
+			// A4 less the 12 mm margins on both sides, in CSS pixels at 96 dpi.
+			const printableWidth = (186 / 25.4) * 96;
+			const overflow = await sheets.evaluateAll(
+				(articles, width) =>
+					articles.map((article) => {
+						const bounds = article.getBoundingClientRect();
+						const rightmost = Math.max(
+							bounds.right,
+							...Array.from(
+								article.querySelectorAll('*'),
+								(element) => element.getBoundingClientRect().right
+							)
+						);
+						return Math.max(bounds.width - width, rightmost - bounds.right);
+					}),
+				printableWidth
+			);
+			for (const amount of overflow)
+				expect(amount, `${slug} exceeds A4 width`).toBeLessThanOrEqual(1);
+			const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true });
+			const pdfText = pdf.toString('latin1');
+			expect(pdfText.startsWith('%PDF-'), slug).toBe(true);
+			const boxes = [...pdfText.matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)];
+			expect(boxes.length, `${slug} has no PDF pages`).toBeGreaterThan(0);
+			for (const [, width, height] of boxes) {
+				expect(Number(width), `${slug} page width`).toBeCloseTo(595.28, 0);
+				expect(Number(height), `${slug} page height`).toBeCloseTo(841.89, 0);
+			}
+		}
+		await page.close();
+	});
+
+	test('the five documents are accessible in both themes and by keyboard', async ({ browser }) => {
+		const slugs = [
+			'23-delivery-note-print',
+			'44-settlement-print',
+			'45-payment-print',
+			'77-prize-delivery-certificate',
+			'78-prize-unawarded-certificate'
+		];
+		for (const colorScheme of ['light', 'dark'] as const) {
+			const context = await browser.newContext({
+				baseURL,
+				viewport: { width: 375, height: 812 },
+				colorScheme,
+				storageState: await adminPhone.storageState()
+			});
+			const page = await context.newPage();
+			for (const slug of slugs) {
+				const screen = staff.find((item) => item.slug === slug);
+				expect(screen, `Missing demo document ${slug}`).toBeDefined();
+				await open(page, screen!.path);
+				expect(
+					(await new AxeBuilder({ page }).analyze()).violations,
+					`${slug} ${colorScheme}`
+				).toEqual([]);
+				await page.keyboard.press('Tab');
+				await expect(page.getByRole('button', { name: 'Imprimir' })).toBeFocused();
+			}
+			await context.close();
+		}
 	});
 
 	test('portal screens do not scroll sideways', async () => {

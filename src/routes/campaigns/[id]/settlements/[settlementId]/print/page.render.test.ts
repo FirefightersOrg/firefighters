@@ -65,6 +65,8 @@ describe('settlement delivery note print page', () => {
 			'Caja de efectivo'
 		])
 			expect(body).toContain(text);
+		expect(body.match(/class="doc-totals"/g)).toHaveLength(2);
+		expect(body.match(/class="doc-bond">0068/g)).toHaveLength(2);
 		expect(body.split('Firma del cobrador').length - 1).toBe(2);
 		expect(body.split('Firma de la administración').length - 1).toBe(2);
 	});
