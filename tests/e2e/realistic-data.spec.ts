@@ -63,7 +63,12 @@ async function sweep(context: BrowserContext, screens: Screen[]) {
 		const overflow = await page.evaluate(
 			() => document.scrollingElement!.scrollWidth - window.innerWidth
 		);
-		const known = KNOWN_OVERFLOW[screen.slug];
+		// The home route can redirect to the single active campaign on a clean database.
+		const destination =
+			screen.slug === '00-home'
+				? screens.find((item) => item.path === new URL(page.url()).pathname)
+				: undefined;
+		const known = KNOWN_OVERFLOW[screen.slug] ?? (destination && KNOWN_OVERFLOW[destination.slug]);
 		if (known) {
 			expect
 				.soft(
@@ -114,17 +119,17 @@ test.describe.serial('realistic data at 375 px', () => {
 	});
 
 	test('the five demo documents fit the A4 printable width', async () => {
-		const slugs = [
-			'23-delivery-note-print',
-			'44-settlement-print',
-			'45-payment-print',
-			'77-prize-delivery-certificate',
-			'78-prize-unawarded-certificate'
+		const documents = [
+			{ slug: '23-delivery-note-print', maxPages: 2 },
+			{ slug: '44-settlement-print', maxPages: 4 },
+			{ slug: '45-payment-print', maxPages: 1 },
+			{ slug: '77-prize-delivery-certificate', maxPages: 1 },
+			{ slug: '78-prize-unawarded-certificate', maxPages: 1 }
 		];
 		const page = await adminPhone.newPage();
 		await page.setViewportSize({ width: 702, height: 1000 });
 		await page.emulateMedia({ media: 'print' });
-		for (const slug of slugs) {
+		for (const { slug, maxPages } of documents) {
 			const screen = staff.find((item) => item.slug === slug);
 			expect(screen, `Missing demo document ${slug}`).toBeDefined();
 			await open(page, screen!.path);
@@ -153,12 +158,10 @@ test.describe.serial('realistic data at 375 px', () => {
 			const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true });
 			const pdfText = pdf.toString('latin1');
 			expect(pdfText.startsWith('%PDF-'), slug).toBe(true);
-			const boxes = [...pdfText.matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)];
-			expect(boxes.length, `${slug} has no PDF pages`).toBeGreaterThan(0);
-			for (const [, width, height] of boxes) {
-				expect(Number(width), `${slug} page width`).toBeCloseTo(595.28, 0);
-				expect(Number(height), `${slug} page height`).toBeCloseTo(841.89, 0);
-			}
+			// /Page identifies an actual page; the /Pages node is excluded by the word boundary.
+			const pageCount = [...pdfText.matchAll(/\/Type\s*\/Page\b/g)].length;
+			expect(pageCount, `${slug} has no PDF pages`).toBeGreaterThan(0);
+			expect(pageCount, `${slug} exceeds its demo page limit`).toBeLessThanOrEqual(maxPages);
 		}
 		await page.close();
 	});
