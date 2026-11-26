@@ -138,6 +138,25 @@ The record leads with a figure and its name, then says the sale in sentences bui
 - Each one asks for its reason in a dialog whose title is the question («¿Corregir el cobrador de la venta del bono 0190?»), whose text says what figures today and what the change does, and whose button repeats the action. «Marcar como incobrable» says who can undo it: «Solo un administrador puede revertir la marca.»
 - In tables, where a sentence cannot be rebuilt, a party the role cannot read is «Sin acceso al comprador» or «Sin acceso al cobrador» (`src/lib/domain/parties.ts`), as plain text with no link. No screen says «Unknown».
 
+## The campaign home (`src/lib/domain/campaign-home.ts`)
+
+- Under the title, a campaign under way says when it ends («Hasta el 29/06/2027, 6 cuotas de $ 10.000»); a draft or a closed one says both dates («Del … al …»).
+- The day's actions are four, named by what they do: «Registrar venta», «Registrar pago», «Entregar bonos», «Cargar bonos». The search is the page's primary button («Buscar bono»); on a draft it is «Activar».
+- «Para resolver» lists what waits for someone, as a sentence with its count, a line that says why it matters, and the name of where it leads. The section is not drawn when nothing waits.
+
+| What waits                        | Sentence                                                        | Second line                                                                             | Leads to                                     |
+| --------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Payments sent by a collector      | «2 cobros enviados por Jorge Medina sin procesar»               | «$ 20.000. Su rendición no se puede cerrar hasta incluirlos o rechazarlos.»             | «Abrir la rendición»                         |
+| The same, with no open settlement | «1 cobro enviado por Marta Giménez sin procesar»                | «$ 10.000. No tiene una rendición abierta: hace falta una para incluirlo o rechazarlo.» | «Abrir una rendición» (or «Ver rendiciones») |
+| Sold bonds short of the next draw | «8 bonos vendidos pueden quedar fuera de «Sorteo de noviembre»» | «El sorteo exige la cuota 2 paga. El corte es el 05/12/2026, 23:59: faltan 9 días.»     | «Ver los bonos» (listed under the item)      |
+| The same, after the cutoff        | «9 bonos vendidos no entran en «Sorteo de octubre»»             | «El sorteo exige la cuota 1 paga. El corte fue el 25/11/2026, 23:59.»                   | «Ver los bonos»                              |
+| Open settlements                  | «3 rendiciones abiertas»                                        | «Sus pagos quedan confirmados cuando se cierran.»                                       | «Ver rendiciones»                            |
+
+- Every figure says what it is measured against on its own line: «148 de 240», «58 sin vender; 33 sin entregar», «$ 4.470.000 de $ 8.880.000 vendidos», «$ 1.010.000 de $ 4.410.000 por cobrar».
+- Every amount on the home is in whole pesos (rounded): it is a summary. The records and the reports keep the cents.
+- «Saldo a favor de cada cobrador» lists amounts without a sign. A balance the other way says «a favor de Bomberos» under the amount: never a minus sign alone.
+- A part that could not be loaded says which: «No se pudieron cargar los bonos, lo cobrado y el próximo sorteo. Volver a intentar.»
+
 ## Deliveries (`src/lib/domain/delivery-summary.ts`)
 
 - The bonds of a delivery are named as the ranges the operator has in the hand: «0211 a 0215» and «5 bonos», a lone bond «0220» and «1 bono», a pata «0100 + 0101» and «Pata de 2 números». Ranges are in number order, whatever the order they were added in, and a gap splits a range, so a missing number is seen.

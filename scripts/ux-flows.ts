@@ -268,7 +268,7 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}`);
 			await r.screen('Campaña');
 			await r.tap(
-				r.page.getByRole('link', { name: 'Entregar bonos a un cobrador' }),
+				r.page.getByRole('link', { name: 'Entregar bonos', exact: true }),
 				'Entregar bonos'
 			);
 			await r.screen('Nueva entrega, vacía');

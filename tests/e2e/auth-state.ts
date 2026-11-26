@@ -12,7 +12,13 @@ const byRole = (role: string) => {
 	return user;
 };
 
-export const ROLES = { admin: seed.admin, collector: byRole('collector') };
+export const ROLES = {
+	admin: seed.admin,
+	collector: byRole('collector'),
+	operator: byRole('operator'),
+	treasurer: byRole('treasurer'),
+	readOnly: byRole('read-only')
+};
 export type Role = keyof typeof ROLES;
 
 /** `storageState` file of each role, written by the setup project. */
