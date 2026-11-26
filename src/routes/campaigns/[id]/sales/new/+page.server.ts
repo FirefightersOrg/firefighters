@@ -91,6 +91,43 @@ const saleFormSchema = (campaignId: string, startsAt: string | null, today = arg
 		});
 };
 
+type Campaign = NonNullable<Awaited<ReturnType<typeof getCampaignById>>['data']>;
+
+/**
+ * The bonds a query finds, each with the name of the collector who has it (null when the role
+ * cannot read it). Shared by the `lookup` action and by the load, which runs it for `?bond=` so a
+ * link from a bond's record arrives with the bond already found. Null means the read failed.
+ */
+async function lookupBonds(locals: App.Locals, campaign: Campaign, query: string) {
+	// A campaign number ("0068" or "68") searches base/associated numbers; anything else is a code.
+	let number: number | null;
+	try {
+		number = parseCampaignNumber(query, campaignNumberingConfig(campaign));
+	} catch {
+		number = null;
+	}
+	const result = await findBondsForSale(
+		locals.supabase,
+		campaign.id,
+		number !== null ? { number } : { code: query.slice(0, 200) }
+	);
+	if (result.error) return { found: null, message: 'No se pudieron buscar los bonos.' };
+	const collectors = await getCollectorsByIds(
+		locals.supabase,
+		result.data.flatMap((bond) => (bond.collectorId ? [bond.collectorId] : []))
+	);
+	if (collectors.error) return { found: null, message: 'No se pudieron cargar los cobradores.' };
+	return {
+		found: result.data.map((bond) => ({
+			...bond,
+			collectorName: bond.collectorId
+				? (collectors.data?.get(bond.collectorId)?.displayName ?? null)
+				: null
+		})),
+		message: null
+	};
+}
+
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
 		error(500, { message: 'No se pudieron cargar los permisos.' });
@@ -103,8 +140,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (campaign.error || buyers.error)
 		error(500, { message: 'No se pudo cargar el registro de la venta.' });
 	if (!campaign.data) error(404, { message: 'Campaña no encontrada.' });
+	// `?bond=0057`: reached from a bond's record (or a bookmark) with the bond to sell. A failed
+	// lookup here is not fatal: the page opens with the search field, as without the parameter.
+	const bondQuery = (url.searchParams.get('bond') ?? '').trim();
+	const prefound = bondQuery ? await lookupBonds(locals, campaign.data, bondQuery) : null;
 	return {
 		campaign: campaign.data,
+		bondQuery,
+		found: prefound?.found ?? null,
 		buyers: buyers.data?.items ?? [],
 		buyerSearch: url.searchParams.get('buyer') ?? '',
 		buyerTotal: buyers.data?.total ?? 0,
@@ -138,42 +181,10 @@ export const actions: Actions = {
 				errors: {},
 				message: campaign.error ? 'No se pudieron buscar los bonos.' : 'Campaña no encontrada.'
 			});
-		// A campaign number ("0068" or "68") searches base/associated numbers; anything else is a code.
-		let number: number | null;
-		try {
-			number = parseCampaignNumber(query, campaignNumberingConfig(campaign.data));
-		} catch {
-			number = null;
-		}
-		const result = await findBondsForSale(
-			locals.supabase,
-			params.id,
-			number !== null ? { number } : { code: query.slice(0, 200) }
-		);
-		if (result.error)
-			return fail(500, { form: 'lookup', errors: {}, message: 'No se pudieron buscar los bonos.' });
-		const collectors = await getCollectorsByIds(
-			locals.supabase,
-			result.data.flatMap((bond) => (bond.collectorId ? [bond.collectorId] : []))
-		);
-		if (collectors.error)
-			return fail(500, {
-				form: 'lookup',
-				errors: {},
-				message: 'No se pudieron cargar los cobradores.'
-			});
-		return {
-			form: 'lookup',
-			success: true,
-			found: result.data.map((bond) => ({
-				...bond,
-				collectorName: bond.collectorId
-					? (collectors.data?.get(bond.collectorId)?.displayName ?? 'Unknown collector')
-					: null
-			})),
-			query,
-			errors: {}
-		};
+		const looked = await lookupBonds(locals, campaign.data, query);
+		if (!looked.found)
+			return fail(500, { form: 'lookup', errors: {}, message: looked.message ?? '' });
+		return { form: 'lookup', success: true, found: looked.found, query, errors: {} };
 	},
 	createBuyer: async ({ request, locals, url }) => {
 		if (permissionsUnavailable(locals.permissions))
