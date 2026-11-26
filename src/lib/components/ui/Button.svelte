@@ -98,8 +98,10 @@
 			<path d="M21 12a9 9 0 1 1-6.219-8.56" />
 		</svg>
 	{/if}
-	<!-- The label stays in the layout while loading so the width never changes. -->
-	<span class={cn('inline-flex items-center justify-center gap-2', loading && 'invisible')}>
+	<!-- The label stays in the layout while loading so the width never changes. It is transparent,
+	     not `invisible`: `visibility: hidden` would also take the button's name away from assistive
+	     tech (axe `button-name`), and a busy button still has to say what it is. -->
+	<span class={cn('inline-flex items-center justify-center gap-2', loading && 'opacity-0')}>
 		{#if icon}<Icon name={icon} size="sm" />{/if}
 		{@render children?.()}
 		{#if iconEnd}<Icon name={iconEnd} size="sm" />{/if}

@@ -17,7 +17,7 @@ Dispara una acción; el texto es verbo + objeto en tipo oración («Guardar camb
 
 ## Hacer / evitar
 
-- Hacer: `loading` mientras la acción corre; el ancho no cambia y el botón queda inactivo.
+- Hacer: `loading` mientras la acción corre; el ancho no cambia y el botón queda inactivo. El texto queda transparente (no oculto), así el botón conserva su nombre para lectores de pantalla.
 - Hacer: `size="lg"` + `block` para la acción principal en móvil.
 - Evitar: deshabilitar sin explicar; preferir dejarlo activo y validar con un mensaje.
 - Evitar: «Aceptar», «Sí», «OK», «Click aquí».

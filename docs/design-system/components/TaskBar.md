@@ -11,6 +11,7 @@ La barra de una tarea enfocada (cargar una rendición, armar una entrega): la ci
 ## Reglas
 
 - En teléfono y tableta queda fija al pie de la pantalla, al alcance del pulgar, y reemplaza a las pestañas de navegación mientras dura la tarea. Desde 1024 px es un bloque más de la página.
+- Las pestañas de la campaña se ocultan solas mientras haya una `TaskBar` en la página, con una regla de `src/app.css` (`body:has([data-taskbar]) [data-campaign-tabs]`, por debajo de 1024 px). La salida es el enlace «Volver a …» y el encabezado.
 - Reserva su propio espacio debajo de la página: el último control nunca queda tapado.
 - La cifra es la que importa para actuar («Entrega en efectivo $ 63.000»), no un total cualquiera.
 - Una por pantalla.
