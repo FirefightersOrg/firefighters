@@ -6,8 +6,8 @@
 	import type { PortalInstallment } from '$lib/server/repositories/portal';
 
 	/**
-	 * Installment plan of an own sale. Read-only today; SAN-147 ("Registrar cobro") passes `actions` to add a
-	 * per-installment control in a last column, without touching the rest of the table.
+	 * Installment plan of an own sale. `actions` adds a per-installment control («Cobrar») in a last
+	 * column. Below 720px each installment is a stacked block instead of a strip of columns.
 	 */
 	let {
 		installments,
@@ -17,21 +17,35 @@
 	const rows = $derived(installments.map((i) => ({ ...i })));
 	type Row = (typeof rows)[number];
 	const columns = $derived<TableColumn<Row>[]>([
-		{ key: 'number', header: 'Cuota', align: 'right' },
-		{ key: 'dueDate', header: 'Vencimiento' },
-		{ key: 'amount', header: 'Monto', align: 'right' },
-		{ key: 'pendingAmount', header: 'Pendiente de rendición', align: 'right' },
-		{ key: 'balance', header: 'Saldo', align: 'right' },
-		{ key: 'status', header: 'Estado' },
-		...(actions ? [{ key: 'actions', header: 'Acciones' }] : [])
+		{ key: 'number', header: 'Cuota', align: 'right', stack: 'primary' },
+		{ key: 'balance', header: 'Saldo', align: 'right', stack: 'trailing' },
+		{ key: 'dueDate', header: 'Vencimiento', stack: 'secondary' },
+		// On a phone the state and what is in a settlement are part of the second line.
+		{ key: 'status', header: 'Estado', stack: 'hidden' },
+		{ key: 'amount', header: 'Monto', align: 'right', stack: 'hidden' },
+		{ key: 'pendingAmount', header: 'Pendiente de rendición', align: 'right', stack: 'hidden' },
+		...(actions
+			? [{ key: 'actions', header: 'Acciones', stack: 'secondary' } satisfies TableColumn<Row>]
+			: [])
 	]);
 	const hasPending = (row: Row) => Number(row.pendingAmount) > 0;
+	/** The word before the date on a phone, where there is no column header. */
+	const dueWord = (row: Row) =>
+		row.status === 'overdue' ? 'Venció el\u00a0' : row.status === 'pending' ? 'Vence el\u00a0' : '';
 </script>
 
-<Table {columns} {rows} rowKey="id" caption="Cuotas de la venta">
+<Table {columns} {rows} rowKey="id" caption="Cuotas de la venta" stack>
 	{#snippet cell({ row, column })}
-		{#if column.key === 'dueDate'}
-			{formatDate(row.dueDate)}
+		{#if column.key === 'number'}
+			<span class="min-[720px]:hidden">Cuota&nbsp;</span>{row.number}
+		{:else if column.key === 'dueDate'}
+			<span class="min-[720px]:hidden">{dueWord(row)}</span>{formatDate(row.dueDate)}
+			<span class="ml-1 inline-flex flex-wrap items-center gap-x-2 align-middle min-[720px]:hidden">
+				<StatusBadge kind="installment" status={row.status} />
+				{#if hasPending(row)}
+					<span>{formatMoney(row.pendingAmount, { decimals: 'always' })} en rendición</span>
+				{/if}
+			</span>
 		{:else if column.key === 'amount'}
 			<span class="tabular-nums">{formatMoney(row.amount, { decimals: 'always' })}</span>
 		{:else if column.key === 'pendingAmount'}

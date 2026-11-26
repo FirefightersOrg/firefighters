@@ -97,6 +97,15 @@ The record opens with sentences built from data, not with labels and values. Eve
 - Column and filter names are the short word people say: «Estado» (not «Estado comercial»), «Pagos» (not «Estado financiero»).
 - A control that does nothing yet is not shown. No «Fase N» labels.
 
+## The collector's portal: «Por cobrar» and «Cobrar»
+
+- The portal opens on «Por cobrar»: «Vencidas» first, then «Vencen esta semana», each with how many installments and how much («11 cuotas, $ 160.000»).
+- A row is the bond, the buyer, «Cuota 2, venció el 25/09/2026» and the amount. Its actions are named by what they do: «Llamar» (a `tel:` link) and «Cobrar».
+- «Cobrar» opens a sheet titled with what is being collected («Cobrar la cuota 1 del bono 0012») and its button names the amount («Enviar cobro de $ 10.000»). The sheet says once what sending means: «El cobro queda enviado y se confirma cuando el operador lo incluye en una rendición y la cierra. Una vez enviado, no se puede editar.»
+- What was sent and not processed yet stays on the row as «Enviado $ 10.000»; what is already in a settlement, as «En rendición: $ 10.000».
+- The tab bar uses one short word per section («Por cobrar», «Bonos», «Ventas», «Compradores», «Cuenta»); the link's full name stays «Mis bonos», «Mi cuenta corriente».
+- A collector with no campaign in course reads «No hay una campaña en curso», never a list of drafts or closed campaigns.
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

@@ -216,7 +216,7 @@ describe('collector portal own scope (local Supabase)', () => {
 			expect(result.collector).toMatchObject({ id: collectorA, status: 'active' });
 			expect(result.campaigns.map((c: { id: string }) => c.id)).toContain(campaignId);
 		} catch (err) {
-			expect(err).toMatchObject({ status: 303, location: `/portal/${campaignId}/bonos` });
+			expect(err).toMatchObject({ status: 303, location: `/portal/${campaignId}/por-cobrar` });
 		}
 	});
 

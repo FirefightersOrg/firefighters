@@ -19,3 +19,6 @@
 />
 
 {@render children()}
+
+<!-- Room for the tab bar fixed at the bottom on a phone: the last control is never covered. -->
+<div class="h-16 lg:hidden" aria-hidden="true"></div>

@@ -79,6 +79,25 @@ describe('portal "Registrar cobro" action (SAN-147)', () => {
 		expect(Object.keys(call[1]).some((k) => k.includes('collector'))).toBe(false);
 	});
 
+	it('the sheet posts the amount as people write it: the database receives the same payment (UX plan PR 10)', async () => {
+		// The sheet fills the amount in as «10.000,00»; the old form sent «10000.00». Same payment.
+		const submitted = async (amount: string) => {
+			const { rpc, locals } = setup({ rpc: { portal_payment_submit: 'pay-1' } });
+			await thrown(() => actions.registrar(post(locals, { ...valid, amount, note: '' })));
+			return (submitCalls(rpc)[0] as unknown as [string, Record<string, unknown>])[1];
+		};
+		const asWritten = await submitted('10.000,00');
+		expect(asWritten).toEqual(await submitted('10000.00'));
+		expect(asWritten).toMatchObject({
+			p_amount: 10000,
+			p_applications: [{ installment_id: INSTALLMENT, amount_applied: 10000 }]
+		});
+		// The fields the action reads are the ones the sheet sends, no more and no fewer.
+		expect(Object.keys(valid).sort()).toEqual(
+			['amount', 'installmentId', 'note', 'paymentDate', 'paymentMethod', 'requestKey'].sort()
+		);
+	});
+
 	it('ignores a collector id sent in the form', async () => {
 		const { rpc, locals } = setup({ rpc: { portal_payment_submit: 'pay-1' } });
 		await thrown(() => actions.registrar(post(locals, { ...valid, collectorId: 'someone-else' })));

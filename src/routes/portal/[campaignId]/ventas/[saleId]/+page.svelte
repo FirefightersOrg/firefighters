@@ -4,16 +4,16 @@
 	import {
 		Alert,
 		Badge,
+		Button,
 		Card,
 		EmptyState,
 		PageHeader,
-		Stat,
 		StatusBadge,
 		Table
 	} from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import InstallmentsTable from '$lib/components/portal/InstallmentsTable.svelte';
-	import RegisterPaymentForm from '$lib/components/portal/RegisterPaymentForm.svelte';
+	import CollectSheet, { type CollectTarget } from '$lib/components/portal/CollectSheet.svelte';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
 	import { bondLabel, submissionStatusLabel, submissionStatusTone } from '$lib/portal/labels';
 	import { parseMoneyInput, centsToDecimalString } from '$lib/domain/money';
@@ -27,10 +27,10 @@
 	const methodLabel = { cash: 'Efectivo', transfer: 'Transferencia' } as const;
 	const paymentRows = $derived(data.payments.map((payment) => ({ ...payment })));
 	const paymentColumns: TableColumn<(typeof paymentRows)[number]>[] = [
-		{ key: 'paymentDate', header: 'Fecha' },
-		{ key: 'amount', header: 'Monto', align: 'right' },
+		{ key: 'paymentDate', header: 'Fecha', stack: 'primary' },
+		{ key: 'amount', header: 'Monto', align: 'right', stack: 'trailing' },
 		{ key: 'method', header: 'Medio' },
-		{ key: 'status', header: 'Estado' }
+		{ key: 'status', header: 'Estado', stack: 'secondary' }
 	];
 	// What can still be sent per installment: balance minus the drafts already waiting for a settlement.
 	const availableFor = (installment: (typeof data.installments)[number]) =>
@@ -41,13 +41,34 @@
 					(parseMoneyInput(data.reserved[installment.id] ?? '0') ?? 0)
 			)
 		);
+	const money = (value: string) => formatMoney(value, { decimals: 'always' });
+
+	// «Cobrar» opens the payment sheet on one installment. When the server sent a submission back
+	// with an error, the sheet opens again on that installment with what was typed.
+	type Installment = (typeof data.installments)[number];
+	const targetOf = (installment: Installment): CollectTarget => ({
+		action: '?/registrar',
+		installmentId: installment.id,
+		installmentNumber: installment.number,
+		bond,
+		buyerName: sale.buyerName,
+		available: availableFor(installment)
+	});
+	const failed = $derived(form?.form === 'registrar' && form.message ? form : null);
+	// A submission the server sent back is a fresh page: the sheet starts open on its installment.
+	// svelte-ignore state_referenced_locally
+	const sentBack = failed
+		? data.installments.find((item) => item.id === failed.installmentId)
+		: null;
+	let collecting = $state<CollectTarget | null>(sentBack ? targetOf(sentBack) : null);
+
 	const submissionRows = $derived(data.submissions.map((s) => ({ ...s })));
 	const submissionColumns: TableColumn<(typeof submissionRows)[number]>[] = [
-		{ key: 'paymentDate', header: 'Fecha' },
+		{ key: 'paymentDate', header: 'Fecha', stack: 'primary' },
+		{ key: 'amount', header: 'Monto', align: 'right', stack: 'trailing' },
+		{ key: 'status', header: 'Estado', stack: 'secondary' },
 		{ key: 'installmentNumbers', header: 'Cuotas' },
-		{ key: 'amount', header: 'Monto', align: 'right' },
-		{ key: 'method', header: 'Medio' },
-		{ key: 'status', header: 'Estado' }
+		{ key: 'method', header: 'Medio' }
 	];
 </script>
 
@@ -55,7 +76,7 @@
 
 <PageHeader
 	title={`Venta del bono ${bond}`}
-	description={`${sale.campaignName} · ${PAYMENT_MODE_LABELS[sale.paymentMode]} · ${formatDate(sale.soldAt)}`}
+	description={`${PAYMENT_MODE_LABELS[sale.paymentMode]}, vendido el ${formatDate(sale.soldAt)}.`}
 	breadcrumbs={[
 		{ label: 'Mi portal', href: resolve('/portal') },
 		{
@@ -66,17 +87,11 @@
 	]}
 />
 
-{#snippet registerAction(installment: (typeof data.installments)[number])}
+{#snippet registerAction(installment: Installment)}
 	{#if ['pending', 'overdue'].includes(installment.status) && Number(availableFor(installment)) > 0}
-		<RegisterPaymentForm
-			installmentId={installment.id}
-			installmentNumber={installment.number}
-			available={availableFor(installment)}
-			today={data.today}
-			noteMax={data.noteMax}
-			requestKey={data.requestKey}
-			result={form?.form === 'registrar' && form.installmentId === installment.id ? form : null}
-		/>
+		<Button variant="primary" onclick={() => (collecting = targetOf(installment))}
+			>Cobrar<span class="sr-only"> la cuota {installment.number}</span></Button
+		>
 	{:else}
 		—
 	{/if}
@@ -88,15 +103,14 @@
 			Quedó enviado. Se confirma cuando el operador lo incluye en una rendición y la cierra.
 		</Alert>
 	{/if}
-	<div class="grid gap-4 sm:grid-cols-4">
-		<Stat label="Total" value={formatMoney(sale.totalAmount, { decimals: 'always' })} />
-		<Stat label="Cobrado" value={formatMoney(sale.paidAmount, { decimals: 'always' })} />
-		<Stat
-			label="Pendiente de rendición"
-			value={formatMoney(sale.pendingAmount, { decimals: 'always' })}
-		/>
-		<Stat label="Saldo" value={formatMoney(sale.balance, { decimals: 'always' })} />
-	</div>
+	<!-- One line of totals: what was collected of what, and what is left. -->
+	<p class="m-0 text-[18px] leading-7 text-text" data-sale-totals>
+		Cobrado <strong class="font-semibold">{money(sale.paidAmount)}</strong> de {money(
+			sale.totalAmount
+		)}. Falta cobrar
+		<strong class="font-semibold">{money(sale.balance)}</strong
+		>{#if Number(sale.pendingAmount) > 0}; hay {money(sale.pendingAmount)} pendientes de rendición{/if}.
+	</p>
 
 	<Card title="Comprador">
 		<dl class="m-0 grid gap-2 sm:grid-cols-2">
@@ -114,7 +128,14 @@
 			</div>
 			<div>
 				<dt class="text-label text-muted">Teléfono</dt>
-				<dd class="m-0">{sale.buyerPhone ?? '—'}</dd>
+				<dd class="m-0">
+					{#if sale.buyerPhone?.trim()}
+						<a
+							class="inline-flex min-h-touch items-center rounded-sm text-primary-text underline underline-offset-2"
+							href="tel:{sale.buyerPhone.replace(/[^\d+]/g, '')}">{sale.buyerPhone}</a
+						>
+					{:else}—{/if}
+				</dd>
 			</div>
 			<div>
 				<dt class="text-label text-muted">Dirección</dt>
@@ -146,6 +167,7 @@
 				rows={submissionRows}
 				rowKey="id"
 				caption="Cobros registrados desde el portal"
+				stack
 			>
 				{#snippet cell({ row, column })}
 					{#if column.key === 'paymentDate'}
@@ -173,7 +195,13 @@
 	{/if}
 
 	<Card title="Pagos aplicados" flush>
-		<Table columns={paymentColumns} rows={paymentRows} rowKey="id" caption="Pagos de la venta">
+		<Table
+			columns={paymentColumns}
+			rows={paymentRows}
+			rowKey="id"
+			caption="Pagos de la venta"
+			stack
+		>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'paymentDate'}
 					{formatDate(row.paymentDate)}
@@ -191,3 +219,16 @@
 		</Table>
 	</Card>
 </div>
+
+{#if collecting}
+	{#key collecting.installmentId}
+		<CollectSheet
+			target={collecting}
+			today={data.today}
+			noteMax={data.noteMax}
+			requestKey={data.requestKey}
+			result={failed && collecting.installmentId === failed.installmentId ? failed : null}
+			onClose={() => (collecting = null)}
+		/>
+	{/key}
+{/if}

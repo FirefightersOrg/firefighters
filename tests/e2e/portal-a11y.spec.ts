@@ -312,21 +312,23 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		await inPage(desktop, 'light', async (page) => {
 			await open(page, `/portal/${ids.campaignId}/bonos`);
 			const nav = page.getByRole('navigation', { name: /Portal del cobrador/ });
-			for (const name of [
+			// UX plan PR 10: «Por cobrar» first, in the order of the collector's day.
+			const names = [
+				'Por cobrar',
 				'Mis bonos',
 				'Mis ventas',
 				'Mis compradores',
-				'Por cobrar',
 				'Mi cuenta corriente'
-			])
-				await expect(nav.getByRole('link', { name })).toBeVisible();
+			];
+			for (const name of names) await expect(nav.getByRole('link', { name })).toBeVisible();
+			expect(await nav.getByRole('link').allInnerTexts()).toEqual(names);
 			await expect(nav.getByRole('link', { name: 'Mis bonos' })).toHaveAttribute(
 				'aria-current',
 				'page'
 			);
 			// Tab to "Mi cuenta corriente" and open it with Enter.
 			await nav.getByRole('link', { name: 'Mis bonos' }).focus();
-			for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');
+			for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
 			await expect(nav.getByRole('link', { name: 'Mi cuenta corriente' })).toBeFocused();
 			await page.keyboard.press('Enter');
 			await expect(page).toHaveURL(new RegExp(`/portal/${ids.campaignId}/cuenta$`));
@@ -361,6 +363,66 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		await inPage(desktop, 'light', async (page) => {
 			await open(page, `/portal/${ids.campaignId}/ventas/${ids.sale}`);
 			await expect(page.getByText('Pendiente de rendición').first()).toBeVisible();
+		});
+	});
+
+	test('the landing goes straight to what there is to collect (P5)', async () => {
+		test.setTimeout(60_000);
+		await inPage(phone, 'light', async (page) => {
+			await open(page, '/portal');
+			// With one campaign in course the landing redirects (asserted in page.server.test.ts). In a
+			// full run other specs leave their own active campaigns in this database, and then the
+			// landing lists them: either way the way in is «Por cobrar», never «Mis bonos».
+			if (!/\/por-cobrar$/.test(new URL(page.url()).pathname)) {
+				await expect(page.getByRole('heading', { name: 'Elegir la campaña' })).toBeVisible();
+				await expect(page.locator('main a[href$="/bonos"]')).toHaveCount(0);
+				await page.locator(`main a[href="/portal/${ids.campaignId}/por-cobrar"]`).click();
+			}
+			await expect(page).toHaveURL(new RegExp(`/portal/${ids.campaignId}/por-cobrar$`));
+			await expect(page.getByRole('heading', { name: 'Por cobrar', level: 1 })).toBeVisible();
+			// On a phone the five sections are a bar at the bottom, with «Por cobrar» current.
+			const tabs = page.locator('[data-portal-tabs]');
+			await expect(tabs.getByRole('link')).toHaveCount(5);
+			await expect(tabs.getByRole('link', { name: 'Por cobrar' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			const bar = await tabs.boundingBox();
+			expect(bar!.y + bar!.height, 'the bar is at the bottom of the screen').toBeGreaterThan(780);
+		});
+	});
+
+	test('a collection is sent from the list: «Cobrar», the sheet, «Enviar», and it stays as «Enviado»', async () => {
+		test.setTimeout(90_000);
+		await inPage(phone, 'light', async (page) => {
+			await open(page, `/portal/${ids.campaignId}/por-cobrar`);
+			const row = page.locator('[data-due-row]').first();
+			await expect(row).toContainText('0300');
+			// The collection seeded above ($ 100) is on the row; what is left can still be sent.
+			await expect(row).toContainText(/Enviado \$\s100/);
+			await row.getByRole('button', { name: /^Cobrar/ }).tap();
+			const sheet = page.getByRole('dialog');
+			await expect(sheet).toContainText('Cobrar la cuota 1 del bono 0300');
+			await expect(sheet.getByLabel('Importe')).toHaveValue('900,00');
+			await expect(sheet.getByRole('radio', { name: 'Efectivo' })).toBeChecked();
+			await expectNoSeriousViolations(page, 'hoja Cobrar (abierta)');
+			// More than what is left cannot be sent.
+			await sheet.getByLabel('Importe').fill('950');
+			await expect(sheet.getByText(/El importe no puede superar/)).toBeVisible();
+			await expect(sheet.getByRole('button', { name: /^Enviar cobro/ })).toBeDisabled();
+			await sheet.getByLabel('Importe').fill('900,00');
+			await sheet.getByRole('button', { name: /^Enviar cobro de \$\s900$/ }).tap();
+			// Third screen: the sale, saying the collection was sent.
+			await expect(page).toHaveURL(
+				new RegExp(`/portal/${ids.campaignId}/ventas/${ids.sale}\\?enviado=1$`)
+			);
+			await expect(page.getByText('Cobro enviado')).toBeVisible();
+
+			// Back on the list the installment is still there, as sent, with nothing left to collect.
+			await open(page, `/portal/${ids.campaignId}/por-cobrar`);
+			const sent = page.locator('[data-due-row]').first();
+			await expect(sent).toContainText(/Enviado \$\s1\.000/);
+			await expect(sent.getByRole('button', { name: /^Cobrar/ })).toHaveCount(0);
 		});
 	});
 });

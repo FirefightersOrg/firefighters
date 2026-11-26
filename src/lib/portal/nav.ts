@@ -4,16 +4,37 @@ export type PortalSection = 'bonos' | 'ventas' | 'compradores' | 'por-cobrar' | 
 export interface PortalNavItem {
 	section: PortalSection;
 	label: string;
+	/** The short word under the icon in the phone's tab bar. */
+	tabLabel: string;
 	/** Permission required to see the entry (the pages check it again on the server). */
 	permission: string;
 }
 
+/**
+ * In the order of the collector's day: what there is to collect first (decision P5), then the bonds
+ * in hand, the sales, the buyers and the account.
+ */
 export const PORTAL_NAV: readonly PortalNavItem[] = [
-	{ section: 'bonos', label: 'Mis bonos', permission: 'bond.view_own' },
-	{ section: 'ventas', label: 'Mis ventas', permission: 'sale.view_own' },
-	{ section: 'compradores', label: 'Mis compradores', permission: 'sale.view_own' },
-	{ section: 'por-cobrar', label: 'Por cobrar', permission: 'sale.view_own' },
-	{ section: 'cuenta', label: 'Mi cuenta corriente', permission: 'collector.ledger.view_own' }
+	{
+		section: 'por-cobrar',
+		label: 'Por cobrar',
+		tabLabel: 'Por cobrar',
+		permission: 'sale.view_own'
+	},
+	{ section: 'bonos', label: 'Mis bonos', tabLabel: 'Bonos', permission: 'bond.view_own' },
+	{ section: 'ventas', label: 'Mis ventas', tabLabel: 'Ventas', permission: 'sale.view_own' },
+	{
+		section: 'compradores',
+		label: 'Mis compradores',
+		tabLabel: 'Compradores',
+		permission: 'sale.view_own'
+	},
+	{
+		section: 'cuenta',
+		label: 'Mi cuenta corriente',
+		tabLabel: 'Cuenta',
+		permission: 'collector.ledger.view_own'
+	}
 ];
 
 /** Entries the holder of `permissions` may see; `current` marks the section of `pathname`. */
