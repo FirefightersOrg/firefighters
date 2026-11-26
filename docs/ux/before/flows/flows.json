@@ -1,6 +1,7 @@
 [
 	{
 		"flow": "search-bond",
+		"failed": false,
 		"screens": 3,
 		"taps": 2,
 		"fields": 1,
@@ -36,6 +37,7 @@
 	},
 	{
 		"flow": "register-sale",
+		"failed": false,
 		"screens": 5,
 		"taps": 3,
 		"fields": 1,
@@ -95,6 +97,7 @@
 	},
 	{
 		"flow": "register-sale-buyer-search",
+		"failed": false,
 		"screens": 2,
 		"taps": 2,
 		"fields": 2,
@@ -136,6 +139,7 @@
 	},
 	{
 		"flow": "settlement",
+		"failed": false,
 		"screens": 8,
 		"taps": 7,
 		"fields": 0,
@@ -227,6 +231,7 @@
 	},
 	{
 		"flow": "deliver-bonds",
+		"failed": false,
 		"screens": 5,
 		"taps": 4,
 		"fields": 2,
@@ -286,6 +291,7 @@
 	},
 	{
 		"flow": "draw",
+		"failed": false,
 		"screens": 10,
 		"taps": 10,
 		"fields": 7,
@@ -413,6 +419,7 @@
 	},
 	{
 		"flow": "portal-collect",
+		"failed": false,
 		"screens": 7,
 		"taps": 6,
 		"fields": 0,

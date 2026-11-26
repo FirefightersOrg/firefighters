@@ -13,7 +13,7 @@ Working documents of the frontend and UX/UI redesign (coordinated in #50).
 
 ## Reproducing the evidence
 
-Everything runs against the local Supabase stack and never against a remote project (the scripts refuse unless `APP_ENV=local` and the URL is localhost).
+Everything runs against the local stack and never against a remote one. The scripts refuse to run unless `APP_ENV=local` and the Supabase URL is on localhost, and the two browser scripts also refuse a `UX_BASE_URL` that is not on localhost, because they sign in with the seed credentials (`scripts/ux-local.ts`).
 
 ```sh
 pnpm db:reset
@@ -42,7 +42,7 @@ before/report.json
 
 ### `scripts/ux-flows.ts`
 
-Runs the critical flows on a 375 px screen and counts what each costs: screens the person has to read, taps, fields typed and choices made. It saves a screenshot per screen and `flows.json`. It writes data (a sale, payments, a closed settlement, a delivery, a draw, a collector payment), so reset and reseed before running it again.
+Runs the critical flows on a 375 px screen and counts what each costs: screens the person has to read, taps, fields typed and choices made. It saves a screenshot per screen and `flows.json`. It writes data (a sale, payments, a closed settlement, a delivery, a draw, a collector payment), so reset and reseed before running it again. If a flow fails, its entry in `flows.json` is marked `failed` and the script exits with status 1, so an incomplete run cannot pass for a good one.
 
 ```txt
 before/flows/<flow>/<nn>-<screen>.jpg

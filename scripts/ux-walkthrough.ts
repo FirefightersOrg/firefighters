@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { resolveSeedConfig } from './seed-admin';
+import { assertOnBaseUrl, resolveLocalBaseUrl } from './ux-local';
 
 /**
  * Walks every screen of the app with each role, at 375 px and 1280 px, in light and dark, and saves
@@ -19,12 +20,13 @@ import { resolveSeedConfig } from './seed-admin';
  *
  *   APP_ENV=local pnpm exec tsx scripts/ux-walkthrough.ts docs/ux/before
  *
- * Options (environment): UX_BASE_URL (default http://127.0.0.1:5173), UX_ROLES (comma list),
+ * Options (environment): UX_BASE_URL (default http://127.0.0.1:5173; only localhost is accepted,
+ * because the script signs in with the seed credentials), UX_ROLES (comma list),
  * UX_ONLY (comma list of substrings of the screen slug), UX_QUALITY (JPEG quality, default 60).
  */
 
 const CAMPAIGN_NAME = 'Bono Contribución 2026';
-const BASE_URL = process.env.UX_BASE_URL ?? 'http://127.0.0.1:5173';
+const BASE_URL = resolveLocalBaseUrl(process.env.UX_BASE_URL);
 const QUALITY = Number(process.env.UX_QUALITY ?? 60);
 const VIEWPORTS = [
 	{ name: '375', width: 375, height: 812, touch: true },
@@ -250,6 +252,7 @@ async function login(browser: Browser, email: string, password: string) {
 	const page = await context.newPage();
 	await page.goto(`${BASE_URL}/login`);
 	await page.waitForLoadState('networkidle');
+	assertOnBaseUrl(page.url(), BASE_URL);
 	await page.getByLabel('Correo electrónico').fill(email);
 	await page.getByLabel('Contraseña').fill(password);
 	await page.getByRole('button', { name: /ingresar|iniciar sesión/i }).click();

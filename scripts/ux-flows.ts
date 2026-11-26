@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { resolveSeedConfig } from './seed-admin';
+import { assertOnBaseUrl, resolveLocalBaseUrl, runEach } from './ux-local';
 
 /**
  * Runs the critical flows on a phone-sized screen (375 px) the way a person would, counting what
@@ -15,11 +16,14 @@ import { resolveSeedConfig } from './seed-admin';
  *
  *   APP_ENV=local pnpm exec tsx scripts/ux-flows.ts docs/ux/before/flows
  *
- * Options (environment): UX_BASE_URL (default http://127.0.0.1:5173), UX_FLOWS (comma list).
+ * Options (environment): UX_BASE_URL (default http://127.0.0.1:5173; only localhost is accepted,
+ * because the script signs in with the seed credentials and writes data), UX_FLOWS (comma list).
+ *
+ * If a flow fails, the report still has what it recorded (marked `failed`), and the script exits 1.
  */
 
 const CAMPAIGN_NAME = 'Bono Contribución 2026';
-const BASE_URL = process.env.UX_BASE_URL ?? 'http://127.0.0.1:5173';
+const BASE_URL = resolveLocalBaseUrl(process.env.UX_BASE_URL);
 
 interface Step {
 	kind: 'screen' | 'tap' | 'type' | 'choose';
@@ -30,6 +34,7 @@ interface Step {
 class Recorder {
 	steps: Step[] = [];
 	notes: string[] = [];
+	failed = false;
 	private shots = 0;
 	constructor(
 		readonly name: string,
@@ -92,6 +97,7 @@ class Recorder {
 		const count = (kind: Step['kind']) => this.steps.filter((step) => step.kind === kind).length;
 		return {
 			flow: this.name,
+			failed: this.failed,
 			screens: count('screen'),
 			taps: count('tap'),
 			fields: count('type'),
@@ -119,6 +125,7 @@ async function phone(browser: Browser, email: string, password: string) {
 	const page = await context.newPage();
 	await page.goto(`${BASE_URL}/login`);
 	await page.waitForLoadState('networkidle');
+	assertOnBaseUrl(page.url(), BASE_URL);
 	await page.getByLabel('Correo electrónico').fill(email);
 	await page.getByLabel('Contraseña').fill(password);
 	await page.getByRole('button', { name: /ingresar|iniciar sesión/i }).click();
@@ -368,33 +375,41 @@ async function main() {
 	const wanted = (process.env.UX_FLOWS ?? Object.keys(flows).join(',')).split(',');
 	const collector = config.fixtures.find((user) => user.roleNames.includes('collector'))!;
 	const browser = await chromium.launch();
-	const results = [];
-	for (const name of wanted) {
+	const unknown = wanted.filter((name) => !flows[name]);
+	if (unknown.length) throw new Error(`Unknown flow: ${unknown.join(', ')}`);
+	const { results, failed, exitCode } = await runEach(wanted, async (name) => {
 		const flow = flows[name];
-		if (!flow) throw new Error(`Unknown flow ${name}`);
 		const user = flow.role === 'admin' ? config.admin : collector;
 		const page = await phone(browser, user.email, user.password);
 		const recorder = new Recorder(name, page, join(outDir, name));
+		let error: string | null = null;
 		try {
 			await flow.run(recorder, campaign.data.id, eligible.data[0].number_value as number);
 		} catch (err) {
-			recorder.note(`FAILED: ${(err as Error).message.split('\n')[0]}`);
+			error = (err as Error).message.split('\n')[0];
+			recorder.failed = true;
+			recorder.note(`FAILED: ${error}`);
 			await recorder.screen('Fallo').catch(() => {});
-			console.error(`${name} failed:`, (err as Error).message.split('\n')[0]);
+			console.error(`${name} failed:`, error);
 		}
 		const summary = recorder.summary();
-		results.push(summary);
 		console.log(
 			`${name}: ${summary.screens} screens, ${summary.taps} taps, ${summary.fields} fields, ${summary.choices} choices`
 		);
 		await page.context().close();
-	}
+		return { result: summary, error };
+	});
 	await browser.close();
 	writeFileSync(join(outDir, 'flows.json'), `${JSON.stringify(results, null, '\t')}\n`);
+	if (exitCode !== 0)
+		console.error(
+			`${failed.length} flow(s) failed: ${failed.join(', ')}. Their counts in flows.json are incomplete.`
+		);
+	return exitCode;
 }
 
 main()
-	.then(() => process.exit(0))
+	.then((exitCode) => process.exit(exitCode))
 	.catch((err) => {
 		console.error('ux-flows failed:', err);
 		process.exit(1);
