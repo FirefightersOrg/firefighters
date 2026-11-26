@@ -216,6 +216,8 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 
 ### PR 12. Register a sale, and the sale record (A6, A8, A9)
 
+Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale (`sales/new`); 12b, the sale record and the «Sin acceso» fallbacks.
+
 - **Scope.**
   - `sales/new/+page.svelte`: the found bond is kept in page state; the buyer is found by typing (the existing `?buyer=` search, fetched without leaving the page, matches listed under the field); answered steps collapse to a line; a single match is selected; the payment mode is a `SegmentedControl`; `?bond=` arrives with the bond searched; the button names the bond and the buyer.
   - `sales/[saleId]/+page.svelte`: the plan first, with what is owed as the lead figure; «Marcar como incobrable» and the corrections under «Corregir o anular», each in a dialog.
@@ -223,7 +225,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 - **Screens.** New sale, sale record.
 - **Acceptance.**
   - Searching for a buyer after choosing the bond keeps the bond (the probe flow in `ux-flows.ts` reports it kept).
-  - The sale flow is 6 actions and 4 screens or fewer (7 and 5 today).
+  - The sale flow is 6 actions or fewer (7 today). Measured: 6 actions and 5 screens. The screens stay at 5, not the 4 first written here: the bond found, with who has it, is still a state the person reads before choosing the buyer, and it is counted as before.
   - Without JavaScript the form still registers a sale (the search falls back to today's GET).
   - No screen shows «Unknown buyer» or «Unknown collector» for any role (a crawl in the E2E sweep asserts it).
   - The sale's actions and their server tests are unchanged.

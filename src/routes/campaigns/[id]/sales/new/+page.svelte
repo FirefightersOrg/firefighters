@@ -408,12 +408,15 @@
 			{#if saleError('bondId')}
 				<div id="bondId-error"><Alert tone="danger">{saleError('bondId')}</Alert></div>
 			{/if}
-			<SegmentedControl
-				legend="Modalidad"
-				name="paymentMode"
-				options={modeOptions}
-				bind:value={mode}
-			/>
+			<!-- In its own block: the control's fieldset resets its margins, so the form's spacing would skip it. -->
+			<div>
+				<SegmentedControl
+					legend="Modalidad"
+					name="paymentMode"
+					options={modeOptions}
+					bind:value={mode}
+				/>
+			</div>
 			<div class="grid gap-4 sm:grid-cols-2">
 				<Field
 					label="Fecha de venta"
@@ -455,8 +458,14 @@
 				</div>
 			{/if}
 			{#if form?.form === 'sale' && form.message}<Alert tone="danger">{form.message}</Alert>{/if}
-			<Button type="submit" variant="primary" size="lg" block data-confirm-sale
-				>{confirmLabel}</Button
+			<!-- The label names the bond and the buyer, so it may need two lines on a phone. -->
+			<Button
+				type="submit"
+				variant="primary"
+				size="lg"
+				block
+				class="h-auto! min-h-control-lg py-2.5 text-center whitespace-normal!"
+				data-confirm-sale>{confirmLabel}</Button
 			>
 		</form>
 	</section>

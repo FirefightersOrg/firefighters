@@ -106,6 +106,14 @@ The record opens with sentences built from data, not with labels and values. Eve
 - The tab bar uses one short word per section («Por cobrar», «Bonos», «Ventas», «Compradores», «Cuenta»); the link's full name stays «Mis bonos», «Mi cuenta corriente».
 - A collector with no campaign in course reads «No hay una campaña en curso», never a list of drafts or closed campaigns.
 
+## Registering a sale
+
+- Three steps named by what they ask: «Bono», «Comprador», «Pago». No numbers in the headings.
+- An answered step is one line that says the answer («0035 Lo tiene Jorge Medina», «Panadería La Espiga») with the way back named by its object: «Cambiar el bono», «Cambiar el comprador».
+- A bond that cannot be sold says why in a sentence: «El bono 0036 no se puede vender: Ya está vendido.»
+- The button says what it is about to register: «Confirmar venta del bono 0035 a Panadería La Espiga». Until there is a bond it is «Confirmar venta».
+- A collector the role cannot read is not named («Entregado a un cobrador»): never «Unknown collector».
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.
