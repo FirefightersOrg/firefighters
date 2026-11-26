@@ -384,7 +384,8 @@ describe('portal sales and buyers pages', () => {
 			// The fields and default values the action has always received.
 			expect(html).toContain('name="installmentId" value="i1"');
 			expect(html).toContain('name="requestKey" value="req-key"');
-			expect(html).toMatch(/name="amount"[^>]*value="70.00"|value="70.00"[^>]*name="amount"/);
+			// The amount comes filled in as people write it: the action parses both spellings alike.
+			expect(html).toMatch(/name="amount"[^>]*value="70,00"|value="70,00"[^>]*name="amount"/);
 			expect(html).toMatch(
 				/name="paymentDate"[^>]*value="2026-11-25"|value="2026-11-25"[^>]*name="paymentDate"/
 			);

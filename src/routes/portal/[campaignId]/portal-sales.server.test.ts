@@ -150,3 +150,90 @@ describe('portal sales and buyers loads', () => {
 		});
 	});
 });
+
+describe('«Por cobrar»: what the collect sheet needs (UX plan PR 10)', () => {
+	const due = (installment: string, sale: string) => ({
+		sale_id: sale,
+		campaign_name: 'C',
+		number_digits: 4,
+		bond_numbers: [68],
+		buyer_id: BUYER,
+		buyer_name: 'Ada',
+		buyer_phone: null,
+		installment_id: installment,
+		installment_number: 1,
+		due_date: '2026-11-10',
+		amount: 100,
+		status: 'overdue',
+		pending_amount: 0,
+		balance: 100,
+		total_count: 3
+	});
+	const OTHER_SALE = '11111111-1111-4111-8111-222222222222';
+	const rows = {
+		...collectorRow,
+		portal_my_campaign_due_installments: [due('i1', SALE), due('i2', SALE), due('i3', OTHER_SALE)],
+		portal_my_sale_reserved: [{ installment_id: 'i1', submitted_amount: 30 }]
+	};
+
+	it('adds what was already sent per installment, today, the note limit and a request key', async () => {
+		const { rpc, locals } = setup({
+			permissions: ['sale.view_own', 'payment.create_own'],
+			rpc: rows
+		});
+		const data = await dueLoad(ev(locals, `/portal/${CAMP}/por-cobrar`));
+		expect(data.due).toHaveLength(3);
+		expect(data.reserved).toEqual({ i1: '30.00' });
+		expect(data.canRegister).toBe(true);
+		expect(data.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+		expect(data.noteMax).toBeGreaterThan(0);
+		expect(data.requestKey).toMatch(/^[0-9a-f-]{36}$/);
+		// One read of the reserved amounts per sale of the page, not per installment.
+		const reads = rpc.mock.calls.filter(
+			(call) => (call as unknown[])[0] === 'portal_my_sale_reserved'
+		) as unknown as [string, { p_sale_id: string }][];
+		expect(reads.map((call) => call[1].p_sale_id).sort()).toEqual([SALE, OTHER_SALE].sort());
+	});
+
+	it('is read-only without payment.create_own or for an inactive collector', async () => {
+		const noPermission = setup({ permissions: ['sale.view_own'], rpc: rows });
+		expect((await dueLoad(ev(noPermission.locals, `/portal/${CAMP}/por-cobrar`))).canRegister).toBe(
+			false
+		);
+		const inactive = setup({
+			permissions: ['sale.view_own', 'payment.create_own'],
+			rpc: {
+				...rows,
+				portal_my_collector: [{ id: 'c1', display_name: 'Ana', status: 'inactive' }]
+			}
+		});
+		expect((await dueLoad(ev(inactive.locals, `/portal/${CAMP}/por-cobrar`))).canRegister).toBe(
+			false
+		);
+	});
+
+	it('fails with a 500 when the sent amounts cannot be read, instead of offering a wrong amount', async () => {
+		const { locals } = setup({
+			permissions: ['sale.view_own', 'payment.create_own'],
+			rpc: { ...rows, portal_my_sale_reserved: new Error('boom') }
+		});
+		expect(await failure(() => dueLoad(ev(locals, `/portal/${CAMP}/por-cobrar`)))).toMatchObject({
+			status: 500
+		});
+	});
+
+	it('reads nothing more for an empty list or without a linked collector', async () => {
+		const empty = setup({ rpc: { ...collectorRow, portal_my_campaign_due_installments: [] } });
+		const data = await dueLoad(ev(empty.locals, `/portal/${CAMP}/por-cobrar`));
+		expect(data).toMatchObject({ due: [], reserved: {} });
+		expect(
+			empty.rpc.mock.calls.some((call) => (call as unknown[])[0] === 'portal_my_sale_reserved')
+		).toBe(false);
+		const unlinked = setup({ rpc: { portal_my_collector: [] } });
+		expect(await dueLoad(ev(unlinked.locals, `/portal/${CAMP}/por-cobrar`))).toMatchObject({
+			collector: null,
+			due: [],
+			canRegister: false
+		});
+	});
+});

@@ -87,8 +87,8 @@
 					{@const sent = sentCents(item)}
 					{@const available = availableCents(item)}
 					{@const phone = item.buyerPhone?.trim()}
-					<li class="border-b border-border py-3" data-due-row>
-						<div class="flex items-start gap-3">
+					<li class="border-b border-border py-3 sm:flex sm:items-center sm:gap-4" data-due-row>
+						<div class="flex min-w-0 items-start gap-3 sm:flex-1">
 							<BondNumber
 								number={bondLabel(item.bondNumbers, item.numberDigits)}
 								size="md"
@@ -119,7 +119,7 @@
 							</div>
 							<Money value={item.balance} class="shrink-0 pt-2.5 text-body font-medium" />
 						</div>
-						<div class="mt-2 flex flex-wrap items-center gap-2">
+						<div class="mt-2 flex flex-wrap items-center gap-2 sm:mt-0 sm:shrink-0">
 							{#if sent > 0}
 								<Badge tone="info">Enviado {pesos(sent)}</Badge>
 							{/if}

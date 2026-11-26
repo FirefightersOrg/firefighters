@@ -22,7 +22,7 @@
 
 <script lang="ts">
 	import { Alert, Dialog, Field, SegmentedControl, Textarea, TextInput } from '$lib/components/ui';
-	import { centsToDecimalString, parseMoneyInput } from '$lib/domain/money';
+	import { centsToDecimalString, formatMoneyInput, parseMoneyInput } from '$lib/domain/money';
 	import { PAYMENT_METHOD_LABELS } from '$lib/domain/payments';
 	import { formatMoney } from '$lib/format';
 
@@ -61,7 +61,7 @@
 	];
 	// The initial values are intentional: what the server sent back, or the installment's defaults.
 	// svelte-ignore state_referenced_locally
-	let amount = $state(result?.values?.amount ?? target.available);
+	let amount = $state(result?.values?.amount ?? formatMoneyInput(target.available));
 	// svelte-ignore state_referenced_locally
 	let method = $state(result?.values?.paymentMethod ?? 'cash');
 	// svelte-ignore state_referenced_locally
