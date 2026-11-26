@@ -80,7 +80,7 @@
 >
 <PageHeader
 	title="Reportes financieros y de sorteos"
-	description="Pagos confirmados, rendiciones, cuentas y padrones congelados. Fechas de Buenos Aires."
+	description="Pagos, rendiciones, cuentas y padrones. Sin pagos en borrador ni anulados. Fechas de Buenos Aires."
 	breadcrumbs={[
 		{ label: 'Reportes operativos', href: resolve('/campaigns/[id]/reports', { id: campaign.id }) },
 		{ label: 'Reportes financieros' }

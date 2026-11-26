@@ -102,6 +102,8 @@ describe('financial report views', () => {
 			const body = page(view);
 			expect(body.match(/id="report-title"/g)).toHaveLength(1);
 			expect(body).toContain('data-stack="true"');
+			expect(body).toContain('Sin pagos en borrador ni anulados.');
+			expect(body).not.toContain('Pagos confirmados');
 			expect(body).toContain(`view=${view}`);
 			expect(body).not.toContain('<script>');
 		}
