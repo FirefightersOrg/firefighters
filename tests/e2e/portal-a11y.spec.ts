@@ -366,6 +366,27 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		});
 	});
 
+	test('no table scrolls sideways on a phone: every list is stacked rows (UX plan PR 11)', async () => {
+		test.setTimeout(120_000);
+		await inPage(phone, 'light', async (page) => {
+			for (const route of ROUTES) {
+				await open(page, route.path(ids));
+				const scrolling = await page.evaluate(() =>
+					[...document.querySelectorAll<HTMLElement>('main *')]
+						.filter(
+							(el) =>
+								el.clientWidth > 1 &&
+								// A region that scrolls: clipped text (ellipsis, visually hidden labels) is not one.
+								['auto', 'scroll'].includes(getComputedStyle(el).overflowX) &&
+								el.scrollWidth > el.clientWidth + 1
+						)
+						.map((el) => `${el.tagName.toLowerCase()}.${el.className.toString().slice(0, 40)}`)
+				);
+				expect(scrolling, `${route.name}: something scrolls sideways at 375px`).toEqual([]);
+			}
+		});
+	});
+
 	test('the landing goes straight to what there is to collect (P5)', async () => {
 		test.setTimeout(60_000);
 		await inPage(phone, 'light', async (page) => {

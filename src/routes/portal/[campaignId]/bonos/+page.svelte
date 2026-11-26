@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import {
+		BondNumber,
 		Button,
 		EmptyState,
 		Field,
@@ -48,13 +49,12 @@
 
 	type Row = (typeof data.bonds)[number] & Record<string, unknown>;
 	const columns: TableColumn<Row>[] = [
-		{ key: 'base', header: 'Número base', mono: true },
-		{ key: 'associated', header: 'Número asociado', mono: true },
-		{ key: 'type', header: 'Tipo' },
-		{ key: 'status', header: 'Estado comercial' },
-		{ key: 'financial', header: 'Estado financiero' },
-		{ key: 'value', header: 'Valor', align: 'right' },
-		{ key: 'detail', header: 'Detalle' }
+		{ key: 'base', header: 'Número', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'financial', header: 'Pagos', stack: 'secondary' },
+		{ key: 'associated', header: 'Número asociado', mono: true, stack: 'hidden' },
+		{ key: 'type', header: 'Tipo', stack: 'hidden' },
+		{ key: 'value', header: 'Valor', align: 'right', stack: 'hidden' }
 	];
 	const join = (values: string[]) => (values.length ? values.join(', ') : '—');
 </script>
@@ -93,10 +93,11 @@
 			{pagination.total === 1 ? 'bono' : 'bonos'}
 		</p>
 
-		<Table {columns} rows={data.bonds as Row[]} caption="Bonos asignados">
+		<Table {columns} rows={data.bonds as Row[]} caption="Bonos asignados" stack>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'base'}
-					{join(row.baseNumbers)}
+					<!-- The number is the way into the bond: no separate «Ver detalle» column. -->
+					<BondNumber number={join(row.baseNumbers)} size="sm" href={detailHref(row.id)} />
 				{:else if column.key === 'associated'}
 					{join(row.associatedNumbers)}
 				{:else if column.key === 'type'}
@@ -107,13 +108,6 @@
 					<StatusBadge kind="bondFinancial" status={row.financialStatus} />
 				{:else if column.key === 'value'}
 					{formatMoney(row.totalValue)}
-				{:else}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved above -->
-					<a
-						href={detailHref(row.id)}
-						class="rounded-sm text-primary underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-						>Ver detalle</a
-					>
 				{/if}
 			{/snippet}
 			{#snippet empty()}
@@ -132,7 +126,7 @@
 		{#if pagination.pageCount > 1 || pagination.page > 1}
 			<nav aria-label="Paginación" class="flex items-center justify-between gap-3 text-body-sm">
 				{#if pagination.page > 1}
-					<Button href={pageLink(pagination.page - 1)} rel="prev">← Anterior</Button>
+					<Button href={pageLink(pagination.page - 1)} rel="prev">Anterior</Button>
 				{:else}
 					<span></span>
 				{/if}
@@ -140,7 +134,7 @@
 					>Página {formatNumber(pagination.page)} de {formatNumber(pagination.pageCount)}</span
 				>
 				{#if pagination.page < pagination.pageCount}
-					<Button href={pageLink(pagination.page + 1)} rel="next">Siguiente →</Button>
+					<Button href={pageLink(pagination.page + 1)} rel="next">Siguiente</Button>
 				{:else}
 					<span></span>
 				{/if}

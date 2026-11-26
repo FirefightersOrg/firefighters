@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
-	import { EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
+	import { BondNumber, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import PortalPagination from '$lib/components/portal/PortalPagination.svelte';
 	import { bondLabel } from '$lib/portal/labels';
@@ -13,13 +13,12 @@
 	const rows = $derived(data.sales.map((sale) => ({ ...sale, id: sale.saleId })));
 	type Row = (typeof rows)[number];
 	const columns: TableColumn<Row>[] = [
-		{ key: 'bond', header: 'Bono', mono: true },
-		{ key: 'campaignName', header: 'Campaña' },
-		{ key: 'buyerName', header: 'Comprador' },
-		{ key: 'saleStatus', header: 'Venta' },
-		{ key: 'financialStatus', header: 'Estado financiero' },
-		{ key: 'balance', header: 'Saldo', align: 'right' },
-		{ key: 'nextDueDate', header: 'Próximo vencimiento' }
+		{ key: 'bond', header: 'Bono', stack: 'primary' },
+		{ key: 'balance', header: 'Saldo', align: 'right', stack: 'trailing' },
+		{ key: 'buyerName', header: 'Comprador', stack: 'secondary' },
+		{ key: 'financialStatus', header: 'Pagos', stack: 'secondary' },
+		{ key: 'nextDueDate', header: 'Próximo vencimiento' },
+		{ key: 'saleStatus', header: 'Venta', stack: 'hidden' }
 	];
 </script>
 
@@ -32,16 +31,17 @@
 />
 
 <div class="space-y-6">
-	<Table {columns} {rows} caption="Mis ventas">
+	<Table {columns} {rows} caption="Mis ventas" stack>
 		{#snippet cell({ row, column })}
 			{#if column.key === 'bond'}
-				<a
-					class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+				<BondNumber
+					number={bondLabel(row.bondNumbers, row.numberDigits)}
+					size="sm"
 					href={resolve('/portal/[campaignId]/ventas/[saleId]', {
 						campaignId: data.campaign.id,
 						saleId: row.saleId
-					})}>{bondLabel(row.bondNumbers, row.numberDigits)}</a
-				>
+					})}
+				/>
 			{:else if column.key === 'buyerName'}
 				<a
 					class="rounded-sm text-primary-text underline-offset-2 hover:underline"

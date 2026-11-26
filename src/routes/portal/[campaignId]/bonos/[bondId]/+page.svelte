@@ -37,18 +37,18 @@
 	type AssignmentRow = (typeof data.assignments)[number] & Record<string, unknown>;
 	type NoteRow = (typeof data.notes)[number] & Record<string, unknown>;
 	const assignmentColumns: TableColumn<AssignmentRow>[] = [
-		{ key: 'type', header: 'Movimiento' },
-		{ key: 'status', header: 'Estado' },
-		{ key: 'assignedAt', header: 'Fecha' },
+		{ key: 'type', header: 'Movimiento', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'assignedAt', header: 'Fecha', stack: 'secondary' },
 		{ key: 'returnedAt', header: 'Devuelto' },
 		{ key: 'note', header: 'Remito' }
 	];
 	const noteColumns: TableColumn<NoteRow>[] = [
-		{ key: 'note', header: 'Remito' },
+		{ key: 'note', header: 'Remito', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'issuedAt', header: 'Emitido', stack: 'secondary' },
 		{ key: 'reason', header: 'Motivo' },
-		{ key: 'status', header: 'Estado' },
-		{ key: 'issuedAt', header: 'Emitido' },
-		{ key: 'print', header: 'Versión imprimible' }
+		{ key: 'print', header: 'Versión imprimible', stack: 'secondary' }
 	];
 </script>
 
@@ -101,6 +101,7 @@
 			columns={assignmentColumns}
 			rows={data.assignments as AssignmentRow[]}
 			caption="Historial de asignaciones"
+			stack
 		>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'type'}
@@ -122,7 +123,7 @@
 	</Card>
 
 	<Card title="Remitos recibidos">
-		<Table columns={noteColumns} rows={data.notes as NoteRow[]} caption="Remitos recibidos">
+		<Table columns={noteColumns} rows={data.notes as NoteRow[]} caption="Remitos recibidos" stack>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'note'}
 					{deliveryNoteLabel(row.noteNumber)}

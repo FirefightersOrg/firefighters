@@ -12,11 +12,11 @@
 	const rows = $derived(data.buyers.map((buyer) => ({ ...buyer })));
 	type Row = (typeof rows)[number];
 	const columns: TableColumn<Row>[] = [
-		{ key: 'displayName', header: 'Comprador' },
-		{ key: 'phone', header: 'Teléfono' },
-		{ key: 'address', header: 'Dirección' },
-		{ key: 'saleCount', header: 'Ventas', align: 'right' },
-		{ key: 'balance', header: 'Saldo', align: 'right' }
+		{ key: 'displayName', header: 'Comprador', stack: 'primary' },
+		{ key: 'balance', header: 'Saldo', align: 'right', stack: 'trailing' },
+		{ key: 'phone', header: 'Teléfono', stack: 'secondary' },
+		{ key: 'address', header: 'Dirección', stack: 'secondary' },
+		{ key: 'saleCount', header: 'Ventas', align: 'right', stack: 'hidden' }
 	];
 </script>
 
@@ -29,7 +29,7 @@
 />
 
 <div class="space-y-6">
-	<Table {columns} {rows} caption="Mis compradores">
+	<Table {columns} {rows} caption="Mis compradores" stack>
 		{#snippet cell({ row, column })}
 			{#if column.key === 'displayName'}
 				<a
@@ -41,6 +41,13 @@
 				>
 			{:else if column.key === 'balance'}
 				<span class="tabular-nums">{formatMoney(row.balance, { decimals: 'always' })}</span>
+			{:else if column.key === 'phone'}
+				{#if row.phone?.trim()}
+					<a
+						class="inline-flex min-h-touch items-center rounded-sm text-primary-text underline underline-offset-2"
+						href="tel:{row.phone.replace(/[^\d+]/g, '')}">{row.phone}</a
+					>
+				{:else}—{/if}
 			{:else if column.key === 'saleCount'}
 				<span class="tabular-nums">{row.saleCount}</span>
 			{:else}
