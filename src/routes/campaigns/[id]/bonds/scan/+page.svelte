@@ -147,7 +147,7 @@
 					{#each data.openSessions as open (open.id)}
 						<li class="flex flex-wrap items-center justify-between gap-2 py-2">
 							<span>
-								Iniciado el {formatDateTime(open.createdAt)}{open.notes ? ` · ${open.notes}` : ''}
+								Iniciado el {formatDateTime(open.createdAt)}{open.notes ? `. ${open.notes}` : ''}
 							</span>
 							<span class="flex gap-2">
 								<Button href={scanHref(open.id)}>Continuar</Button>
