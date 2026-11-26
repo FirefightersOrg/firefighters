@@ -1401,23 +1401,26 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			expect(renderList(filtered)).toContain(`data-bond-id="${a.m4}"`);
 		});
 
-		it('the record renders its 14 sections (SAN-55 adds Assignment history); audit for audit.view, a note otherwise', async () => {
-			const titles = BOND_RECORD_SECTIONS.map((s) => s.title);
-			expect(titles).toHaveLength(14);
+		it('the record opens with a summary and keeps its reference data in collapsed groups; audit only for audit.view', async () => {
+			// UX plan PR 8: the fourteen numbered sections became a summary plus these titled blocks.
+			expect(BOND_RECORD_SECTIONS.map((s) => s.id)).toEqual([
+				'general',
+				'numbers',
+				'barcode',
+				'custody',
+				'audit'
+			]);
 			const byRole: Record<string, string> = {};
 			for (const role of ['admin', 'operator', 'treasurer', 'read-only'] as const) {
 				const loaded = await record(users[role], A, a.s600);
 				const html = renderRecord(loaded);
-				BOND_RECORD_SECTIONS.forEach((section, i) => {
-					expect(html, `${role}: section ${section.id}`).toContain(`id="${section.id}"`);
-					expect(html).toMatch(
-						new RegExp(
-							`${i + 1}\\.</span>(?:\\s|<!--[^>]*-->)*${section.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
-						)
-					);
-				});
 				byRole[role] = html;
 				const canAudit = role === 'admin' || role === 'treasurer';
+				expect(html, `${role}: summary`).toContain('data-bond-sentence');
+				for (const section of BOND_RECORD_SECTIONS)
+					if (section.id !== 'audit' || canAudit)
+						expect(html, `${role}: block ${section.id}`).toContain(`<section id="${section.id}"`);
+				expect(html.toLowerCase(), `${role}: no phase notes`).not.toContain('fase');
 				expect(loaded.record.audit.allowed, role).toBe(canAudit);
 				if (canAudit) {
 					// The member's own load plus both patas it was in (group / ungroup / group).
@@ -1434,7 +1437,8 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 					expect(html).toContain('Wrong bonds');
 				} else {
 					expect(loaded.record.audit.entries).toEqual([]);
-					expect(html).toContain('No hay permiso para ver el registro de auditoría.');
+					// Without audit.view the group is not offered at all.
+					expect(html).not.toContain('Movimientos registrados');
 					expect(html).not.toContain('data-audit-action');
 				}
 			}

@@ -1,8 +1,7 @@
 /**
  * View model of the bond record page (`/campaigns/[id]/bonds/[bondId]`), built on the server by
- * `buildBondRecord` ($lib/server/bonds/record.ts). One part per section component (the 14
- * sections of docs/screens.md "Bond record"); sections whose data arrives in later phases render
- * an empty state from the bond alone.
+ * `buildBondRecord` ($lib/server/bonds/record.ts): the bond's own data, numbers, group, codes,
+ * audit entries and actions. Who has it, who bought it and what is owed come from the page's load.
  */
 import type {
 	BondCommercialStatus,
@@ -84,7 +83,7 @@ export interface BondRecordBarcode {
 	modeLabel: string;
 }
 
-/** Sections 4 and 5: the current collector / buyer (Phase 5 adds their records). */
+/** The ids of the current collector / buyer; their names are read by the page's load. */
 export interface BondRecordParty {
 	/** `bonds.current_collector_id` / `current_buyer_id`; null while not assigned. */
 	id: string | null;
@@ -138,21 +137,16 @@ export interface BondRecord {
 	actions: BondRecordActions;
 }
 
-/** The 14 sections of docs/screens.md "Bond record", in order (anchor id and title). */
+/**
+ * The blocks of reference data inside the record's collapsed groups (anchor id and title). The
+ * record used to be fourteen numbered sections; since UX plan PR 8 the page opens with a summary
+ * and only these remain as titled blocks.
+ */
 export const BOND_RECORD_SECTIONS = [
 	{ id: 'general', title: 'Datos generales' },
 	{ id: 'numbers', title: 'Números participantes' },
 	{ id: 'barcode', title: 'Código de barras' },
-	{ id: 'collector', title: 'Cobrador actual' },
 	{ id: 'custody', title: 'Historial de asignaciones' },
-	{ id: 'buyer', title: 'Comprador actual' },
-	{ id: 'sale', title: 'Venta' },
-	{ id: 'installments', title: 'Cuotas' },
-	{ id: 'payments', title: 'Pagos' },
-	{ id: 'settlements', title: 'Rendiciones' },
-	{ id: 'commissions', title: 'Comisiones' },
-	{ id: 'draws', title: 'Sorteos y padrones' },
-	{ id: 'prizes', title: 'Premios' },
 	{ id: 'audit', title: 'Auditoría' }
 ] as const;
 

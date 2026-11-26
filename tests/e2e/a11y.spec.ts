@@ -335,7 +335,13 @@ function routeTests(routes: Route[]) {
 		}
 }
 
-type DialogCase = { area: string; path: (i: Ids) => string; trigger: (page: Page) => Locator };
+type DialogCase = {
+	area: string;
+	path: (i: Ids) => string;
+	/** Something to open first, when the trigger is inside a collapsed group. */
+	reveal?: (page: Page) => Promise<void>;
+	trigger: (page: Page) => Locator;
+};
 // One open Dialog per area. axe runs while it is open; Esc closes it and focus returns to the
 // button that opened it (native <dialog> behaviour, asserted so a regression is caught).
 const DIALOGS: DialogCase[] = [
@@ -347,6 +353,8 @@ const DIALOGS: DialogCase[] = [
 	{
 		area: 'bonds: mark as lost',
 		path: (i) => `${campaign(i)}/bonds/${i.lostBond}`,
+		// UX plan PR 8: custody actions live under «Entregas y devoluciones», collapsed.
+		reveal: (p) => p.locator('summary', { hasText: 'Entregas y devoluciones' }).click(),
 		trigger: (p) => p.getByRole('button', { name: 'Marcar como extraviado' })
 	},
 	{
@@ -435,6 +443,7 @@ test.describe.serial('a11y and mobile pass', () => {
 				test.setTimeout(60_000);
 				await inPage(desktop, scheme, async (page) => {
 					await open(page, d.path(ids));
+					await d.reveal?.(page);
 					const trigger = d.trigger(page);
 					await trigger.click();
 					const dialog = page.getByRole('dialog');
