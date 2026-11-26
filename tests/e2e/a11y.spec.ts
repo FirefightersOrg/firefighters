@@ -19,6 +19,7 @@ import {
 } from './api';
 import { createActiveCampaign, open, runId } from './helpers';
 import { ANONYMOUS, STATE } from './auth-state';
+import { SCHEMES, SCHEMES_FOR_DIALOGS, runCell, type Scheme } from './matrix';
 
 /**
  * SAN-137 accessibility and mobile pass. Builds one campaign with data on every screen (bond,
@@ -31,8 +32,6 @@ import { ANONYMOUS, STATE } from './auth-state';
  * Plus the winning-number validation result and one open Dialog per area, with axe run while the
  * dialog is open, Esc closing it and focus returning to its trigger.
  */
-const SCHEMES = ['light', 'dark'] as const;
-type Scheme = (typeof SCHEMES)[number];
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const baseURL = `http://127.0.0.1:${process.env.E2E_PORT ?? 4317}`;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -130,6 +129,23 @@ async function seed(): Promise<Ids> {
 type Route = { name: string; path: (i: Ids) => string };
 const campaign = (i: Ids) => `/campaigns/${i.campaignId}`;
 const r = (name: string, path: (i: Ids) => string): Route => ({ name, path });
+/**
+ * Core routes: one per kind of screen, they get the whole matrix in the default run (see matrix.ts).
+ * Every other route is checked in light + desktop unless E2E_FULL=1.
+ */
+const CORE = new Set([
+	'campaigns list',
+	'campaign new',
+	'campaign detail',
+	'bonds list',
+	'bond detail',
+	'sale new',
+	'settlement detail (closed)',
+	'delivery print',
+	'reports (financial)',
+	'winners (pending validation + unawarded)',
+	'winners (delivered)'
+]);
 /** Screens whose content does not depend on the prize workflow stage. */
 const ROUTES: Route[] = [
 	r('campaigns list', () => '/campaigns'),
@@ -268,28 +284,31 @@ function newContext(browser: Browser, state: string, phoneSize: boolean) {
 function routeTests(routes: Route[]) {
 	for (const route of routes)
 		for (const scheme of SCHEMES) {
-			test(`axe and 1280px: ${route.name} [${scheme}]`, async () => {
-				test.setTimeout(60_000);
-				await inPage(desktop, scheme, async (page) => {
-					const path = route.path(ids);
-					await open(page, path);
-					const label = `${route.name} ${anon(path)} [${scheme}]`;
-					await expectNoSeriousViolations(page, label);
-					const { overflow } = await measure(page, false);
-					expect(overflow, `${label}: horizontal scroll at 1280px`).toBeLessThanOrEqual(1);
+			const core = CORE.has(route.name);
+			if (runCell(core, scheme, false))
+				test(`axe and 1280px: ${route.name} [${scheme}]`, async () => {
+					test.setTimeout(60_000);
+					await inPage(desktop, scheme, async (page) => {
+						const path = route.path(ids);
+						await open(page, path);
+						const label = `${route.name} ${anon(path)} [${scheme}]`;
+						await expectNoSeriousViolations(page, label);
+						const { overflow } = await measure(page, false);
+						expect(overflow, `${label}: horizontal scroll at 1280px`).toBeLessThanOrEqual(1);
+					});
 				});
-			});
-			test(`375px: ${route.name} [${scheme}]`, async () => {
-				test.setTimeout(60_000);
-				await inPage(phone, scheme, async (page) => {
-					const path = route.path(ids);
-					await open(page, path);
-					const label = `${route.name} ${anon(path)} [${scheme}]`;
-					const { overflow, tiny } = await measure(page, true);
-					expect(overflow, `${label}: horizontal scroll at 375px`).toBeLessThanOrEqual(1);
-					expect(tiny, `${label}: targets under 44px at 375px`).toEqual([]);
+			if (runCell(core, scheme, true))
+				test(`375px: ${route.name} [${scheme}]`, async () => {
+					test.setTimeout(60_000);
+					await inPage(phone, scheme, async (page) => {
+						const path = route.path(ids);
+						await open(page, path);
+						const label = `${route.name} ${anon(path)} [${scheme}]`;
+						const { overflow, tiny } = await measure(page, true);
+						expect(overflow, `${label}: horizontal scroll at 375px`).toBeLessThanOrEqual(1);
+						expect(tiny, `${label}: targets under 44px at 375px`).toEqual([]);
+					});
 				});
-			});
 		}
 }
 
@@ -333,7 +352,7 @@ test.describe.serial('a11y and mobile pass', () => {
 
 	routeTests(ROUTES);
 
-	for (const scheme of SCHEMES)
+	for (const scheme of SCHEMES_FOR_DIALOGS)
 		test(`winning-number validation result [${scheme}]`, async () => {
 			test.setTimeout(90_000);
 			// Prize #1 is still pending validation: load number 100 (the sold, paid bond); the result
@@ -380,7 +399,7 @@ test.describe.serial('a11y and mobile pass', () => {
 	routeTests(DELIVERED_ROUTES);
 
 	for (const d of DIALOGS)
-		for (const scheme of SCHEMES)
+		for (const scheme of SCHEMES_FOR_DIALOGS)
 			test(`dialog ${d.area} [${scheme}]`, async () => {
 				test.setTimeout(60_000);
 				await inPage(desktop, scheme, async (page) => {

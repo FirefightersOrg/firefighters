@@ -10,6 +10,7 @@ import {
 	serviceClient
 } from './api';
 import { login, open, runId } from './helpers';
+import { SCHEMES, runCell, type Scheme } from './matrix';
 
 /**
  * SAN-148 accessibility pass of the collector portal (same method as SAN-137, `a11y.spec.ts`). A collector
@@ -21,8 +22,6 @@ import { login, open, runId } from './helpers';
  * Needs the local Supabase stack (service role key from the environment or `supabase status`), like the
  * other E2E specs. It refuses to run against anything that is not local.
  */
-const SCHEMES = ['light', 'dark'] as const;
-type Scheme = (typeof SCHEMES)[number];
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const baseURL = `http://127.0.0.1:${process.env.E2E_PORT ?? 4317}`;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -125,6 +124,15 @@ async function seed(browser: Browser) {
 type Route = { name: string; path: (i: Ids) => string };
 const r = (name: string, path: (i: Ids) => string): Route => ({ name, path });
 const portal = (i: Ids) => `/portal/${i.campaignId}`;
+/**
+ * Core routes get the whole matrix in the default run, the rest only light + desktop (see matrix.ts):
+ * a list, a detail, the screen with the payment form and the account ledger.
+ */
+const CORE = new Set([
+	'mis bonos',
+	'detalle de venta con formulario de cobro',
+	'mi cuenta corriente'
+]);
 const ROUTES: Route[] = [
 	r('landing', () => '/portal'),
 	r('mis bonos', (i) => `${portal(i)}/bonos`),
@@ -223,31 +231,34 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 
 	for (const route of ROUTES)
 		for (const scheme of SCHEMES) {
-			test(`axe and 1280px: ${route.name} [${scheme}]`, async () => {
-				test.setTimeout(60_000);
-				await inPage(desktop, scheme, async (page) => {
-					const path = route.path(ids);
-					await open(page, path);
-					const label = `${route.name} ${anon(path)} [${scheme}]`;
-					await expect(page.locator('main h1').first()).toBeVisible();
-					await expectNoSeriousViolations(page, label);
-					expect(
-						(await measure(page, false)).overflow,
-						`${label}: scroll at 1280px`
-					).toBeLessThanOrEqual(1);
+			const core = CORE.has(route.name);
+			if (runCell(core, scheme, false))
+				test(`axe and 1280px: ${route.name} [${scheme}]`, async () => {
+					test.setTimeout(60_000);
+					await inPage(desktop, scheme, async (page) => {
+						const path = route.path(ids);
+						await open(page, path);
+						const label = `${route.name} ${anon(path)} [${scheme}]`;
+						await expect(page.locator('main h1').first()).toBeVisible();
+						await expectNoSeriousViolations(page, label);
+						expect(
+							(await measure(page, false)).overflow,
+							`${label}: scroll at 1280px`
+						).toBeLessThanOrEqual(1);
+					});
 				});
-			});
-			test(`375px: ${route.name} [${scheme}]`, async () => {
-				test.setTimeout(60_000);
-				await inPage(phone, scheme, async (page) => {
-					const path = route.path(ids);
-					await open(page, path);
-					const label = `${route.name} ${anon(path)} [${scheme}]`;
-					const { overflow, tiny } = await measure(page, true);
-					expect(overflow, `${label}: horizontal scroll at 375px`).toBeLessThanOrEqual(1);
-					expect(tiny, `${label}: targets under 44px at 375px`).toEqual([]);
+			if (runCell(core, scheme, true))
+				test(`375px: ${route.name} [${scheme}]`, async () => {
+					test.setTimeout(60_000);
+					await inPage(phone, scheme, async (page) => {
+						const path = route.path(ids);
+						await open(page, path);
+						const label = `${route.name} ${anon(path)} [${scheme}]`;
+						const { overflow, tiny } = await measure(page, true);
+						expect(overflow, `${label}: horizontal scroll at 375px`).toBeLessThanOrEqual(1);
+						expect(tiny, `${label}: targets under 44px at 375px`).toEqual([]);
+					});
 				});
-			});
 		}
 
 	test('the sub-navigation is reachable by keyboard and links every section', async () => {
