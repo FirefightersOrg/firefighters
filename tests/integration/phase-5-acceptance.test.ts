@@ -725,8 +725,8 @@ describe('Phase 5: collectors and buyers', () => {
 		for (const user of [users.treasurer, users['read-only']]) {
 			const data = await campaignLoad(event(user, `/campaigns/${campaignId}`, { id: campaignId }));
 			const html = render(CampaignPage, { props: { data } as never }).body;
-			expect(html).not.toContain('>Cobradores</a>');
-			expect(html).not.toContain('>Compradores</a>');
+			expect(html).toContain('>Cobradores</a>');
+			expect(html).toContain('>Compradores</a>');
 		}
 	});
 });

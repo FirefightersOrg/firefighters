@@ -1,3 +1,4 @@
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
@@ -157,7 +158,7 @@ async function annulledPaymentFor(collector: string) {
 		p_bond_id: bondId,
 		p_buyer_id: buyer,
 		p_payment_mode: 'installments',
-		p_first_due_date: new Date().toISOString().slice(0, 10),
+		p_first_due_date: todayInBuenosAires(),
 		p_request_id: rid('sale')
 	});
 	const { data: inst, error } = await admin.client
@@ -178,7 +179,7 @@ async function annulledPaymentFor(collector: string) {
 		p_sale_id: saleId,
 		p_amount: 100,
 		p_payment_method: 'cash',
-		p_payment_date: new Date().toISOString().slice(0, 10),
+		p_payment_date: todayInBuenosAires(),
 		p_applications: [{ installment_id: inst.id, amount_applied: 100 }],
 		p_request_id: rid('pay')
 	});
