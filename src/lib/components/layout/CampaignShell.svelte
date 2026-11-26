@@ -164,7 +164,7 @@
      sweep measures). The first stop for the keyboard. -->
 <a
 	href="#contenido"
-	class="fixed top-2 left-4 z-[var(--z-toast)] inline-flex min-h-touch -translate-y-[calc(100%+1rem)] items-center rounded-md bg-surface px-4 text-label text-text shadow-lg focus:translate-y-0"
+	class="fixed top-2 left-4 z-[var(--z-toast)] inline-flex min-h-touch -translate-y-[calc(100%+1rem)] items-center rounded-md bg-surface px-4 text-label text-text focus:translate-y-0 focus:shadow-lg"
 	>Ir al contenido</a
 >
 
