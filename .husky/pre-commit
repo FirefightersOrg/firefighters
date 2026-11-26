@@ -1,1 +1,2 @@
+pnpm exec svelte-kit sync || exit $?
 pnpm exec lint-staged
