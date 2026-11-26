@@ -17,6 +17,9 @@
 #   PGTAP_IMAGE     pg_prove image (default: the one the Supabase CLI uses, public.ecr.aws/supabase/pg_prove:3.36)
 #   SUPABASE_DB_CONTAINER  DB container (default: supabase_db_<project_id>)
 #   SUPABASE_DB_NETWORK    docker network (default: supabase_network_<project_id>)
+#   SUPABASE_PROJECT_ID    Supabase project_id of the target stack (default: from supabase/config.toml)
+#   SUPABASE_DB_HOST/SUPABASE_DB_PORT/SUPABASE_DB_PASSWORD  used with PG_PROVE (default 127.0.0.1, 54322, postgres)
+# Nothing assumes a single stack: a pool of stacks only needs to export these per slot.
 #
 # Requirement: the local Supabase stack is running, plus either Docker (the pg_prove image is already
 # pulled by `supabase test db`) or a local `pg_prove` (set PG_PROVE; it connects to 127.0.0.1:54322).
@@ -25,7 +28,7 @@ set -u
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 tests_dir="$root/supabase/tests/database"
-project_id=$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' "$root/supabase/config.toml" | head -1)
+project_id=${SUPABASE_PROJECT_ID:-$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' "$root/supabase/config.toml" | head -1)}
 container=${SUPABASE_DB_CONTAINER:-supabase_db_$project_id}
 network=${SUPABASE_DB_NETWORK:-supabase_network_$project_id}
 image=${PGTAP_IMAGE:-public.ecr.aws/supabase/pg_prove:3.36}
@@ -42,11 +45,11 @@ prove() { # prove <jobs> <files...>
 	local j=$1
 	shift
 	if [ -n "${PG_PROVE:-}" ]; then
-		PGPASSWORD=postgres "$PG_PROVE" -h 127.0.0.1 -p 54322 -U postgres -d postgres --jobs "$j" "$@"
+		PGPASSWORD=${SUPABASE_DB_PASSWORD:-postgres} "$PG_PROVE" -h "${SUPABASE_DB_HOST:-127.0.0.1}" -p "${SUPABASE_DB_PORT:-54322}" -U postgres -d postgres --jobs "$j" "$@"
 	else
 		local args=() f
 		for f in "$@"; do args+=("/tests/$(basename "$f")"); done
-		docker run --rm --network "$network" -v "$tests_dir:/tests:ro" -e PGPASSWORD=postgres \
+		docker run --rm --network "$network" -v "$tests_dir:/tests:ro" -e PGPASSWORD="${SUPABASE_DB_PASSWORD:-postgres}" \
 			"$image" pg_prove -h "$container" -p 5432 -U postgres -d postgres --jobs "$j" "${args[@]}"
 	fi
 }
