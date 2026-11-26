@@ -4,10 +4,12 @@ What the redesign changed, measured the same way as the audit ([`audit.md`](audi
 
 ## How it was measured
 
+> The captures, both reports and the two scripts left the tree in PR 20; this document keeps the numbers. See [«Where the evidence went»](README.md#where-the-evidence-went).
+
 The same two scripts as before, on the same demo campaign (`pnpm seed:demo`: 240 bonds, 147 sales, 15 settlements), against a production build of `main` at `90bc176`, in a clean database:
 
-- `scripts/ux-walkthrough.ts` opens every screen as every role at 375 px and 1280 px, in light and dark, and records its length in phone screens (812 px) and how far the page scrolls sideways. 896 captures, as before. The files are in [`after/`](after/) with the same layout as [`before/`](before/); `after/report.json` has every row.
-- `scripts/ux-flows.ts` runs the critical flows at 375 px and counts the screens the person reads and the actions (taps, fields typed, choices). The steps are in `after/flows/`.
+- `scripts/ux-walkthrough.ts` opens every screen as every role at 375 px and 1280 px, in light and dark, and records its length in phone screens (812 px) and how far the page scrolls sideways. 896 captures, as before. The files were in `docs/ux/after/` with the same layout as `docs/ux/before/`, and `after/report.json` had every row.
+- `scripts/ux-flows.ts` runs the critical flows at 375 px and counts the screens the person reads and the actions (taps, fields typed, choices). The steps were in `after/flows/`.
 
 Two limits of these numbers. The length of a page says nothing about whether the first screen answers the question, which is what most of the work was about. And «sideways scroll» is measured on the page: before, several tables did not move the page but scrolled inside their card with their columns cut, and that does not show in the «before» column.
 
@@ -131,7 +133,7 @@ Other rows that got longer, and why:
 | `p7-to-collect`         | 1.7                  | 2.6      | 0                           | 0     |
 | `p8-my-account`         | 3                    | 2.8      | 0                           | 0     |
 
-`98-not-found` answers 404 by design. The treasurer, operator and read-only rows are in `after/report.json`.
+`98-not-found` answers 404 by design. The treasurer, operator and read-only rows were in `after/report.json`.
 
 ## The audit's items
 

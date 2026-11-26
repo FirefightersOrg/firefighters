@@ -1,12 +1,14 @@
 # UX audit
 
+> The screenshots, the prototypes and the two measuring scripts this document refers to were removed from the tree in PR 20. The paths are kept as they were; the files are in the repository's history, see [«Where the evidence went»](README.md#where-the-evidence-went).
+
 What gets in the way of the people who use Firefighters today, ordered by impact, with the evidence, the cause and a concrete proposal for each problem. The vision that answers them is in [`direction.md`](direction.md). How the evidence was produced, and how to reproduce it, is in [`README.md`](README.md).
 
 ## How it was done
 
 - The app ran locally on `main` (756d91e) with one realistic campaign (`pnpm seed:demo`): 6 collectors, 90 buyers, 240 bonds, 147 sales, 12 closed and 3 open settlements, 3 draws.
-- `scripts/ux-walkthrough.ts` opened **62 screens** (52 staff screens, 9 of the portal, and the login) with the **5 roles**, at **375 px and 1280 px**, in **light and dark**: 896 captures, each measured (status, length, overflow, controls). Results in [`before/report.json`](before/report.json), 488 screenshots in [`before/`](before/).
-- `scripts/ux-flows.ts` ran the **critical flows on a 375 px screen** as a person would, counting screens, taps, fields and choices: [`before/flows/flows.json`](before/flows/flows.json), with a screenshot per step.
+- `scripts/ux-walkthrough.ts` opened **62 screens** (52 staff screens, 9 of the portal, and the login) with the **5 roles**, at **375 px and 1280 px**, in **light and dark**: 896 captures, each measured (status, length, overflow, controls). Results in `docs/ux/before/report.json`, 488 screenshots in `docs/ux/before/`.
+- `scripts/ux-flows.ts` ran the **critical flows on a 375 px screen** as a person would, counting screens, taps, fields and choices: `docs/ux/before/flows/flows.json`, with a screenshot per step.
 - The source of each screen was read to find the cause.
 
 What was not done: nobody from the station was observed using the app. Frequencies below are estimates from the business flows in `docs/`, and should be corrected by whoever knows the station's routine.
@@ -113,9 +115,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A1. Recording a payment is slow and blind on a phone
 
-| 375 px, open settlement                                                     | 375 px, a payment ready to add                                                            |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ![Open settlement at 375 px](before/admin/375-light/42-settlement-open.jpg) | ![Payment ready to add at 375 px](before/flows/settlement/04-pago-listo-para-agregar.jpg) |
+Screenshots, no longer in the tree: «375 px, open settlement» (`docs/ux/before/admin/375-light/42-settlement-open.jpg`), «375 px, a payment ready to add» (`docs/ux/before/flows/settlement/04-pago-listo-para-agregar.jpg`).
 
 - **What happens.** The open settlement starts with seven totals as stacked cards. «Carga rápida de pagos» comes after two screens. A sale is chosen from a `<select>` labelled «Bono / comprador». The installments appear in a table whose «Importe» column, with the editable amount, is cut off at 375 px. An empty «Cobros enviados por el cobrador» card takes a full screen even when there is nothing in it.
 - **Cause.** `settlements/[settlementId]/+page.svelte`: the open state keeps the pre-redesign `Stat` grid (#147 only redesigned the closed state); the form is a `Select` over `data.candidates`; the installments are a table inside a card.
@@ -123,9 +123,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A2. No navigation inside a campaign
 
-| 375 px, campaign page (sections at the very bottom)                          | 375 px, any inner screen                                       |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| ![Campaign page at 375 px](before/admin/375-light/03-campaign-workbench.jpg) | ![Sale form at 375 px](before/admin/375-light/31-sale-new.jpg) |
+Screenshots, no longer in the tree: «375 px, campaign page (sections at the very bottom)» (`docs/ux/before/admin/375-light/03-campaign-workbench.jpg`), «375 px, any inner screen» (`docs/ux/before/admin/375-light/31-sale-new.jpg`).
 
 - **What happens.** The sections of a campaign (Bonos, Entregas, Ventas, Rendiciones, …) are links in a column of the campaign page. At 1280 px they sit beside the dashboard. At 375 px they render after it: the page is 5.2 screens long and the links are the last thing on it. Every other screen has only breadcrumbs, which wrap to two lines on a phone. Going from a sale to the settlements is: campaign, scroll to the bottom, Rendiciones.
 - **Cause.** `campaigns/[id]/+page.svelte` owns the navigation as page content; `campaigns/+layout.svelte` renders only the top bar, whose links are «Campañas» and «Mi portal».
@@ -133,7 +131,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A3. The bond record does not say who has the bond or who bought it
 
-![Bond record at 375 px](before/admin/375-light/13-bond-sold.jpg)
+Screenshot, no longer in the tree: «Bond record at 375 px» (`docs/ux/before/admin/375-light/13-bond-sold.jpg`).
 
 - **What happens.** The record of a sold bond has 14 numbered sections over 5.5 screens. Section 4, «Cobrador actual», reads «Hay un cobrador registrado para este bono; sus datos se muestran cuando existan las fichas de cobradores. Los cobradores llegan en la fase 5 y los bonos se les entregan en la fase 6.» Section 6 says the same about the buyer. Neither name appears anywhere on the record. Sections 10 and 11 say «Las rendiciones con cobradores llegan en la fase 8» and «Las comisiones se generan desde la fase 9». The audit section lists `sale.create` and `bond.deliver`.
 - **Cause.** `BondPartySection.svelte` and `BondPendingSection.svelte` were written in phase 3, before collectors, buyers and sales existed, and were never replaced. The route already loads the active sale and the collectors.
@@ -141,7 +139,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A4. Payments in a settlement cannot be identified
 
-![Open settlement at 1280 px](before/admin/1280-light/42-settlement-open.jpg)
+Screenshot, no longer in the tree: «Open settlement at 1280 px» (`docs/ux/before/admin/1280-light/42-settlement-open.jpg`).
 
 - **What happens.** «Pagos de la rendición» has the columns Fecha, Importe, Método, Estado and Acciones. Ten rows of «24/11/2026, $ 10.000,00, Efectivo» cannot be told apart, so a payment loaded on the wrong bond cannot be found by reading the list. The same table on the closed settlement has 171 controls for 21 payments.
 - **Cause.** The table's columns do not include the sale; each row renders its remove form (a reason field and «Quitar») and a «Corregir / anular» disclosure with three forms.
@@ -149,9 +147,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A5. The portal does not work one-handed
 
-| «Por cobrar» at 375 px                                              | Sending a payment at 375 px                                                     |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| ![Portal, to collect](before/collector/375-light/p7-to-collect.jpg) | ![Portal, payment form](before/flows/portal-collect/05-formulario-de-cobro.jpg) |
+Screenshots, no longer in the tree: ««Por cobrar» at 375 px» (`docs/ux/before/collector/375-light/p7-to-collect.jpg`), «Sending a payment at 375 px» (`docs/ux/before/flows/portal-collect/05-formulario-de-cobro.jpg`).
 
 - **What happens.** «Por cobrar» is a seven-column table; at 375 px the bond number, the installment, the amount and the state are off-screen, and the phone number is text, not a link. On the sale page the «Registrar cobro» form opens inside the last cell of the installments table: the explanation wraps one word per line, and the amount field and «Revisar y enviar» are cut. Four stacked totals come first. The navigation is five links that wrap to two lines above every page.
 - **Cause.** The portal pages reuse the desktop `Table`; `RegisterPaymentForm` is rendered in the table's actions column.
@@ -159,9 +155,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A6. Registering a sale loses the bond, and buyers are hard to find
 
-| Bond found and selected                                                       | After searching for the buyer                                                                            |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| ![Bond selected](before/flows/register-sale-buyer-search/01-bono-elegido.jpg) | ![After the buyer search](before/flows/register-sale-buyer-search/02-despues-de-buscar-el-comprador.jpg) |
+Screenshots, no longer in the tree: «Bond found and selected» (`docs/ux/before/flows/register-sale-buyer-search/01-bono-elegido.jpg`), «After searching for the buyer» (`docs/ux/before/flows/register-sale-buyer-search/02-despues-de-buscar-el-comprador.jpg`).
 
 - **What happens.** After finding and selecting the bond, typing a name in «Buscar compradores» and pressing «Buscar» reloads the page. The found bond is gone and step 3 says «elegir un bono para ver quién lo tiene», yet the plan preview still shows a schedule. The buyer dropdown lists the first 30 of 90 buyers («Se muestran los primeros 30 de 90; afinar la búsqueda»), so with a real buyer list the search is unavoidable.
 - **Cause.** `sales/new/+page.svelte`: the bond lookup lives in the `form` result of a POST action, and the buyer search is a GET form on the same page, which navigates and drops `form`.
@@ -169,9 +163,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A7. Lists on a phone: filters first, columns cut, the page scrolls sideways
 
-| Bonds                                                             | Sales                                                             | Settlements                                                                   |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| ![Bonds list at 375 px](before/admin/375-light/10-bonds-list.jpg) | ![Sales list at 375 px](before/admin/375-light/30-sales-list.jpg) | ![Settlements list at 375 px](before/admin/375-light/40-settlements-list.jpg) |
+Screenshots, no longer in the tree: «Bonds» (`docs/ux/before/admin/375-light/10-bonds-list.jpg`), «Sales» (`docs/ux/before/admin/375-light/30-sales-list.jpg`), «Settlements» (`docs/ux/before/admin/375-light/40-settlements-list.jpg`).
 
 - **What happens.**
   - Filters fill the first screen before any row (8 fields on Bonos, two of them disabled).
@@ -183,7 +175,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A8. Rare and risky actions sit on the main surface; red means «normal»
 
-![Sale detail at 375 px](before/admin/375-light/32-sale-detail.jpg)
+Screenshot, no longer in the tree: «Sale detail at 375 px» (`docs/ux/before/admin/375-light/32-sale-detail.jpg`).
 
 - **What happens.** On a sale, «Marcar como incobrable» (a red button with its reason field) and «Correcciones auditadas» (two forms) come before the installment plan, which is what people open the sale for. On an open settlement every payment row shows a «Motivo obligatorio» field with «Quitar». «Cerrar rendición», the normal end of the task, is a red danger button beside the title, and so is the confirm button in its dialog.
 - **Cause.** Each action was added as a card or an inline form where its data lives; `variant="danger"` is used for «cannot be reopened» as well as for «destroys something».
@@ -191,7 +183,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A9. Treasurer and read-only see «Unknown collector» and «Unknown buyer»
 
-![Sale detail as treasurer](before/treasurer/375-light/32-sale-detail.jpg)
+Screenshot, no longer in the tree: «Sale detail as treasurer» (`docs/ux/before/treasurer/375-light/32-sale-detail.jpg`).
 
 - **What happens.** Signed in as treasurer:
   - the sales list and each sale show «Unknown buyer» and «Unknown collector», as links that answer 403;
@@ -206,9 +198,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A10. Words from how the system was built, and mixed money formats
 
-| Bonds list, «Fase 6»                                                | Campaign page, two formats in one card                                         |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Bonds list at 1280 px](before/admin/1280-light/10-bonds-list.jpg) | ![Campaign page at 1280 px](before/admin/1280-light/03-campaign-workbench.jpg) |
+Screenshots, no longer in the tree: «Bonds list, «Fase 6»» (`docs/ux/before/admin/1280-light/10-bonds-list.jpg`), «Campaign page, two formats in one card» (`docs/ux/before/admin/1280-light/03-campaign-workbench.jpg`).
 
 - **What happens.**
   - Development phases in the interface: a disabled «Asignar a cobrador» button with a «Fase 6» label and a filter «Disponible con cobradores y compradores (fase 5)» on the bonds list; ten such sentences on the bond record. Those phases shipped long ago.
@@ -223,9 +213,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A11. After signing in there is a dead end before the work
 
-| Home after signing in                                   | Portal home with two campaigns                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------------- |
-| ![Home at 1280 px](before/admin/1280-light/00-home.jpg) | ![Portal home at 375 px](before/flows/portal-collect/01-portal.jpg) |
+Screenshots, no longer in the tree: «Home after signing in» (`docs/ux/before/admin/1280-light/00-home.jpg`), «Portal home with two campaigns» (`docs/ux/before/flows/portal-collect/01-portal.jpg`).
 
 - **What happens.** Staff land on a «Sesión activa» card with their name, e-mail and role names (`admin`), and one button, «Campañas». Then the list, then the campaign: two screens with nothing to do, every session. A collector with a draft campaign in the system lands on a picker that offers the draft.
 - **Cause.** `/` was the phase 1 session page. `/portal` lists every campaign the collector can see.
@@ -233,7 +221,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A12. Records and reports are many screens long
 
-![Collector record at 1280 px](before/admin/1280-light/52-collector-detail.jpg)
+Screenshot, no longer in the tree: «Collector record at 1280 px» (`docs/ux/before/admin/1280-light/52-collector-detail.jpg`).
 
 | Screen                                   | Length at 375 px | At 1280 px   |
 | ---------------------------------------- | ---------------- | ------------ |
@@ -251,7 +239,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A13. Error pages are bare and in English
 
-![403 as treasurer](before/treasurer/1280-light/50-collectors-list.jpg)
+Screenshot, no longer in the tree: «403 as treasurer» (`docs/ux/before/treasurer/1280-light/50-collectors-list.jpg`).
 
 - **What happens.** A 403 or a 404 renders the words «403 Forbidden» in the top-left corner of an empty page: no header, no way back, in English. Non-admin roles meet it often: 14 screens for the treasurer, 8 for the operator, 30 for read-only.
 - **Cause.** There is no `+error.svelte`; SvelteKit's default page is shown.
@@ -259,7 +247,7 @@ The counts alone look reasonable. What they hide is where each flow can go wrong
 
 ### A14. Dark mode looks like another product
 
-![Closed settlement, dark](before/admin/1280-dark/43-settlement-closed.jpg)
+Screenshot, no longer in the tree: «Closed settlement, dark» (`docs/ux/before/admin/1280-dark/43-settlement-closed.jpg`).
 
 - **What happens.** In dark the action colour is a light periwinkle blue (`#86a6ff`) on near-black, with no trace of navy. #145 left this as a follow-up.
 - **Proposal.** The navy-aligned dark palette in proposal P3, shown in the dark screenshots of prototype 3.

@@ -1,5 +1,7 @@
 # UX direction
 
+> The screenshots, the prototypes and the two measuring scripts this document refers to were removed from the tree in PR 20. The paths are kept as they were; the files are in the repository's history, see [«Where the evidence went»](README.md#where-the-evidence-went).
+
 The vision for the frontend redesign: principles, navigation, the patterns each kind of screen follows, and prototypes of the four screens that matter most. It answers the problems in [`audit.md`](audit.md) (referenced as A1, A2, …). Nothing here is implemented yet. Once this direction is approved, `plan.md` turns it into small PRs.
 
 All interface text below is in Spanish, as it will ship. This document, like the rest of the repo docs, is in English.
@@ -135,13 +137,11 @@ Today «Cerrar rendición» is a red danger button beside the title, and every p
 
 ## Prototypes
 
-Static HTML in [`prototypes/`](prototypes/), built with the Cimiento tokens and the repo's fonts (run `pnpm install`, then open the files in a browser; they respond from 375 px to 1280 px and follow the system colour scheme). Data is the demo campaign from `pnpm seed:demo`. Screenshots are in [`prototypes/shots/`](prototypes/shots/).
+The prototypes were static HTML in `docs/ux/prototypes/`, built with the Cimiento tokens and the repo's fonts; they responded from 375 px to 1280 px and followed the system colour scheme. Data is the demo campaign from `pnpm seed:demo`. Their screenshots were in `docs/ux/prototypes/shots/`.
 
 ### 1. Campaign home (`01-campaign-workbench.html`)
 
-| 375 px                                                                           | 1280 px                                                                            |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ![Campaign home at 375 px](prototypes/shots/01-campaign-workbench-375-light.jpg) | ![Campaign home at 1280 px](prototypes/shots/01-campaign-workbench-1280-light.jpg) |
+Screenshots, no longer in the tree: «375 px» (`docs/ux/prototypes/shots/01-campaign-workbench-375-light.jpg`), «1280 px» (`docs/ux/prototypes/shots/01-campaign-workbench-1280-light.jpg`).
 
 What changes from today:
 
@@ -153,9 +153,7 @@ What changes from today:
 
 ### 2. Bond record (`02-bond-record.html`)
 
-| 375 px                                                                  | 1280 px                                                                   |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| ![Bond record at 375 px](prototypes/shots/02-bond-record-375-light.jpg) | ![Bond record at 1280 px](prototypes/shots/02-bond-record-1280-light.jpg) |
+Screenshots, no longer in the tree: «375 px» (`docs/ux/prototypes/shots/02-bond-record-375-light.jpg`), «1280 px» (`docs/ux/prototypes/shots/02-bond-record-1280-light.jpg`).
 
 What changes from today:
 
@@ -167,9 +165,7 @@ What changes from today:
 
 ### 3. Open settlement (`03-open-settlement.html`)
 
-| 375 px                                                                          | 1280 px                                                                           |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ![Open settlement at 375 px](prototypes/shots/03-open-settlement-375-light.jpg) | ![Open settlement at 1280 px](prototypes/shots/03-open-settlement-1280-light.jpg) |
+Screenshots, no longer in the tree: «375 px» (`docs/ux/prototypes/shots/03-open-settlement-375-light.jpg`), «1280 px» (`docs/ux/prototypes/shots/03-open-settlement-1280-light.jpg`).
 
 What changes from today:
 
@@ -185,15 +181,11 @@ What changes from today:
 
 Dark, with the proposed palette (see P3):
 
-| 375 px                                                                             | 1280 px                                                                              |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| ![Open settlement, dark, 375 px](prototypes/shots/03-open-settlement-375-dark.jpg) | ![Open settlement, dark, 1280 px](prototypes/shots/03-open-settlement-1280-dark.jpg) |
+Screenshots, no longer in the tree: «375 px» (`docs/ux/prototypes/shots/03-open-settlement-375-dark.jpg`), «1280 px» (`docs/ux/prototypes/shots/03-open-settlement-1280-dark.jpg`).
 
 ### 4. Collector portal, «Por cobrar» (`04-portal-to-collect.html`)
 
-| The list                                                                           | Collecting                                                                                  |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| ![Portal, to collect, 375 px](prototypes/shots/04-portal-to-collect-375-light.jpg) | ![Portal, collect sheet, 375 px](prototypes/shots/04-portal-to-collect-sheet-375-light.jpg) |
+Screenshots, no longer in the tree: «The list» (`docs/ux/prototypes/shots/04-portal-to-collect-375-light.jpg`), «Collecting» (`docs/ux/prototypes/shots/04-portal-to-collect-sheet-375-light.jpg`).
 
 What changes from today:
 
@@ -233,7 +225,7 @@ Outside this redesign's limits (no SQL, migrations, permissions or service contr
 
 ## How this will be measured
 
-The audit counted screens, taps, fields and choices for each critical flow on a phone (`scripts/ux-flows.ts`, results in [`before/flows/flows.json`](before/flows/flows.json)). The same script runs again after each phase. Targets:
+The audit counted screens, taps, fields and choices for each critical flow on a phone (`scripts/ux-flows.ts`, results in `docs/ux/before/flows/flows.json`). The same script runs again after each phase. Targets:
 
 | Flow                                            | Today (375 px)                                                                | Target                                                             |
 | ----------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------ |
