@@ -62,7 +62,27 @@ El color de estado está reservado para estados.
 
 ### Tema oscuro
 
-El rediseño todavía no cambió la paleta oscura (sigue el azul claro `#86a6ff` para `primary`); solo `focus` (amarillo), `brand` y `accent` tienen valores nuevos. Alinearla con el marino queda como seguimiento.
+La paleta oscura acompaña al marino (2026-11, propuesta P3 de `docs/ux/direction.md`): fondos azul noche (`bg` `#0f141b`, `surface` `#171d26`) y un marino claro como color de acción (`primary` `#b9cbe6`, con texto `on-primary` `#10203a`). `focus`, `accent` y `brand` no cambian, ni los colores de estado.
+
+Contraste medido de los pares que se usan (mínimo 4,5:1 para texto y 3:1 para bordes de controles, íconos y foco):
+
+| Par                                                    | Contraste                       |
+| ------------------------------------------------------ | ------------------------------- |
+| `text` sobre `bg` / `surface`                          | 15,9 / 14,6                     |
+| `text` sobre `surface-raised` / `surface-hover`        | 13,3 / 12,1                     |
+| `text-muted` sobre `bg` / `surface`                    | 8,5 / 7,8                       |
+| `text-muted` sobre `surface-hover` / `neutral-soft`    | 6,5 / 6,4                       |
+| `text-subtle` sobre `bg` / `surface`                   | 6,2 / 5,7                       |
+| `text-subtle` sobre `surface-raised` / `surface-hover` | 5,2 / 4,7                       |
+| `on-primary` sobre `primary` / `primary-hover`         | 9,9 / 11,8                      |
+| `primary-text` sobre `primary-soft` / `surface`        | 9,6 / 11,1                      |
+| `success-text` sobre `success-soft`                    | 9,2                             |
+| `warning-text` sobre `warning-soft`                    | 9,6                             |
+| `danger-text` sobre `danger-soft`                      | 7,9                             |
+| `on-danger` sobre `danger`                             | 6,3                             |
+| `border-strong` sobre `surface` / `surface-raised`     | 3,9 / 3,5                       |
+| `focus` sobre `bg` / `surface`                         | 11,3 / 10,4                     |
+| `brand` sobre `surface`                                | 4,3 (solo decorativo: la marca) |
 
 Cada token tiene valor para `light` y `dark`. No se invierte el color a mano: siempre se usa el token. En oscuro, `primary` se aclara y su texto (`on-primary`) se oscurece; por eso nunca usar `#fff` literal sobre un color de marca. La sombra pierde fuerza en oscuro, así que `shadow-lg` suma un filete de 1px.
 
@@ -91,14 +111,14 @@ Controles de `control-md` (40px) por defecto, `control-sm` en barras de herramie
 
 ### Estados de interacción
 
-| Estado        | Tratamiento                                                                                                                                                                                                                                                                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hover         | Fondo `surface-hover` (filas, ghost) o `*-hover` (botones con relleno).                                                                                                                                                                                                                                                                                 |
-| Foco          | `outline` de 2px con 2px de separación, solo con teclado (`:focus-visible`): marino en claro (12,4:1) y amarillo en oscuro (11,7:1). En claro se suma un halo `accent` de 6px, decorativo: el contraste lo garantiza el `outline`, que ningún componente pisa (las sombras propias de un control sí tapan el halo). Nunca quitar el foco sin reemplazo. |
-| Deshabilitado | Fondo `surface-sunken`, texto `text-disabled`, cursor `not-allowed`. Preferir explicar por qué antes que deshabilitar.                                                                                                                                                                                                                                  |
-| Cargando      | Spinner dentro del botón, el ancho no cambia, `aria-busy`.                                                                                                                                                                                                                                                                                              |
-| Inválido      | Borde `danger` + mensaje en `danger-text` debajo del campo, enlazado con `aria-describedby`.                                                                                                                                                                                                                                                            |
-| Solo lectura  | Fondo `surface-sunken`, texto `text`, sin borde fuerte. Se puede seleccionar y copiar.                                                                                                                                                                                                                                                                  |
+| Estado        | Tratamiento                                                                                                                                                                                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hover         | Fondo `surface-hover` (filas, ghost) o `*-hover` (botones con relleno).                                                                                                                                                                                                                                                                                                 |
+| Foco          | `outline` de 2px con 2px de separación, solo con teclado (`:focus-visible`): marino en claro (12,4:1) y amarillo en oscuro (10,4:1 sobre `surface`). En claro se suma un halo `accent` de 6px, decorativo: el contraste lo garantiza el `outline`, que ningún componente pisa (las sombras propias de un control sí tapan el halo). Nunca quitar el foco sin reemplazo. |
+| Deshabilitado | Fondo `surface-sunken`, texto `text-disabled`, cursor `not-allowed`. Preferir explicar por qué antes que deshabilitar.                                                                                                                                                                                                                                                  |
+| Cargando      | Spinner dentro del botón, el ancho no cambia, `aria-busy`.                                                                                                                                                                                                                                                                                                              |
+| Inválido      | Borde `danger` + mensaje en `danger-text` debajo del campo, enlazado con `aria-describedby`.                                                                                                                                                                                                                                                                            |
+| Solo lectura  | Fondo `surface-sunken`, texto `text`, sin borde fuerte. Se puede seleccionar y copiar.                                                                                                                                                                                                                                                                                  |
 
 ### Movimiento
 
