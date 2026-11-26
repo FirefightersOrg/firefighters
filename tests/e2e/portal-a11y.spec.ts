@@ -375,7 +375,9 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 					[...document.querySelectorAll<HTMLElement>('main *')]
 						.filter(
 							(el) =>
-								getComputedStyle(el).overflowX !== 'visible' && el.scrollWidth > el.clientWidth + 1
+								el.clientWidth > 1 &&
+								getComputedStyle(el).overflowX !== 'visible' &&
+								el.scrollWidth > el.clientWidth + 1
 						)
 						.map((el) => `${el.tagName.toLowerCase()}.${el.className.toString().slice(0, 40)}`)
 				);

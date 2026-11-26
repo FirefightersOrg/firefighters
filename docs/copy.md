@@ -99,6 +99,12 @@ The record opens with sentences built from data, not with labels and values. Eve
 - The tab bar uses one short word per section («Por cobrar», «Bonos», «Ventas», «Compradores», «Cuenta»); the link's full name stays «Mis bonos», «Mi cuenta corriente».
 - A collector with no campaign in course reads «No hay una campaña en curso», never a list of drafts or closed campaigns.
 
+## The collector's account
+
+- The balance is said in words, with the figure without a sign: «Saldo a favor del cobrador», «Saldo a cargo del cobrador», «Sin saldo». Under it, one line on what it is: «Suma los movimientos que no están anulados.»
+- The commission figures («Comisiones generadas», «Ajustadas», «Liquidadas», «Anulaciones y correcciones») are reference amounts, not the terms of a sum: they are listed under the balance, never drawn as an addition.
+- On a phone a movement shows one amount with its sign («− $ 30.000,00» for a debit) instead of a debit and a credit column.
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.
