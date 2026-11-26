@@ -53,6 +53,8 @@ export default defineConfig({
 			PUBLIC_SUPABASE_ANON_KEY: process.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
 			SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
 			APP_ENV: 'local',
+			// Lets the UI-kit spec open /dev/ui on the production build (it is dev-only otherwise).
+			PUBLIC_UI_KIT_SHOWCASE: '1',
 			PUBLIC_INSTITUTION_NAME: 'Bomberos Voluntarios'
 		}
 	}

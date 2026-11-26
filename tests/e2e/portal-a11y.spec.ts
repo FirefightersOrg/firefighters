@@ -10,6 +10,7 @@ import {
 	serviceClient
 } from './api';
 import { login, open, runId } from './helpers';
+import { ANONYMOUS } from './auth-state';
 import { SCHEMES, runCell, type Scheme } from './matrix';
 
 /**
@@ -111,6 +112,8 @@ async function seed(browser: Browser) {
 	const ctx = await browser.newContext({
 		baseURL,
 		serviceWorkers: 'block',
+		// Not the default admin session: this context signs in as the new collector.
+		storageState: ANONYMOUS,
 		locale: 'es-AR',
 		timezoneId: 'America/Argentina/Buenos_Aires'
 	});
