@@ -251,6 +251,12 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
 - **Acceptance.** At 375 px each list shows its first row in the first screenful and never scrolls sideways; every filter keeps its query string; open settlements come before closed ones; the list server tests are unchanged.
 - **Risk.** Medium by volume. If the diff passes 800 lines it is split in two (operation lists, then people and draws).
 - **Depends on.** PR 4.
+- **14a as delivered (sales, settlements, delivery notes).**
+  - Measured at 375 x 812 px with the demo campaign: the first row ends at 512 px (sales), 411 px (settlements) and 543 px (delivery notes), above the tab bar, which starts at 755 px. Before, the first row started at 749, 773 and 773 px, behind the tab bar or below it, and each table scrolled sideways inside its card (268, 159 and 219 px). Now nothing scrolls sideways, also with a 60-character collector, a 65-character buyer and a pata of six numbers.
+  - The settlements list is not paginated: `listSettlements` reads every page of its query and returns the whole list. The open ones are put first in that function, after the read, keeping the query's order (newest number first) inside each group. The query did not change, and neither did SQL. Every caller gets that order, the collector record included.
+  - The settlements list has nothing to search by, and `FilterBar` always draws a search field, so its filters are folded in a `Disclosure` with the chips drawn by the page. A `FilterBar` with an optional search would replace that: a Cimiento change, left for its own PR.
+  - The sales list drops the «Modalidad» column (it stays as a filter and on the sale record) and shows the sale date, which is what the list is ordered by: with eight columns the table scrolled inside its card at 1024 px.
+  - The three `load` functions are untouched, and so are `sales/page.server.test.ts` and `settlements/page.server.test.ts`.
 
 ### PR 15. Collector and buyer records, current account (A12)
 
