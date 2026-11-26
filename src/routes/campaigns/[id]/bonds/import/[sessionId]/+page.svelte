@@ -7,9 +7,11 @@
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
 	import {
 		Alert,
+		BondNumber,
 		Button,
 		Card,
 		Dialog,
+		Disclosure,
 		EmptyState,
 		Field,
 		PageHeader,
@@ -118,14 +120,23 @@
 
 	type ItemRow = ImportItem & Record<string, unknown>;
 	const columns: TableColumn<ItemRow>[] = $derived([
-		{ key: 'rowNumber', header: 'Fila', align: 'right' },
-		{ key: 'status', header: 'Estado' },
-		{ key: 'type', header: 'Tipo' },
-		{ key: 'pata', header: 'Pata' },
-		{ key: 'numbers', header: 'Base / asociado' },
-		{ key: 'barcode', header: 'Código de barras' },
-		{ key: 'problem', header: 'Problema' },
-		...(data.canEdit ? [{ key: 'actions', header: 'Acciones', align: 'right' as const }] : [])
+		{ key: 'numbers', header: 'Número', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'rowNumber', header: 'Fila', align: 'right', stack: 'hidden' },
+		{ key: 'type', header: 'Tipo', stack: 'hidden' },
+		{ key: 'pata', header: 'Pata', stack: 'hidden' },
+		{ key: 'barcode', header: 'Código de barras', stack: 'hidden' },
+		{ key: 'problem', header: 'Observación', stack: 'secondary' },
+		...(data.canEdit
+			? [
+					{
+						key: 'actions',
+						header: 'Acciones',
+						align: 'right' as const,
+						stack: 'secondary' as const
+					}
+				]
+			: [])
 	]);
 	const rows = $derived(data.items as ItemRow[]);
 	const TYPE_LABELS = { simple: 'Bono simple', pata: 'Pata' } as const;
@@ -170,8 +181,8 @@
 		</Alert>
 	{:else if session.rolledBackAt}
 		<Alert tone="warning">
-			Esta importación se revirtió el {formatDateTime(session.rolledBackAt)}: sus bonos se anularon
-			({session.rollbackReason}).
+			Esta importación se revirtió el {formatDateTime(session.rolledBackAt)} y sus bonos se anularon.
+			Motivo: {session.rollbackReason}.
 		</Alert>
 	{:else if data.lockedMessage}
 		<Alert tone="warning">{data.lockedMessage}</Alert>
@@ -223,14 +234,14 @@
 				</div>
 				<p id="confirm-hint" class="m-0 w-full text-body-sm text-muted">
 					{#if summary.errors > 0}
-						Confirmar está deshabilitado: corregir o quitar {summary.errors === 1
+						Todavía no se puede confirmar: corregir o quitar {summary.errors === 1
 							? 'la fila con error'
 							: `las ${formatNumber(summary.errors)} filas con errores`}.
 					{:else if summary.status !== 'validated'}
-						Validar la importación para habilitar Confirmar.
+						Para confirmar, primero validar la importación.
 					{:else}
-						Confirmar crea todos los bonos de una vez. Una persona administradora puede revertir más
-						tarde una importación hecha por error.
+						Al confirmar se crean todos los bonos de una vez. Si fue un error, quien administra el
+						sistema puede revertir la importación más tarde.
 					{/if}
 				</p>
 			</div>
@@ -238,18 +249,25 @@
 	{/if}
 
 	{#if data.canRollBack}
-		<Card
-			title="Revertir esta importación"
-			description="Anula los bonos disponibles de esta importación y libera sus números y códigos. Los bonos ya anulados a mano quedan como están. Solo es posible mientras ninguno se haya entregado, vendido o agrupado en una pata."
-			id="rollback"
-		>
-			<Button variant="danger" disabled={busy !== null} onclick={() => (rollingBack = true)}>
-				Revertir importación
-			</Button>
-			{#if form?.form === 'rollback' && form.errors?.reason}
-				<p class="m-0 mt-2 text-body-sm text-danger-text">{form.errors.reason[0]}</p>
-			{/if}
-		</Card>
+		<div id="rollback">
+			<Disclosure summary="Revertir esta importación" defaultOpen={form?.form === 'rollback'}>
+				<div class="flex flex-col gap-3">
+					<p class="m-0 text-body-sm text-muted">
+						Anula los bonos disponibles de esta importación y libera sus números y códigos. Los
+						bonos ya anulados a mano quedan como están. Solo se puede mientras ninguno se haya
+						entregado, vendido o agrupado en una pata.
+					</p>
+					<div>
+						<Button variant="danger" disabled={busy !== null} onclick={() => (rollingBack = true)}>
+							Revertir importación
+						</Button>
+					</div>
+					{#if form?.form === 'rollback' && form.errors?.reason}
+						<p class="m-0 text-body-sm text-danger-text">{form.errors.reason[0]}</p>
+					{/if}
+				</div>
+			</Disclosure>
+		</div>
 	{/if}
 
 	<section class="flex flex-col gap-3" aria-labelledby="rows-title">
@@ -277,7 +295,7 @@
 		{#if data.items.length === 0}
 			<EmptyState title="Ninguna fila coincide con este filtro" icon="search" />
 		{:else}
-			<Table {columns} {rows} caption="Filas de la importación" density="compact">
+			<Table {columns} {rows} caption="Filas de la importación" density="compact" stack>
 				{#snippet cell({ row, column })}
 					{@const removed = row.removedAt !== null}
 					{#if column.key === 'rowNumber'}
@@ -289,13 +307,24 @@
 					{:else if column.key === 'pata'}
 						<span class="font-mono">{row.groupKey ?? '—'}</span>
 					{:else if column.key === 'numbers'}
-						<span class="font-mono tabular-nums"
-							>{number(row.baseNumber)} / {associated(row.baseNumber)}</span
-						>
+						{#if row.baseNumber === null}
+							<span class="text-muted">Sin número</span>
+						{:else}
+							<BondNumber
+								number={number(row.baseNumber)}
+								associated={associated(row.baseNumber)}
+								size="sm"
+							/>
+						{/if}
 					{:else if column.key === 'barcode'}
 						<span class="font-mono">{row.barcode ?? '—'}</span>
 					{:else if column.key === 'problem'}
 						<span class="text-caption">
+							<span class="min-[720px]:hidden"
+								>Fila {row.rowNumber}{row.groupKey ? `, pata ${row.groupKey}` : ''}{row.barcode
+									? `, código ${row.barcode}`
+									: ''}.
+							</span>
 							{#if removed}
 								Quitada{row.removeReason ? `: ${row.removeReason}` : ''}
 							{:else if row.errorMessage}
@@ -361,7 +390,7 @@
 							/>
 						</Field>
 						<Field
-							label="grupo_pata"
+							label="Código de la pata"
 							id="group-{editItem.id}"
 							error={failure?.errors?.groupKey?.[0]}
 						>
@@ -410,7 +439,7 @@
 							<Button onclick={() => (editing = null)}>Cerrar</Button>
 						</div>
 						<p class="m-0 text-body-sm text-muted sm:col-span-4">
-							Fila de origen: <code class="font-mono">{editItem.rawValue}</code>
+							Así venía en el archivo: <code class="font-mono">{editItem.rawValue}</code>
 						</p>
 					</form>
 				</Card>

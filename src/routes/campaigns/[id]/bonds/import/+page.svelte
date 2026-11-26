@@ -6,6 +6,7 @@
 		Alert,
 		Button,
 		Card,
+		Disclosure,
 		EmptyState,
 		Field,
 		PageHeader,
@@ -36,11 +37,11 @@
 
 	type SessionRow = (typeof data.sessions)[number] & Record<string, unknown>;
 	const columns: TableColumn<SessionRow>[] = [
-		{ key: 'file', header: 'Archivo' },
-		{ key: 'type', header: 'Tipo' },
-		{ key: 'status', header: 'Estado' },
-		{ key: 'uploaded', header: 'Subido' },
-		{ key: 'open', header: 'Acción', align: 'right' }
+		{ key: 'file', header: 'Archivo', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'type', header: 'Tipo', stack: 'hidden' },
+		{ key: 'uploaded', header: 'Subido', stack: 'secondary' },
+		{ key: 'open', header: 'Acción', align: 'right', stack: 'hidden' }
 	];
 	const rows = $derived(data.sessions as SessionRow[]);
 </script>
@@ -51,7 +52,7 @@
 
 <PageHeader
 	title="Importar bonos desde un archivo"
-	description="Subir un archivo CSV o de Excel, revisar las filas y confirmar. No se crea nada hasta confirmar."
+	description="Subir un archivo CSV o de Excel, revisar las filas y confirmar. No se crea ningún bono hasta confirmar."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: campaignHref },
@@ -68,8 +69,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 underline"
-			>Usar el lector de códigos de barras →</a
+			class="text-primary-text underline-offset-2 underline">Usar el lector de códigos de barras</a
 		>
 	</p>
 
@@ -82,27 +82,31 @@
 
 		<Card title="Subir un archivo" id="upload">
 			<div class="flex flex-col gap-5">
-				<div class="text-body-sm text-muted">
-					<p class="m-0">
-						La primera fila debe tener los nombres de las columnas
-						<code class="rounded-sm bg-surface-sunken px-1 font-mono"
-							>tipo_bono,grupo_pata,numero_base,barcode</code
-						>. Las filas que comparten un
-						<code class="rounded-sm bg-surface-sunken px-1 font-mono">grupo_pata</code> forman una pata
-						(cada fila de una pata necesita su código de barras).
-					</p>
-					<pre
-						class="m-0 mt-2 overflow-x-auto rounded-lg bg-surface-sunken p-3 font-mono text-caption">tipo_bono,grupo_pata,numero_base,barcode
+				<p class="m-0 text-body-sm text-muted">
+					Cada fila del archivo es un bono simple o una unidad de una pata. Las filas que comparten
+					el mismo código de pata forman una pata, y cada una necesita su código de barras.
+				</p>
+				<Disclosure summary="Cómo tiene que ser el archivo">
+					<div class="flex flex-col gap-2 text-body-sm text-muted">
+						<p class="m-0">
+							La primera fila lleva los nombres de las columnas:
+							<code class="rounded-sm bg-surface-sunken px-1 font-mono"
+								>tipo_bono,grupo_pata,numero_base,barcode</code
+							>. Por ejemplo:
+						</p>
+						<pre
+							class="m-0 overflow-x-auto rounded-lg bg-surface-sunken p-3 font-mono text-caption">tipo_bono,grupo_pata,numero_base,barcode
 simple,,1658,1658
 pata,PATA1200,1200,PATA1200-1200
 pata,PATA1200,1315,PATA1200-1315</pre>
-				</div>
+					</div>
+				</Disclosure>
 				{#if campaign.status === 'draft'}
 					<Alert tone="warning">
-						Esta campaña es un borrador. <strong
-							>Confirmar la primera importación congela sus reglas</strong
-						>
-						(precio, cuotas, numeración, política de desborde y modo de código de barras).
+						Esta campaña todavía es un borrador. <strong
+							>Al confirmar la primera importación, ya no se pueden cambiar sus reglas</strong
+						>: el precio, las cuotas, la numeración, qué pasa si un número se pasa del máximo y el
+						modo de código de barras.
 					</Alert>
 				{/if}
 
@@ -154,14 +158,18 @@ pata,PATA1200,1315,PATA1200-1315</pre>
 	<section aria-labelledby="history-title" class="flex flex-col gap-3">
 		<h2 id="history-title" class="m-0 text-heading-3">Importaciones de archivos</h2>
 		{#if data.sessions.length === 0}
-			<EmptyState title="Todavía no hay importaciones">
-				Subir un archivo CSV o XLSX para cargar bonos en lote.
+			<EmptyState title="Todavía no se importó ningún archivo">
+				Subir un archivo CSV o de Excel con los bonos para cargarlos de una vez.
 			</EmptyState>
 		{:else}
-			<Table {columns} {rows} caption="Importaciones de archivos">
+			<Table {columns} {rows} caption="Importaciones de archivos" stack>
 				{#snippet cell({ row, column })}
 					{#if column.key === 'file'}
-						<span class="font-medium">{row.fileName}</span>
+						<a
+							href={sessionHref(row.id)}
+							class="inline-flex min-h-touch items-center font-medium text-primary-text underline-offset-2 hover:underline min-[720px]:min-h-0"
+							>{row.fileName}</a
+						>
 						{#if row.notes}<span class="block text-caption text-muted">{row.notes}</span>{/if}
 					{:else if column.key === 'type'}
 						{IMPORT_SOURCE_LABELS[row.sourceType]}
@@ -171,7 +179,9 @@ pata,PATA1200,1315,PATA1200-1315</pre>
 							status={row.rolledBackAt !== null ? 'rolled_back' : row.status}
 						/>
 					{:else if column.key === 'uploaded'}
-						<span class="tabular-nums">{formatDateTime(row.createdAt)}</span>
+						<span class="min-[720px]:hidden"
+							>{IMPORT_SOURCE_LABELS[row.sourceType]}, subido el
+						</span><span class="tabular-nums">{formatDateTime(row.createdAt)}</span>
 					{:else if column.key === 'open'}
 						<Button href={sessionHref(row.id)} size="sm">
 							{row.status === 'draft' || row.status === 'validated' ? 'Revisar' : 'Ver'}

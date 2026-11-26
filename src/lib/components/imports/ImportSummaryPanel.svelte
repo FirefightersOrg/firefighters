@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Stat } from '$lib/components/ui';
+	import { importSummarySentences } from '$lib/domain/import-preview';
 	import { formatNumber } from '$lib/format';
 	import type { ImportSessionSummary } from '$lib/server/services/imports';
 
@@ -12,7 +13,7 @@
 		{ label: 'Números base', value: summary.baseNumbers },
 		{ label: 'Números participantes', value: summary.participatingNumbers },
 		{
-			label: 'Errores bloqueantes',
+			label: 'Errores',
 			value: summary.errors,
 			detail: summary.errors > 0 ? 'Impiden confirmar' : undefined
 		},
@@ -29,6 +30,9 @@
 	]);
 </script>
 
+<p class="m-0 mb-3 text-body {summary.errors > 0 ? 'text-danger-text' : 'text-text'}">
+	{importSummarySentences(summary).join(' ')}
+</p>
 <div
 	class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7"
 	role="group"

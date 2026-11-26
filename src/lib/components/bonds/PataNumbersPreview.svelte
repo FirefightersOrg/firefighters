@@ -11,11 +11,11 @@
 
 <script lang="ts">
 	import { formatMoney, formatNumber } from '$lib/format';
+	import BondNumber from '$lib/components/ui/BondNumber.svelte';
 
 	/**
 	 * Preview of a pata (printed or manually grouped): every base → associated pair (2N numbers),
-	 * what blocks saving, N (`commercial_unit_count`) and the total value (`simple_bond_value * N`,
-	 * es-AR). Announced politely to screen readers.
+	 * what blocks saving, how many simple bonds it is worth and the total value (whole pesos). Announced politely to screen readers.
 	 */
 	let {
 		id = 'pata-preview',
@@ -64,11 +64,11 @@
 							></span
 						>
 					{:else}
-						<span class="font-semibold">{row.baseFormatted}</span>
-						<span aria-hidden="true" class="text-subtle">→</span><span class="sr-only"
-							>asociado</span
-						>
-						<span class="font-semibold">{row.associatedFormatted}</span>
+						<BondNumber
+							number={row.baseFormatted ?? ''}
+							associated={row.associatedFormatted}
+							size="sm"
+						/>
 					{/if}
 				</li>
 			{/each}
@@ -85,8 +85,11 @@
 
 	<dl class="m-0 mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-3">
 		<div>
-			<dt class="text-caption text-muted">Unidades (N)</dt>
-			<dd class="m-0 text-heading-3 tabular-nums">{formatNumber(unitCount)}</dd>
+			<dt class="text-caption text-muted">Vale</dt>
+			<dd class="m-0 text-heading-3 tabular-nums">
+				{formatNumber(unitCount)}
+				{unitCount === 1 ? 'bono' : 'bonos'}
+			</dd>
 		</div>
 		<div>
 			<dt class="text-caption text-muted">Números participantes</dt>
@@ -98,7 +101,8 @@
 				{totalValue ? formatMoney(totalValue) : '—'}
 			</dd>
 			<dd class="m-0 text-caption text-muted tabular-nums">
-				{formatMoney(simpleBondValue)} × {formatNumber(unitCount)}
+				{formatNumber(unitCount)}
+				{unitCount === 1 ? 'bono' : 'bonos'} de {formatMoney(simpleBondValue)}
 			</dd>
 		</div>
 	</dl>

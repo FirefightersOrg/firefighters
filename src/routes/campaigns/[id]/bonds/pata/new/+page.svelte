@@ -4,9 +4,11 @@
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import BondConflictLinks from '$lib/components/bonds/BondConflictLinks.svelte';
+	import NumberingRule from '$lib/components/bonds/NumberingRule.svelte';
 	import PataNumbersPreview from '$lib/components/bonds/PataNumbersPreview.svelte';
 	import {
 		Alert,
+		BondNumber,
 		Button,
 		Card,
 		EmptyState,
@@ -19,7 +21,7 @@
 	} from '$lib/components/ui';
 	import { MIN_PATA_SIZE } from '$lib/domain/bonds';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
-	import { associatedNumberRuleText } from '$lib/domain/numbering';
+	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
 	import { previewPata } from '$lib/domain/pata-preview';
 	import { formatNumber } from '$lib/format';
 	import { BOND_CODE_MAX_LENGTH } from '$lib/schemas/bond';
@@ -36,6 +38,7 @@
 
 	const campaign = $derived(data.campaign);
 	const config = $derived(campaignNumberingConfig(campaign));
+	const numbering = $derived(buildNumberingPreview(config));
 	const campaignHref = $derived(resolve('/campaigns/[id]', { id: campaign.id }));
 	const pageHref = $derived(resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id }));
 	const grouping = $derived(data.grouping);
@@ -170,7 +173,7 @@
 
 <PageHeader
 	title="Cargar una pata"
-	description="Una pata vende N números base juntos: vale lo mismo que N bonos simples. Las patas nuevas quedan disponibles para la venta."
+	description="Una pata junta varios números base y se vende como un solo bono: vale lo mismo que esos bonos simples sumados. Las patas nuevas quedan disponibles para la venta."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: campaignHref },
@@ -187,7 +190,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/new', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 underline">Cargar bonos simples →</a
+			class="text-primary-text underline-offset-2 underline">Cargar bonos simples</a
 		>
 	</p>
 
@@ -222,14 +225,16 @@
 			<Card title="Pata impresa" id="printed">
 				<div class="flex flex-col gap-5">
 					<p class="m-0 text-body-sm text-muted">
-						Ingresar los {MIN_PATA_SIZE} o más números base impresos en la pata. Cada uno trae su número
-						asociado (<span class="tabular-nums">{associatedNumberRuleText(campaign)}</span>).
+						Escribir los {MIN_PATA_SIZE} o más números base impresos en la pata. Cada uno trae su número
+						asociado.
 					</p>
+					<NumberingRule {campaign} {numbering} />
 					{#if campaign.status === 'draft'}
 						<Alert tone="warning">
-							Esta campaña es un borrador. <strong>Guardar el primer bono congela sus reglas</strong
-							>
-							(precio, cuotas, numeración, política de desborde y modo de código de barras).
+							Esta campaña todavía es un borrador. <strong
+								>Al guardar el primer bono, ya no se pueden cambiar sus reglas</strong
+							>: el precio, las cuotas, la numeración, qué pasa si un número se pasa del máximo y el
+							modo de código de barras.
 						</Alert>
 					{/if}
 					{#if formMessage === FIX_FIELDS_MESSAGE}
@@ -343,21 +348,22 @@
 						>
 							{#each grouping.results as bond (bond.id)}
 								<li class="flex items-center justify-between gap-3 py-2">
-									<span class="font-mono tabular-nums"
-										>{bond.baseFormatted} <span aria-hidden="true">→</span><span class="sr-only"
-											>asociado</span
-										>
-										{bond.associatedFormatted}
-										{#if bond.internalCode}<span class="ml-2 font-sans text-caption text-muted"
-												>{bond.internalCode}</span
-											>{/if}</span
-									>
+									<span class="flex flex-wrap items-baseline gap-x-3">
+										<BondNumber
+											number={bond.baseFormatted}
+											associated={bond.associatedFormatted}
+											size="sm"
+										/>
+										{#if bond.internalCode}<span class="text-caption text-muted"
+												>Código {bond.internalCode}</span
+											>{/if}
+									</span>
 									<a
 										href={pageWith(
 											groupingQuery({ q: grouping.query, selected: [...selectedIds, bond.id] })
 										)}
 										data-sveltekit-noscroll
-										class="font-medium text-primary-text underline-offset-2 hover:underline"
+										class="inline-flex min-h-touch items-center font-medium text-primary-text underline-offset-2 hover:underline"
 										aria-label={`Agregar el bono ${bond.baseFormatted}`}>Agregar</a
 									>
 								</li>
@@ -401,9 +407,11 @@
 							{#each grouping.selected as bond (bond.id)}
 								<li class="flex items-center justify-between gap-3 py-2">
 									<span>
-										<span class="font-mono tabular-nums"
-											>{bond.baseFormatted ?? 'Bono desconocido'}</span
-										>
+										{#if bond.baseFormatted}
+											<BondNumber number={bond.baseFormatted} size="sm" />
+										{:else}
+											<span class="text-muted">Bono que ya no existe</span>
+										{/if}
 										{#if bond.problem}
 											<span class="ml-2 text-caption text-danger-text">{bond.problem}</span>
 											{#if bond.pataId}
@@ -426,7 +434,7 @@
 											})
 										)}
 										data-sveltekit-noscroll
-										class="text-primary-text underline-offset-2 hover:underline"
+										class="inline-flex min-h-touch items-center text-primary-text underline-offset-2 hover:underline"
 										aria-label={`Quitar el bono ${bond.baseFormatted ?? ''}`.trim()}>Quitar</a
 									>
 								</li>

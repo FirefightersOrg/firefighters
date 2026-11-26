@@ -8,10 +8,13 @@
 	 */
 	let {
 		id = 'baseNumber-preview',
-		preview
+		preview,
+		circularFrom = null
 	}: {
 		id?: string;
 		preview: BaseNumberPreview;
+		/** Circular mode: where the associated numbers start (formatted); they restart past the maximum. */
+		circularFrom?: string | null;
 	} = $props();
 </script>
 
@@ -35,7 +38,6 @@
 					{preview.baseFormatted}
 				</dd>
 			</div>
-			<div aria-hidden="true" class="text-heading-2 text-subtle">→</div>
 			<div>
 				<dt class="text-caption text-muted">Número asociado</dt>
 				<dd class="m-0 font-figure text-number-lg font-bold tabular-nums">
@@ -43,5 +45,10 @@
 				</dd>
 			</div>
 		</dl>
+		{#if circularFrom}
+			<p class="m-0 mt-2 text-caption text-muted">
+				Modo circular: los asociados empiezan en {circularFrom} y vuelven a empezar al llegar al máximo.
+			</p>
+		{/if}
 	{/if}
 </div>

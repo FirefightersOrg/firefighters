@@ -7,6 +7,7 @@
 	import ImportSummaryPanel from '$lib/components/imports/ImportSummaryPanel.svelte';
 	import {
 		Alert,
+		BondNumber,
 		Button,
 		Card,
 		EmptyState,
@@ -19,6 +20,7 @@
 	} from '$lib/components/ui';
 	import { BARCODE_MODE_LABELS } from '$lib/domain/campaigns';
 	import { translateImportMessage } from '$lib/domain/import-messages';
+	import { associatedNumberFor } from '$lib/domain/numbering';
 	import { formatImportNumber } from '$lib/domain/import-preview';
 	import { formatDateTime } from '$lib/format';
 	import type { ImportItem } from '$lib/server/repositories/imports';
@@ -42,6 +44,11 @@
 	const scanHref = (sessionId: string) =>
 		`${resolve('/campaigns/[id]/bonds/scan', { id: campaign.id })}?session=${sessionId}` as ResolvedPathname;
 	const number = (value: number | null) => formatImportNumber(value, campaign.numberDigits);
+	const associated = (value: number | null) =>
+		formatImportNumber(
+			value === null ? null : associatedNumberFor(value, campaign),
+			campaign.numberDigits
+		);
 
 	let barcode = $state('');
 	let baseNumber = $state('');
@@ -91,11 +98,12 @@
 
 	type ScanRow = ImportItem & Record<string, unknown>;
 	const scanColumns: TableColumn<ScanRow>[] = [
-		{ key: 'rowNumber', header: 'N.º', align: 'right' },
-		{ key: 'barcode', header: 'Código', mono: true },
-		{ key: 'base', header: 'Número base', mono: true },
-		{ key: 'pata', header: 'Pata' },
-		{ key: 'status', header: 'Estado' }
+		{ key: 'base', header: 'Número', stack: 'primary' },
+		{ key: 'status', header: 'Estado', stack: 'trailing' },
+		{ key: 'rowNumber', header: 'Fila', align: 'right', stack: 'hidden' },
+		{ key: 'pata', header: 'Pata', stack: 'hidden' },
+		{ key: 'barcode', header: 'Código de barras', mono: true, stack: 'hidden' },
+		{ key: 'problem', header: 'Observación', stack: 'secondary' }
 	];
 	const scanRows = $derived(recent as ScanRow[]);
 </script>
@@ -106,7 +114,7 @@
 
 <PageHeader
 	title="Escanear bonos"
-	description={`Modo de código de barras: ${BARCODE_MODE_LABELS[campaign.barcodeMode]}. Los escaneos se verifican al instante y solo crean bonos al confirmar el lote.`}
+	description="Cada código se revisa al instante. Los bonos se crean recién al confirmar el lote."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: campaignHref },
@@ -123,7 +131,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/import', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 underline">Importar un archivo →</a
+			class="text-primary-text underline-offset-2 underline">Importar un archivo</a
 		>
 	</p>
 
@@ -132,6 +140,9 @@
 	{:else if !data.session}
 		{#if form?.message && !form.success}<Alert tone="danger">{form.message}</Alert>{/if}
 		<Card title="Iniciar un lote de escaneo" id="start">
+			<p class="m-0 mb-4 text-body-sm text-muted">
+				Modo de código de barras de la campaña: {BARCODE_MODE_LABELS[campaign.barcodeMode]}.
+			</p>
 			<form method="POST" action="?/start" class="flex flex-wrap items-end gap-3" use:enhance>
 				<div class="min-w-64 flex-1">
 					<Field label="Notas" id="notes" optional>
@@ -167,7 +178,7 @@
 					? 'ring-4 ring-danger'
 					: ''}"
 		>
-			<Card title="Escáner" id="scanner">
+			<Card title="Escaneo" id="scanner">
 				{#snippet actions()}
 					<Button variant="primary" href={previewHref(session.id)}>Revisar y confirmar</Button>
 				{/snippet}
@@ -220,7 +231,7 @@
 								label="Código de barras"
 								id="barcode"
 								required
-								hint="Apuntar el lector acá. Enter o Tab envían el código."
+								hint="Apuntar el lector a este campo. Enter o Tab envían el código."
 								error={form?.form === 'scan' ? form.errors?.barcode?.[0] : undefined}
 							>
 								<TextInput
@@ -239,7 +250,7 @@
 							<Field
 								label="Número base"
 								id="baseNumber"
-								hint="Esta campaña lo necesita ingresado con cada código."
+								hint="Esta campaña pide escribir el número base junto con cada código."
 								error={form?.form === 'scan' ? form.errors?.baseNumber?.[0] : undefined}
 							>
 								<TextInput
@@ -252,11 +263,11 @@
 							</Field>
 						{/if}
 						<Field
-							label="grupo_pata (solo patas)"
+							label="Código de la pata (solo patas)"
 							id="groupKey"
 							hint={groupKey.trim()
-								? `Escaneando unidades de la pata ${groupKey.trim()}.`
-								: 'Vacío: bonos simples.'}
+								? `Se escanean bonos de la pata ${groupKey.trim()}. Vaciar el campo para volver a bonos simples.`
+								: 'Dejar vacío para escanear bonos simples.'}
 						>
 							<TextInput
 								name="groupKey"
@@ -273,13 +284,27 @@
 						</div>
 					</form>
 
-					<div aria-live="polite" class="min-h-6 text-body-sm">
+					<div aria-live="polite" class="min-h-12 text-body">
 						{#if form?.form === 'scan' && form.message}
-							<p class="m-0 {form.success ? 'text-success-text' : 'text-danger-text'}">
-								{form.scanned
-									? `Fila ${form.scanned.rowNumber}: ${form.success ? `${number(form.scanned.baseNumber)} cargado.` : form.message}`
-									: form.message}
-							</p>
+							{#if form.success && form.scanned}
+								<p class="m-0 flex flex-wrap items-baseline gap-x-2 font-medium text-success-text">
+									<span>Leído:</span>
+									<BondNumber
+										number={number(form.scanned.baseNumber)}
+										associated={associated(form.scanned.baseNumber)}
+										size="md"
+									/>
+									<span class="text-body-sm font-normal text-muted"
+										>Fila {form.scanned.rowNumber} del lote.</span
+									>
+								</p>
+							{:else}
+								<p class="m-0 font-medium text-danger-text">
+									{form.scanned
+										? `Fila ${form.scanned.rowNumber}: ${form.message}`
+										: `${form.message} Volver a escanear.`}
+								</p>
+							{/if}
 						{/if}
 					</div>
 				</div>
@@ -300,27 +325,45 @@
 				</EmptyState>
 			{:else}
 				<div class="flex flex-col gap-3">
-					<Table columns={scanColumns} rows={scanRows} caption="Últimos escaneos" density="compact">
+					<Table
+						columns={scanColumns}
+						rows={scanRows}
+						caption="Últimos escaneos"
+						density="compact"
+						stack
+					>
 						{#snippet cell({ row, column })}
 							{#if column.key === 'rowNumber'}
 								<span class="tabular-nums">{row.rowNumber}</span>
 							{:else if column.key === 'barcode'}
 								{row.barcode ?? '—'}
 							{:else if column.key === 'base'}
-								{number(row.baseNumber)}
+								{#if row.baseNumber === null}
+									<span class="text-muted">Sin número</span>
+								{:else}
+									<BondNumber
+										number={number(row.baseNumber)}
+										associated={associated(row.baseNumber)}
+										size="sm"
+									/>
+								{/if}
 							{:else if column.key === 'pata'}
 								{row.groupKey ?? '—'}
 							{:else if column.key === 'status'}
 								<StatusBadge kind="importItem" status={row.status} />
-								{#if row.errorMessage}<span class="ml-2 text-caption text-muted"
-										>{translateImportMessage(row.errorMessage)}</span
-									>{/if}
+							{:else if column.key === 'problem'}
+								<span class="min-[720px]:hidden"
+									>Fila {row.rowNumber}, código {row.barcode ?? '—'}{row.groupKey
+										? `, pata ${row.groupKey}`
+										: ''}.
+								</span>
+								{#if row.errorMessage}{translateImportMessage(row.errorMessage)}{/if}
 							{/if}
 						{/snippet}
 					</Table>
 					<p class="m-0 text-body-sm text-muted">
-						Los estados son los de cada escaneo; un escaneo posterior puede convertir uno anterior
-						en duplicado. La página de revisión muestra el estado actual.
+						Cada estado es el del momento del escaneo. Un escaneo posterior puede volver duplicado a
+						uno anterior; «Revisar y confirmar» muestra el estado actual.
 					</p>
 				</div>
 			{/if}

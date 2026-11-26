@@ -4,8 +4,10 @@
 	import { resolve } from '$app/paths';
 	import BaseNumberPreview from '$lib/components/bonds/BaseNumberPreview.svelte';
 	import BondConflictLinks from '$lib/components/bonds/BondConflictLinks.svelte';
+	import NumberingRule from '$lib/components/bonds/NumberingRule.svelte';
 	import {
 		Alert,
+		BondNumber,
 		Button,
 		Card,
 		Field,
@@ -16,9 +18,7 @@
 	} from '$lib/components/ui';
 	import { previewBaseNumber } from '$lib/domain/bond-preview';
 	import { campaignNumberingConfig } from '$lib/domain/campaigns';
-	import { associatedNumberRuleText } from '$lib/domain/numbering';
 	import { buildNumberingPreview } from '$lib/domain/numbering-preview';
-	import { formatNumber } from '$lib/format';
 	import { BOND_CODE_MAX_LENGTH, BOND_ENTRY_INTENT_FIELD } from '$lib/schemas/bond';
 	import type { PageProps } from './$types';
 
@@ -89,7 +89,7 @@
 
 <PageHeader
 	title="Cargar bonos"
-	description="Bonos simples, un número base por vez. Los bonos nuevos quedan disponibles para la venta."
+	description="Se carga un bono simple por vez, con su número base. Los bonos nuevos quedan disponibles para la venta."
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: campaignHref },
@@ -106,7 +106,7 @@
 	<p class="m-0 text-body-sm">
 		<a
 			href={resolve('/campaigns/[id]/bonds/pata/new', { id: campaign.id })}
-			class="text-primary-text underline-offset-2 underline">Cargar una pata →</a
+			class="text-primary-text underline-offset-2 underline">Cargar una pata</a
 		>
 	</p>
 
@@ -128,22 +128,13 @@
 
 		<Card title="Bono simple" id="entry">
 			<div class="flex flex-col gap-5">
-				<p class="m-0 text-body-sm text-muted">
-					Números de {campaign.numberDigits} dígitos hasta
-					<span class="font-mono tabular-nums">{campaign.maxNumber}</span>; número asociado =
-					<span class="tabular-nums">{associatedNumberRuleText(campaign)}</span>.
-					{#if numbering.ok}
-						Números base utilizables:
-						<span class="font-mono tabular-nums"
-							>{numbering.examples[0].baseFormatted}–{numbering.maxValidBase.baseFormatted}</span
-						>
-						({formatNumber(numbering.usableBaseCount)}).
-					{/if}
-				</p>
+				<NumberingRule {campaign} {numbering} />
 				{#if campaign.status === 'draft'}
 					<Alert tone="warning">
-						Esta campaña es un borrador. <strong>Guardar el primer bono congela sus reglas</strong>
-						(precio, cuotas, numeración, política de desborde y modo de código de barras).
+						Esta campaña todavía es un borrador. <strong
+							>Al guardar el primer bono, ya no se pueden cambiar sus reglas</strong
+						>: el precio, las cuotas, la numeración, qué pasa si un número se pasa del máximo y el
+						modo de código de barras.
 					</Alert>
 				{/if}
 
@@ -195,7 +186,10 @@
 							/>
 						</div>
 						<div class="sm:pt-6">
-							<BaseNumberPreview {preview} />
+							<BaseNumberPreview
+								{preview}
+								circularFrom={numbering.ok ? (numbering.associatedRange?.from ?? null) : null}
+							/>
 						</div>
 					</div>
 
@@ -263,19 +257,19 @@
 		</Card>
 
 		{#if saved.length > 0}
-			<Card title="Guardados desde esta página" id="saved">
+			<Card title="Cargados en esta visita" id="saved">
 				<ul class="m-0 list-none divide-y divide-border p-0 text-body-sm">
 					{#each saved as bond (bond.id)}
 						<li class="flex items-center justify-between py-2">
-							<span class="font-mono tabular-nums"
-								>{bond.baseFormatted} <span aria-hidden="true">→</span><span class="sr-only"
-									>asociado</span
-								>
-								{bond.associatedFormatted}</span
-							>
+							<BondNumber
+								number={bond.baseFormatted}
+								associated={bond.associatedFormatted}
+								size="sm"
+							/>
 							<a
 								href={bondHref(bond.id)}
-								class="text-primary-text underline-offset-2 hover:underline">Ver</a
+								class="inline-flex min-h-touch items-center text-primary-text underline-offset-2 hover:underline sm:min-h-0"
+								aria-label={`Ver el bono ${bond.baseFormatted}`}>Ver</a
 							>
 						</li>
 					{/each}
