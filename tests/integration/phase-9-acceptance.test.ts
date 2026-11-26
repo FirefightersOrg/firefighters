@@ -80,6 +80,7 @@ async function soldBond(label: string, collectorId: string) {
 		p_buyer_id: buyerId,
 		p_payment_mode: 'installments',
 		p_first_due_date: baDate(1),
+		p_sale_date: baDate(-10),
 		p_request_id: rid(`sale-${label}`)
 	});
 	const { data, error } = await service

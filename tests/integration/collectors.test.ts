@@ -206,7 +206,7 @@ describe('collectors (local Supabase)', () => {
 		).rejects.toMatchObject({ status: 403 });
 		await expect(
 			listLoad(event(readOnly, `/campaigns/${campaignId}/collectors`, { id: campaignId }))
-		).rejects.toMatchObject({ status: 403 });
+		).resolves.toHaveProperty('collectors');
 
 		// SAN-93 owns the operator view matrix. Until collector.view is granted, 403 is expected.
 		if (

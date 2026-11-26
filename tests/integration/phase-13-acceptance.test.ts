@@ -263,6 +263,7 @@ async function soldAndPaid(
 		p_buyer_id: buyer,
 		p_payment_mode: 'installments',
 		p_first_due_date: today,
+		p_sale_date: paymentDate,
 		p_request_id: rid(`sale-${base}`)
 	});
 	const { data: rows, error } = await users.admin.client

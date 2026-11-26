@@ -24,6 +24,7 @@ const page = (status = 'open') =>
 		props: {
 			data: {
 				campaign: { id },
+				today: '2026-11-25',
 				settlement: { ...settlement, status },
 				totals,
 				payments: [
@@ -43,6 +44,8 @@ describe('settlement workspace render', () => {
 		// Every Stat value is tabular (acceptance: amounts right-aligned and tabular).
 		expect(body.match(/text-number-lg[^"]*tabular-nums/g)).toHaveLength(7);
 		expect(body).toContain('?/add');
+		expect(body).toContain('Fecha del pago');
+		expect(body).toContain('name="paymentDate"');
 		expect(body).toContain('?/remove');
 		expect(body).toContain('?/close');
 		expect(body).toContain('31/12/2025');
@@ -74,6 +77,7 @@ describe('settlement workspace render', () => {
 			props: {
 				data: {
 					campaign: { id },
+					today: '2026-11-25',
 					settlement: { ...settlement, status: 'closed' },
 					totals,
 					payments: [{ id: 'p', date: '', amount: '1.00', method: 'cash', status: 'annulled' }],
@@ -105,6 +109,7 @@ describe('collector submissions (SAN-147)', () => {
 			props: {
 				data: {
 					campaign: { id },
+					today: '2026-11-25',
 					settlement,
 					totals,
 					payments: [],
@@ -169,6 +174,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 			props: {
 				data: {
 					campaign: { id },
+					today: '2026-11-25',
 					settlement: { ...settlement, status: 'closed' },
 					totals,
 					payments: [
@@ -203,6 +209,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 			props: {
 				data: {
 					campaign: { id },
+					today: '2026-11-25',
 					settlement,
 					totals,
 					payments: [],
@@ -258,6 +265,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 				props: {
 					data: {
 						campaign: { id },
+						today: '2026-11-25',
 						settlement: {
 							...settlement,
 							status: 'closed',

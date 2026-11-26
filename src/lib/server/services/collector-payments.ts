@@ -46,6 +46,10 @@ type RpcError = { code?: string; message?: string };
 const MESSAGES: [RegExp, string][] = [
 	[/date cannot be in the future/, 'La fecha del cobro no puede ser futura.'],
 	[
+		/payment date cannot be before the sale date/,
+		'La fecha del cobro no puede ser anterior a la fecha de la venta.'
+	],
+	[
 		/exceed installment amount/,
 		'El importe supera el saldo de la cuota, contando los cobros pendientes.'
 	],

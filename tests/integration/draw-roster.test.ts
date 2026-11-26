@@ -125,6 +125,7 @@ beforeAll(async () => {
 			p_buyer_id: buyerId,
 			p_payment_mode: 'installments',
 			p_first_due_date: today,
+			p_sale_date: cutoffDay,
 			p_request_id: request(`sale-${index}`)
 		});
 		const { data, error } = await admin
@@ -222,6 +223,7 @@ it('SAN-152 annulling a draw built from own numbers releases nothing and keeps s
 		p_buyer_id: buyerId,
 		p_payment_mode: 'full_payment',
 		p_first_due_date: today,
+		p_sale_date: today,
 		p_request_id: context.requestId
 	});
 	const installment = await admin

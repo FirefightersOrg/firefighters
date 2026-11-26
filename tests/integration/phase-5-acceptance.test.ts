@@ -445,7 +445,7 @@ describe('Phase 5: collectors and buyers', () => {
 
 	it('uses the current role matrix for route 403s and RLS, including the collector own scope', async () => {
 		// SAN-93 (#44): the operator views collectors (collector.view) and manages buyers;
-		// treasurer/read-only cannot view either party.
+		// Treasurer and read-only can also view both parties.
 		expect(
 			await collectorsLoad(
 				event(
@@ -460,12 +460,11 @@ describe('Phase 5: collectors and buyers', () => {
 			collectors: expect.arrayContaining([expect.objectContaining({ id: collectorId })])
 		});
 		for (const user of [users.treasurer, users['read-only']]) {
-			expect(
-				await status(() =>
-					buyersLoad(event(user, `/campaigns/${campaignId}/buyers`, { id: campaignId }))
-				)
-			).toBe(403);
+			await expect(
+				buyersLoad(event(user, `/campaigns/${campaignId}/buyers`, { id: campaignId }))
+			).resolves.toHaveProperty('buyers');
 		}
+
 		expect(
 			await buyersLoad(
 				event(
@@ -493,7 +492,7 @@ describe('Phase 5: collectors and buyers', () => {
 		expect(collectorRows.data).toEqual([]);
 		expect(
 			(await users.treasurer.client.from('buyers').select('id').eq('id', buyerId)).data
-		).toEqual([]);
+		).toEqual([{ id: buyerId }]);
 		expect(
 			(await users.operator.client.from('buyers').select('id').eq('id', buyerId)).data
 		).toEqual([{ id: buyerId }]);
@@ -726,8 +725,8 @@ describe('Phase 5: collectors and buyers', () => {
 		for (const user of [users.treasurer, users['read-only']]) {
 			const data = await campaignLoad(event(user, `/campaigns/${campaignId}`, { id: campaignId }));
 			const html = render(CampaignPage, { props: { data } as never }).body;
-			expect(html).not.toContain('>Cobradores</a>');
-			expect(html).not.toContain('>Compradores</a>');
+			expect(html).toContain('>Cobradores</a>');
+			expect(html).toContain('>Compradores</a>');
 		}
 	});
 });
