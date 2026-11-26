@@ -67,6 +67,14 @@ export function mapSettlementRpcError(error: RpcError) {
 				: 'Hay cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
 		);
 	}
+	if (
+		error.code === '22023' &&
+		/payment date cannot be before the sale date/.test(error.message ?? '')
+	)
+		return new SettlementServiceError(
+			'validation',
+			'La fecha del cobro no puede ser anterior a la fecha de la venta.'
+		);
 	if (['22023', '23514'].includes(error.code ?? ''))
 		return new SettlementServiceError(
 			'validation',

@@ -496,6 +496,41 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		expect(after.data).toEqual(before.data);
 	});
 
+	it('rejects a staff payment dated before the sale date and accepts the sale day', async () => {
+		const sale = await createSale('before-sale', baDate(-3));
+		const settlementId = await openSettlement(
+			users.operator.client,
+			{ campaignId, collectorId, notes: 'before sale' },
+			ctx(users.operator)
+		);
+		const early = rid('before-sale-payment');
+		await noWrites(early, async () => {
+			const result = await users.operator.client.rpc('settlement_add_payment', {
+				p_settlement_id: settlementId,
+				p_sale_id: sale.saleId,
+				p_amount: 10,
+				p_payment_method: 'cash',
+				p_payment_date: baDate(-4),
+				p_request_id: early,
+				p_applications: [{ installment_id: sale.installments[0].id, amount_applied: 10 }]
+			});
+			expect(result.error?.code).toBe('22023');
+			expect(result.error?.message).toMatch(/before the sale date/);
+		});
+		const onSaleDay = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 10,
+				paymentMethod: 'cash',
+				paymentDate: baDate(-3),
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 10 }]
+			},
+			ctx(users.operator, rid('sale-day-payment'))
+		);
+		expect(onSaleDay).toBeTruthy();
+	});
 	it('C2 closes atomically, confirms applications across settlements, records snapshots and audits', async () => {
 		const advance = await createSale('advance', baDate());
 		const overdue = await createSale('overdue', baDate(-2));
@@ -764,7 +799,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 	});
 
 	it('C5 verifies printable documents and settlement workspace against real closed and open data', async () => {
-		const sale = await createSale('c5-print', baDate());
+		const sale = await createSale('c5-print', baDate(-1));
 		const { data: bondNumbers, error: bondNumbersError } = await service
 			.from('bond_numbers')
 			.select('number_value')

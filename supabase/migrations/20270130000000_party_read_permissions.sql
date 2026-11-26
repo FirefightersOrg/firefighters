@@ -47,6 +47,9 @@ begin
   if p_payment_date > v_today then
     raise exception 'payment date cannot be in the future' using errcode = 'invalid_parameter_value';
   end if;
+  if p_payment_date < (v_sale.sold_at at time zone 'America/Argentina/Buenos_Aires')::date then
+    raise exception 'payment date cannot be before the sale date' using errcode = 'invalid_parameter_value';
+  end if;
   insert into public.payments (
     campaign_id, sale_id, collector_id, buyer_id, settlement_id, amount,
     payment_method, payment_date, status, created_by

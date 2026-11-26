@@ -1,7 +1,7 @@
 begin;
 -- current_date below is the Buenos Aires date, as in the RPCs (not UTC midnight).
 set local timezone = 'America/Argentina/Buenos_Aires';
-select plan(48);
+select plan(49);
 insert into auth.users(id,email) values ('a6280000-0000-0000-0000-000000000001','settle@example.com');
 insert into public.profiles(id,auth_user_id,full_name,email,status) values ('b6280000-0000-0000-0000-000000000001','a6280000-0000-0000-0000-000000000001','Settlement','settle@example.com','active');
 insert into public.user_roles(user_id,role_id) select 'b6280000-0000-0000-0000-000000000001',id from public.roles where name='admin';
@@ -17,15 +17,16 @@ insert into public.user_roles(user_id,role_id) select 'b6280000-0000-0000-0000-0
 with x as (insert into public.collectors(display_name,user_profile_id) values('Ana','b6280000-0000-0000-0000-000000000003') returning id) insert into ids select 'collector',id from x;
 with x as (insert into public.buyers(type,first_name) values('individual','Eva') returning id) insert into ids select 'buyer',id from x;
 with x as (insert into public.bonds(campaign_id,kind,origin,commercial_unit_count,total_value,commercial_status) values(pg_temp.id('c'),'simple','printed',1,100,'available') returning id) insert into ids select 'bond',id from x;
-with x as (insert into public.sales(campaign_id,bond_id,buyer_id,collector_id,payment_mode,total_amount,created_by) values(pg_temp.id('c'),pg_temp.id('bond'),pg_temp.id('buyer'),pg_temp.id('collector'),'installments',100,'b6280000-0000-0000-0000-000000000001') returning id) insert into ids select 'sale',id from x;
+with x as (insert into public.sales(campaign_id,bond_id,buyer_id,collector_id,payment_mode,total_amount,created_by,sold_at) values(pg_temp.id('c'),pg_temp.id('bond'),pg_temp.id('buyer'),pg_temp.id('collector'),'installments',100,'b6280000-0000-0000-0000-000000000001',(current_date - 2)::timestamp + interval '12 hours') returning id) insert into ids select 'sale',id from x;
 with x as (insert into public.payment_plans(sale_id,installment_count,total_amount) values(pg_temp.id('sale'),2,100) returning id) insert into ids select 'plan',id from x;
 with x as (insert into public.installments(payment_plan_id,installment_number,due_date,amount) select pg_temp.id('plan'),n,current_date+1,50 from generate_series(1,2)n returning id,installment_number) insert into ids select 'i'||installment_number,id from x;
 set local role authenticated;
 with x as (select public.settlement_open(pg_temp.id('c'),pg_temp.id('collector'),' note ','r1') id) insert into ids select 'set',id from x;
 select is((select settlement_number from public.settlements where id=pg_temp.id('set')),1,'opens next numbered settlement');
 select throws_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),10,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',10)),(now() at time zone 'America/Argentina/Buenos_Aires')::date+1)$$,'22023','payment date cannot be in the future','future Buenos Aires payment date rejected');
+select throws_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),10,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',10)),current_date-3)$$,'22023','payment date cannot be before the sale date','payment dated before the sale is rejected');
 select throws_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),10,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',9)))$$,'22023','payment applications must equal the payment amount','applications must sum to the payment');
-select lives_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),100,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',50),jsonb_build_object('installment_id',pg_temp.id('i2'),'amount_applied',50)), current_date - 2, 'historical-payment')$$,'adds multi-installment cash payment');
+select lives_ok($$select public.settlement_add_payment(pg_temp.id('set'),pg_temp.id('sale'),100,'cash',jsonb_build_array(jsonb_build_object('installment_id',pg_temp.id('i1'),'amount_applied',50),jsonb_build_object('installment_id',pg_temp.id('i2'),'amount_applied',50)), current_date - 2, 'historical-payment')$$,'adds multi-installment cash payment dated the sale day (equal date accepted)');
 reset role;
 select is((select payment_date from public.payments where settlement_id=pg_temp.id('set')),current_date - 2,'historical date is persisted');
 select is((select new_value->>'payment_date' from public.audit_log where request_id='historical-payment'),(current_date - 2)::text,'audit records the effective historical date');

@@ -29,9 +29,9 @@ begin
  foreach k in array array['cash','transfer','method','reverse','old','new','pending','partial','zero','advance'] loop
   insert into public.bonds(campaign_id,kind,origin,commercial_unit_count,total_value,commercial_status)
    values(pg_temp.id('campaign'),'simple','printed',1,100,'available') returning id into b;
-  insert into public.sales(campaign_id,bond_id,buyer_id,collector_id,payment_mode,total_amount,created_by)
+  insert into public.sales(campaign_id,bond_id,buyer_id,collector_id,payment_mode,total_amount,created_by,sold_at)
    values(pg_temp.id('campaign'),b,pg_temp.id('buyer'),pg_temp.id('collector'),
-    case when k='new' then 'installments' else 'full_payment' end,100,'b6710000-0000-0000-0000-000000000001') returning id into s;
+    case when k='new' then 'installments' else 'full_payment' end,100,'b6710000-0000-0000-0000-000000000001',now() - interval '30 days') returning id into s;
   insert into public.payment_plans(sale_id,installment_count,total_amount) values(s,1,100) returning id into pp;
   insert into public.installments(payment_plan_id,installment_number,due_date,amount)
    values(pp,1,case when k='advance' then current_date+10 else current_date-1 end,100) returning id into i;
