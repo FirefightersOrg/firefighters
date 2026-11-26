@@ -338,29 +338,21 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 		role: 'collector',
 		run: async (r) => {
 			await r.page.goto(`${BASE_URL}/portal`);
-			await r.screen('Portal');
-			// With more than one campaign the portal starts on a list of campaigns.
+			// With one campaign in course the portal opens on «Por cobrar» (UX plan PR 10).
 			const campaign = r.page.getByRole('link', { name: DEMO_CAMPAIGN_NAME });
-			if (await campaign.count()) {
+			if (!/\/por-cobrar$/.test(new URL(r.page.url()).pathname) && (await campaign.count())) {
+				await r.screen('Portal');
 				await r.tap(campaign.first(), 'Elegir la campaña');
-				await r.screen('Mis bonos');
 			}
-			await r.tap(r.page.getByRole('link', { name: 'Por cobrar' }), 'Por cobrar');
 			await r.screen('Por cobrar');
-			await r.tap(r.page.locator('main table a[href*="/ventas/"]').first(), 'Abrir la venta');
-			await r.screen('Venta');
-			await r.tap(r.page.getByText('Registrar cobro').first(), 'Registrar cobro');
-			await r.screen('Formulario de cobro');
-			await r.tap(
-				r.page.getByRole('button', { name: 'Revisar y enviar' }).first(),
-				'Revisar y enviar'
-			);
+			await r.tap(r.page.getByRole('button', { name: /^Cobrar/ }).first(), 'Cobrar');
 			await r.page.getByRole('dialog').waitFor();
-			await r.screen('Confirmar el cobro');
+			await r.screen('Hoja de cobro');
 			await r.tap(
-				r.page.getByRole('dialog').getByRole('button', { name: 'Enviar cobro' }),
+				r.page.getByRole('dialog').getByRole('button', { name: /^Enviar cobro/ }),
 				'Enviar cobro'
 			);
+			await r.page.waitForURL(/enviado=1$/);
 			await r.screen('Cobro enviado');
 		}
 	}

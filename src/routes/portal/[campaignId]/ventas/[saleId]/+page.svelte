@@ -27,10 +27,10 @@
 	const methodLabel = { cash: 'Efectivo', transfer: 'Transferencia' } as const;
 	const paymentRows = $derived(data.payments.map((payment) => ({ ...payment })));
 	const paymentColumns: TableColumn<(typeof paymentRows)[number]>[] = [
-		{ key: 'paymentDate', header: 'Fecha' },
-		{ key: 'amount', header: 'Monto', align: 'right' },
+		{ key: 'paymentDate', header: 'Fecha', stack: 'primary' },
+		{ key: 'amount', header: 'Monto', align: 'right', stack: 'trailing' },
 		{ key: 'method', header: 'Medio' },
-		{ key: 'status', header: 'Estado' }
+		{ key: 'status', header: 'Estado', stack: 'secondary' }
 	];
 	// What can still be sent per installment: balance minus the drafts already waiting for a settlement.
 	const availableFor = (installment: (typeof data.installments)[number]) =>
@@ -64,11 +64,11 @@
 
 	const submissionRows = $derived(data.submissions.map((s) => ({ ...s })));
 	const submissionColumns: TableColumn<(typeof submissionRows)[number]>[] = [
-		{ key: 'paymentDate', header: 'Fecha' },
+		{ key: 'paymentDate', header: 'Fecha', stack: 'primary' },
+		{ key: 'amount', header: 'Monto', align: 'right', stack: 'trailing' },
+		{ key: 'status', header: 'Estado', stack: 'secondary' },
 		{ key: 'installmentNumbers', header: 'Cuotas' },
-		{ key: 'amount', header: 'Monto', align: 'right' },
-		{ key: 'method', header: 'Medio' },
-		{ key: 'status', header: 'Estado' }
+		{ key: 'method', header: 'Medio' }
 	];
 </script>
 
@@ -76,7 +76,7 @@
 
 <PageHeader
 	title={`Venta del bono ${bond}`}
-	description={`${sale.campaignName} · ${PAYMENT_MODE_LABELS[sale.paymentMode]} · ${formatDate(sale.soldAt)}`}
+	description={`${PAYMENT_MODE_LABELS[sale.paymentMode]}, vendido el ${formatDate(sale.soldAt)}.`}
 	breadcrumbs={[
 		{ label: 'Mi portal', href: resolve('/portal') },
 		{
@@ -167,6 +167,7 @@
 				rows={submissionRows}
 				rowKey="id"
 				caption="Cobros registrados desde el portal"
+				stack
 			>
 				{#snippet cell({ row, column })}
 					{#if column.key === 'paymentDate'}
@@ -194,7 +195,13 @@
 	{/if}
 
 	<Card title="Pagos aplicados" flush>
-		<Table columns={paymentColumns} rows={paymentRows} rowKey="id" caption="Pagos de la venta">
+		<Table
+			columns={paymentColumns}
+			rows={paymentRows}
+			rowKey="id"
+			caption="Pagos de la venta"
+			stack
+		>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'paymentDate'}
 					{formatDate(row.paymentDate)}
