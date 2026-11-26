@@ -136,11 +136,14 @@ test('report tabs and audit filters work from the keyboard; codes appear only in
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/view=monthly/);
 	await open(page, `${campaign()}/audit`);
-	await page.getByLabel('Nombre de la persona').fill('Jorge Medina');
+	// A collector the demo always creates under this name. Its first collector («Jorge Medina») is
+	// the one linked to the fixture collector user, and when another spec linked that user first
+	// (the portal sweep, earlier in a full run) the demo reuses that collector, with its name.
+	await page.getByLabel('Nombre de la persona').fill('Marta Giménez');
 	await page.getByLabel('Nombre de la persona').press('Enter');
-	await expect(page).toHaveURL(/person=Jorge/);
+	await expect(page).toHaveURL(/person=Marta/);
 	const rows = page.locator('main tbody');
-	await expect(rows).toContainText('Jorge Medina');
+	await expect(rows).toContainText('Marta Giménez');
 	expect(await rows.innerText()).not.toMatch(
 		/\b[a-z_]+\.[a-z_]+\b|[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}/
 	);
