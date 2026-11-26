@@ -169,8 +169,92 @@ describe('portal sales and buyers pages', () => {
 			pendingAmount: '0.00',
 			balance: '100.00'
 		};
-		expect(body(DuePage, { collector, due: [due], pagination })).toContain('Vencida');
-		expect(body(DuePage, { collector, due: [], pagination })).toContain('No hay cuotas por cobrar');
+		const collectProps = {
+			reserved: {},
+			canRegister: true,
+			today: '2026-11-26',
+			noteMax: 500,
+			requestKey: '00000000-0000-4000-8000-000000000000'
+		};
+		const text = (data: Record<string, unknown>) =>
+			body(DuePage, { collector, pagination, ...collectProps, ...data })
+				.replace(/<!--.*?-->/g, '')
+				.replace(/<[^>]+>/g, ' ')
+				.replaceAll('\u00a0', ' ')
+				.replace(/\s+/g, ' ');
+		const overdue = text({ due: [due] });
+		expect(overdue).toContain('Vencidas');
+		expect(overdue).toContain('1 cuota, $ 100');
+		expect(overdue).toContain('0068');
+		expect(overdue).toContain('Cuota 2, venció el 10/11/2026');
+		expect(overdue).toContain('Cobrar la cuota 2 del bono 0068');
+		expect(overdue).not.toContain('Llamar');
+		expect(body(DuePage, { collector, due: [], pagination, ...collectProps })).toContain(
+			'No hay cuotas por cobrar'
+		);
+	});
+
+	it('groups what is overdue and what is due this week, with a call link and «Cobrar» (UX plan PR 10)', () => {
+		const item = (over: Record<string, unknown>) => ({
+			saleId: 's1',
+			campaignName: 'C',
+			numberDigits: 4,
+			bondNumbers: [68],
+			buyerId: 'b1',
+			buyerName: 'Ada Lovelace',
+			buyerPhone: '2364 47-1234',
+			installmentId: 'i1',
+			installmentNumber: 2,
+			dueDate: '2026-11-10',
+			amount: '100.00',
+			status: 'overdue',
+			pendingAmount: '0.00',
+			balance: '100.00',
+			...over
+		});
+		const props = {
+			collector,
+			pagination,
+			reserved: { i3: '60.00', i4: '100.00' },
+			canRegister: true,
+			today: '2026-11-26',
+			noteMax: 500,
+			requestKey: '00000000-0000-4000-8000-000000000000'
+		};
+		const html = body(DuePage, {
+			...props,
+			due: [
+				item({}),
+				item({
+					installmentId: 'i2',
+					installmentNumber: 3,
+					status: 'pending',
+					dueDate: '2026-11-30'
+				}),
+				item({ installmentId: 'i3', saleId: 's2', bondNumbers: [70], status: 'pending' }),
+				item({ installmentId: 'i4', saleId: 's3', bondNumbers: [71], status: 'pending' })
+			]
+		});
+		expect(html.indexOf('Vencidas')).toBeLessThan(html.indexOf('Vencen esta semana'));
+		expect(html.match(/data-due-row/g)).toHaveLength(4);
+		// Every phone number is a call link.
+		expect(html.match(/href="tel:2364471234"/g)).toHaveLength(4);
+		expect(html).toContain('Llamar a Ada Lovelace al 2364 47-1234');
+		// The bond leads to the sale and the buyer to their record.
+		expect(html).toContain('href="/portal/k/ventas/s1"');
+		expect(html).toContain('href="/portal/k/compradores/b1"');
+		// What was sent and not processed yet stays in the list as «Enviado»; when nothing is left to
+		// send for the installment, «Cobrar» is not offered.
+		const flat = html.replace(/<!--.*?-->/g, '').replaceAll('\u00a0', ' ');
+		expect(flat).toContain('Enviado $ 60');
+		expect(flat).toContain('Enviado $ 100');
+		expect(html.match(/Cobrar<span/g)).toHaveLength(3);
+		expect(html).not.toContain('la cuota 2 del bono 0071');
+
+		// Without the permission, or with an inactive collector, the list is read-only.
+		const readOnly = body(DuePage, { ...props, canRegister: false, due: [item({})] });
+		expect(readOnly).not.toContain('Cobrar<span');
+		expect(readOnly).toContain('Llamar');
 	});
 
 	it('lists the campaigns on the portal landing, each linking to what there is to collect', () => {
