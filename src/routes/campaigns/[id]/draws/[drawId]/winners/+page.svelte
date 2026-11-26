@@ -1,5 +1,5 @@
 <script lang="ts">
-	import BondStub from '$lib/components/draws/BondStub.svelte';
+	import BondStub from '$lib/components/ui/BondStub.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Alert,

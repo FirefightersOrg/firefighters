@@ -48,3 +48,13 @@ export { default as FormErrorSummary } from './FormErrorSummary.svelte';
 // --- SAN-132: form result ---
 export { default as FormResult } from './FormResult.svelte';
 // --- end SAN-132 ---
+
+// --- UX plan PR 3: figures (bond number, money, sheet, stub) ---
+export { default as BondNumber } from './BondNumber.svelte';
+export type { BondNumberSize } from './BondNumber.svelte';
+export { default as Money } from './Money.svelte';
+export type { MoneyContext } from './Money.svelte';
+export { default as MoneySheet } from './MoneySheet.svelte';
+export type { MoneySheetRow } from './MoneySheet.svelte';
+export { default as BondStub } from './BondStub.svelte';
+// --- end UX plan PR 3 ---
