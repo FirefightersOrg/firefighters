@@ -197,7 +197,7 @@ test.describe.serial('campaign home', () => {
 		await todo(page).locator('[data-task="open-settlements"]').getByRole('link').click();
 		await page
 			.getByRole('main')
-			.getByRole('link', { name: /^#\d+$/ })
+			.getByRole('link', { name: /^Rendición \d+$/ })
 			.first()
 			.click();
 		await expect(page).toHaveURL(new RegExp(`/settlements/${UUID}$`));
