@@ -80,6 +80,14 @@ function renderPage(
 			collectors: [],
 			can: { returnBond: false, reassign: false, markLost: false }
 		},
+		sale: null,
+		today: '2026-11-26',
+		parties: { collector: null, buyer: null },
+		next: { deliver: false, sell: false, pay: false },
+		installments: [],
+		payments: [],
+		drawRosterEntries: [],
+		prizes: [],
 		...extra
 	};
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal PageProps for SSR
@@ -102,10 +110,11 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			]
 		});
-		expect(body).toContain('Sorteos y padrones');
-		expect(body).toContain('0007');
-		expect(body).toContain('Extraordinario');
-		expect(body).toContain('Bono sin pago total');
+		expect(body).toContain('id="draws-title"');
+		expect(body).toContain('Full payment special');
+		expect(body).toContain('/draws/draw/roster');
+		expect(body).toContain('Participa con 0007 (extraordinario). Bono sin pago total');
+		expect(body).toContain('No habilitado');
 	});
 
 	it('renders confirmed payment certificates in the Payments section', () => {
@@ -154,7 +163,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('Premios ganados: 1');
 		expect(body).toContain('No cuenta como ganado');
 		expect(body).toContain('December');
-		expect(body).toContain('N.º 1 — Bike');
+		expect(body).toContain('N.º 1, Bike');
 		expect(body).toContain('Entregado');
 		expect(body).toContain('2026-11-19 23:30 (Buenos Aires)');
 		expect(body).toContain('/draws/draw/winners');
@@ -319,74 +328,55 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 		expect(body).toContain('La campaña está cerrada.');
 		expect(body).not.toContain('action="?/annul"');
 	});
-	it('renders the 14 numbered sections in order, with an index of anchors', () => {
-		const body = renderPage(record());
-		const titles = [
-			'Datos generales',
-			'Números participantes',
-			'Código de barras',
-			'Cobrador actual',
-			'Historial de asignaciones',
-			'Comprador actual',
-			'Venta',
-			'Cuotas',
-			'Pagos',
-			'Rendiciones',
-			'Comisiones',
-			'Sorteos y padrones',
-			'Premios',
-			'Auditoría'
-		];
-		const ids = [
-			'general',
-			'numbers',
-			'barcode',
-			'collector',
-			'custody',
-			'buyer',
-			'sale',
-			'installments',
-			'payments',
-			'settlements',
-			'commissions',
-			'draws',
-			'prizes',
-			'audit'
-		];
-		let last = -1;
-		ids.forEach((id, i) => {
-			const at = body.indexOf(`<section id="${id}"`);
-			expect(at, id).toBeGreaterThan(last);
-			last = at;
-			expect(body).toContain(`aria-labelledby="${id}-title"`);
-			expect(body).toContain(`href="#${id}"`);
-			expect(body).toMatch(
-				new RegExp(
-					`<h2 id="${id}-title"[^>]*>\\s*(?:<!--[^>]*-->)*<span[^>]*>${i + 1}\\.</span>(?:<!--[^>]*-->)*\\s*${titles[i]}`
-				)
-			);
-		});
-		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds"`);
+	it('opens with the summary; the reference data and the corrections are collapsed underneath', () => {
+		const body = renderPage(
+			record({ actions: { ungroup: false, annul: true, lockedMessage: null } })
+		);
+		// No index of fourteen numbered sections any more.
+		expect(body).not.toContain('href="#general"');
+		expect(body).not.toMatch(/<span[^>]*>\d+\.<\/span>/);
+		const order = [
+			'data-bond-summary',
+			'Historial y correcciones',
+			'Entregas y devoluciones',
+			'Datos del bono',
+			'Corregir o anular'
+		].map((text) => body.indexOf(text));
+		expect(order.every((at) => at >= 0)).toBe(true);
+		expect([...order].sort((a, b) => a - b)).toEqual(order);
+		// The groups are closed <details>: their content is in the page, not on the first screen.
+		expect(body.match(/<details[^>]*>/g)?.every((tag) => !/\sopen/.test(tag))).toBe(true);
+		for (const id of ['general', 'numbers', 'barcode', 'custody'])
+			expect(body).toContain(`<section id="${id}"`);
 	});
 
-	it('later-phase sections show empty states; collector and buyer are not set', () => {
+	it('an available bond: says so in a sentence, with no leftovers of how the system was built', () => {
 		const body = renderPage(record());
-		expect(body).toContain('No se entregó a un cobrador.');
-		expect(body).toContain('Sin comprador: el bono no se vendió.');
-		expect(body).toContain('Este bono no se vendió.');
-		expect(body).toContain('Sin plan de cuotas.');
-		expect(body).toContain('No hay pagos registrados.');
-		expect(body).toContain('No figura en ninguna rendición.');
-		expect(body).toContain('No se generaron comisiones.');
-		expect(body).toContain('No figura en ningún padrón de sorteo.');
-		expect(body).toContain('Sin premios.');
+		expect(body).toContain('Disponible. Todavía no se entregó a ningún cobrador.');
+		expect(body).toContain('0068');
+		expect(body).toContain('Número asociado 4939');
+		// Audit A10: no «fase», no sections that only said they were empty.
+		expect(body.toLowerCase()).not.toContain('fase');
+		for (const gone of [
+			'Cobrador actual',
+			'Comprador actual',
+			'No figura en ninguna rendición.',
+			'No se generaron comisiones.',
+			'Sin plan de cuotas.',
+			'Sin premios.'
+		])
+			expect(body).not.toContain(gone);
+		expect(body).not.toContain('id="installments-title"');
+		expect(body).not.toContain('id="draws-title"');
+		// The reference data is still there, collapsed.
+		expect(body).toContain('Este bono no se entregó a ningún cobrador.');
 		expect(body).toContain('El código de barras es el número base');
 		expect(body).toContain('No se registró un código de barras para este bono.');
-		expect(body).toContain('No hay pagos');
 	});
 
 	it('audit: a note without audit.view; entries with actor, reason and pata link', () => {
-		expect(renderPage(record())).toContain('No hay permiso para ver el registro de auditoría.');
+		// Without audit.view the group is not offered at all.
+		expect(renderPage(record())).not.toContain('Movimientos registrados');
 
 		const body = renderPage(
 			record({
@@ -424,7 +414,7 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				}
 			})
 		);
-		expect(body).not.toContain('No hay permiso para ver el registro de auditoría.');
+		expect(body).toContain('Movimientos registrados');
 		expect(body.indexOf('data-audit-action="bond.group"')).toBeLessThan(
 			body.indexOf('data-audit-action="bond.create"')
 		);
@@ -463,37 +453,155 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 });
 
 describe('bond sale sections', () => {
-	it('links its active sale and shows pending installments', () => {
-		const data = {
-			campaign,
-			record: record(),
-			custody: {
-				history: [],
-				collectors: [],
-				can: { returnBond: false, reassign: false, markLost: false }
-			},
+	it('a sold bond: who bought it, who collects it, what is owed, and the next step', () => {
+		const sold = record();
+		sold.general.commercialStatus = 'sold';
+		sold.general.financialStatus = 'overdue';
+		const installment = (number: number, dueDate: string, over: Record<string, unknown> = {}) => ({
+			id: `i${number}`,
+			installmentNumber: number,
+			dueDate,
+			amount: '10000.00',
+			applied: '0.00',
+			lastPayment: null,
+			status: 'pending',
+			...over
+		});
+		const extra = {
 			sale: {
 				sale: {
 					id: 'a0000000-0000-0000-0000-000000000009',
 					paymentMode: 'installments',
-					totalAmount: '60000.00'
+					totalAmount: '30000.00'
 				}
 			},
+			parties: {
+				collector: { id: 'col', name: 'Héctor Acosta', canOpen: true },
+				buyer: { id: 'buy', name: 'Stella Rodríguez', phone: '2364 47-1234', canOpen: true }
+			},
+			next: { deliver: true, sell: true, pay: true },
 			installments: [
-				{
-					id: 'i',
-					installmentNumber: 1,
-					dueDate: '2027-01-01',
-					amount: '6000.00',
-					status: 'pending'
-				}
+				installment(1, '2026-09-22', {
+					status: 'paid',
+					applied: '10000.00',
+					lastPayment: {
+						date: '2026-10-09',
+						method: 'cash',
+						settlementId: 's',
+						settlementNumber: 14
+					}
+				}),
+				installment(2, '2026-10-22', { status: 'overdue' }),
+				installment(3, '2027-01-01')
 			]
 		};
-		const body = render(Page, {
-			props: { data, form: null, params: { id: CAMPAIGN_ID, bondId: BOND_ID } } as never
-		}).body;
-		expect(body).toContain('Venta activa');
+		const body = renderPage(sold, null, extra);
+		const text = body
+			.replace(/<!--.*?-->/g, '')
+			.replace(/<[^>]+>/g, '')
+			.replaceAll('\u00a0', ' ')
+			.replace(/\s+/g, ' ');
+		expect(text).toContain(
+			'Vendido a Stella Rodríguez en 3 cuotas. Lo cobra Héctor Acosta. Pagó 1 cuota y debe $ 20.000, de los cuales $ 10.000 están vencidos.'
+		);
+		// The names are links for a role that can open those records.
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/buyers/buy"`);
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/collectors/col"`);
+		// One next step for the state (pay), and the buyer's phone as a call link.
+		expect(body).toContain(
+			`href="/campaigns/${CAMPAIGN_ID}/settlements/new?intent=payment&amp;collector=col"`
+		);
+		expect(body).toContain('Registrar pago');
+		expect(body).not.toContain('Registrar venta');
+		expect(body).not.toContain('Entregar a un cobrador');
+		expect(body).toContain('href="tel:2364471234"');
+		expect(body).toContain('Llamar al 2364 47-1234');
+		// Installments: what is owed on each, the paid one with when and how, and the total.
 		expect(body).toContain('/sales/a0000000-0000-0000-0000-000000000009');
-		expect(body).toContain('01/01/2027');
+		expect(body).toContain('Ver la venta');
+		expect(text).toContain('Pagada el 09/10/2026 en efectivo, rendición 14');
+		expect(text).toContain('Venció el 22/10/2026');
+		expect(text).toContain('Vence el 01/01/2027');
+		expect(text).toContain('Falta cobrar $ 20.000');
+
+		// A role that can read the names but not open the records: text, no links.
+		const plain = renderPage(sold, null, {
+			...extra,
+			parties: {
+				collector: { ...extra.parties.collector, canOpen: false },
+				buyer: { ...extra.parties.buyer, canOpen: false }
+			},
+			next: { deliver: false, sell: false, pay: false }
+		});
+		expect(plain).toContain('Stella Rodríguez');
+		expect(plain).not.toContain('/buyers/buy');
+		expect(plain).not.toContain('/collectors/col');
+		expect(plain).not.toContain('Registrar pago');
+
+		// A role that cannot read the buyer at all: the sentence does without the name.
+		const unnamed = renderPage(sold, null, {
+			...extra,
+			parties: { collector: extra.parties.collector, buyer: null }
+		})
+			.replace(/<!--.*?-->/g, '')
+			.replace(/<[^>]+>/g, '')
+			.replace(/\s+/g, ' ');
+		expect(unnamed).toContain('Vendido en 3 cuotas.');
+		expect(unnamed).not.toContain('Unknown');
+		expect(unnamed).not.toContain('Llamar');
+	});
+
+	it('the next step follows the state, and only when the role may take it', () => {
+		const next = { deliver: true, sell: true, pay: true };
+		const available = renderPage(record(), null, { next });
+		expect(available).toContain('Entregar a un cobrador');
+		expect(available).toContain(`href="/campaigns/${CAMPAIGN_ID}/deliveries/new"`);
+		expect(available).not.toContain('Registrar venta');
+
+		const delivered = record();
+		delivered.general.commercialStatus = 'delivered_to_collector';
+		const withCollector = {
+			next,
+			parties: { collector: { id: 'col', name: 'Héctor Acosta', canOpen: false }, buyer: null }
+		};
+		const body = renderPage(delivered, null, withCollector);
+		expect(body).toContain('Registrar venta');
+		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/sales/new"`);
+		expect(body).not.toContain('Entregar a un cobrador');
+		expect(body).toContain('Héctor Acosta');
+		expect(
+			renderPage(delivered, null, { ...withCollector, next: { ...next, sell: false } })
+		).not.toContain('Registrar venta');
+
+		const lost = record();
+		lost.general.commercialStatus = 'lost';
+		const lostBody = renderPage(lost, null, { next });
+		expect(lostBody).toContain('Extraviado.');
+		for (const label of ['Entregar a un cobrador', 'Registrar venta', 'Registrar pago'])
+			expect(lostBody).not.toContain(label);
+	});
+
+	it('a collapsed group opens by itself when the server answered about something inside it', () => {
+		const opened = (body: string, summary: string) => {
+			const at = body.indexOf(summary);
+			return /\sopen/.test(body.slice(body.lastIndexOf('<details', at), at));
+		};
+		const custody = renderPage(record(), {
+			form: 'custody',
+			success: false,
+			message: 'No se pudo.'
+		});
+		expect(opened(custody, 'Entregas y devoluciones')).toBe(true);
+		const annul = renderPage(
+			record({ actions: { ungroup: false, annul: true, lockedMessage: null } }),
+			{
+				form: 'annul',
+				success: false,
+				message: 'Revisar.',
+				errors: { reason: ['Falta el motivo.'] }
+			}
+		);
+		expect(opened(annul, 'Corregir o anular')).toBe(true);
+		expect(opened(annul, 'Entregas y devoluciones')).toBe(false);
 	});
 });

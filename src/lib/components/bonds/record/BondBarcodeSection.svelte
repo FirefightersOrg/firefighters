@@ -26,7 +26,4 @@
 			No se registró un código de barras para este bono.
 		</p>
 	{/if}
-	<p class="m-0 mt-3 text-caption text-muted">
-		La carga y la búsqueda por código de barras escaneado llegan en la fase 4.
-	</p>
 </RecordSection>

@@ -31,7 +31,11 @@ import {
 import type { RepositoryResult } from '$lib/server/repositories/campaigns';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listBondAssignments } from '$lib/server/repositories/deliveries';
-import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import {
+	getBuyer,
+	getCollector,
+	listActiveCollectorOptions
+} from '$lib/server/repositories/parties';
 import {
 	DeliveryServiceError,
 	markBondLost,
@@ -44,7 +48,12 @@ import { fail, redirect } from '@sveltejs/kit';
 import { annulBond, BOND_MESSAGES, ungroupPata } from '$lib/server/services/bonds';
 import { BOND_RECORD_ACTION_FIELDS, bondAnnulSchema, bondUngroupSchema } from '$lib/schemas/bond';
 import { readFormFields } from '$lib/schemas/campaign';
-import { getActiveSaleForBond, listInstallmentsForSale } from '$lib/server/repositories/sales';
+import {
+	getActiveSaleForBond,
+	listInstallmentPaymentsForSale,
+	listInstallmentsForSale
+} from '$lib/server/repositories/sales';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { listBondPayments } from '$lib/server/repositories/settlements';
 import {
 	correctBondCollector,
@@ -184,10 +193,37 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (historyResult.error || activeSaleResult.error || drawEntriesResult.error)
 		fail500(historyResult.error ?? activeSaleResult.error ?? drawEntriesResult.error);
 	if (collectorsResult.error) fail500(collectorsResult.error);
-	const installmentsResult = activeSaleResult.data
-		? await listInstallmentsForSale(locals.supabase, activeSaleResult.data.sale.id)
-		: { data: [], error: null };
+	const [installmentsResult, installmentPaymentsResult, collectorResult, buyerResult] =
+		await Promise.all([
+			activeSaleResult.data
+				? listInstallmentsForSale(locals.supabase, activeSaleResult.data.sale.id)
+				: Promise.resolve({ data: [], error: null }),
+			activeSaleResult.data
+				? listInstallmentPaymentsForSale(locals.supabase, activeSaleResult.data.sale.id)
+				: Promise.resolve({ data: new Map(), error: null }),
+			// Who has the bond and who bought it (audit A3), read with the caller's own client: a role
+			// that cannot read them gets no name, and the record says so without it.
+			bond.currentCollectorId
+				? getCollector(locals.supabase, bond.currentCollectorId)
+				: Promise.resolve({ data: null, error: null }),
+			bond.currentBuyerId
+				? getBuyer(locals.supabase, bond.currentBuyerId)
+				: Promise.resolve({ data: null, error: null })
+		]);
 	if (installmentsResult.error) fail500(installmentsResult.error);
+	if (installmentPaymentsResult.error) fail500(installmentPaymentsResult.error);
+	for (const failed of [collectorResult.error, buyerResult.error])
+		if (failed)
+			console.error('[bonds] bond record party read failed', {
+				requestId: locals.requestId,
+				bondId: params.bondId,
+				error: failed
+			});
+	const collector = collectorResult.data;
+	const buyer = buyerResult.data;
+	const installmentPayments = installmentPaymentsResult.data ?? new Map();
+	const can_ = (...codes: Parameters<typeof hasPermissionIn>[1][]) =>
+		codes.some((code) => hasPermissionIn(locals.permissions, code));
 	const paymentsResult = await listBondPayments(locals.supabase, bond.id);
 	if (paymentsResult.error) fail500(paymentsResult.error);
 	const prizesResult = canViewPrizes
@@ -219,7 +255,39 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			permissions: locals.permissions ?? []
 		}),
 		sale: activeSaleResult.data,
-		installments: installmentsResult.data ?? [],
+		today: todayInBuenosAires(),
+		/** The current collector and buyer, by name; `canOpen` says whether the role may open the record. */
+		parties: {
+			collector: collector
+				? {
+						id: collector.id,
+						name: collector.displayName,
+						canOpen: can_('collector.view', 'collector.manage')
+					}
+				: null,
+			buyer: buyer
+				? {
+						id: buyer.id,
+						name:
+							buyer.type === 'business'
+								? (buyer.businessName ?? '')
+								: [buyer.firstName, buyer.lastName].filter(Boolean).join(' '),
+						phone: buyer.phone,
+						canOpen: can_('buyer.view', 'buyer.manage')
+					}
+				: null
+		},
+		/** What the role may do next from the record (the page picks the one that fits the state). */
+		next: {
+			deliver: canDeliver && can_('bond.assign'),
+			sell: canDeliver && can_('sale.create'),
+			pay: can_('settlement.create', 'settlement.update_open')
+		},
+		installments: (installmentsResult.data ?? []).map((installment) => ({
+			...installment,
+			applied: installmentPayments.get(installment.id)?.applied ?? '0.00',
+			lastPayment: installmentPayments.get(installment.id)?.last ?? null
+		})),
 		payments: paymentsResult.data ?? [],
 		drawRosterEntries: drawEntriesResult.data ?? [],
 		canViewDraws,
