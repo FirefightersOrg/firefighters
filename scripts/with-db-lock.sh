@@ -1,17 +1,34 @@
 #!/usr/bin/env bash
-# Serializes use of the single local Supabase stack across every worktree/agent on this machine.
+# Runs a command against one local Supabase stack of a small pool ("slots"), taking the slot's lock.
 #
 # Usage: scripts/with-db-lock.sh <command> [args...]
 #
-# The local Supabase (one DB, one auth service, shared seeded users) cannot take two test runs or
-# a `db reset` at once: concurrent runs fight over users/permissions and starve auth, which shows
-# up as "Could not load the permissions", PGRST303 and "Hook timed out" failures. The lock lives in
-# the git common dir, so all worktrees of this repo share it.
+# One local Supabase (one DB, one auth service, shared seeded users) cannot take two test runs or a
+# `db reset` at once: concurrent runs fight over users/permissions and starve auth, which shows up
+# as "Could not load the permissions", PGRST303 and "Hook timed out" failures. So every agent takes
+# a whole stack for its command, and up to DB_SLOTS agents (default 3) run in parallel, each on its
+# own stack: project_id firefighters-N, its own ports, trimmed services (see
+# scripts/supabase-slot-config.sh). The locks live in the git common dir, so all worktrees share them.
+#
+# What the wrapped command gets (slot mode):
+#   SUPABASE_SLOT, SUPABASE_PROJECT_ID, SUPABASE_WORKDIR (pass as `--workdir` to the CLI),
+#   PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+#   SUPABASE_DB_URL, SUPABASE_DB_HOST/PORT/PASSWORD, SUPABASE_DB_CONTAINER, SUPABASE_DB_NETWORK,
+#   E2E_PORT (Playwright dev server, unique per slot).
+# The slot's stack is started if it is down. Nothing here resets the DB: that is the caller's job
+# (`pnpm db:reset`), so a sequence is `scripts/with-db-lock.sh sh -c 'pnpm db:reset && ...'`.
+#
+# Env:
+#   DB_SLOTS               pool size (default 3). 1 = single-stack mode: the stack from
+#                          supabase/config.toml (project_id firefighters, ports 543xx), the single
+#                          lock supabase-db.lock, and nothing exported or started: today's behavior.
+#   DB_SLOT                pin one slot instead of taking the first free one.
+#   DB_LOCK_WAIT_SECONDS   bound on the wait for a free slot (default 3600; 0 = forever).
+#   DB_LOCK_STALE_SECONDS  age after which a lock with no pid is stale (default 3600).
 #
 # Portable `mkdir` lock (macOS has no `flock`). A lock is stale only when its owner pid is gone, or
-# when it has no pid and is older than DB_LOCK_STALE_SECONDS (default 3600). A live owner is never
-# displaced. DB_LOCK_WAIT_SECONDS bounds the wait (default
-# 3600; 0 = forever).
+# when it has no pid and is older than DB_LOCK_STALE_SECONDS. A live owner is never displaced.
+# Re-entrant: a nested call from a command that already holds a slot just runs.
 set -u
 
 if [ "$#" -eq 0 ]; then
@@ -19,19 +36,29 @@ if [ "$#" -eq 0 ]; then
 	exit 2
 fi
 
-# Nested call from a command that already holds the lock.
+# Nested call from a command that already holds the lock (and so its slot env).
 if [ "${SUPABASE_DB_LOCK_HELD:-}" = "1" ]; then
 	exec "$@"
 fi
 
+root=$(cd "$(dirname "$0")/.." && pwd)
 common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || {
 	echo "with-db-lock: not inside a git repository" >&2
 	exit 2
 }
-lock_dir="$common_dir/supabase-db.lock"
+slots=${DB_SLOTS:-3}
 stale_after=${DB_LOCK_STALE_SECONDS:-3600}
 max_wait=${DB_LOCK_WAIT_SECONDS:-3600}
+case "$slots" in '' | *[!0-9]* | 0)
+	echo "with-db-lock: DB_SLOTS must be a positive integer" >&2
+	exit 2
+	;;
+esac
 
+lock_dir=""
+lock_path() { # lock_path <slot>
+	if [ "$slots" = "1" ]; then echo "$common_dir/supabase-db.lock"; else echo "$common_dir/supabase-db-slot-$1.lock"; fi
+}
 owner_pid() { cat "$lock_dir/pid" 2>/dev/null; }
 
 # mtime of the lock dir (BSD stat on macOS, GNU stat on Linux).
@@ -39,8 +66,8 @@ lock_mtime() { stat -f %m "$lock_dir" 2>/dev/null || stat -c %Y "$lock_dir" 2>/d
 
 # A lock is stale only when its owner is provably gone: the pid file names a dead process, or the
 # lock never got a pid (the owner died between `mkdir` and writing it) and is older than the
-# threshold. A live owner is never displaced, however long it runs, so two commands can never hold
-# the lock at once (a wedged holder is bounded by DB_LOCK_WAIT_SECONDS on the waiters instead).
+# threshold. A live owner is never displaced, however long it runs (a wedged holder is bounded by
+# DB_LOCK_WAIT_SECONDS on the waiters instead).
 lock_is_stale() {
 	local pid started now
 	pid=$(owner_pid)
@@ -83,21 +110,38 @@ trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM HUP
 
-waited=0
-announced=0
-until mkdir "$lock_dir" 2>/dev/null; do
+# try_slot <slot>: 0 if we now hold it. A stale lock is removed and retried once.
+try_slot() {
+	lock_dir=$(lock_path "$1")
+	local stale_pid
+	if mkdir "$lock_dir" 2>/dev/null; then return 0; fi
 	if lock_is_stale; then
 		stale_pid=$(owner_pid)
-		echo "with-db-lock: removing stale lock (owner pid ${stale_pid:-unknown})" >&2
+		echo "with-db-lock: removing stale lock of slot $1 (owner pid ${stale_pid:-unknown})" >&2
 		remove_stale_lock "$stale_pid"
-		continue
+		mkdir "$lock_dir" 2>/dev/null && return 0
 	fi
+	return 1
+}
+
+slot=""
+waited=0
+announced=0
+while :; do
+	if [ -n "${DB_SLOT:-}" ]; then candidates=$DB_SLOT; else candidates=$(seq 1 "$slots"); fi
+	for s in $candidates; do
+		if try_slot "$s"; then
+			slot=$s
+			break
+		fi
+	done
+	[ -n "$slot" ] && break
 	if [ "$announced" = "0" ]; then
-		echo "waiting for local Supabase lock… (held by pid $(owner_pid), $lock_dir)" >&2
+		echo "waiting for a free local Supabase slot (all $slots busy, locks in $common_dir)…" >&2
 		announced=1
 	fi
 	if [ "$max_wait" -gt 0 ] && [ "$waited" -ge "$max_wait" ]; then
-		echo "with-db-lock: gave up after ${waited}s waiting for the lock" >&2
+		echo "with-db-lock: gave up after ${waited}s waiting for a slot" >&2
 		exit 1
 	fi
 	sleep 2
@@ -107,7 +151,46 @@ held=1
 echo "$token" >"$lock_dir/token"
 echo $$ >"$lock_dir/pid"
 date +%s >"$lock_dir/started"
-[ "$announced" = "1" ] && echo "local Supabase lock acquired after ${waited}s" >&2
+[ "$announced" = "1" ] && echo "local Supabase slot $slot acquired after ${waited}s" >&2
+
+if [ "$slots" != "1" ]; then
+	workdir=$("$root/scripts/supabase-slot-config.sh" "$slot") || exit 1
+	supabase_bin=${SUPABASE_BIN:-supabase}
+	base=$((54300 + 100 * slot))
+	export SUPABASE_SLOT=$slot
+	export SUPABASE_WORKDIR=$workdir
+	export SUPABASE_PROJECT_ID="firefighters-$slot"
+	export SUPABASE_DB_CONTAINER="supabase_db_firefighters-$slot"
+	export SUPABASE_DB_NETWORK="supabase_network_firefighters-$slot"
+	export SUPABASE_DB_HOST=127.0.0.1
+	export SUPABASE_DB_PORT=$((base + 22))
+	export SUPABASE_DB_PASSWORD=postgres
+	export SUPABASE_DB_URL="postgresql://postgres:postgres@127.0.0.1:$((base + 22))/postgres"
+	export PUBLIC_SUPABASE_URL="http://127.0.0.1:$((base + 21))"
+	export E2E_PORT=$((4317 + slot))
+
+	# Start the slot's stack if it is down.
+	if ! "$supabase_bin" status --workdir "$workdir" >/dev/null 2>&1; then
+		echo "with-db-lock: starting the stack of slot $slot ($SUPABASE_PROJECT_ID)…" >&2
+		"$supabase_bin" start --workdir "$workdir" >&2 || {
+			echo "with-db-lock: could not start slot $slot" >&2
+			exit 1
+		}
+	fi
+	# The local JWT secret is shared by all stacks, but read the keys from the stack instead of
+	# assuming it.
+	status_env=$("$supabase_bin" status --workdir "$workdir" -o env 2>/dev/null)
+	key() { printf '%s\n' "$status_env" | sed -n "s/^$1=\"\(.*\)\"$/\1/p" | head -1; }
+	PUBLIC_SUPABASE_ANON_KEY=$(key ANON_KEY)
+	SUPABASE_SERVICE_ROLE_KEY=$(key SERVICE_ROLE_KEY)
+	if [ -z "$PUBLIC_SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+		echo "with-db-lock: could not read the keys of slot $slot (supabase status -o env)" >&2
+		exit 1
+	fi
+	export PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+	# Same value for shell and node code: the guard in tests/integration needs APP_ENV=local.
+	export APP_ENV=${APP_ENV:-local}
+fi
 
 # Not `exec`: the trap must run afterwards to release the lock.
 SUPABASE_DB_LOCK_HELD=1 "$@"
