@@ -14,8 +14,17 @@ export async function open(page: Page, url: string) {
 	await page.waitForLoadState('networkidle');
 }
 
+/**
+ * Signs in through the login page. Safe on a context that already has a session (for instance a
+ * saved `storageState` applied to every new context): the login page redirects a signed-in user
+ * away, so the session is dropped first and `user` signs in over it.
+ */
 export async function login(page: Page, user = ADMIN) {
 	await open(page, '/login');
+	if (!new URL(page.url()).pathname.startsWith('/login')) {
+		await page.context().clearCookies();
+		await open(page, '/login');
+	}
 	await page.getByLabel('Correo electrónico').fill(user.email);
 	await page.getByLabel('Contraseña').fill(user.password);
 	await page.getByRole('button', { name: /ingresar|iniciar sesión/i }).click();

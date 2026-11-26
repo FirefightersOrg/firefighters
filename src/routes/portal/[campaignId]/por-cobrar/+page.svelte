@@ -98,7 +98,8 @@
 								})}
 							/>
 							<div class="min-w-0 flex-1 pt-2.5">
-								<p class="m-0 truncate text-body font-medium">
+								<!-- The whole name, on two lines if it has to: a collector must not guess who it is. -->
+								<p class="m-0 text-body font-medium break-words">
 									<a
 										class="rounded-sm text-text underline-offset-2 hover:underline"
 										href={resolve('/portal/[campaignId]/compradores/[buyerId]', {

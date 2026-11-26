@@ -93,8 +93,11 @@ describe('Mi cuenta corriente page', () => {
 	it('renders the balance, commission summary, entries and settlements', () => {
 		const body = page(full());
 		expect(body).toMatch(/data-testid="ledger-balance"[\s\S]*\$.17,50/);
-		expect(body).toContain('Comisiones');
-		expect(body).toContain('Generadas');
+		// The balance comes first, in words: who it is in favour of (UX plan PR 11).
+		expect(body).toContain('Saldo a favor del cobrador');
+		expect(body).toContain('Suma los movimientos que no están anulados.');
+		expect(body.indexOf('data-testid="ledger-balance"')).toBeLessThan(body.indexOf('<table'));
+		expect(body).toContain('Comisiones generadas');
 		expect(body).toContain('Liquidadas');
 		expect(body).toContain('Anulaciones y correcciones');
 		for (const column of ['Fecha', 'Concepto', 'Débito', 'Crédito', 'Saldo', 'Estado'])
@@ -103,6 +106,21 @@ describe('Mi cuenta corriente page', () => {
 		expect(body).toContain('Rendición N.º 7');
 		expect(body).toContain('Historial de rendiciones');
 		expect(body).toContain('Cerrada');
+	});
+
+	it('says whose favour the balance is in, without a sign on the figure', () => {
+		const summary = full().summary;
+		const against = page(full({ summary: { ...summary, balance: -17.5 } }));
+		expect(against).toContain('Saldo a cargo del cobrador');
+		expect(against).toMatch(/data-testid="ledger-balance"[\s\S]*?\$.17,50/);
+		expect(against).not.toMatch(/data-testid="ledger-balance"[\s\S]{0,400}-\$/);
+		expect(page(full({ summary: { ...summary, balance: 0 } }))).toContain('Sin saldo');
+	});
+
+	it('stacks movements and settlements on a phone, with one signed amount per movement', () => {
+		const body = page(full());
+		expect(body.match(/max-\[719px\]:/g)?.length).toBeGreaterThan(4);
+		expect(body).toMatch(/min-\[720px\]:hidden[^>]*>\s*(?:<!--.*?-->)*(−\u00a0)?\$/);
 	});
 
 	it('shows annulled entries struck through and does not leak notes', () => {
