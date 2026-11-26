@@ -265,11 +265,16 @@ describe('collector portal own scope (local Supabase)', () => {
 		expect(await outcome(() => homeLoad(home))).toBe(303);
 	});
 
-	it('operator, treasurer and read-only are unchanged: no portal, same home page', async () => {
+	it('operator, treasurer and read-only get no portal: their home is the campaigns', async () => {
 		for (const caller of [operator, treasurer, readOnly]) {
 			expect(await outcome(() => portalLoad(portalEvent(caller)))).toBe(403);
 			const home = { locals: locals(caller) } as unknown as Parameters<typeof homeLoad>[0];
-			expect(await outcome(() => homeLoad(home))).toBe(200);
+			// UX plan PR 6: staff who can open campaigns land on the only active one, or on the list.
+			const landing: unknown = await Promise.resolve(homeLoad(home)).then(
+				() => null,
+				(thrown: unknown) => thrown
+			);
+			expect(isRedirect(landing) ? landing.location : landing).toMatch(/^\/campaigns(\/|$)/);
 		}
 		const { data } = await operator.client.from('bonds').select('id').eq('campaign_id', campaignId);
 		expect(data?.length).toBe(2);

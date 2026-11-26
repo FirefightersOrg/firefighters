@@ -61,6 +61,21 @@ test.describe.serial('error pages, landing and the back link', () => {
 		await page.close();
 	});
 
+	test('keyboard: skip link, then the way back is the first stop in the content', async () => {
+		const page = await admin.newPage();
+		await page.goto(`/campaigns/${campaignId}/bonds/${MISSING}`);
+		await page.waitForLoadState('networkidle');
+		await page.keyboard.press('Tab');
+		await expect(page.getByRole('link', { name: 'Ir al contenido' })).toBeFocused();
+		await page.keyboard.press('Enter');
+		await page.keyboard.press('Tab');
+		const back = page.locator('[data-error-page]').getByRole('link', { name: 'Volver a Bonos' });
+		await expect(back).toBeFocused();
+		await page.keyboard.press('Enter');
+		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds$`));
+		await page.close();
+	});
+
 	test('403 inside a campaign: says whose section it is, never «Forbidden»', async () => {
 		const page = await readOnly.newPage();
 		const response = await page.goto(`/campaigns/${campaignId}/settlements`);
