@@ -5,25 +5,29 @@
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
 	import {
 		Alert,
+		BondNumber,
 		Button,
 		Card,
+		Money,
 		PageHeader,
-		StatusBadge,
-		Table,
-		type TableColumn
+		StatusBadge
 	} from '$lib/components/ui';
-	import { countdownLabel, cutoffCountdown, type AtRiskBond } from '$lib/domain/dashboard';
-	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
-	import { formatSignedMoney } from '$lib/domain/financial-reports';
 	import {
-		formatDate,
-		formatDateTime,
-		formatMoney,
-		formatNumber,
-		formatPaddedNumber
-	} from '$lib/format';
+		balanceWords,
+		homeTasks,
+		wholePesos,
+		type HomeTaskTarget
+	} from '$lib/domain/campaign-home';
+	import { DRAW_TYPE_LABELS, type DrawType } from '$lib/domain/draws';
+	import { formatDate, formatDateTime, formatMoney, formatNumber } from '$lib/format';
 	import type { PageProps } from './$types';
 
+	/**
+	 * Campaign home (UX plan PR 13, audit A7 and A10). In this order: find a bond, the day's actions,
+	 * what is waiting for someone («Para resolver», each item leading to where it is resolved), one
+	 * line of figures, and the collectors' balances and the next draw as ruled lists. Every amount is
+	 * in whole pesos. A draft campaign has «Activar» first; the close checklist stays at the end.
+	 */
 	let { data, form }: PageProps = $props();
 
 	const campaign = $derived(data.campaign);
@@ -44,21 +48,16 @@
 		financialGroup && !('error' in financialGroup) ? financialGroup : null
 	);
 	const nextDraw = $derived(operational?.nextDraw ?? null);
-	const countdown = $derived(nextDraw ? cutoffCountdown(nextDraw.paymentCutoffAt) : null);
-	// Once the roster is frozen the cutoff has usually passed: the bonds left are not enabled.
-	const rosterFrozen = $derived(nextDraw?.status === 'roster_frozen');
-	const atRiskColumns: TableColumn<AtRiskBond & Record<string, unknown>>[] = [
-		{ key: 'bond', header: 'Bono' },
-		{ key: 'collector', header: 'Cobrador' },
-		{ key: 'missing', header: 'Cuotas pendientes', align: 'right' }
-	];
 
 	/** Dates and installment plan, under the title (the full rules live in Datos y reglas). */
 	const meta = $derived(
 		[
-			campaign.startsAt && campaign.endsAt
-				? `Del ${formatDate(campaign.startsAt)} al ${formatDate(campaign.endsAt)}`
-				: 'Sin fechas definidas',
+			!campaign.startsAt || !campaign.endsAt
+				? 'Sin fechas definidas'
+				: campaign.status === 'active' || campaign.status === 'closing'
+					? // Under way: the start is behind, what matters is when it ends.
+						`Hasta el ${formatDate(campaign.endsAt)}`
+					: `Del ${formatDate(campaign.startsAt)} al ${formatDate(campaign.endsAt)}`,
 			`${campaign.installmentCount} ${campaign.installmentCount === 1 ? 'cuota' : 'cuotas'} de ${formatMoney(campaign.installmentValue)}`
 		].join(', ')
 	);
@@ -68,32 +67,66 @@
 		items.filter(([ok]) => ok).map(([, label, href]) => ({ label, href }));
 	const id = $derived(campaign.id);
 
-	/** The day's actions, first: what operations does every day (only while the campaign is active). */
+	/** The day's actions: what operations does every day (only while the campaign is active). */
 	const dayActions = $derived(
 		allowed([
 			[data.can.registerSale, 'Registrar venta', resolve('/campaigns/[id]/sales/new', { id })],
-			[
-				data.can.deliverBonds,
-				'Entregar bonos a un cobrador',
-				resolve('/campaigns/[id]/deliveries/new', { id })
-			],
 			[
 				data.can.openSettlement,
 				'Registrar pago',
 				`${resolve('/campaigns/[id]/settlements/new', { id })}?intent=payment`
 			],
-			[data.can.loadBonds, 'Cargar bonos', resolve('/campaigns/[id]/bonds/new', { id })],
-			[data.can.loadBonds, 'Cargar una pata', resolve('/campaigns/[id]/bonds/pata/new', { id })]
+			[data.can.deliverBonds, 'Entregar bonos', resolve('/campaigns/[id]/deliveries/new', { id })],
+			[data.can.loadBonds, 'Cargar bonos', resolve('/campaigns/[id]/bonds/new', { id })]
 		])
 	);
+
+	// --- Para resolver --------------------------------------------------------------------------------
+	const tasks = $derived(
+		homeTasks({
+			submitted: operational?.submitted ?? null,
+			nextDraw,
+			// The count the shell already shows beside «Rendiciones» (the layout's load).
+			openSettlements: data.shell?.openSettlements ?? null,
+			can: { viewSettlements: data.can.viewSettlements, openSettlement: data.can.openSettlement }
+		})
+	);
+	const hrefOf = (target: HomeTaskTarget | null) =>
+		!target || target.kind === 'at-risk-bonds'
+			? null
+			: target.kind === 'settlement'
+				? resolve('/campaigns/[id]/settlements/[settlementId]', {
+						id,
+						settlementId: target.settlementId
+					})
+				: target.kind === 'new-settlement'
+					? `${resolve('/campaigns/[id]/settlements/new', { id })}?intent=payment&collector=${target.collectorId}`
+					: `${resolve('/campaigns/[id]/settlements', { id })}?status=open`;
+	const atRisk = $derived(operational?.atRisk ?? []);
+	const atRiskTotal = $derived(atRisk[0]?.totalCount ?? atRisk.length);
+
+	// --- Balances and the next draw -------------------------------------------------------------------
+	const balances = $derived(
+		(financial?.balances.top ?? []).flatMap((row) => {
+			const words = balanceWords(row.balance);
+			return words ? [{ ...row, ...words }] : [];
+		})
+	);
+	const pendingCommission = $derived(
+		financial ? balanceWords(financial.commissions.pending) : null
+	);
+	const section = 'flex items-baseline justify-between gap-3 border-b border-border-strong pb-2';
+	const sectionLink =
+		'inline-flex min-h-touch items-center rounded-sm text-body-sm text-primary-text underline underline-offset-2';
+	const taskRow = 'flex min-h-14 flex-col gap-x-4 gap-y-1 py-3 sm:flex-row sm:items-center';
+	const taskGo = 'shrink-0 text-body-sm font-medium text-primary-text underline underline-offset-2';
 </script>
 
-{#snippet figure(label: string, value: string, detail?: string)}
-	<div>
-		<dt class="text-body-sm text-muted">{label}</dt>
-		<dd class="m-0 font-figure text-figure tabular-nums">{value}</dd>
-		{#if detail}<dd class="m-0 text-body-sm text-muted">{detail}</dd>{/if}
-	</div>
+{#snippet taskText(title: string, detail: string)}
+	<span class="min-w-0 flex-1">
+		<span class="block text-body font-medium text-text">{title}</span>
+		<span class="block text-body-sm text-muted">{detail}</span>
+	</span>
 {/snippet}
 
 {#snippet status()}
@@ -145,8 +178,12 @@
 		<Alert tone={transitionResult.success ? 'success' : 'danger'}>{transitionMessage}</Alert>
 	{/if}
 
+	{#if campaign.status === 'draft'}
+		{@render status()}
+	{/if}
+
 	{#if data.can.viewBonds}
-		<!-- The hero: finding a bond is what happens most. Plain GET to the bonds list. -->
+		<!-- Finding a bond is what happens most. A plain GET to the bonds list. -->
 		<form
 			method="GET"
 			action={resolve('/campaigns/[id]/bonds', { id })}
@@ -161,291 +198,286 @@
 				inputmode="numeric"
 				autocomplete="off"
 				placeholder="Número de bono"
-				class="h-13 w-full min-w-0 shrink-0 rounded-md sm:w-auto sm:flex-1 border border-border-strong bg-surface px-4 text-[18px] font-medium text-text placeholder:font-normal"
+				class="h-13 w-full min-w-0 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-[18px] font-medium text-text placeholder:font-normal sm:w-auto sm:flex-1"
 			/>
-			<Button type="submit" variant="primary" size="lg">Buscar bono</Button>
+			<!-- On a draft the primary button is «Activar»: one primary per view. -->
+			<Button
+				type="submit"
+				variant={campaign.status === 'draft' ? 'secondary' : 'primary'}
+				size="lg">Buscar bono</Button
+			>
 		</form>
 	{/if}
 
 	{#if dayActions.length}
-		<div class="flex flex-wrap gap-2">
-			{#each dayActions as action, i (action.href)}
-				<Button href={action.href} variant={i === 0 ? 'primary' : 'secondary'}
-					>{action.label}</Button
-				>
+		<!-- The page's primary button is the search; the day's actions are four equal doors. -->
+		<ul class="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:flex sm:flex-wrap" data-day-actions>
+			{#each dayActions as action (action.href)}
+				<li class="flex">
+					<Button href={action.href} class="w-full justify-center text-center"
+						>{action.label}</Button
+					>
+				</li>
 			{/each}
-		</div>
-	{/if}
-
-	{#if operational}
-		<!-- One line of figures, no nested cards. -->
-		<dl
-			id="dash-figures"
-			class="m-0 grid grid-cols-2 gap-x-8 gap-y-4 border-y border-border py-4 lg:grid-cols-4"
-		>
-			<div>
-				<dt class="text-body-sm text-muted">Bonos vendidos</dt>
-				<dd class="m-0 font-figure text-figure tabular-nums">
-					{formatNumber(operational.bonds.sold)}<span
-						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
-						>de {formatNumber(operational.bonds.total)}</span
-					>
-				</dd>
-			</div>
-			<div>
-				<dt class="text-body-sm text-muted">En manos de cobradores</dt>
-				<dd class="m-0 font-figure text-figure tabular-nums">
-					{formatNumber(operational.bonds.delivered)}<span
-						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
-						>{formatNumber(operational.bonds.available)} disponibles</span
-					>
-				</dd>
-			</div>
-			<div>
-				<dt class="text-body-sm text-muted">Cobrado</dt>
-				<dd class="m-0 font-figure text-figure tabular-nums">
-					{formatMoney(operational.revenue.collected)}
-
-					<div
-						class="mt-2 h-1.5 overflow-hidden rounded-full bg-border"
-						role="img"
-						aria-label="{operational.revenue.collectedPercent} % de lo esperado ({formatMoney(
-							operational.revenue.expected
-						)})"
-					>
-						<span
-							class="block h-full bg-primary"
-							style="width: {Math.min(100, operational.revenue.collectedPercent)}%"
-						></span>
-					</div>
-				</dd>
-			</div>
-			<div>
-				<dt class="text-body-sm text-muted">Cuotas vencidas</dt>
-				<dd class="m-0 font-figure text-figure tabular-nums">
-					{formatMoney(operational.revenue.overdue)}<span
-						class="ml-1.5 font-sans text-body-sm font-normal text-muted"
-						>pendiente {formatMoney(operational.revenue.pending)}</span
-					>
-				</dd>
-			</div>
-		</dl>
+		</ul>
 	{/if}
 
 	{#if operationalFailed}
 		<Alert tone="danger"
-			>No se pudo cargar el tablero operativo (bonos, recaudación y próximo sorteo). Volver a
-			intentar.</Alert
+			>No se pudieron cargar los bonos, lo cobrado y el próximo sorteo. Volver a intentar.</Alert
 		>
 	{/if}
 	{#if financialFailed}
 		<Alert tone="danger"
-			>No se pudo cargar el tablero financiero (efectivo, comisiones y saldos). Volver a intentar.</Alert
+			>No se pudieron cargar los saldos de los cobradores. Volver a intentar.</Alert
 		>
 	{/if}
 
-	<!-- The campaign's sections are in the shell (rail and tab bar), not on this page. -->
-	<div class="flex min-w-0 flex-col gap-5">
-		{#if campaign.status === 'draft'}
-			{@render status()}
-		{/if}
-
-		{#if operational && operational.submitted.count > 0}
-			<Card
-				title="Cobros enviados sin procesar"
-				id="dash-submitted"
-				description="{operational.submitted.count === 1
-					? '1 cobro enviado'
-					: `${formatNumber(operational.submitted.count)} cobros enviados`} por cobradores desde su portal, por {formatMoney(
-					operational.submitted.amount
-				)}. No cuentan en ninguna rendición hasta que se incluyan o se rechacen, y bloquean el cierre de la rendición de su cobrador."
-			>
-				<table class="w-full border-collapse text-body-sm">
-					<caption class="sr-only">Cobros enviados sin procesar por cobrador</caption>
-					<thead>
-						<tr class="border-b border-border text-left text-muted">
-							<th scope="col" class="py-2 font-medium">Cobrador</th>
-							<th scope="col" class="py-2 text-right font-medium">Cobros</th>
-							<th scope="col" class="py-2 text-right font-medium">Importe</th>
-							<th scope="col" class="py-2 pl-4 font-medium">Dónde procesarlos</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each operational.submitted.byCollector as row (row.collectorId)}
-							<tr class="border-b border-border last:border-0">
-								<td class="py-2.5">{row.collectorName}</td>
-								<td class="py-2.5 text-right tabular-nums">{formatNumber(row.count)}</td>
-								<td class="py-2.5 text-right tabular-nums">{formatMoney(row.amount)}</td>
-								<td class="py-2.5 pl-4">
-									{#if !data.can.viewSettlements}
-										<span class="text-muted">Sin acceso a rendiciones</span>
-									{:else if row.openSettlementId}
-										<a
-											href={resolve('/campaigns/[id]/settlements/[settlementId]', {
-												id: campaign.id,
-												settlementId: row.openSettlementId
-											})}
-											class="text-primary-text underline-offset-2 hover:underline"
-											>Abrir la rendición</a
+	{#if tasks.length > 0}
+		<section aria-labelledby="todo-title" id="dash-todo">
+			<div class={section}>
+				<h2 id="todo-title" class="m-0 text-heading-3 text-text">Para resolver</h2>
+			</div>
+			<ul class="m-0 list-none p-0">
+				{#each tasks as task (task.key)}
+					{@const href = hrefOf(task.target)}
+					<li class="border-b border-border" data-task={task.key}>
+						{#if task.target?.kind === 'at-risk-bonds'}
+							<details class="group">
+								<summary
+									class="{taskRow} cursor-pointer list-none rounded-sm hover:bg-surface-hover [&::-webkit-details-marker]:hidden"
+								>
+									{@render taskText(task.title, task.detail)}
+									<span class={taskGo}>{task.action}</span>
+								</summary>
+								<ul
+									class="m-0 list-none p-0 pb-2"
+									aria-label="Bonos que no cubren lo que exige el sorteo"
+								>
+									{#each atRisk as bond (bond.bondId)}
+										<li
+											class="flex min-h-touch items-center gap-3 border-t border-border py-1"
+											data-at-risk-bond
 										>
-									{:else}
-										<a
-											href={resolve('/campaigns/[id]/settlements', { id: campaign.id })}
-											class="text-primary-text underline-offset-2 hover:underline"
-											>Ver rendiciones (no hay una abierta)</a
-										>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</Card>
-		{/if}
-
-		{#if operational}
-			<Card title="Próximo sorteo" id="dash-next-draw">
-				{#if nextDraw && countdown}
-					<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-						{@render figure(
-							DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? nextDraw.name,
-							formatDate(nextDraw.drawDate),
-							nextDraw.name
-						)}
-						{@render figure(
-							'Fecha de corte',
-							formatDateTime(nextDraw.paymentCutoffAt),
-							countdownLabel(countdown)
-						)}
-						{@render figure(
-							rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo',
-							formatNumber(nextDraw.atRiskCount),
-							nextDraw.requiredInstallmentNumber
-								? `Cuota requerida: ${nextDraw.requiredInstallmentNumber}`
-								: 'Requiere el pago total'
-						)}
-					</dl>
-				{:else}
-					<p class="m-0 text-body-sm text-muted">No hay sorteos programados.</p>
-				{/if}
-			</Card>
-
-			{#if nextDraw}
-				<Card
-					title={rosterFrozen ? 'Bonos no habilitados' : 'Bonos en riesgo'}
-					id="dash-at-risk"
-					description={rosterFrozen
-						? 'Bonos vendidos que no cubrieron las cuotas requeridas antes de la fecha de corte.'
-						: 'Bonos vendidos que no cubren las cuotas requeridas antes de la fecha de corte.'}
-				>
-					{#if operational.atRisk.length}
-						<Table
-							caption="Bonos en riesgo para {nextDraw.name}"
-							columns={atRiskColumns}
-							rows={operational.atRisk.map((b) => ({ ...b, id: b.bondId }))}
-							rowKey="id"
-						>
-							{#snippet cell({ row, column })}
-								{#if column.key === 'bond'}
-									<a
-										href={resolve('/campaigns/[id]/bonds/[bondId]', {
-											id: campaign.id,
-											bondId: row.bondId
-										})}
-										class="font-figure font-bold text-primary-text tabular-nums underline-offset-2 hover:underline"
-										>{row.baseNumber === null
-											? 'Sin número'
-											: formatPaddedNumber(row.baseNumber, campaign.numberDigits)}</a
-									>
-								{:else if column.key === 'collector'}
-									{row.collectorName ?? 'Sin cobrador'}
-								{:else}
-									{formatNumber(row.missingInstallments)}
+											{#if bond.baseNumber === null}
+												<a
+													class="inline-flex min-h-touch items-center rounded-sm text-primary-text underline underline-offset-2"
+													href={resolve('/campaigns/[id]/bonds/[bondId]', {
+														id,
+														bondId: bond.bondId
+													})}>Bono sin número</a
+												>
+											{:else}
+												<BondNumber
+													number={bond.baseNumber}
+													digits={campaign.numberDigits}
+													href={resolve('/campaigns/[id]/bonds/[bondId]', {
+														id,
+														bondId: bond.bondId
+													})}
+												/>
+											{/if}
+											<span class="min-w-0 flex-1 text-body-sm text-muted">
+												{bond.collectorName ? `Lo cobra ${bond.collectorName}` : 'Sin cobrador'}
+											</span>
+											<span class="shrink-0 text-body-sm text-text">
+												{bond.missingInstallments === 1
+													? 'falta 1 cuota'
+													: `faltan ${formatNumber(bond.missingInstallments)} cuotas`}
+											</span>
+										</li>
+									{/each}
+								</ul>
+								{#if atRiskTotal > atRisk.length}
+									<p class="m-0 pb-3 text-body-sm text-muted">
+										Se muestran {formatNumber(atRisk.length)} de {formatNumber(atRiskTotal)} bonos.
+									</p>
 								{/if}
-							{/snippet}
-						</Table>
-						{#if operational.atRisk[0] && operational.atRisk[0].totalCount > operational.atRisk.length}
-							<p class="m-0 mt-3 text-body-sm text-muted">
-								Se muestran {formatNumber(operational.atRisk.length)} de
-								{formatNumber(operational.atRisk[0].totalCount)} bonos en riesgo.
-							</p>
+							</details>
+						{:else if href}
+							<a {href} class="{taskRow} rounded-sm hover:bg-surface-hover">
+								{@render taskText(task.title, task.detail)}
+								<span class={taskGo}>{task.action}</span>
+							</a>
+						{:else}
+							<div class={taskRow}>{@render taskText(task.title, task.detail)}</div>
 						{/if}
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
+
+	{#if operational}
+		<section aria-labelledby="state-title">
+			<div class={section}>
+				<h2 id="state-title" class="m-0 text-heading-3 text-text">Estado de la campaña</h2>
+				{#if data.can.viewReports}
+					<a class={sectionLink} href={resolve('/campaigns/[id]/reports', { id })}>Reportes</a>
+				{/if}
+			</div>
+			<dl id="dash-figures" class="m-0 grid grid-cols-2 gap-x-6 gap-y-4 pt-4 lg:grid-cols-4">
+				<div class="min-w-0">
+					<dt class="text-body-sm text-muted">Bonos vendidos</dt>
+					<dd class="m-0 font-figure text-figure tabular-nums">
+						{formatNumber(operational.bonds.sold)}
+					</dd>
+					<dd class="m-0 text-body-sm text-muted">de {formatNumber(operational.bonds.total)}</dd>
+				</div>
+				<div class="min-w-0">
+					<dt class="text-body-sm text-muted">En manos de cobradores</dt>
+					<dd class="m-0 font-figure text-figure tabular-nums">
+						{formatNumber(operational.bonds.delivered)}
+					</dd>
+					<dd class="m-0 text-body-sm text-muted">
+						sin vender{operational.bonds.available > 0
+							? `; ${formatNumber(operational.bonds.available)} sin entregar`
+							: ''}
+					</dd>
+				</div>
+				<div class="min-w-0">
+					<dt class="text-body-sm text-muted">Cobrado</dt>
+					<dd class="m-0">
+						<Money
+							value={wholePesos(operational.revenue.collected)}
+							class="font-figure text-figure"
+						/>
+						<div
+							class="mt-1 h-1.5 overflow-hidden rounded-full bg-border"
+							role="img"
+							aria-label="{operational.revenue.collectedPercent} % de lo vendido"
+						>
+							<span
+								class="block h-full bg-primary"
+								style="width: {Math.min(100, operational.revenue.collectedPercent)}%"
+							></span>
+						</div>
+					</dd>
+					<dd class="m-0 pt-1 text-body-sm text-muted">
+						de <Money value={wholePesos(operational.revenue.expected)} /> vendidos
+					</dd>
+				</div>
+				<div class="min-w-0">
+					<dt class="text-body-sm text-muted">Cuotas vencidas sin cobrar</dt>
+					<dd class="m-0">
+						<Money
+							value={wholePesos(operational.revenue.overdue)}
+							class="font-figure text-figure"
+						/>
+					</dd>
+					<dd class="m-0 text-body-sm text-muted">
+						de <Money value={wholePesos(operational.revenue.pending)} /> por cobrar
+					</dd>
+				</div>
+			</dl>
+		</section>
+	{/if}
+
+	{#if financial || operational}
+		<div class="grid gap-8 lg:grid-cols-2">
+			{#if financial}
+				<section aria-labelledby="balances-title" id="dash-balances">
+					<div class={section}>
+						<h2 id="balances-title" class="m-0 text-heading-3 text-text">
+							Saldo a favor de cada cobrador
+						</h2>
+						{#if data.can.viewCollectors}
+							<a class={sectionLink} href={resolve('/campaigns/[id]/collectors', { id })}
+								>Cobradores</a
+							>
+						{/if}
+					</div>
+					{#if balances.length}
+						<ul class="m-0 list-none p-0" aria-label="Los saldos más grandes">
+							{#each balances as row (row.collectorId)}
+								<li class="flex min-h-touch items-center gap-3 border-b border-border">
+									<span class="min-w-0 flex-1 text-body">
+										{#if data.can.viewCollectors}
+											<a
+												class="inline-flex min-h-touch items-center rounded-sm text-primary-text underline underline-offset-2"
+												href={resolve('/campaigns/[id]/collectors/[collectorId]', {
+													id,
+													collectorId: row.collectorId
+												})}>{row.collectorName}</a
+											>
+										{:else}
+											{row.collectorName}
+										{/if}
+									</span>
+									<span class="shrink-0 text-right">
+										<Money value={wholePesos(row.amount)} class="block text-body font-medium" />
+										{#if row.owes}
+											<span class="block text-body-sm text-muted">a favor de Bomberos</span>
+										{/if}
+									</span>
+								</li>
+							{/each}
+						</ul>
 					{:else}
-						<p class="m-0 text-body-sm text-muted">
-							Ningún bono vendido está en riesgo para este sorteo.
+						<p class="m-0 pt-3 text-body-sm text-muted">Ningún cobrador tiene saldo.</p>
+					{/if}
+					{#if pendingCommission}
+						<p class="m-0 flex items-baseline justify-between gap-3 pt-3">
+							<span class="text-body font-semibold"
+								>{pendingCommission.owes
+									? 'Comisión liquidada de más'
+									: 'Comisión sin liquidar'}</span
+							>
+							<Money value={wholePesos(pendingCommission.amount)} class="text-body font-semibold" />
 						</p>
 					{/if}
-				</Card>
+				</section>
 			{/if}
-		{/if}
 
-		{#if financial}
-			<Card title="Saldos de cobradores" id="dash-balances">
-				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
-					{@render figure('Saldo neto', formatSignedMoney(financial.balances.net))}
-					{@render figure(
-						'Cobradores con saldo a favor',
-						formatNumber(financial.balances.creditors)
-					)}
-				</dl>
-				{#if financial.balances.top.length}
-					<table class="mt-4 w-full border-collapse text-body-sm">
-						<caption class="sr-only">Saldos más grandes por cobrador</caption>
-						<thead>
-							<tr class="border-b border-border text-left text-muted">
-								<th scope="col" class="py-2 font-medium">Cobrador</th>
-								<th scope="col" class="py-2 text-right font-medium">Saldo</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each financial.balances.top as row (row.collectorId)}
-								<tr class="border-b border-border last:border-0">
-									<td class="py-2.5">{row.collectorName}</td>
-									<td class="py-2.5 text-right tabular-nums">{formatSignedMoney(row.balance)}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{:else}
-					<p class="m-0 mt-4 text-body-sm text-muted">
-						Todavía no hay movimientos en las cuentas corrientes.
-					</p>
-				{/if}
-			</Card>
-
-			<Card title="Efectivo y transferencias" id="dash-cash" description="Pagos confirmados.">
-				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-					{@render figure('Efectivo', formatMoney(financial.cash.cash))}
-					{@render figure('Transferencias', formatMoney(financial.cash.transfer))}
-					{@render figure('Total cobrado', formatMoney(financial.cash.total))}
-				</dl>
-				<p class="m-0 mt-4 text-body-sm text-muted">
-					Rendido en {formatNumber(financial.commissions.closedSettlements)}
-					{financial.commissions.closedSettlements === 1
-						? 'rendición cerrada'
-						: 'rendiciones cerradas'}:
-					{formatMoney(financial.commissions.settledCash)} en efectivo y
-					{formatMoney(financial.commissions.settledTransfer)} en transferencias.
-					{#if financial.commissions.openSettlements > 0}
-						{financial.commissions.openSettlements === 1
-							? 'Hay 1 rendición abierta.'
-							: `Hay ${formatNumber(financial.commissions.openSettlements)} rendiciones abiertas.`}
+			{#if operational}
+				<section aria-labelledby="draw-title" id="dash-next-draw">
+					<div class={section}>
+						<h2 id="draw-title" class="m-0 text-heading-3 text-text">Próximo sorteo</h2>
+						{#if data.can.viewDraws}
+							<a class={sectionLink} href={resolve('/campaigns/[id]/draws', { id })}>Sorteos</a>
+						{/if}
+					</div>
+					{#if nextDraw}
+						<div
+							class="relative flex items-center gap-4 border-b border-border py-3 hover:bg-surface-hover"
+						>
+							<div class="min-w-0 flex-1">
+								<p class="m-0 text-body font-medium">
+									{#if data.can.viewDraws}
+										<a
+											class="rounded-sm text-primary-text underline underline-offset-2 after:absolute after:inset-0 after:content-['']"
+											href={resolve('/campaigns/[id]/draws/[drawId]', { id, drawId: nextDraw.id })}
+											>{nextDraw.name}</a
+										>
+									{:else}
+										{nextDraw.name}
+									{/if}
+								</p>
+								<p class="m-0 text-body-sm text-muted">
+									{DRAW_TYPE_LABELS[nextDraw.type as DrawType] ?? 'Sorteo'}, {nextDraw.requiredInstallmentNumber
+										? `exige la cuota ${nextDraw.requiredInstallmentNumber} paga`
+										: 'exige el pago total'}
+								</p>
+							</div>
+							<div class="shrink-0 text-right">
+								<p class="m-0 font-figure text-figure tabular-nums">
+									{formatDate(nextDraw.drawDate)}
+								</p>
+								<p class="m-0 text-body-sm text-muted">
+									corte el {formatDateTime(nextDraw.paymentCutoffAt)}
+								</p>
+							</div>
+						</div>
+					{:else}
+						<p class="m-0 pt-3 text-body-sm text-muted">No hay sorteos programados.</p>
 					{/if}
-				</p>
-			</Card>
+				</section>
+			{/if}
+		</div>
+	{/if}
 
-			<Card title="Comisiones" id="dash-commissions" description="De las rendiciones cerradas.">
-				<dl class="m-0 grid grid-cols-1 gap-4 sm:grid-cols-3">
-					{@render figure('Generadas', formatMoney(financial.commissions.generated))}
-					{@render figure('Liquidadas', formatMoney(financial.commissions.settled))}
-					{@render figure('Sin liquidar', formatSignedMoney(financial.commissions.pending))}
-				</dl>
-			</Card>
-		{/if}
-
-		{#if campaign.status !== 'draft'}
-			{@render status()}
-		{/if}
-	</div>
+	{#if campaign.status !== 'draft'}
+		{@render status()}
+	{/if}
 </div>
 <!-- eslint-enable svelte/no-navigation-without-resolve -->

@@ -240,8 +240,9 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
   - 2.5 screens or shorter at 375 px with the demo campaign (5.2 today); no horizontal scroll (leaves `KNOWN_OVERFLOW`).
   - Each «Para resolver» item links to the screen that resolves it and disappears when there is nothing to resolve.
   - No amount on the page has cents.
-  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions.
-- **Risk.** Medium. The page is each role's landing; a render test per role.
+  - `load` returns the same keys (`phase-2-acceptance` unchanged) plus, at most, counts read with existing permissions. As delivered, `load` did not change at all: the count of open settlements is the one the shell's layout already loads.
+  - As delivered: 2.4 screens at 375 px with the demo campaign. The bonds short of the next draw have no screen of their own, so their item opens the list in place (collapsed until asked for) and each bond links to its record. The cash and commission breakdowns left the home: they are in the financial report.
+- **Risk.** Medium. The page is each role's landing; a render test per role. As delivered, the roles are checked in an E2E with the fixture users (operator, treasurer, read-only), since what each one sees comes from its permissions in the database.
 - **Depends on.** PRs 3, 4, 5, 7 (the «Registrar pago» action).
 
 ### PR 14. Lists: sales, settlements, deliveries, people, draws (A7, A9)
@@ -251,6 +252,11 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
 - **Acceptance.** At 375 px each list shows its first row in the first screenful and never scrolls sideways; every filter keeps its query string; open settlements come before closed ones; the list server tests are unchanged.
 - **Risk.** Medium by volume. If the diff passes 800 lines it is split in two (operation lists, then people and draws).
 - **Depends on.** PR 4.
+- **As delivered, 14b (collectors, buyers, draws).** The second half of the split.
+  - Measured at 375 x 812 with the demo campaign: the first row ends at 511 px on collectors, 503 px on buyers and 417 px on draws (646, 630 and 630 px before: already in the first screenful since the campaign shell of PR 5, but the tables scrolled sideways inside their cards, with the bonds of a collector, the phone of a buyer and the state of a draw off screen). No page and no table scrolls sideways, also with 60-character names (E2E).
+  - Two facts were added to the loads, each from an existing repository function under an existing permission: the collector's balance (`getCollectorAccounts`, one call per page, only with `report.view_financial`) and the buyer's bonds in the campaign (`listBuyerBonds`, one read per buyer of the page, only with `bond.view`). The assertions of the list server tests are unchanged; new cases cover both.
+  - The draws list has no search, so it does not use `FilterBar` (which requires one): its two filters are folded in a `Disclosure` with the same chips. The draws are shown as a calendar in two tables (to be held, next first; held or annulled, latest first), ordered in the page from what the load returns.
+  - Not done: the winning numbers on the draws list («what was drawn»). The only existing function that returns them for every draw of a campaign (`getPrizesReport`) needs `report.view_financial`, which the operator who loads the winners does not have; they stay on the draw record.
 
 ### PR 15. Collector and buyer records, current account (A12)
 
