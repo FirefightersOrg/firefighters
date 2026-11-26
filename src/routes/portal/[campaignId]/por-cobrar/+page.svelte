@@ -108,6 +108,11 @@
 										})}>{item.buyerName}</a
 									>
 								</p>
+								{#if item.buyerAddress}
+									<p class="m-0 text-body-sm text-muted break-words" data-buyer-address>
+										{item.buyerAddress}
+									</p>
+								{/if}
 								<p
 									class="m-0 text-body-sm {group.id === 'overdue'
 										? 'text-danger-text'

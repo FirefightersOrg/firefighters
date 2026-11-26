@@ -160,6 +160,7 @@ describe('«Por cobrar»: what the collect sheet needs (UX plan PR 10)', () => {
 		buyer_id: BUYER,
 		buyer_name: 'Ada',
 		buyer_phone: null,
+		buyer_address: sale === SALE ? 'Calle 1' : null,
 		installment_id: installment,
 		installment_number: 1,
 		due_date: '2026-11-10',
@@ -183,6 +184,11 @@ describe('«Por cobrar»: what the collect sheet needs (UX plan PR 10)', () => {
 		});
 		const data = await dueLoad(ev(locals, `/portal/${CAMP}/por-cobrar`));
 		expect(data.due).toHaveLength(3);
+		expect(data.due.map((item: { buyerAddress: string | null }) => item.buyerAddress)).toEqual([
+			'Calle 1',
+			'Calle 1',
+			null
+		]);
 		expect(data.reserved).toEqual({ i1: '30.00' });
 		expect(data.canRegister).toBe(true);
 		expect(data.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);

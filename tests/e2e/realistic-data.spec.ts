@@ -169,6 +169,31 @@ test.describe.serial('realistic data at 375 px', () => {
 		await sweep(collectorPhone, portal);
 	});
 
+	test('long buyer addresses wrap below the name in Por cobrar at 375 px', async () => {
+		const page = await collectorPhone.newPage();
+		await open(page, portal.find((screen) => screen.slug === 'p7-to-collect')!.path);
+		const addresses = page.locator('[data-due-row] [data-buyer-address]');
+		const long = addresses.filter({ hasText: 'entre avenida de los Inmigrantes' });
+		expect(await long.count()).toBeGreaterThan(0);
+		for (const address of await long.all()) {
+			await expect(address).toContainText('casa del fondo');
+			const layout = await address.evaluate((element) => {
+				const rect = element.getBoundingClientRect();
+				const name = element.previousElementSibling!.getBoundingClientRect();
+				return {
+					wrapped: rect.height > parseFloat(getComputedStyle(element).lineHeight),
+					belowName: rect.top >= name.bottom,
+					withinPage: rect.left >= 0 && rect.right <= innerWidth
+				};
+			});
+			expect(layout).toEqual({ wrapped: true, belowName: true, withinPage: true });
+		}
+		expect(
+			await page.evaluate(() => document.scrollingElement!.scrollWidth - innerWidth)
+		).toBeLessThanOrEqual(TOLERANCE);
+		await page.close();
+	});
+
 	// UX plan PR 13 (audit A7 and A10): the home of a campaign with real volumes is short, says
 	// what waits and where it is resolved, and shows whole pesos.
 	test('the campaign home is 2.5 screens or shorter, with no cents', async () => {
