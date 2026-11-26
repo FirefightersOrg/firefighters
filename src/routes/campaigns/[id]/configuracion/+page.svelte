@@ -70,12 +70,14 @@
 			{/if}
 			<div>
 				<dt class="text-caption text-muted">Valor del bono simple</dt>
-				<dd class="m-0 mt-0.5 tabular-nums">{formatMoney(campaign.simpleBondValue)}</dd>
+				<dd class="m-0 mt-0.5 tabular-nums">
+					{formatMoney(Math.round(Number(campaign.simpleBondValue)))}
+				</dd>
 			</div>
 			<div>
 				<dt class="text-caption text-muted">Cuotas</dt>
 				<dd class="m-0 mt-0.5 tabular-nums">
-					{campaign.installmentCount} × {formatMoney(campaign.installmentValue)}
+					{campaign.installmentCount} × {formatMoney(Math.round(Number(campaign.installmentValue)))}
 				</dd>
 			</div>
 			<div>
@@ -141,6 +143,7 @@
 	{#key campaignEditFormKey(campaign)}
 		{#if data.can.editName || data.can.editDates}
 			<CampaignGeneralForm
+				confirmChanges
 				{campaign}
 				result={generalResult}
 				nameReadonly={!data.can.editName}
@@ -149,12 +152,14 @@
 		{/if}
 
 		{#if data.can.editRules}
-			<RiskyOperationChecklist
-				campaignId={campaign.id}
-				operation="cambiar las reglas de la campaña"
-				canExport={data.can.exportBackups}
-			/>
-			<CampaignRulesForm {campaign} result={rulesResult} />
+			<div class="[&_a]:inline-flex [&_a]:min-h-touch [&_a]:items-center">
+				<RiskyOperationChecklist
+					campaignId={campaign.id}
+					operation="cambiar las reglas de la campaña"
+					canExport={data.can.exportBackups}
+				/>
+			</div>
+			<CampaignRulesForm {campaign} result={rulesResult} confirmChanges />
 		{/if}
 	{/key}
 </div>

@@ -21,15 +21,9 @@ import { open } from './helpers';
  * and opens every staff screen as the admin and every portal screen as the linked collector, at
  * 375 px in light, checking that the page does not scroll sideways.
  *
- * Screens that overflow today are listed in KNOWN_OVERFLOW with the audit item and the plan PR that
- * fixes them. The list only shrinks: a listed screen that stops overflowing fails the sweep until
- * its entry is removed, and a screen that is not listed fails as soon as it overflows.
+ * Every screen must pass: the known-overflow list the audit started with emptied as plan PRs 13, 17
+ * and 18 fixed the last screens, and was removed (UX plan PR 18).
  */
-const KNOWN_OVERFLOW: Record<string, string> = {
-	'81-reports-financial': 'audit A7, the export buttons do not wrap (plan PR 17)',
-	'82-reports-financial-collector': 'audit A7, the export buttons do not wrap (plan PR 17)'
-};
-
 const baseURL = `http://127.0.0.1:${process.env.E2E_PORT ?? 4317}`;
 /** Sub-pixel rounding, as in the a11y sweep. */
 const TOLERANCE = 1;
@@ -52,7 +46,7 @@ function phone(browser: Browser, storageState: string) {
 	});
 }
 
-/** Opens each screen and checks its horizontal overflow against the known list. */
+/** Opens each screen and checks that the page does not scroll sideways. */
 async function sweep(context: BrowserContext, screens: Screen[]) {
 	const page = await context.newPage();
 	for (const screen of screens) {
@@ -60,24 +54,9 @@ async function sweep(context: BrowserContext, screens: Screen[]) {
 		const overflow = await page.evaluate(
 			() => document.scrollingElement!.scrollWidth - window.innerWidth
 		);
-		// The home route can redirect to the single active campaign on a clean database.
-		const destination =
-			screen.slug === '00-home'
-				? screens.find((item) => item.path === new URL(page.url()).pathname)
-				: undefined;
-		const known = KNOWN_OVERFLOW[screen.slug] ?? (destination && KNOWN_OVERFLOW[destination.slug]);
-		if (known) {
-			expect
-				.soft(
-					overflow,
-					`${screen.slug} no longer scrolls sideways at 375 px: remove it from KNOWN_OVERFLOW (${known})`
-				)
-				.toBeGreaterThan(TOLERANCE);
-		} else {
-			expect
-				.soft(overflow, `${screen.slug} scrolls sideways at 375 px with realistic data`)
-				.toBeLessThanOrEqual(TOLERANCE);
-		}
+		expect
+			.soft(overflow, `${screen.slug} scrolls sideways at 375 px with realistic data`)
+			.toBeLessThanOrEqual(TOLERANCE);
 	}
 	await page.close();
 }
@@ -100,12 +79,6 @@ test.describe.serial('realistic data at 375 px', () => {
 	test.afterAll(async () => {
 		await adminPhone?.close();
 		await collectorPhone?.close();
-	});
-
-	test('the known-overflow list only names screens that exist', () => {
-		const slugs = new Set([...staff, ...portal].map((screen) => screen.slug));
-		for (const slug of Object.keys(KNOWN_OVERFLOW))
-			expect(slugs, `KNOWN_OVERFLOW names an unknown screen: ${slug}`).toContain(slug);
 	});
 
 	test('staff screens do not scroll sideways', async () => {

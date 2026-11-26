@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
-	import { Button, Card, Field, PageHeader, TextInput } from '$lib/components/ui';
+	import { Button, Disclosure, Field, PageHeader, TextInput } from '$lib/components/ui';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -35,16 +35,19 @@
 />
 
 <div class="space-y-6">
-	<RiskyOperationChecklist
-		campaignId={campaign.id}
-		operation="una operación riesgosa (importación masiva, cambio de reglas, corrección masiva, cierre)"
-		canExport={true}
-	/>
+	<div class="[&_a]:inline-flex [&_a]:min-h-touch [&_a]:items-center">
+		<RiskyOperationChecklist
+			campaignId={campaign.id}
+			operation="una operación riesgosa (importación masiva, cambio de reglas, corrección masiva, cierre)"
+			canExport={true}
+		/>
+	</div>
 
-	<Card
-		title="Período"
-		description="Opcional. Filtra los pagos (por fecha de pago) y las cuentas de cobradores (por fecha del movimiento), con los extremos incluidos."
-	>
+	<Disclosure summary="Filtrar por período"
+		><p class="mb-3 text-body-sm text-muted">
+			Opcional. Filtra los pagos por su fecha y las cuentas por la fecha del movimiento. Incluye
+			ambos extremos.
+		</p>
 		<div class="grid gap-4 sm:grid-cols-2">
 			<Field label="Desde" optional>
 				<TextInput type="date" bind:value={from} />
@@ -53,12 +56,13 @@
 				<TextInput type="date" bind:value={to} />
 			</Field>
 		</div>
-	</Card>
+	</Disclosure>
 
-	<Card title="Exportaciones">
+	<section aria-labelledby="exports-title">
+		<h2 id="exports-title" class="mb-3 text-heading-2">Exportaciones</h2>
 		<ul class="divide-y divide-border text-body">
 			{#each data.exports as e (e.kind)}
-				<li class="flex items-center justify-between gap-3 py-2">
+				<li class="flex flex-wrap items-center justify-between gap-3 py-3">
 					<span>{e.label}</span>
 					{#if e.allowed}
 						<Button href={href(e.kind, e.hasPeriod)} download icon="download">Descargar CSV</Button>
@@ -68,5 +72,5 @@
 				</li>
 			{/each}
 		</ul>
-	</Card>
+	</section>
 </div>

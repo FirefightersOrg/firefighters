@@ -29,7 +29,7 @@
 </script>
 
 {#if show}
-	<div class="flex gap-2">
+	<div class="flex max-w-full flex-wrap gap-2">
 		<Button size="sm" href={href('csv')} data-sveltekit-reload>Exportar CSV</Button>
 		<Button size="sm" href={href('xlsx')} data-sveltekit-reload>Exportar Excel</Button>
 	</div>

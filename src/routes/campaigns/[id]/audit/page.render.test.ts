@@ -33,7 +33,11 @@ describe('campaign audit render', () => {
 		const body = render(Page, { props: { data: data(), params: { id: campaignId } } as any }).body;
 		expect(body).toContain('1.051 registros');
 		expect(body).toContain('Treasurer');
-		expect(body).toContain('payment.annul');
+		expect(body).toContain('Registro anulado');
+		expect(body).toContain('Pago');
+		expect(body.replace(/<[^>]*>/g, '')).not.toContain('payment.annul');
+		expect(body).not.toContain(entry.actorUserId);
+		expect(body).toContain('name="person"');
 		expect(body).toContain('name="entityType"');
 		expect(body).toContain('Siguiente');
 	});
@@ -42,6 +46,7 @@ describe('campaign audit render', () => {
 			props: { data: data(entry), params: { id: campaignId } } as any
 		}).body;
 		expect(body).toContain('Detalle del cambio');
+		expect(body).toContain('payment.annul');
 		expect(body).toContain('Duplicate receipt');
 		expect(body).toContain('confirmed');
 		expect(body).toContain('annulled');

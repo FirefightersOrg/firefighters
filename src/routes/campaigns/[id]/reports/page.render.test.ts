@@ -46,6 +46,8 @@ function page(overrides: Record<string, unknown> = {}, form: unknown = null) {
 		props: {
 			data: {
 				campaign: mapCampaignRow(campaignRow()),
+				view: 'by-status',
+				canViewCollectors: true,
 				filters: {
 					collectorId: null,
 					kind: null,
@@ -101,41 +103,57 @@ function page(overrides: Record<string, unknown> = {}, form: unknown = null) {
 }
 
 describe('/campaigns/[id]/reports page', () => {
-	it('renders the four reports with Argentine money formatting', () => {
-		const body = page();
-		expect(body).toContain('Bonos por estado comercial y financiero');
-		expect(body).toContain('Bonos por cobrador');
-		expect(body).toContain('Cuotas: pendientes, pagadas, adelantadas y vencidas');
-		expect(body).toContain('Resumen mensual por cobrador: marzo de 2027');
-		expect(body).toContain('120.000,00');
-		expect(body).toContain('Vencidas');
-		expect(body).toContain(`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}`);
+	it('renders exactly one report per URL, with totals before the table and whole pesos', () => {
+		const expected = {
+			'by-status': 'Bonos por estado comercial y financiero',
+			'by-collector': 'Bonos por cobrador',
+			installments: 'Cuotas: pendientes, pagadas, adelantadas y vencidas',
+			monthly: 'Resumen mensual por cobrador: marzo de 2027'
+		};
+		for (const [view, title] of Object.entries(expected)) {
+			const body = page({ view });
+			expect(body).toContain(`<h2 id="report-title" class="min-w-0 text-heading-2">${title}</h2>`);
+			expect(body.match(/id="report-title"/g)).toHaveLength(1);
+			expect(body.indexOf('Totales del reporte')).toBeLessThan(body.indexOf('<table'));
+			expect(body).toContain(view === 'installments' ? '12.000' : '120.000');
+			expect(body).not.toContain('120.000,00');
+			expect(body).toContain('data-stack="true"');
+		}
+		expect(page({ view: 'by-collector' })).toContain(
+			`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}`
+		);
 	});
 
 	it('escapes collector names (no raw HTML)', () => {
-		const body = page();
+		const body = page({ view: 'by-collector' });
 		expect(body).not.toContain('<b>Ana</b>');
 		expect(body).toContain('&lt;b>Ana&lt;/b>');
 	});
 
-	it('shows empty states', () => {
-		const body = page({
-			bondsByStatus: buildStatusMatrix([]),
-			bondsByCollector: { rows: [], totals: totalBondsByCollector([]) },
-			installments: pivotInstallments([]),
-			monthly: { rows: [], totals: totalCollectorMonthly([]) }
-		});
-		expect(body).toContain('Ningún bono coincide con los filtros.');
-		expect(body).toContain('Ninguna cuota coincide con los filtros.');
-		expect(body).toContain('No hubo actividad de cobradores en este mes.');
+	it('keeps collector names from the report without offering an inaccessible record link', () => {
+		const body = page({ view: 'by-collector', canViewCollectors: false });
+		expect(body).toContain('&lt;b>Ana&lt;/b>');
+		expect(body).not.toContain(`/campaigns/${CAMPAIGN_ID}/collectors/${COLLECTOR_ID}`);
+	});
+
+	it('shows each view’s empty state', () => {
+		expect(page({ view: 'by-status', bondsByStatus: buildStatusMatrix([]) })).toContain(
+			'Ningún bono coincide con los filtros.'
+		);
+		expect(page({ view: 'installments', installments: pivotInstallments([]) })).toContain(
+			'Ninguna cuota coincide con los filtros.'
+		);
+		expect(
+			page({ view: 'monthly', monthly: { rows: [], totals: totalCollectorMonthly([]) } })
+		).toContain('No hubo actividad de cobradores en este mes.');
 	});
 
 	it('lists the overdue-warning sales, informative only (SAN-142)', () => {
-		const body = page();
+		const body = page({ view: 'overdue-warning' });
 		expect(body).toContain('Ventas con 3 o más cuotas vencidas');
 		expect(body).toContain('no marca ninguna venta como incobrable');
 		expect(body).toContain(`/campaigns/${CAMPAIGN_ID}/sales/s1`);
-		expect(body).toContain('24.000,00');
+		expect(body).toContain('24.000');
 		expect(body).toContain('10/01/2027');
 		expect(body).not.toContain('?/setOverdueThreshold');
 	});
@@ -147,12 +165,13 @@ describe('/campaigns/[id]/reports page', () => {
 			canViewSales: false,
 			sales: [] as unknown[]
 		};
-		const empty = page({ overdueWarning: base });
+		const empty = page({ view: 'overdue-warning', overdueWarning: base });
 		expect(empty).toContain('Ventas con 1 o más cuota vencida');
 		expect(empty).toContain('Ninguna venta tiene 1 o más cuota vencida.');
 		expect(empty).toContain('?/setOverdueThreshold');
 		expect(empty).toContain('value="1"');
 		const unlinked = page({
+			view: 'overdue-warning',
 			overdueWarning: {
 				...base,
 				canEdit: false,

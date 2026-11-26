@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
 vi.mock('$lib/server/repositories/audit-log', () => ({
+	AUDIT_PAGE_SIZE: 50,
 	listCampaignAuditEntries: vi.fn(),
 	getCampaignAuditEntry: vi.fn()
 }));
@@ -53,7 +54,7 @@ describe('campaign audit viewer', () => {
 			entityType: 'payment',
 			from: '2026-11-01',
 			to: '2026-11-19',
-			page: 21
+			page: 11
 		});
 	});
 	it('loads a scoped detail and maps missing detail to 404', async () => {
@@ -84,6 +85,75 @@ describe('campaign audit viewer', () => {
 			error: null
 		} as never);
 		const result = await load(event(['campaign.view', 'audit.view']) as never);
-		expect(result?.entries.items).toEqual(items);
+		expect(result?.entries.items).toEqual(
+			items.map((item) => ({
+				...item,
+				subject: { sale: 'Venta', payment: 'Pago', draw: 'Sorteo', prize: 'Premio' }[
+					item.entityType
+				]
+			}))
+		);
 	});
+});
+
+it('searches names across more than 1,000 authorized rows before paginating', async () => {
+	const items = Array.from({ length: 1051 }, (_, i) => ({
+		id: String(i),
+		action: 'buyer.update',
+		entityType: 'buyer',
+		entityId: null,
+		actorName: null,
+		actorUserId: null,
+		oldValue: null,
+		newValue: { first_name: i === 1050 ? 'Ángela' : 'María', last_name: 'Giménez' },
+		createdAt: '2026-11-01T12:00:00Z',
+		reason: null,
+		requestId: null
+	}));
+	vi.mocked(listCampaignAuditEntries).mockImplementation(
+		async (_client, campaignId, filters = {}) => {
+			expect(campaignId).toBe(CAMPAIGN_ID);
+			const page = filters.page ?? 1;
+			return {
+				data: {
+					items: items.slice((page - 1) * 50, page * 50),
+					total: items.length,
+					page,
+					pageSize: 50
+				},
+				error: null
+			};
+		}
+	);
+	const result = await load(event(['campaign.view', 'audit.view'], '?person=angela') as never);
+	expect(result?.entries.total).toBe(1);
+	expect(result?.entries.items).toMatchObject([{ id: '1050', subject: 'Ángela Giménez' }]);
+	expect(listCampaignAuditEntries).toHaveBeenCalledTimes(22);
+});
+
+it('shows 25 rows per page without skipping the other half of a repository page', async () => {
+	const items = Array.from({ length: 50 }, (_, i) => ({
+		id: String(i),
+		entityType: 'buyer',
+		action: 'buyer.create',
+		newValue: { first_name: `Persona ${i}` }
+	}));
+	vi.mocked(listCampaignAuditEntries).mockResolvedValue({
+		data: { items, total: 100, page: 1, pageSize: 50 },
+		error: null
+	} as never);
+	const first = await load(event(['campaign.view', 'audit.view']) as never);
+	const second = await load(event(['campaign.view', 'audit.view'], '?page=2') as never);
+	expect(first?.entries.items.map((row: { id: string }) => row.id)).toEqual(
+		items.slice(0, 25).map((row) => row.id)
+	);
+	expect(second?.entries.items.map((row: { id: string }) => row.id)).toEqual(
+		items.slice(25).map((row) => row.id)
+	);
+	expect(second?.entries).toMatchObject({ page: 2, pageSize: 25, total: 100 });
+	expect(listCampaignAuditEntries).toHaveBeenLastCalledWith(
+		expect.anything(),
+		CAMPAIGN_ID,
+		expect.objectContaining({ page: 1 })
+	);
 });
