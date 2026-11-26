@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Installment, PaymentPlan, Sale } from '$lib/domain/sales';
-import { toDecimalString } from '$lib/domain/money';
+import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
 import type { RepositoryResult } from './campaigns';
 import type { FinancialStatus } from '$lib/domain/financial-status';
 
@@ -108,6 +108,81 @@ export async function listInstallmentsForSale(
 		.order('installment_number')
 		.overrideTypes<InstallmentRow[], { merge: false }>();
 	return error ? { data: null, error } : { data: (data ?? []).map(mapInstallmentRow), error: null };
+}
+
+/** What was paid on one installment: how much, and the last payment that touched it. */
+export interface InstallmentPayments {
+	/** Applied by every payment that is not annulled, as a decimal string. */
+	applied: string;
+	/** The latest of those payments, to say when and how the installment was paid. */
+	last: {
+		date: string;
+		method: string;
+		settlementId: string | null;
+		settlementNumber: number | null;
+	} | null;
+}
+
+/**
+ * What the payments of a sale applied to each installment of its active plan: `installment id ->
+ * payments`. Counts every payment that is not annulled, the database's own balance rule (the same
+ * one `listCollectorPaymentCandidates` follows), so what the bond record says is owed matches what
+ * the settlement lets somebody pay. Read with the caller's client: RLS decides what is visible.
+ */
+export async function listInstallmentPaymentsForSale(
+	supabase: SupabaseClient,
+	saleId: string
+): Promise<RepositoryResult<Map<string, InstallmentPayments>>> {
+	type ApplicationRow = {
+		installment_id: string;
+		amount_applied: string | number;
+		payments: {
+			status: string;
+			payment_date: string;
+			payment_method: string;
+			settlement_id: string | null;
+			settlements: { settlement_number: number } | null;
+		};
+	};
+	// One sale has a handful of installments and payments: far below a page of PostgREST rows.
+	const { data, error } = await supabase
+		.from('payment_installments')
+		.select(
+			'installment_id,amount_applied,payments!inner(status,payment_date,payment_method,settlement_id,settlements(settlement_number)),installments!inner(payment_plans!inner(sale_id,status))'
+		)
+		.neq('payments.status', 'annulled')
+		.eq('installments.payment_plans.sale_id', saleId)
+		.eq('installments.payment_plans.status', 'active')
+		.order('payment_id')
+		.order('installment_id')
+		.overrideTypes<ApplicationRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	const cents = new Map<string, number>();
+	const last = new Map<string, InstallmentPayments['last']>();
+	for (const row of data ?? []) {
+		cents.set(
+			row.installment_id,
+			(cents.get(row.installment_id) ?? 0) +
+				(parseMoneyToCents(toDecimalString(row.amount_applied)) ?? 0)
+		);
+		const previous = last.get(row.installment_id);
+		if (!previous || row.payments.payment_date >= previous.date)
+			last.set(row.installment_id, {
+				date: row.payments.payment_date,
+				method: row.payments.payment_method,
+				settlementId: row.payments.settlement_id,
+				settlementNumber: row.payments.settlements?.settlement_number ?? null
+			});
+	}
+	return {
+		data: new Map(
+			[...cents].map(([id, total]) => [
+				id,
+				{ applied: centsToDecimalString(total), last: last.get(id) ?? null }
+			])
+		),
+		error: null
+	};
 }
 
 export interface SaleListItem {
