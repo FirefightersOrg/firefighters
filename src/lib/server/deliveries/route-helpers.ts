@@ -28,6 +28,9 @@ export interface DeliveryBondOption {
 	label: string;
 	kind: string;
 	units: number;
+	/** Participating base numbers, sorted: what the screens group into ranges (UX plan PR 16). */
+	baseNumbers: number[];
+	associatedNumbers: number[];
 }
 
 export function deliveryFailure(
@@ -76,5 +79,12 @@ export function bondOption(bond: BondListEntry, campaign: Campaign): DeliveryBon
 		bond.kind === 'simple'
 			? `${bond.baseNumbers.map(fmt).join(', ')} / ${bond.associatedNumbers.map(fmt).join(', ')}`
 			: `Pata ${bond.baseNumbers.map(fmt).join(', ')}`;
-	return { id: bond.id, label, kind: bond.kind, units: bond.commercialUnitCount };
+	return {
+		id: bond.id,
+		label,
+		kind: bond.kind,
+		units: bond.commercialUnitCount,
+		baseNumbers: bond.baseNumbers,
+		associatedNumbers: bond.associatedNumbers
+	};
 }

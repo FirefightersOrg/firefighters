@@ -65,7 +65,8 @@ const text = (value: string): SummaryPart => ({ text: value });
 const sentence = (value: string) =>
 	/[.!?»]$/.test(value.trim()) ? value.trim() : `${value.trim()}.`;
 
-function installmentRows(
+/** The installments that count (not annulled), in order, with what each still owes. */
+export function installmentRows(
 	installments: readonly BondSummaryInstallment[],
 	today: string
 ): BondSummaryRow[] {
@@ -83,12 +84,38 @@ function installmentRows(
 		.sort((a, b) => a.number - b.number);
 }
 
-function soldSentences(input: BondSummaryInput, rows: BondSummaryRow[]): SummaryPart[][] {
+/**
+ * What is paid and what is owed, as one sentence. Shared by the bond record and the sale record, so
+ * both say the same thing about the same installments.
+ */
+export function debtSentence(rows: readonly BondSummaryRow[], uncollectible = false): string {
 	const debt = rows.reduce((sum, row) => sum + row.owedCents, 0);
 	const overdue = rows.filter((row) => row.overdue).reduce((sum, row) => sum + row.owedCents, 0);
 	const paidCount = rows.filter((row) => row.owedCents === 0).length;
-	const single = rows.length <= 1;
-	const mode = single ? ' en un pago.' : ` en ${rows.length} cuotas.`;
+	if (uncollectible) return `Se dio por incobrable: quedaron ${pesos(debt)} sin cobrar.`;
+	if (debt === 0) return 'Está pagado.';
+	if (rows.length <= 1) {
+		const row = rows[0];
+		const paid = cents(row.amount) - row.owedCents;
+		const lead = paid > 0 ? `Pagó ${pesos(paid)} y debe ${pesos(debt)}` : `Debe ${pesos(debt)}`;
+		return `${lead}, que ${row.overdue ? 'venció' : 'vence'} el ${formatDate(row.dueDate)}.`;
+	}
+	const lead =
+		paidCount === 0
+			? 'Todavía no pagó ninguna cuota'
+			: `Pagó ${paidCount} ${paidCount === 1 ? 'cuota' : 'cuotas'}`;
+	const tail =
+		overdue === 0
+			? '.'
+			: overdue === debt
+				? ', todo vencido.'
+				: `, de los cuales ${pesos(overdue)} están vencidos.`;
+	return `${lead} y debe ${pesos(debt)}${tail}`;
+}
+
+function soldSentences(input: BondSummaryInput, rows: BondSummaryRow[]): SummaryPart[][] {
+	const debt = rows.reduce((sum, row) => sum + row.owedCents, 0);
+	const mode = rows.length <= 1 ? ' en un pago.' : ` en ${rows.length} cuotas.`;
 	const sentences: SummaryPart[][] = [
 		input.buyerName
 			? [text('Vendido a '), { text: input.buyerName, ref: 'buyer' }, text(mode)]
@@ -100,31 +127,7 @@ function soldSentences(input: BondSummaryInput, rows: BondSummaryRow[]): Summary
 			{ text: input.collectorName, ref: 'collector' },
 			text('.')
 		]);
-
-	if (input.uncollectible) {
-		sentences.push([text(`Se dio por incobrable: quedaron ${pesos(debt)} sin cobrar.`)]);
-	} else if (debt === 0) {
-		sentences.push([text('Está pagado.')]);
-	} else if (single) {
-		const row = rows[0];
-		const paid = cents(row.amount) - row.owedCents;
-		const lead = paid > 0 ? `Pagó ${pesos(paid)} y debe ${pesos(debt)}` : `Debe ${pesos(debt)}`;
-		sentences.push([
-			text(`${lead}, que ${row.overdue ? 'venció' : 'vence'} el ${formatDate(row.dueDate)}.`)
-		]);
-	} else {
-		const lead =
-			paidCount === 0
-				? 'Todavía no pagó ninguna cuota'
-				: `Pagó ${paidCount} ${paidCount === 1 ? 'cuota' : 'cuotas'}`;
-		const tail =
-			overdue === 0
-				? '.'
-				: overdue === debt
-					? ', todo vencido.'
-					: `, de los cuales ${pesos(overdue)} están vencidos.`;
-		sentences.push([text(`${lead} y debe ${pesos(debt)}${tail}`)]);
-	}
+	sentences.push([text(debtSentence(rows, input.uncollectible))]);
 	return sentences;
 }
 

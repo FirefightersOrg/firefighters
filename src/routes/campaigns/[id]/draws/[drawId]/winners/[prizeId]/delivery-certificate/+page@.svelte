@@ -21,29 +21,31 @@
 </script>
 
 <svelte:head><title>Constancia de entrega de premio - {doc.draw}</title></svelte:head>
-<div class="doc-toolbar">
-	<button type="button" onclick={() => window.print()}>Imprimir</button>
-</div>
-<article class="doc-sheet">
-	<header class="doc-header">
-		<div>
-			<p class="doc-institution">{doc.institutionName}</p>
-			<h1 class="doc-title">Constancia de entrega de premio</h1>
-		</div>
-	</header>
-	<dl class="doc-fields doc-fields-2">
-		{#each fields as [label, value] (label)}
-			<div>
-				<dt>{label}</dt>
-				<dd>{value}</dd>
-			</div>
-		{/each}
-	</dl>
-	<div class="doc-signatures">
-		<div>
-			<span class="doc-line"></span>{doc.recipientSignature}<br /><small
-				>{doc.recipientName} y {doc.recipientDocument}</small
-			>
-		</div>
+<main>
+	<div class="doc-toolbar">
+		<button type="button" onclick={() => window.print()}>Imprimir</button>
 	</div>
-</article>
+	<article class="doc-sheet">
+		<header class="doc-header">
+			<div>
+				<p class="doc-institution">{doc.institutionName}</p>
+				<h1 class="doc-title">Constancia de entrega de premio</h1>
+			</div>
+		</header>
+		<dl class="doc-fields doc-fields-2">
+			{#each fields as [label, value] (label)}
+				<div>
+					<dt>{label}</dt>
+					<dd class:doc-bond={label === 'Número ganador' || label === 'Bono asociado'}>{value}</dd>
+				</div>
+			{/each}
+		</dl>
+		<div class="doc-signatures">
+			<div>
+				<span class="doc-line"></span>{doc.recipientSignature}<br /><small
+					>{doc.recipientName} y {doc.recipientDocument}</small
+				>
+			</div>
+		</div>
+	</article>
+</main>

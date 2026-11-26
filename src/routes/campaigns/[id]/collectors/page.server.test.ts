@@ -24,9 +24,11 @@ function collectorRow(overrides: Record<string, unknown> = {}) {
 
 function setup(
 	permissions = VIEWER,
-	campaign: { data: unknown; error: unknown } = { data: campaignRow(), error: null }
+	campaign: { data: unknown; error: unknown } = { data: campaignRow(), error: null },
+	rpc?: { data: unknown; error: unknown }
 ) {
 	const mock = mockSupabase({
+		rpc,
 		tables: {
 			campaigns: campaign,
 			collectors: { data: [collectorRow()], error: null, count: 1 },
@@ -75,5 +77,54 @@ describe('/campaigns/[id]/collectors load', () => {
 		expect(chains.bonds[0].select).toHaveBeenCalledWith('id', { count: 'exact', head: true });
 		expect(data?.collectors[0]).toMatchObject({ displayName: 'Ada Collector', assignedBonds: 2 });
 		expect(data?.query).toEqual({ q: 'Ada Collector', status: 'active' });
+	});
+
+	// UX plan PR 14b: the balance of each collector, for the roles that read the financial reports.
+	it('does not read balances without report.view_financial', async () => {
+		const { locals, rpc } = setup();
+		const data = await load(event(locals));
+		expect(rpc).not.toHaveBeenCalled();
+		expect(data?.collectors[0].balance).toBeNull();
+		expect(data?.can.balances).toBe(false);
+	});
+
+	it('reads the balances of the campaign in one call with report.view_financial', async () => {
+		const account = (collector_id: string, balance: string) => ({
+			collector_id,
+			collector_name: 'Ada Collector',
+			entry_count: 3,
+			credit_total: '2000.00',
+			debit_total: '500.00',
+			balance,
+			last_entry_on: '2026-11-20'
+		});
+		const financial = [...VIEWER, 'report.view_financial'];
+		const { locals, rpc } = setup(financial, undefined, {
+			data: [account(COLLECTOR_ID, '-1500.00')],
+			error: null
+		});
+		const data = await load(event(locals));
+		expect(rpc).toHaveBeenCalledTimes(1);
+		expect(rpc).toHaveBeenCalledWith('report_collector_accounts', {
+			p_campaign_id: CAMPAIGN_ID,
+			p_collector_id: null
+		});
+		expect(data?.collectors[0]).toMatchObject({ balance: '-1500.00', assignedBonds: 2 });
+		expect(data?.can.balances).toBe(true);
+
+		// A collector without movements has no row in the report: no balance, not an unknown one.
+		const other = setup(financial, undefined, {
+			data: [account('c0000000-0000-0000-0000-000000000002', '900.00')],
+			error: null
+		});
+		expect((await load(event(other.locals)))?.collectors[0].balance).toBe('0.00');
+	});
+
+	it('fails when the balances cannot be read, instead of showing a list without them', async () => {
+		const { locals } = setup([...VIEWER, 'report.view_financial'], undefined, {
+			data: null,
+			error: { message: 'boom' }
+		});
+		await expect(load(event(locals))).rejects.toMatchObject({ status: 500 });
 	});
 });

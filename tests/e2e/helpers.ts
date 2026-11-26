@@ -90,9 +90,10 @@ export async function deliverAndSell(
 	await open(page, `/campaigns/${campaignId}/deliveries/new`);
 	await page.locator('#query').fill(String(base));
 	await page.getByRole('button', { name: 'Agregar' }).click();
-	await expect(page.getByText('1 agregados.')).toBeVisible();
+	await expect(page.getByText('1 bono agregado.')).toBeVisible();
 	await page.locator('#collectorId').selectOption({ label: collector });
-	await page.getByRole('button', { name: 'Entregar y emitir remito' }).click();
+	// UX plan PR 16: the button says how many bonds go to whom.
+	await page.getByRole('button', { name: `Entregar 1 bono a ${collector}` }).click();
 	await expect(page).toHaveURL(/\/deliveries\/[0-9a-f-]{36}$/);
 	const noteId = page.url().split('/').pop()!;
 	await expect(page.getByRole('heading', { name: /Remito \d{4}/ })).toBeVisible();
@@ -101,16 +102,18 @@ export async function deliverAndSell(
 	await open(page, `/campaigns/${campaignId}/sales/new`);
 	await page.locator('#query').fill(String(base));
 	await page.locator('form[action="?/lookup"] button[type="submit"]').click();
-	await page.getByRole('radio').first().check();
+	// UX plan PR 12: the one bond that matches is chosen, and each answered step is one line.
+	await expect(page.locator('[data-chosen-bond]')).toBeVisible();
 	await page.getByText('Crear un comprador').click();
 	await page.locator('#buyer-firstName').fill('Ana');
 	await page.locator('#buyer-lastName').fill(`Comprador ${collector}`);
 	await page.getByRole('button', { name: 'Crear comprador' }).click();
-	await expect(page.locator('#buyerId')).not.toHaveValue('');
-	await page.getByRole('button', { name: 'Confirmar venta' }).click();
+	await expect(page.locator('[data-chosen-buyer]')).toBeVisible();
+	await page.getByRole('button', { name: /^Confirmar venta del bono/ }).click();
 	await expect(page).toHaveURL(/\/sales\/[0-9a-f-]{36}$/);
 	const saleId = page.url().split('/').pop()!;
-	await expect(page.getByText('Pago total').first()).toBeVisible();
+	// UX plan PR 12b: the sale record says the sale in a sentence.
+	await expect(page.locator('[data-sale-sentence]')).toContainText('en un pago');
 
 	return { noteId, saleId };
 }

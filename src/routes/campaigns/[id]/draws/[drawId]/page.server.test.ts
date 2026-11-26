@@ -6,6 +6,7 @@ vi.mock('$lib/server/repositories/draws', () => ({
 	getCurrentDrawRoster: vi.fn(),
 	rosterHasLegacyExtras: vi.fn()
 }));
+vi.mock('$lib/server/repositories/prizes', () => ({ listDrawPrizes: vi.fn() }));
 vi.mock('$lib/server/services/draws', async (original) => ({
 	...(await original<any>()),
 	updateDraw: vi.fn(),
@@ -24,6 +25,7 @@ import {
 	getDraw,
 	rosterHasLegacyExtras
 } from '$lib/server/repositories/draws';
+import { listDrawPrizes } from '$lib/server/repositories/prizes';
 import { annulDraw, completeDraw, DrawServiceError, updateDraw } from '$lib/server/services/draws';
 import { freezeDrawRoster, generateDrawRoster } from '$lib/server/services/draw-rosters';
 import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
@@ -63,8 +65,34 @@ beforeEach(() => {
 	vi.mocked(getDraw).mockResolvedValue({ data: draw, error: null } as never);
 	vi.mocked(getCurrentDrawRoster).mockResolvedValue({ data: null, error: null });
 	vi.mocked(rosterHasLegacyExtras).mockResolvedValue({ data: false, error: null });
+	vi.mocked(listDrawPrizes).mockResolvedValue({ data: [], error: null });
 });
 describe('draw detail', () => {
+	it('counts the prizes for the next step, and leaves them unknown when they cannot be read', async () => {
+		const event = {
+			locals: makeLocals({ permissions: ['campaign.view', 'draw.view', 'draw.load_winner'] }),
+			params: { id: CAMPAIGN_ID, drawId: DRAW_ID },
+			url: new URL(url)
+		} as never;
+		vi.mocked(listDrawPrizes).mockResolvedValue({
+			data: [
+				{ status: 'pending_validation' },
+				{ status: 'pending_delivery' },
+				{ status: 'unawarded' },
+				{ status: 'annulled' }
+			],
+			error: null
+		} as never);
+		const loaded = (await load(event)) as any;
+		expect(loaded.prizes).toEqual({ total: 3, unresolved: 1, resolved: 2, pendingDelivery: 1 });
+		expect(loaded.can.loadWinner).toBe(true);
+		expect(listDrawPrizes).toHaveBeenCalledWith(expect.anything(), DRAW_ID);
+
+		vi.mocked(listDrawPrizes).mockResolvedValue({ data: null, error: new Error('rls') } as never);
+		const unknown = (await load(event)) as any;
+		expect(unknown.prizes).toBeNull();
+		expect(unknown.draw.id).toBe(DRAW_ID);
+	});
 	it('draw.update permits editing but not annulment or completion', async () => {
 		const loaded = (await load({
 			locals: makeLocals({ permissions: ['campaign.view', 'draw.update'] }),

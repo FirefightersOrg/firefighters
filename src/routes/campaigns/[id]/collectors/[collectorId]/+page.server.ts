@@ -27,7 +27,12 @@ import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
 import { listCollectorPendingInstallments } from '$lib/server/repositories/sales';
 import { listCollectorCommissionRules } from '$lib/server/repositories/commission-rules';
 import { getCollectorLedgerBalance } from '$lib/server/services/commission-ledger';
-import { listSettlements } from '$lib/server/repositories/settlements';
+import {
+	listCollectorPaymentCandidates,
+	listSettlements
+} from '$lib/server/repositories/settlements';
+import { isReadableName } from '$lib/domain/parties';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import {
 	DeliveryServiceError,
 	reassignBondsToCollector,
@@ -54,25 +59,32 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!campaignResult.data) error(404, { message: CAMPAIGN_MESSAGES.notFound });
 	if (!collectorResult.data) error(404, { message: notFound });
 	const auditAllowed = hasPermissionIn(locals.permissions, 'audit.view');
-	const [bonds, buyers, profiles, audit, installments, settlements] = await Promise.all([
-		listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
-		listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
-		listAvailableCollectorProfileOptions(locals.supabase),
-		auditAllowed
-			? listAuditEntriesForEntities(locals.supabase, 'collector', [params.collectorId], {
-					limit: AUDIT_ENTRIES_LIMIT + 1
-				})
-			: Promise.resolve(null),
-		listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId),
-		listSettlements(locals.supabase, params.id, { collectorId: params.collectorId })
-	]);
+	const [bonds, buyers, profiles, audit, installments, settlements, candidates] = await Promise.all(
+		[
+			listAssignedBondsForCollector(locals.supabase, params.id, params.collectorId),
+			listBuyers(locals.supabase, { usualCollectorId: params.collectorId, pageSize: BUYERS_SHOWN }),
+			listAvailableCollectorProfileOptions(locals.supabase),
+			auditAllowed
+				? listAuditEntriesForEntities(locals.supabase, 'collector', [params.collectorId], {
+						limit: AUDIT_ENTRIES_LIMIT + 1
+					})
+				: Promise.resolve(null),
+			listCollectorPendingInstallments(locals.supabase, params.id, params.collectorId),
+			listSettlements(locals.supabase, params.id, { collectorId: params.collectorId }),
+			// What is left to collect (UX plan PR 15): every unpaid installment with what it still owes,
+			// the list «Registrar pago» offers. Read with the caller's client: a role that cannot read
+			// payments gets each installment by its whole amount.
+			listCollectorPaymentCandidates(locals.supabase, params.id, params.collectorId)
+		]
+	);
 	if (
 		bonds.error ||
 		buyers.error ||
 		profiles.error ||
 		audit?.error ||
 		installments.error ||
-		settlements.error
+		settlements.error ||
+		candidates.error
 	)
 		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 	const collector = collectorResult.data;
@@ -118,6 +130,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (specialRules.error)
 		error(500, { message: 'No se pudo cargar el cobrador. Volver a intentar.' });
 
+	// A sale given up as uncollectible keeps its unpaid installments, but nobody collects them: the
+	// record counts them apart. The bond carries the mark; the installments say which sale it is.
+	const writtenOff = new Set(
+		assigned.filter((bond) => bond.financialStatus === 'uncollectible').map((bond) => bond.id)
+	);
+	const writtenOffSales = new Set(
+		(installments.data?.items ?? [])
+			.filter((installment) => writtenOff.has(installment.bondId))
+			.map((installment) => installment.saleId)
+	);
+	const can = (...permissions: Parameters<typeof hasPermissionIn>[1][]) =>
+		permissions.some((permission) => hasPermissionIn(locals.permissions, permission));
+
 	const profileOptions = profiles.data ?? [];
 	if (collector.userProfileId) {
 		// The admin can read profiles; anyone else sees a generic label.
@@ -139,8 +164,25 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		bondsTotal: bonds.data?.total ?? 0,
 		buyers: buyers.data?.items ?? [],
 		buyersTotal: buyers.data?.total ?? 0,
-		installments: installments.data?.items ?? [],
+		/** How many installments are pending or overdue by their status (the rows are in `debts`). */
 		installmentsTotal: installments.data?.total ?? 0,
+		/** Unpaid installments by due date, each with what it still owes (see the read above). */
+		debts: (candidates.data ?? []).map((candidate) => ({
+			id: candidate.id,
+			saleId: candidate.saleId,
+			bondNumbers: candidate.bond
+				.split(',')
+				.map((number) => Number(number.trim()))
+				.filter((number) => Number.isInteger(number)),
+			/** Null when the role cannot read the buyer. */
+			buyerName: isReadableName(candidate.buyer) ? candidate.buyer : null,
+			number: candidate.number,
+			dueDate: candidate.dueDate,
+			owed: candidate.amount,
+			status: candidate.status,
+			uncollectible: writtenOffSales.has(candidate.saleId)
+		})),
+		today: todayInBuenosAires(),
 		settlements: settlements.data ?? [],
 		profiles: profileOptions,
 		ledger: ledgerAllowed ? { balance: balance === null ? null : Number(balance) } : null,
@@ -150,7 +192,21 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			audit: auditAllowed,
 			viewReports: hasPermissionIn(locals.permissions, 'report.view_operational'),
 			viewRules: rulesAllowed,
-			manageRules: hasPermissionIn(locals.permissions, 'commission.rule_manage')
+			manageRules: hasPermissionIn(locals.permissions, 'commission.rule_manage'),
+			/** The role may deliver bonds while the campaign takes deliveries. */
+			deliver: custodyCan.reassignBonds,
+			/** The role may load a payment in a settlement of this collector. */
+			pay: can('settlement.create', 'settlement.update_open'),
+			/** Without it, payments cannot be read: the record says so instead of guessing. */
+			viewPayments: can('payment.view', 'payment.create', 'payment.annul'),
+			/** Without it, the settlements cannot be read: the record leaves them out. */
+			viewSettlements: can(
+				'settlement.view',
+				'settlement.create',
+				'settlement.update_open',
+				'settlement.close',
+				'settlement.correct'
+			)
 		},
 		audit: auditAllowed
 			? {

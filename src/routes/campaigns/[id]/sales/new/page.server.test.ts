@@ -107,6 +107,52 @@ describe('new sale', () => {
 			found: [{ sellable: false, reason: 'Ya está vendido.' }]
 		});
 	});
+	it('names the collector of a found bond, or leaves it out when it cannot be read', async () => {
+		vi.mocked(findBondsForSale).mockResolvedValue({
+			data: [{ id: BOND, sellable: true, reason: null, collectorId: 'col' }],
+			error: null
+		} as never);
+		vi.mocked(getCollectorsByIds).mockResolvedValueOnce({
+			data: new Map([['col', { id: 'col', displayName: 'Jorge Medina' }]]),
+			error: null
+		} as never);
+		expect(await run('lookup', ['campaign.view', 'sale.create'], { query: '68' })).toMatchObject({
+			found: [{ id: BOND, collectorName: 'Jorge Medina' }]
+		});
+		// The role cannot read the collector: no name, and never an «Unknown» placeholder.
+		const unnamed = (await run('lookup', ['campaign.view', 'sale.create'], { query: '68' })) as {
+			found: { collectorName: string | null }[];
+		};
+		expect(unnamed.found[0].collectorName).toBeNull();
+		expect(JSON.stringify(unnamed)).not.toContain('Unknown');
+	});
+	it('`?bond=` arrives with the bond already looked up; a failed lookup still opens the page (UX plan PR 12)', async () => {
+		const event = (search: string) =>
+			({
+				locals: makeLocals({ permissions: ['campaign.view', 'sale.create'] }),
+				params: { id: CAMPAIGN_ID },
+				url: new URL(url + search)
+			}) as never;
+		const plain = (await load(event(''))) as Record<string, unknown>;
+		expect(plain).toMatchObject({ bondQuery: '', found: null });
+		expect(findBondsForSale).not.toHaveBeenCalled();
+
+		const found = (await load(event('?bond=0068&buyer=ada'))) as Record<string, unknown>;
+		expect(findBondsForSale).toHaveBeenLastCalledWith(expect.anything(), CAMPAIGN_ID, {
+			number: 68
+		});
+		expect(found).toMatchObject({
+			bondQuery: '0068',
+			buyerSearch: 'ada',
+			found: [{ id: BOND, sellable: true }]
+		});
+
+		vi.mocked(findBondsForSale).mockResolvedValueOnce({
+			data: null,
+			error: new Error('boom')
+		} as never);
+		expect(await load(event('?bond=0068'))).toMatchObject({ bondQuery: '0068', found: null });
+	});
 	it('bounds the sale date to [campaign start (Buenos Aires), today] and the due date to [sale, +1 year] (SAN-106)', () => {
 		expect(_saleDateBounds('2026-03-01T03:00:00Z', '2026-11-25')).toEqual({
 			min: '2026-03-01',
