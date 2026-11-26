@@ -15,7 +15,10 @@
 # Restore = ALLOW_CONNECTIONS false on `postgres`, terminate its sessions (auth, storage, PostgREST,
 # realtime, pg_cron and pg_net reconnect by themselves), DROP, CREATE ... TEMPLATE, then re-apply what
 # a template does not carry (database-level settings such as app.settings.jwt_secret, and the
-# database ACL), then `NOTIFY pgrst, 'reload schema'`.
+# database ACL), then `NOTIFY pgrst, 'reload schema'`. The pg_net background worker sometimes segfaults
+# around the DROP/CREATE and Postgres crash-recovers; so the script waits for the server to be out of
+# recovery before it starts, watches the server processes for 5 s after the restore (redoing the restore
+# once if they were re-forked), and prints psql's stderr when a restore fails and falls back.
 #
 # Env, as exported by scripts/with-db-lock.sh for the slot it took (defaults = the single legacy stack):
 #   SUPABASE_PROJECT_ID     project_id of the target stack (default: from supabase/config.toml)
@@ -151,14 +154,68 @@ wait_healthy() {
 	return 1
 }
 
+# Wait until Postgres accepts connections and is out of crash recovery. A segfault of the pg_net
+# background worker around the DROP/CREATE makes the postmaster restart every process and replay WAL;
+# until that ends every connection gets "the database system is in recovery mode", which would look
+# like a missing template (-> slow full reset) or a failed restore.
+wait_db_ready() {
+	local i
+	for i in $(seq 1 90); do
+		[ "$(sql template1 -c 'select not pg_is_in_recovery()' 2>/dev/null || true)" = "t" ] && return 0
+		sleep 1
+	done
+	echo "db-reset-fast: Postgres is not ready after 90 s (still in recovery?)" >&2
+	return 1
+}
+
+# Identity of the running server processes. Crash recovery does NOT restart the postmaster (its start
+# time stays the same), it kills and re-forks every child, so the checkpointer's PID is the marker that
+# changes; the postmaster start time covers a real restart of the container.
+pm_start() {
+	sql template1 -c "select extract(epoch from pg_postmaster_start_time())::bigint || '/' ||
+		coalesce((select pid::text from pg_stat_activity where backend_type = 'checkpointer'), '?')" 2>/dev/null || echo unknown
+}
+
+# Settle window after DROP/CREATE: the server processes must stay the same for a few seconds (the pg_net
+# worker restarts, and fails right here when it crashes). Returns 1 if the cluster crashed and
+# recovered; the caller then waits for recovery and redoes the step, so a crash never goes unnoticed.
+settle() { # settle <pm_start_before>
+	local i
+	for i in 1 2 3 4 5; do
+		sleep 1
+		[ "$(pm_start)" = "$1" ] || { echo "db-reset-fast: Postgres crashed and is recovering, waiting for it and redoing the restore" >&2; return 1; }
+	done
+}
+
+# Restore from the template, retrying once if the cluster crashed and recovered meanwhile. psql's
+# stderr goes to a file that is printed when the restore fails, so the fallback says why.
+restore_checked() {
+	local attempt errfile pm
+	errfile=$(mktemp)
+	for attempt in 1 2; do
+		wait_db_ready || break
+		pm=$(pm_start)
+		if restore 2>"$errfile" && settle "$pm"; then
+			rm -f "$errfile"
+			return 0
+		fi
+		[ -s "$errfile" ] && sed 's/^/db-reset-fast: psql: /' "$errfile" >&2
+		: >"$errfile"
+	done
+	rm -f "$errfile"
+	return 1
+}
+
+wait_db_ready
 hash=$(compute_hash)
 stored=$(sql template1 -c "select coalesce(shobj_description(oid, 'pg_database'), '') from pg_database where datname = '$template'" 2>/dev/null || true)
 
 if [ "${DB_RESET_FAST_REBUILD:-}" != "1" ] && [ "$stored" = "$hash" ]; then
-	restore || { echo "db-reset-fast: restore failed, falling back to a full reset" >&2; full_reset_and_snapshot; }
+	restore_checked || { echo "db-reset-fast: restore failed, falling back to a full reset" >&2; full_reset_and_snapshot; }
 else
 	[ -n "$stored" ] && echo "db-reset-fast: inputs changed (template $stored, now $hash)"
 	full_reset_and_snapshot
 fi
+wait_db_ready
 wait_healthy
 echo "db-reset-fast: done in $(($(date +%s) - start))s"
