@@ -29,6 +29,10 @@ APP_ENV=local pnpm exec tsx scripts/ux-flows.ts docs/ux/before/flows
 
 Loads the campaign «Bono Contribución 2026» through the same audited SQL functions the app calls, signed in as the seeded admin: 6 collectors (the first one linked to the fixture collector user, so the portal has data), 90 buyers, 240 bonds, 12 delivery notes, 147 sales (a quarter paid in full, the rest in 6 installments, sold over the last four months), 12 closed settlements and 3 open ones, two payments sent from the portal (one still unprocessed), a ledger adjustment, 3 returned bonds, a lost bond and three draws (frozen roster with a delivered and an unawarded prize, roster generated, scheduled). It also creates a second campaign in draft. Numbers come from a seeded generator, so a clean database always gets the same campaign. It does nothing if the campaign already exists.
 
+### `scripts/demo-screens.ts`
+
+The list of screens, addressed with records of the demo campaign (a sold bond, an open and a closed settlement, a frozen draw, …). The walkthrough and the realistic-data E2E sweep (`tests/e2e/realistic-data.spec.ts`) both use it, so they visit the same screens. A new screen is added here once.
+
 ### `scripts/ux-walkthrough.ts`
 
 Signs in as each role (admin, treasurer, operator, read-only, collector) and opens every screen at 375 px and 1280 px, in light and dark. For each capture it writes a row in `report.json`: HTTP status, final path, page title and heading, page length in screens, horizontal overflow in pixels, and the number of controls, links and tables.
