@@ -160,9 +160,11 @@
 	</form>
 {/snippet}
 
+<!-- Off-screen until it takes focus (not `sr-only`: it keeps a full 44px target, which the touch
+     sweep measures). The first stop for the keyboard. -->
 <a
 	href="#contenido"
-	class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-4 focus:z-[var(--z-toast)] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-label focus:text-text focus:shadow-lg"
+	class="fixed top-2 left-4 z-[var(--z-toast)] inline-flex min-h-touch -translate-y-[calc(100%+1rem)] items-center rounded-md bg-surface px-4 text-label text-text shadow-lg focus:translate-y-0"
 	>Ir al contenido</a
 >
 
