@@ -99,8 +99,14 @@ test.describe.serial('campaign shell', () => {
 		const search = page.getByRole('banner').getByRole('search', { name: 'Buscar bono' });
 		await search.getByRole('textbox', { name: 'Número de bono' }).fill('100');
 		await page.keyboard.press('Enter');
-		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds\\?base=100$`));
-		await expect(page.getByRole('row', { name: /0100/ })).toBeVisible();
+		// UX plan PR 9: a number that matches one bond opens its record, with no list in between.
+		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds/[0-9a-f-]{36}$`));
+		await expect(page.locator('main')).toContainText('0100');
+		// A number that matches nothing stays on the list, which says so.
+		await search.getByRole('textbox', { name: 'Número de bono' }).fill('9999');
+		await page.keyboard.press('Enter');
+		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds\\?base=9999$`));
+		await expect(page.getByText('Ningún bono coincide con los filtros')).toBeVisible();
 
 		// The brand goes back to the campaign's home, which has its own search instead.
 		await brand.click();
@@ -185,7 +191,7 @@ test.describe.serial('campaign shell', () => {
 		await expect(field).toBeVisible();
 		await field.fill('100');
 		await page.getByRole('banner').getByRole('button', { name: 'Buscar bono' }).tap();
-		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds\\?base=100$`));
+		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds/[0-9a-f-]{36}$`));
 		await page.close();
 	});
 

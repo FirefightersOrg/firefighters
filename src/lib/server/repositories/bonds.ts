@@ -635,6 +635,35 @@ export interface BondListEntry {
 	groupPataId: string | null;
 }
 
+/**
+ * Who has each bond and who bought it: `bond id -> { collectorId, buyerId }`, for one page of the
+ * list (`bond_list` does not carry them). Read with the caller's client.
+ */
+export async function listBondHolderIds(
+	supabase: SupabaseClient,
+	bondIds: readonly string[]
+): Promise<RepositoryResult<Map<string, { collectorId: string | null; buyerId: string | null }>>> {
+	if (bondIds.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase
+		.from('bonds')
+		.select('id, current_collector_id, current_buyer_id')
+		.in('id', [...new Set(bondIds)])
+		.overrideTypes<
+			{ id: string; current_collector_id: string | null; current_buyer_id: string | null }[],
+			{ merge: false }
+		>();
+	if (error) return { data: null, error };
+	return {
+		data: new Map(
+			(data ?? []).map((row) => [
+				row.id,
+				{ collectorId: row.current_collector_id, buyerId: row.current_buyer_id }
+			])
+		),
+		error: null
+	};
+}
+
 export const BOND_LIST_COLUMNS = [
 	'id',
 	'campaign_id',
