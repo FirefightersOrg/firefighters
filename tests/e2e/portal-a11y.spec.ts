@@ -376,7 +376,8 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 						.filter(
 							(el) =>
 								el.clientWidth > 1 &&
-								getComputedStyle(el).overflowX !== 'visible' &&
+								// A region that scrolls: clipped text (ellipsis, visually hidden labels) is not one.
+								['auto', 'scroll'].includes(getComputedStyle(el).overflowX) &&
 								el.scrollWidth > el.clientWidth + 1
 						)
 						.map((el) => `${el.tagName.toLowerCase()}.${el.className.toString().slice(0, 40)}`)
