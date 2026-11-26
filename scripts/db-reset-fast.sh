@@ -121,13 +121,13 @@ restore() {
 }
 
 # After a restore the services reconnect on their own, with a backoff. Starting a test run before they
-# are back makes it slow (they compete for locks while retrying), so wait until PostgREST, auth and
-# storage hold connections again and answer.
+# are back makes it slow (they compete for locks while retrying), so wait until PostgREST and auth
+# (storage and the rest are off in the slot stacks) hold connections again and answer.
 wait_healthy() {
 	local i n
 	for i in $(seq 1 90); do
-		n=$(sql postgres -c "select count(distinct usename) from pg_stat_activity where datname = 'postgres' and usename in ('authenticator', 'supabase_auth_admin', 'supabase_storage_admin')" 2>/dev/null || echo 0)
-		if [ "$n" -ge 3 ] && {
+		n=$(sql postgres -c "select count(distinct usename) from pg_stat_activity where datname = 'postgres' and usename in ('authenticator', 'supabase_auth_admin')" 2>/dev/null || echo 0)
+		if [ "$n" -ge 2 ] && {
 			[ -z "${PUBLIC_SUPABASE_URL:-}" ] ||
 				{ curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/auth/v1/health" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}" &&
 					curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/rest/v1/" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}"; }
