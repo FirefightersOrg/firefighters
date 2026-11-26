@@ -258,6 +258,11 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
   - The settlements list has nothing to search by, and `FilterBar` always draws a search field, so its filters are folded in a `Disclosure` with the chips drawn by the page. A `FilterBar` with an optional search would replace that: a Cimiento change, left for its own PR.
   - The sales list drops the «Modalidad» column (it stays as a filter and on the sale record) and shows the sale date, which is what the list is ordered by: with eight columns the table scrolled inside its card at 1024 px.
   - The three `load` functions are untouched, and so are `sales/page.server.test.ts` and `settlements/page.server.test.ts`.
+- **As delivered, 14b (collectors, buyers, draws).** The second half of the split.
+  - Measured at 375 x 812 with the demo campaign: the first row ends at 511 px on collectors, 503 px on buyers and 417 px on draws (646, 630 and 630 px before: already in the first screenful since the campaign shell of PR 5, but the tables scrolled sideways inside their cards, with the bonds of a collector, the phone of a buyer and the state of a draw off screen). No page and no table scrolls sideways, also with 60-character names (E2E).
+  - Two facts were added to the loads, each from an existing repository function under an existing permission: the collector's balance (`getCollectorAccounts`, one call per page, only with `report.view_financial`) and the buyer's bonds in the campaign (`listBuyerBonds`, one read per buyer of the page, only with `bond.view`). The assertions of the list server tests are unchanged; new cases cover both.
+  - The draws list has no search, so it does not use `FilterBar` (which requires one): its two filters are folded in a `Disclosure` with the same chips. The draws are shown as a calendar in two tables (to be held, next first; held or annulled, latest first), ordered in the page from what the load returns.
+  - Not done: the winning numbers on the draws list («what was drawn»). The only existing function that returns them for every draw of a campaign (`getPrizesReport`) needs `report.view_financial`, which the operator who loads the winners does not have; they stay on the draw record.
 
 ### PR 15. Collector and buyer records, current account (A12)
 
