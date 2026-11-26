@@ -61,15 +61,21 @@ export async function findDemoIds(admin: SupabaseClient): Promise<DemoIds> {
 	const campaign = await one(admin, 'campaigns', (q) => q.eq('name', DEMO_CAMPAIGN_NAME));
 	const draft = await one(admin, 'campaigns', (q) => q.eq('status', 'draft'));
 	const inCampaign = (q: IdQuery) => q.eq('campaign_id', campaign);
+	// The collector linked to a user, found through its open settlement in the demo campaign. Other
+	// suites link collectors of their own, so «any linked collector» is not enough on a shared database.
 	const linked = await admin
-		.from('collectors')
-		.select('id')
-		.not('user_profile_id', 'is', null)
+		.from('settlements')
+		.select('id, collector_id, collectors!inner(user_profile_id)')
+		.eq('campaign_id', campaign)
+		.eq('status', 'open')
+		.not('collectors.user_profile_id', 'is', null)
 		.limit(1);
-	const linkedCollector = linked.data?.[0]?.id as string;
-	const openSettlement = await one(admin, 'settlements', (q) =>
-		inCampaign(q).eq('status', 'open').eq('collector_id', linkedCollector)
-	);
+	if (linked.error || !linked.data?.[0])
+		throw new Error(
+			`No open settlement of a linked collector in the demo campaign: ${linked.error?.message ?? 'not found'}`
+		);
+	const linkedCollector = linked.data[0].collector_id as string;
+	const openSettlement = linked.data[0].id as string;
 	const closed = await admin
 		.from('settlements')
 		.select('id, collector_id')
