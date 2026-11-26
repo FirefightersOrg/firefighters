@@ -39,6 +39,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		})),
 		/** `?intent=payment`: reached from «Registrar pago», so the page is worded around the payment. */
 		forPayment: url.searchParams.get('intent') === 'payment',
+		/** `?collector=<id>`: reached from a bond's record, so its collector comes chosen. */
+		preselectedCollectorId:
+			(collectors.data ?? []).find((c) => c.id === url.searchParams.get('collector'))?.id ?? null,
 		notesMax: SETTLEMENT_NOTES_MAX
 	};
 };

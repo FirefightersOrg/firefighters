@@ -1,18 +1,19 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import Section from '$lib/components/ui/Section.svelte';
 	import { BOND_RECORD_SECTIONS, type BondRecordSectionId } from './types';
 
 	/**
-	 * A numbered card of the bond record ("3. Barcode"), with an anchor (`#barcode`) for the
-	 * section index at the top of the page. Number and title come from BOND_RECORD_SECTIONS.
+	 * A titled block of the bond record's reference data. It used to be a numbered card with an
+	 * index at the top of the page; since the redesign (UX plan PR 8) these blocks live inside the
+	 * record's collapsed groups, so they are plain: a small title and the content. The `id` stays as
+	 * an anchor.
 	 */
 	let { id, children }: { id: BondRecordSectionId; children: Snippet } = $props();
 
-	const index = $derived(BOND_RECORD_SECTIONS.findIndex((s) => s.id === id));
-	const title = $derived(BOND_RECORD_SECTIONS[index].title);
+	const title = $derived(BOND_RECORD_SECTIONS.find((section) => section.id === id)?.title ?? '');
 </script>
 
-<Section {id} number={index + 1} {title}>
+<section {id} class="scroll-mt-20" aria-labelledby="{id}-title">
+	<h3 id="{id}-title" class="m-0 mb-2 text-label text-muted">{title}</h3>
 	{@render children()}
-</Section>
+</section>
