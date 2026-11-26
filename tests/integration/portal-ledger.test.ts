@@ -106,6 +106,16 @@ async function adjust(collector: string, direction: string, amount: string, labe
 	return data as string;
 }
 
+/**
+ * Today's calendar day in Buenos Aires. The database rejects a payment dated after the Buenos Aires
+ * day, so the UTC day (`toISOString()`) fails from 21:00 to midnight local time, when UTC is already
+ * tomorrow.
+ */
+const baToday = () =>
+	new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(
+		new Date()
+	);
+
 /** A real sale, one confirmed cash payment in a closed settlement, then the payment annulled: the ledger gets `annulment` entries. */
 async function annulledPaymentFor(collector: string) {
 	const rpc = async <T>(name: string, args: Record<string, unknown>) => {
@@ -157,7 +167,7 @@ async function annulledPaymentFor(collector: string) {
 		p_bond_id: bondId,
 		p_buyer_id: buyer,
 		p_payment_mode: 'installments',
-		p_first_due_date: new Date().toISOString().slice(0, 10),
+		p_first_due_date: baToday(),
 		p_request_id: rid('sale')
 	});
 	const { data: inst, error } = await admin.client
@@ -178,7 +188,7 @@ async function annulledPaymentFor(collector: string) {
 		p_sale_id: saleId,
 		p_amount: 100,
 		p_payment_method: 'cash',
-		p_payment_date: new Date().toISOString().slice(0, 10),
+		p_payment_date: baToday(),
 		p_applications: [{ installment_id: inst.id, amount_applied: 100 }],
 		p_request_id: rid('pay')
 	});
