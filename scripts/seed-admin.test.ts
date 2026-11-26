@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { seedAdmin, findAuthUserByEmail, resolveSeedConfig, ensureUser } from './seed-admin';
+import {
+	seedAdmin,
+	findAuthUserByEmail,
+	resolveSeedConfig,
+	ensureUser,
+	retryOnSchemaCache
+} from './seed-admin';
 import * as userAdminService from '../src/lib/server/services/user-admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -275,5 +281,37 @@ describe('seedAdmin', () => {
 			seedAdmin(client, { PUBLIC_SUPABASE_URL: 'https://abc.supabase.co' })
 		).rejects.toThrow();
 		expect(create).not.toHaveBeenCalled();
+	});
+});
+
+describe('retryOnSchemaCache', () => {
+	const sleep = vi.fn(async () => {});
+	beforeEach(() => sleep.mockClear());
+
+	it('retries PGRST205 schema cache errors until they pass', async () => {
+		const run = vi
+			.fn()
+			.mockRejectedValueOnce(
+				new Error(
+					"Failed to look up profile: Could not find the table 'public.profiles' in the schema cache"
+				)
+			)
+			.mockRejectedValueOnce(new Error('PGRST202 function not found'))
+			.mockResolvedValueOnce('ok');
+		await expect(retryOnSchemaCache(run, { sleep })).resolves.toBe('ok');
+		expect(run).toHaveBeenCalledTimes(3);
+		expect(sleep).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not retry other errors', async () => {
+		const run = vi.fn().mockRejectedValue(new Error('invalid input'));
+		await expect(retryOnSchemaCache(run, { sleep })).rejects.toThrow('invalid input');
+		expect(run).toHaveBeenCalledTimes(1);
+	});
+
+	it('gives up after the attempts', async () => {
+		const run = vi.fn().mockRejectedValue(new Error('PGRST205'));
+		await expect(retryOnSchemaCache(run, { attempts: 3, sleep })).rejects.toThrow('PGRST205');
+		expect(run).toHaveBeenCalledTimes(3);
 	});
 });

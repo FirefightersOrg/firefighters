@@ -26,7 +26,7 @@ pnpm db:slot sh -c 'pnpm db:reset && pnpm db:test:parallel && pnpm seed:admin &&
 Each `pnpm db:*`, `seed:*`, `test:integration` and `test:e2e` script also takes a slot by itself when run alone, and nested calls reuse the slot of the outer one. Slot environment (set by the wrapper, read by every consumer, nothing hardcoded): `SUPABASE_SLOT`, `SUPABASE_PROJECT_ID`, `SUPABASE_WORKDIR` (pass it as `--workdir` to the Supabase CLI; `scripts/supabase-cli.sh` does), `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`/`SUPABASE_DB_HOST`/`SUPABASE_DB_PORT`/`SUPABASE_DB_PASSWORD`, `SUPABASE_DB_CONTAINER`/`SUPABASE_DB_NETWORK` and `E2E_PORT` (Playwright dev server). Ports of slot N: api `54321+100N`, db `54322+100N`, shadow db `54320+100N`, dev server `4317+N` (slot 1: 54421/54422/4318); the single legacy stack keeps 543xx/4317, so the two never collide.
 
 ```bash
-pnpm db:reset            # supabase db reset on the slot
+pnpm db:reset            # supabase db reset on the slot, then waits until PostgREST reloaded its schema cache and auth answers (scripts/db-wait-ready.sh)
 pnpm db:reset:fast       # same result (migrated + seed:admin users) restored from a template (see below)
 pnpm db:test             # supabase test db (pgTAP, serial)
 pnpm db:test:parallel    # same suite with pg_prove --jobs (see below)

@@ -19,7 +19,7 @@
 		"test:pwa": "playwright test --config playwright.pwa.config.ts",
 		"db:slot": "scripts/with-db-lock.sh",
 		"db:slots:stop": "scripts/slots-stop.sh",
-		"db:reset": "scripts/with-db-lock.sh scripts/supabase-cli.sh db reset",
+		"db:reset": "scripts/with-db-lock.sh scripts/db-reset.sh",
 		"db:reset:fast": "scripts/with-db-lock.sh scripts/db-reset-fast.sh",
 		"db:test": "scripts/with-db-lock.sh scripts/supabase-cli.sh test db",
 		"db:test:parallel": "scripts/with-db-lock.sh scripts/test-db-parallel.sh",
