@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type BrowserContext } from '@playwright/test';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
+import { ANONYMOUS } from './auth-state';
 import { createActiveCampaign, login, open, runId } from './helpers';
 
 /**
@@ -201,7 +202,12 @@ test.describe.serial('error pages, landing and the back link', () => {
 	});
 
 	test('page titles name the institution', async ({ browser }) => {
-		const anonymous = await browser.newContext({ baseURL, locale: 'es-AR' });
+		// Since SAN-166 a new context starts with the admin's saved session: ask for none.
+		const anonymous = await browser.newContext({
+			baseURL,
+			locale: 'es-AR',
+			storageState: ANONYMOUS
+		});
 		const login = await anonymous.newPage();
 		await open(login, '/login');
 		await expect(login).toHaveTitle('Iniciar sesión - Bomberos Voluntarios');
