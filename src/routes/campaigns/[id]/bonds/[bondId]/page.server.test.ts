@@ -289,8 +289,14 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 			it('names the collector and the buyer, and says whether the role may open them', async () => {
 				const admin = (await load(
 					loadEvent(
-						sold([...ADMIN, 'collector.view', 'buyer.view', 'sale.create', 'settlement.create'])
-							.locals
+						sold([
+							...ADMIN,
+							'collector.view',
+							'buyer.view',
+							'bond.assign',
+							'sale.create',
+							'settlement.create'
+						]).locals
 					)
 				)) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 				expect(admin.parties).toEqual({

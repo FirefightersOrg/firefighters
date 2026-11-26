@@ -23,6 +23,7 @@
 		type TableColumn
 	} from '$lib/components/ui';
 	import { bondSummary } from '$lib/domain/bond-summary';
+	import { calculateFinancialStatus } from '$lib/domain/financial-status';
 	import { centsToDecimalString } from '$lib/domain/money';
 	import { DRAW_INELIGIBILITY_REASON_LABELS } from '$lib/domain/draw-eligibility';
 	import { buenosAiresDateTimeLocal } from '$lib/domain/draws-datetime';
@@ -159,13 +160,54 @@
 	const pesos = (cents: number) => centsToDecimalString(cents);
 
 	// --- Installments: what is still owed on each ---------------------------------------------------
+	const installmentOf = (number: number) =>
+		data.installments.find((item) => item.installmentNumber === number);
+	const how = (method: string) => (method === 'transfer' ? 'por transferencia' : 'en efectivo');
+	/** How an installment with nothing left to pay was paid. */
 	const paidLine = (number: number) => {
-		const last = data.installments.find((item) => item.installmentNumber === number)?.lastPayment;
+		const last = installmentOf(number)?.lastPayment;
 		if (!last) return 'Pagada';
-		return `Pagada el ${formatDate(last.date)} ${last.method === 'transfer' ? 'por transferencia' : 'en efectivo'}${
+		return `Pagada el ${formatDate(last.date)} ${how(last.method)}${
 			last.settlementNumber ? `, rendición ${last.settlementNumber}` : ''
 		}`;
 	};
+	/**
+	 * A payment that is not confirmed yet: the installment still owes it until the settlement closes,
+	 * and the record says where that money is.
+	 */
+	const waitingLine = (number: number) => {
+		const item = installmentOf(number);
+		const waiting = item?.waitingPayment;
+		if (!item || !waiting) return '';
+		const amount = formatMoney(item.waiting);
+		return waiting.submittedByCollector
+			? `Cobro de ${amount} enviado por el cobrador el ${formatDate(waiting.date)}, sin procesar`
+			: `Pago de ${amount} ${how(waiting.method)} cargado en la rendición ${waiting.settlementNumber ?? ''}, que sigue abierta`.replace(
+					'  ',
+					' '
+				);
+	};
+	/**
+	 * The financial state from the same installments and payments as the sentence, so the badge
+	 * never contradicts it (the stored snapshot only moves when a settlement closes).
+	 */
+	const financialStatus = $derived(
+		data.sale
+			? calculateFinancialStatus({
+					saleStatus: data.sale.sale.status,
+					planStatus: data.sale.plan.status,
+					markedUncollectible: general.financialStatus === 'uncollectible',
+					today: data.today,
+					installments: data.installments.map((item) => ({
+						number: item.installmentNumber,
+						dueDate: item.dueDate,
+						amount: item.amount,
+						appliedAmount: item.applied,
+						status: item.status
+					}))
+				})
+			: general.financialStatus
+	);
 
 	// --- Draws: one line per draw -----------------------------------------------------------------
 	type RosterEntry = (typeof data.drawRosterEntries)[number];
@@ -219,7 +261,7 @@
 </svelte:head>
 
 <PageHeader
-	{title}
+	title={general.typeLabel}
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: campaign.name, href: resolve('/campaigns/[id]', { id: campaign.id }) },
@@ -240,7 +282,7 @@
 			<div>
 				<BondStub
 					number={baseNumbers}
-					caption={general.typeLabel}
+					caption={baseNumbers.includes('+') ? 'Números base' : 'Número base'}
 					detail={associatedNumbers ? `Número asociado ${associatedNumbers}` : undefined}
 				/>
 			</div>
@@ -265,7 +307,7 @@
 		<div class="flex flex-wrap gap-2">
 			<StatusBadge kind="bondCommercial" status={general.commercialStatus} />
 			{#if general.commercialStatus === 'sold'}
-				<StatusBadge kind="bondFinancial" status={general.financialStatus} />
+				<StatusBadge kind="bondFinancial" status={financialStatus} />
 			{/if}
 		</div>
 		{#if nextStep || phone}
@@ -312,6 +354,11 @@
 								{#if row.owedCents < (Number(row.amount) || 0) * 100}
 									<span class="text-body-sm text-muted">pago parcial</span>
 								{/if}
+								{#if waitingLine(row.number)}
+									<span class="basis-full text-body-sm text-muted" data-waiting-payment
+										>{waitingLine(row.number)}</span
+									>
+								{/if}
 							{/if}
 						</span>
 						<Money
@@ -323,6 +370,12 @@
 					</li>
 				{/each}
 			</ol>
+			{#if data.canViewPayments === false}
+				<p class="m-0 pt-2 text-body-sm text-muted">
+					Sin permiso para ver los pagos: una cuota con un pago parcial figura por su importe
+					completo.
+				</p>
+			{/if}
 			<p class="m-0 flex items-baseline justify-between gap-3 pt-3">
 				<span class="text-body font-semibold">
 					{summary.debtCents > 0 ? 'Falta cobrar' : 'Pagado'}
@@ -459,7 +512,11 @@
 
 		<Disclosure summary="Datos del bono" defaultOpen={isGrouped}>
 			<div class="flex flex-col gap-6">
-				<BondGeneralSection campaignId={campaign.id} {general} group={record.group} />
+				<BondGeneralSection
+					campaignId={campaign.id}
+					general={{ ...general, financialStatus }}
+					group={record.group}
+				/>
 				<BondNumbersSection campaignId={campaign.id} bondId={general.id} numbers={record.numbers} />
 				<BondBarcodeSection barcode={record.barcode} />
 			</div>

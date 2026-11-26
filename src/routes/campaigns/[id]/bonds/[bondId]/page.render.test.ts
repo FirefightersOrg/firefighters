@@ -170,7 +170,9 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 	});
 	it('shows the general data and the formatted numbers of a simple bond', () => {
 		const body = renderPage(record());
-		expect(body).toContain('Bono simple 0068');
+		// The heading names the kind; the number is the stub's.
+		expect(body).toMatch(/<h1[^>]*>(?:<!--.*?-->)*Bono simple(?:<!--.*?-->)*<\/h1>/);
+		expect(body).toContain('Número base');
 		expect(body).toContain('Datos generales');
 		expect(body).toContain(formatMoney('60000.00'));
 		expect(body).toContain('INT-1');
@@ -304,7 +306,9 @@ describe('/campaigns/[id]/bonds/[bondId] page', () => {
 				actions: { ungroup: true, annul: false, lockedMessage: null }
 			})
 		);
-		expect(body).toContain('Pata agrupada manualmente 0068 + 0069');
+		expect(body).toMatch(/<h1[^>]*>(?:<!--.*?-->)*Pata agrupada manualmente(?:<!--.*?-->)*<\/h1>/);
+		expect(body).toContain('Números base');
+		expect(body).toContain('0068 + 0069');
 		expect(body).toContain(formatMoney('120000.00'));
 		expect(body).toContain('Miembros');
 		expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds/${MEMBER_B}"`);
@@ -472,8 +476,10 @@ describe('bond sale sections', () => {
 				sale: {
 					id: 'a0000000-0000-0000-0000-000000000009',
 					paymentMode: 'installments',
-					totalAmount: '30000.00'
-				}
+					totalAmount: '30000.00',
+					status: 'active'
+				},
+				plan: { status: 'active' }
 			},
 			parties: {
 				collector: { id: 'col', name: 'Héctor Acosta', canOpen: true },
@@ -523,6 +529,57 @@ describe('bond sale sections', () => {
 		expect(text).toContain('Venció el 22/10/2026');
 		expect(text).toContain('Vence el 01/01/2027');
 		expect(text).toContain('Falta cobrar $ 20.000');
+		// The badge comes from the same installments as the sentence, not from a stored snapshot.
+		expect(body).toContain('En mora');
+
+		// A payment whose settlement is still open does not count yet: the installment still owes it,
+		// the bond is still overdue, and the line says where that money is.
+		const waiting = renderPage(sold, null, {
+			...extra,
+			installments: [
+				installment(1, '2026-09-22', {
+					status: 'overdue',
+					waiting: '10000.00',
+					waitingPayment: {
+						date: '2026-11-25',
+						method: 'transfer',
+						settlementId: 's',
+						settlementNumber: 3,
+						submittedByCollector: false
+					}
+				}),
+				installment(2, '2027-01-01', {
+					waiting: '4000.00',
+					waitingPayment: {
+						date: '2026-11-26',
+						method: 'cash',
+						settlementId: null,
+						settlementNumber: null,
+						submittedByCollector: true
+					}
+				})
+			]
+		})
+			.replace(/<!--.*?-->/g, '')
+			.replace(/<[^>]+>/g, '')
+			.replaceAll('\u00a0', ' ')
+			.replace(/\s+/g, ' ');
+		expect(waiting).toContain('Todavía no pagó ninguna cuota y debe $ 20.000');
+		expect(waiting).toContain(
+			'Pago de $ 10.000 por transferencia cargado en la rendición 3, que sigue abierta'
+		);
+		expect(waiting).toContain(
+			'Cobro de $ 4.000 enviado por el cobrador el 26/11/2026, sin procesar'
+		);
+		expect(waiting).not.toContain('Pagada el');
+		expect(waiting).toContain('En mora');
+		expect(waiting).toContain('Falta cobrar $ 20.000');
+
+		// A role that cannot read payments is told so, instead of being shown a guessed balance.
+		expect(renderPage(sold, null, { ...extra, canViewPayments: false })).toContain(
+			'Sin permiso para ver los pagos'
+		);
+		expect(body).not.toContain('Sin permiso para ver los pagos');
 
 		// A role that can read the names but not open the records: text, no links.
 		const plain = renderPage(sold, null, {

@@ -286,8 +286,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		installments: (installmentsResult.data ?? []).map((installment) => ({
 			...installment,
 			applied: installmentPayments.get(installment.id)?.applied ?? '0.00',
-			lastPayment: installmentPayments.get(installment.id)?.last ?? null
+			lastPayment: installmentPayments.get(installment.id)?.last ?? null,
+			waiting: installmentPayments.get(installment.id)?.waiting ?? '0.00',
+			waitingPayment: installmentPayments.get(installment.id)?.waitingPayment ?? null
 		})),
+		/** Without it, payments cannot be read: the record says so instead of guessing balances. */
+		canViewPayments: can_('payment.view', 'payment.create', 'payment.annul'),
 		payments: paymentsResult.data ?? [],
 		drawRosterEntries: drawEntriesResult.data ?? [],
 		canViewDraws,

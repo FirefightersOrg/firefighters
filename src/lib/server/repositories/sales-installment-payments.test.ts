@@ -27,12 +27,13 @@ const application = (
 	amount: string | number,
 	date: string,
 	method = 'cash',
-	settlement: number | null = null
+	settlement: number | null = null,
+	status = 'confirmed'
 ) => ({
 	installment_id: installment,
 	amount_applied: amount,
 	payments: {
-		status: 'confirmed',
+		status,
 		payment_date: date,
 		payment_method: method,
 		settlement_id: settlement === null ? null : `s${settlement}`,
@@ -41,7 +42,7 @@ const application = (
 });
 
 describe('listInstallmentPaymentsForSale', () => {
-	it('adds what was applied to each installment, in cents, and keeps the last payment', async () => {
+	it('adds what confirmed payments applied to each installment, in cents, and keeps the last one', async () => {
 		const { supabase } = client([
 			application('i1', '2500.50', '2026-10-01', 'cash', 12),
 			application('i1', 7499.5, '2026-10-09', 'transfer', 14),
@@ -51,13 +52,48 @@ describe('listInstallmentPaymentsForSale', () => {
 		expect(error).toBeNull();
 		expect(data?.get('i1')).toEqual({
 			applied: '10000.00',
-			last: { date: '2026-10-09', method: 'transfer', settlementId: 's14', settlementNumber: 14 }
+			last: { date: '2026-10-09', method: 'transfer', settlementId: 's14', settlementNumber: 14 },
+			waiting: '0.00',
+			waitingPayment: null
 		});
-		expect(data?.get('i2')).toEqual({
+		expect(data?.get('i2')).toMatchObject({
 			applied: '10000.00',
 			last: { date: '2026-11-02', method: 'cash', settlementId: null, settlementNumber: null }
 		});
 		expect(data?.get('i3')).toBeUndefined();
+	});
+
+	it('a payment that is not confirmed yet does not count as paid: it is reported as waiting', async () => {
+		const { supabase } = client([
+			application('i1', '4000.00', '2026-10-01', 'cash', 12),
+			application('i1', '6000.00', '2026-11-25', 'cash', 15, 'pending_in_settlement'),
+			application('i2', '10000.00', '2026-11-26', 'transfer', null, 'draft')
+		]);
+		const { data } = await listInstallmentPaymentsForSale(supabase, 'sale');
+		expect(data?.get('i1')).toEqual({
+			applied: '4000.00',
+			last: { date: '2026-10-01', method: 'cash', settlementId: 's12', settlementNumber: 12 },
+			waiting: '6000.00',
+			waitingPayment: {
+				date: '2026-11-25',
+				method: 'cash',
+				settlementId: 's15',
+				settlementNumber: 15,
+				submittedByCollector: false
+			}
+		});
+		expect(data?.get('i2')).toEqual({
+			applied: '0.00',
+			last: null,
+			waiting: '10000.00',
+			waitingPayment: {
+				date: '2026-11-26',
+				method: 'transfer',
+				settlementId: null,
+				settlementNumber: null,
+				submittedByCollector: true
+			}
+		});
 	});
 
 	it('reads the active plan of that sale and leaves annulled payments out', async () => {
