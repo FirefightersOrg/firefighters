@@ -92,6 +92,7 @@ export interface PortalDueInstallment {
 	buyerId: string;
 	buyerName: string;
 	buyerPhone: string | null;
+	buyerAddress: string | null;
 	installmentId: string;
 	installmentNumber: number;
 	dueDate: string;
@@ -345,6 +346,7 @@ export async function listMyDueInstallments(
 		buyer_id: string;
 		buyer_name: string;
 		buyer_phone: string | null;
+		buyer_address: string | null;
 		installment_id: string;
 		installment_number: number;
 		due_date: string;
@@ -365,6 +367,7 @@ export async function listMyDueInstallments(
 				buyerId: r.buyer_id,
 				buyerName: r.buyer_name,
 				buyerPhone: r.buyer_phone,
+				buyerAddress: r.buyer_address,
 				installmentId: r.installment_id,
 				installmentNumber: r.installment_number,
 				dueDate: r.due_date,

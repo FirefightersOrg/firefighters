@@ -258,6 +258,46 @@ describe('portal sales and buyers pages', () => {
 		expect(readOnly).toContain('Llamar');
 	});
 
+	it.each(['Calle 1, entre San Martín y avenida de los Inmigrantes, casa del fondo', null])(
+		'shows the address below the buyer only when present: %s',
+		(buyerAddress) => {
+			const html = body(DuePage, {
+				collector,
+				pagination,
+				reserved: {},
+				canRegister: false,
+				due: [
+					{
+						...sale,
+						buyerAddress,
+						installmentId: 'i1',
+						installmentNumber: 1,
+						dueDate: '2026-11-10',
+						amount: '100.00',
+						status: 'overdue'
+					}
+				]
+			});
+			const addresses = [...html.matchAll(/<p[^>]*data-buyer-address[^>]*>([\s\S]*?)<\/p>/g)].map(
+				(match) => match[1].replace(/<!--.*?-->/g, '').trim()
+			);
+			expect(addresses).toEqual(buyerAddress ? [buyerAddress] : []);
+			if (buyerAddress) {
+				expect(html.indexOf('Ada Lovelace')).toBeLessThan(html.indexOf(buyerAddress));
+				expect(html.indexOf(buyerAddress)).toBeLessThan(html.indexOf('Cuota 1'));
+			} else {
+				const row = html.match(/<li[^>]*data-due-row[\s\S]*?<\/li>/)![0];
+				expect(
+					row
+						.replace(/<!--.*?-->/g, '')
+						.replace(/<[^>]+>/g, ' ')
+						.replace(/\s+/g, ' ')
+						.trim()
+				).toBe('0068 Ada Lovelace Cuota 1, venció el 10/11/2026 $ 160 En rendición: $ 40 Llamar');
+			}
+		}
+	);
+
 	it('lists the campaigns on the portal landing, each linking to what there is to collect', () => {
 		const html = body(HomePage, {
 			collector,

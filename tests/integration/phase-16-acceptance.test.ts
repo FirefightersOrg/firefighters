@@ -255,7 +255,7 @@ async function createCampaign(label: string) {
 }
 
 let nextBase = 100 + Math.floor(Math.random() * 1000) * 8;
-async function newBuyer(label: string) {
+async function newBuyer(label: string, address: string | null = 'Calle 1') {
 	return createBuyer(
 		admin.client,
 		{
@@ -266,7 +266,7 @@ async function newBuyer(label: string) {
 			documentNumber: `8${Math.floor(Math.random() * 1e7)}`,
 			taxId: null,
 			phone: '1111',
-			address: 'Calle 1',
+			address,
 			usualCollectorId: null,
 			notes: null
 		},
@@ -386,7 +386,7 @@ beforeAll(async () => {
 
 	campaignId = await createCampaign('main');
 	closingCampaignId = await createCampaign('closing');
-	buyer = { A: await newBuyer('Ana'), B: await newBuyer('Beto') };
+	buyer = { A: await newBuyer('Ana'), B: await newBuyer('Beto', null) };
 	const sA = await sell(campaignId, idA, buyer.A, 'a');
 	const sA2 = await sell(campaignId, idA, buyer.A, 'a2');
 	const sB = await sell(campaignId, idB, buyer.B, 'b');
@@ -459,6 +459,8 @@ describe('1. isolation between two collectors', () => {
 		expect(dueA.due.map((x: any) => x.saleId)).toContain(sale.A);
 		expect(dueA.due.map((x: any) => x.saleId)).not.toContain(sale.B);
 		expect(new Set(dueB.due.map((x: any) => x.saleId))).toEqual(new Set([sale.B]));
+		expect(new Set(dueA.due.map((x: any) => x.buyerAddress))).toEqual(new Set(['Calle 1']));
+		expect(new Set(dueB.due.map((x: any) => x.buyerAddress))).toEqual(new Set([null]));
 	});
 
 	it('the campaign filter keeps the lists inside the campaign of the route', async () => {

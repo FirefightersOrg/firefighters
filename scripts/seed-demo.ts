@@ -287,7 +287,7 @@ export async function seedDemo(): Promise<void> {
 				p_document_number: business ? null : String(between(12_000_000, 44_000_000)),
 				p_tax_id: business ? `30${between(500_000_000, 719_999_999)}` : null,
 				p_phone: `2364 ${between(40, 59)}-${between(1000, 9999)}`,
-				p_address: `${pick(STREETS)} ${between(100, 1900)}`,
+				p_address: `${pick(STREETS)} ${between(100, 1900)}${i % 3 === 0 ? ', entre avenida de los Inmigrantes y camino General San Martín, barrio Los Aromos, casa del fondo' : ''}`,
 				p_usual_collector_id: collectorIds[i % collectorIds.length],
 				p_request_id: requestId('buyer')
 			})
