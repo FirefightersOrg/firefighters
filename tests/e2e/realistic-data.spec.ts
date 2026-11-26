@@ -25,8 +25,6 @@ import { login, open } from './helpers';
  */
 const KNOWN_OVERFLOW: Record<string, string> = {
 	'03-campaign-workbench': 'audit A7, «pendiente $ 4.370.000» does not wrap (plan PR 13)',
-	'10-bonds-list': 'audit A7, the table widens the page (plan PR 9)',
-	'11-bonds-search-result': 'audit A7, the table widens the page (plan PR 9)',
 	'44-settlement-print': 'audit A7, the note is wider than the phone (plan PR 18)',
 	'81-reports-financial': 'audit A7, the export buttons do not wrap (plan PR 17)',
 	'82-reports-financial-collector': 'audit A7, the export buttons do not wrap (plan PR 17)'

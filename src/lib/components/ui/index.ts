@@ -58,3 +58,15 @@ export { default as MoneySheet } from './MoneySheet.svelte';
 export type { MoneySheetRow } from './MoneySheet.svelte';
 export { default as BondStub } from './BondStub.svelte';
 // --- end UX plan PR 3 ---
+
+// --- UX plan PR 4: lists (rows, filters, two-way choice, task bar, row actions) ---
+export { default as RowList } from './RowList.svelte';
+export { default as Row } from './Row.svelte';
+export { default as RowActions } from './RowActions.svelte';
+export type { RowAction } from './RowActions.svelte';
+export { default as FilterBar } from './FilterBar.svelte';
+export type { AppliedFilter } from './FilterBar.svelte';
+export { default as SegmentedControl } from './SegmentedControl.svelte';
+export type { SegmentedOption } from './SegmentedControl.svelte';
+export { default as TaskBar } from './TaskBar.svelte';
+// --- end UX plan PR 4 ---
