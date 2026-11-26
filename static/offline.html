@@ -3,7 +3,8 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="#1d3557" />
+		<meta name="theme-color" content="#1d3557" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#10203a" media="(prefers-color-scheme: dark)" />
 		<title>Sin conexión - Firefighters</title>
 		<style>
 			body {
@@ -47,6 +48,24 @@
 			button:focus-visible {
 				outline: 3px solid #f5c518;
 				outline-offset: 2px;
+			}
+			/* Same values as the dark Cimiento tokens (this page cannot load tokens.css offline). */
+			@media (prefers-color-scheme: dark) {
+				body {
+					background: #0f141b;
+					color: #eceef1;
+				}
+				main {
+					background: #171d26;
+					border-color: #2a323e;
+				}
+				p {
+					color: #a9b1bd;
+				}
+				button {
+					background: #b9cbe6;
+					color: #10203a;
+				}
 			}
 		</style>
 	</head>

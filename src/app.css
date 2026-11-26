@@ -128,7 +128,7 @@
 	}
 
 	/* Redesign focus: the outline carries the contrast (navy in light, 12.4:1 on white; reflective
-	   yellow in dark, 11.7:1), so it holds even where a component sets its own shadow. The yellow
+	   yellow in dark, 10.4:1 on a surface), so it holds even where a component sets its own shadow. The yellow
 	   halo is decorative: it shows only on elements without a shadow of their own (WCAG 1.4.11). */
 	:focus-visible {
 		outline: 2px solid var(--focus);
