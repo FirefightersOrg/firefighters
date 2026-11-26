@@ -392,7 +392,7 @@ describe('settlement workspace', () => {
 					expect.anything()
 				);
 			else {
-				expect(result).toMatchObject({ status: 400 });
+				expect(result).toMatchObject({ status: 400, data: { values: { paymentDate } } });
 				expect(addPaymentToSettlement).not.toHaveBeenCalled();
 			}
 		}

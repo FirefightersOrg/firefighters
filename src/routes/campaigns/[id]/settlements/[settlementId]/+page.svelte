@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { todayInBuenosAires } from '$lib/domain/reports';
 	import { enhance } from '$app/forms';
 	import {
 		Alert,
@@ -413,8 +412,14 @@
 					<TextInput
 						name="paymentDate"
 						type="date"
-						value={todayInBuenosAires()}
-						max={todayInBuenosAires()}
+						value={form?.form === 'add' &&
+						'values' in form &&
+						form.values &&
+						typeof form.values === 'object' &&
+						'paymentDate' in form.values
+							? String(form.values.paymentDate)
+							: data.today}
+						max={data.today}
 						required
 					/>
 				</Field>

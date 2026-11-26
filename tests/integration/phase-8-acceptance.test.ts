@@ -436,6 +436,66 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		});
 	});
 
+	it('persists and audits an explicit payment date, and rejects future dates without writes', async () => {
+		const sale = await createSale('dated', baDate(-3));
+		const settlementId = await openSettlement(
+			users.operator.client,
+			{ campaignId, collectorId, notes: 'dated payment' },
+			ctx(users.operator)
+		);
+		const paymentDate = baDate(-2);
+		const requestId = rid('dated-payment');
+		const paymentId = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 10,
+				paymentMethod: 'cash',
+				paymentDate,
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 10 }]
+			},
+			ctx(users.operator, requestId)
+		);
+		const stored = await users.admin.client
+			.from('payments')
+			.select('payment_date')
+			.eq('id', paymentId)
+			.single();
+		expect(stored.error).toBeNull();
+		expect(stored.data?.payment_date).toBe(paymentDate);
+		const audit = await users.admin.client
+			.from('audit_log')
+			.select('new_value')
+			.eq('request_id', requestId)
+			.eq('action', 'payment.add')
+			.single();
+		expect(audit.error).toBeNull();
+		expect(audit.data?.new_value).toMatchObject({ payment_date: paymentDate });
+		const futureRequest = rid('future-payment');
+		const before = await users.admin.client
+			.from('payments')
+			.select('id')
+			.eq('settlement_id', settlementId);
+		await noWrites(futureRequest, async () => {
+			const result = await users.operator.client.rpc('settlement_add_payment', {
+				p_settlement_id: settlementId,
+				p_sale_id: sale.saleId,
+				p_amount: 10,
+				p_payment_method: 'cash',
+				p_payment_date: baDate(1),
+				p_request_id: futureRequest,
+				p_applications: [{ installment_id: sale.installments[0].id, amount_applied: 10 }]
+			});
+			expect(result.error?.code).toBe('22023');
+		});
+		const after = await users.admin.client
+			.from('payments')
+			.select('id')
+			.eq('settlement_id', settlementId);
+		expect(after.data).toEqual(before.data);
+	});
+
 	it('C2 closes atomically, confirms applications across settlements, records snapshots and audits', async () => {
 		const advance = await createSale('advance', baDate());
 		const overdue = await createSale('overdue', baDate(-2));
