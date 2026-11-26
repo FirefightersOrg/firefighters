@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
-	import { Card, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
+	import { BondNumber, Card, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
 	import { bondLabel } from '$lib/portal/labels';
 	import { formatDate, formatMoney } from '$lib/format';
@@ -12,11 +12,11 @@
 	const rows = $derived(data.sales.map((sale) => ({ ...sale, id: sale.saleId })));
 	type Row = (typeof rows)[number];
 	const columns: TableColumn<Row>[] = [
-		{ key: 'bond', header: 'Bono', mono: true },
-		{ key: 'campaignName', header: 'Campaña' },
-		{ key: 'soldAt', header: 'Fecha' },
-		{ key: 'saleStatus', header: 'Venta' },
-		{ key: 'balance', header: 'Saldo', align: 'right' }
+		{ key: 'bond', header: 'Bono', stack: 'primary' },
+		{ key: 'balance', header: 'Saldo', align: 'right', stack: 'trailing' },
+		{ key: 'soldAt', header: 'Fecha', stack: 'secondary' },
+		{ key: 'saleStatus', header: 'Venta', stack: 'secondary' },
+		{ key: 'campaignName', header: 'Campaña', stack: 'hidden' }
 	];
 </script>
 
@@ -39,7 +39,14 @@
 		<dl class="m-0 grid gap-2 sm:grid-cols-2">
 			<div>
 				<dt class="text-label text-muted">Teléfono</dt>
-				<dd class="m-0">{data.buyer.phone ?? '—'}</dd>
+				<dd class="m-0">
+					{#if data.buyer.phone?.trim()}
+						<a
+							class="inline-flex min-h-touch items-center rounded-sm text-primary-text underline underline-offset-2"
+							href="tel:{data.buyer.phone.replace(/[^\d+]/g, '')}">{data.buyer.phone}</a
+						>
+					{:else}—{/if}
+				</dd>
 			</div>
 			<div>
 				<dt class="text-label text-muted">Dirección</dt>
@@ -49,16 +56,17 @@
 	</Card>
 
 	<Card title="Ventas" flush>
-		<Table {columns} {rows} caption="Ventas del comprador">
+		<Table {columns} {rows} caption="Ventas del comprador" stack>
 			{#snippet cell({ row, column })}
 				{#if column.key === 'bond'}
-					<a
-						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+					<BondNumber
+						number={bondLabel(row.bondNumbers, row.numberDigits)}
+						size="sm"
 						href={resolve('/portal/[campaignId]/ventas/[saleId]', {
 							campaignId: data.campaign.id,
 							saleId: row.saleId
-						})}>{bondLabel(row.bondNumbers, row.numberDigits)}</a
-					>
+						})}
+					/>
 				{:else if column.key === 'soldAt'}
 					{formatDate(row.soldAt)}
 				{:else if column.key === 'saleStatus'}
