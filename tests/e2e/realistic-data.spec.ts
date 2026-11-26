@@ -40,12 +40,13 @@ let adminPhone: BrowserContext;
 let collectorPhone: BrowserContext;
 
 async function phone(browser: Browser, user: { email: string; password: string }) {
-	const signIn = await browser.newContext({ baseURL, locale: 'es-AR' });
+	const signIn = await browser.newContext({ baseURL, serviceWorkers: 'block', locale: 'es-AR' });
 	await login(await signIn.newPage(), user);
 	const storageState = await signIn.storageState();
 	await signIn.close();
 	return browser.newContext({
 		baseURL,
+		serviceWorkers: 'block',
 		locale: 'es-AR',
 		timezoneId: 'America/Argentina/Buenos_Aires',
 		viewport: { width: 375, height: 812 },

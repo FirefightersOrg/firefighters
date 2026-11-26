@@ -21,18 +21,20 @@ async function showcase(context: BrowserContext): Promise<Page> {
 
 test.describe.serial('UI kit: list components', () => {
 	test.beforeAll(async ({ browser }) => {
-		const signIn = await browser.newContext({ baseURL, locale: 'es-AR' });
+		const signIn = await browser.newContext({ baseURL, serviceWorkers: 'block', locale: 'es-AR' });
 		await login(await signIn.newPage());
 		const storageState = await signIn.storageState();
 		await signIn.close();
 		desktop = await browser.newContext({
 			baseURL,
+			serviceWorkers: 'block',
 			locale: 'es-AR',
 			viewport: { width: 1280, height: 800 },
 			storageState
 		});
 		phone = await browser.newContext({
 			baseURL,
+			serviceWorkers: 'block',
 			locale: 'es-AR',
 			viewport: { width: 375, height: 812 },
 			hasTouch: true,
@@ -180,6 +182,7 @@ test.describe.serial('UI kit: list components', () => {
 		test(`axe on the showcase (${scheme})`, async ({ browser }) => {
 			const context = await browser.newContext({
 				baseURL,
+				serviceWorkers: 'block',
 				locale: 'es-AR',
 				viewport: { width: 1280, height: 800 },
 				colorScheme: scheme,

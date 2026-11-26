@@ -297,6 +297,7 @@ function newContext(
 ) {
 	return browser.newContext({
 		baseURL,
+		serviceWorkers: 'block',
 		viewport: phoneSize ? { width: 375, height: 800 } : { width: 1280, height: 800 },
 		isMobile: phoneSize,
 		hasTouch: phoneSize,
@@ -366,6 +367,7 @@ test.describe.serial('a11y and mobile pass', () => {
 		test.setTimeout(300_000);
 		const seedCtx = await browser.newContext({
 			baseURL,
+			serviceWorkers: 'block',
 			locale: 'es-AR',
 			timezoneId: 'America/Argentina/Buenos_Aires'
 		});

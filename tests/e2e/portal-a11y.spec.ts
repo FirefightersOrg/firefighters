@@ -164,6 +164,7 @@ async function seed(page: Page, browser: Browser) {
 	// Sign in the browser as the collector and keep that session for the contexts below.
 	const ctx = await browser.newContext({
 		baseURL,
+		serviceWorkers: 'block',
 		locale: 'es-AR',
 		timezoneId: 'America/Argentina/Buenos_Aires'
 	});
@@ -251,6 +252,7 @@ const newContext = (
 ) =>
 	browser.newContext({
 		baseURL,
+		serviceWorkers: 'block',
 		viewport: phoneSize ? { width: 375, height: 800 } : { width: 1280, height: 800 },
 		isMobile: phoneSize,
 		hasTouch: phoneSize,
@@ -264,6 +266,7 @@ test.describe.serial('portal del cobrador: a11y and mobile pass', () => {
 		test.setTimeout(300_000);
 		const adminCtx = await browser.newContext({
 			baseURL,
+			serviceWorkers: 'block',
 			locale: 'es-AR',
 			timezoneId: 'America/Argentina/Buenos_Aires'
 		});
