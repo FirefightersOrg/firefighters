@@ -2,7 +2,7 @@
 
 How the direction in [`direction.md`](direction.md) becomes code: a list of small PRs, in order. Shared foundations first (Cimiento, the shell), then one screen or one family of screens per PR, starting with what the audit scored highest. Items A1 to A15 are in [`audit.md`](audit.md).
 
-Nothing here starts until Santi and Juan approve this plan in #50.
+Santi approved the plan on 2026-11-26 and answered its three open points (see [Decisions](#decisions)). Implementation starts when #159 is approved on GitHub and merged.
 
 ## Rules for every PR
 
@@ -39,6 +39,7 @@ Nothing here starts until Santi and Juan approve this plan in #50.
 | 17  | Reports, audit, commissions and administration                      | A7, A10, A12 | Medium |
 | 18  | Printable documents                                                 | A7           | Low    |
 | 19  | Wrap-up: after walkthrough, design-system and copy docs             | all          | Low    |
+| 20  | Clean-up: remove the screenshots and working files from the repo    |              | Low    |
 
 PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a screen or a family of screens, highest impact first. With two PRs open at a time, a Cimiento or low-risk PR runs beside a screen PR, never two high-risk ones.
 
@@ -190,7 +191,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 
 - **Scope.** `/portal/**`, routes unchanged.
   - The shell with the portal's five tabs, «Por cobrar» first (replaces `PortalNav`).
-  - `/portal`: lists only active campaigns and, with exactly one, goes to its «Por cobrar» (P5, Q4). No active campaign: an empty state that says so.
+  - `/portal`: lists only campaigns that are active or closing (a campaign in closing still takes payments) and, with exactly one, goes to its «Por cobrar» (P5, Q4). None: an empty state that says so.
   - «Por cobrar»: items grouped into overdue and due this week, each with the bond, the buyer, the installment, the amount, «Llamar» (`tel:`) and «Cobrar».
   - «Cobrar» opens the payment form in a sheet with the amount, cash and today filled in; it submits `RegisterPaymentForm`'s fields to the existing `?/registrar` action of the sale. If that cannot be done from the list without a server change, «Cobrar» links to the sale with the form open on that installment.
   - The sale page: the form leaves the table cell; installments as rows; one line of totals.
@@ -199,10 +200,10 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 - **Acceptance.**
   - `scripts/ux-flows.ts` reports 3 taps and 3 screens to send a payment (6 and 7 today), or 4 and 4 with the fallback.
   - At 375 px nothing is cut on «Por cobrar» or on the sale, and every phone number is a `tel:` link.
-  - A collector with one active and one draft campaign lands on «Por cobrar» of the active one and is never offered the draft.
+  - A collector with one active and one draft campaign lands on «Por cobrar» of the active one and is never offered the draft. A campaign in closing is listed; a closed or annulled one is not.
   - The Phase 16 acceptance suite and `portal-a11y.spec.ts` pass, with the landing expectation updated.
   - The action's request (fields and values) is byte-identical to today's (asserted in the route test).
-- **Risk.** High: the collector's only screen, and money. The `load` of `/portal` changes (approved as P5 and Q4). Open point for #50: Santi said only active campaigns; a campaign «en cierre» still takes payments (`settlement_open` allows it), so this PR proposes listing active and closing ones, and will list only active if that is the answer.
+- **Risk.** High: the collector's only screen, and money. The `load` of `/portal` changes (approved as P5 and Q4).
 - **Depends on.** PRs 3, 4, 5.
 
 ### PR 11. Portal: bonds, sales, buyers, account (A5)
@@ -296,8 +297,19 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 - The backend proposals B1, B2, B4 and B5 in `direction.md`, still undecided.
 - Changes to what each role may do.
 
-## Decisions this plan needs
+### PR 20. Clean-up
 
-1. **Closing campaigns in the portal (PR 10).** Only active campaigns, or active and closing ones? A campaign in closing still takes payments.
-2. **Read-only and names (#160).** Should read-only also read collector and buyer names? Until decided it gets the Spanish fallback.
-3. **Order.** PR 7 (payments) before PR 8 (bond record) and PR 10 (portal). If the collectors start using the portal before treasury uses the new settlement, PR 10 can move ahead of PR 7.
+- **Why.** The screenshots are evidence for the redesign, not something the repo needs to carry afterwards (about 35 MB before, and as much again after).
+- **Scope.** After PR 19 is merged and its summary is posted in #50: remove `docs/ux/before/`, `docs/ux/after/` and `docs/ux/prototypes/` from the tree, and `scripts/ux-walkthrough.ts` and `scripts/ux-flows.ts`. Keep `audit.md`, `direction.md`, `plan.md` and the final before-and-after table (with its numbers written in the document, since the images will be gone), and keep `scripts/seed-demo.ts` (`pnpm seed:demo`), which the E2E sweep from PR 1 uses.
+- **Acceptance.** No image is left under `docs/ux/`; no document links to a removed file; `pnpm lint` and `pnpm test:e2e` pass.
+- **Note.** Removing files does not shrink the repository's history. Rewriting `main` to drop them is possible but is a separate decision (it changes every commit hash after #159), and is not part of this PR.
+
+## Decisions
+
+Answered by Santi on 2026-11-26:
+
+1. **Closing campaigns in the portal (PR 10).** Listed too: active and closing.
+2. **Read-only and names (#160).** Yes, read-only also reads collector and buyer names. The grant is part of #160; until it lands the role gets the Spanish fallback.
+3. **Order.** As planned: the open settlement (PR 7) before the bond record and the portal. Nobody is using the app yet, so there is no reason to move the portal ahead; the settlement is the most frequent task, and the portal's payment sheet reuses what it builds.
+4. **Tickets.** The redesign's PRs do not get tickets. #160, #161 and #162 are tracked in Linear by Juan.
+5. **Clean-up.** The screenshots and working files leave the repo at the end (PR 20).

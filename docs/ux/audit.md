@@ -305,11 +305,11 @@ The links on the campaign page are filtered by permission, so these roles do not
 
 Outside the redesign's limits. Santi answered them on 2026-11-26 (#50):
 
-| #   | Question                                                                                                                   | Decision                                                           | Where it goes                       |
-| --- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------- |
-| Q1  | Should the treasurer read collectors and buyers (`collector.view`, `buyer.view`)? Today they see «Unknown collector» (A9). | Yes.                                                               | #160                                |
-| Q2  | The treasurer has `collector.ledger.view`, but the ledger linked from a closed settlement answers 404 (A9).                | Fix it.                                                            | #161                                |
-| Q3  | Should the staff payment form have a payment date, like the portal's?                                                      | Yes.                                                               | #162                                |
-| Q4  | Should a collector see campaigns that are not active in the portal (A11)?                                                  | No, only active ones. There will usually be one campaign per year. | [`plan.md`](plan.md), the portal PR |
+| #   | Question                                                                                                                   | Decision                                                                                    | Where it goes                       |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Q1  | Should the treasurer read collectors and buyers (`collector.view`, `buyer.view`)? Today they see «Unknown collector» (A9). | Yes.                                                                                        | #160                                |
+| Q2  | The treasurer has `collector.ledger.view`, but the ledger linked from a closed settlement answers 404 (A9).                | Fix it.                                                                                     | #161                                |
+| Q3  | Should the staff payment form have a payment date, like the portal's?                                                      | Yes.                                                                                        | #162                                |
+| Q4  | Should a collector see campaigns that are not active in the portal (A11)?                                                  | Not drafts: active ones, and those in closing. There will usually be one campaign per year. | [`plan.md`](plan.md), the portal PR |
 
-Still open: whether read-only should also read collector and buyer names (it has the same placeholders, noted in #160), and the backend proposals B1, B2, B4 and B5 in [`direction.md`](direction.md#proposals-that-need-backend-or-business-changes).
+Also decided: read-only reads collector and buyer names too (part of #160), and the portal lists campaigns in closing as well as active ones. Still open: the backend proposals B1, B2, B4 and B5 in [`direction.md`](direction.md#proposals-that-need-backend-or-business-changes).
