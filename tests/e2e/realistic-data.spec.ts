@@ -131,26 +131,41 @@ test.describe.serial('realistic data at 375 px', () => {
 	});
 
 	// UX plan PR 12b (audit A9): a party the role cannot read is left out or named in Spanish, never
-	// printed as the repositories' old English stand-ins. Every staff screen is requested as each
-	// staff role; the page's HTML also carries the data it was rendered from.
+	// printed as the repositories' old English stand-ins. Every staff screen is fetched as each staff
+	// role; the page's HTML also carries the data it was rendered from.
+	//
+	// The screens are fetched from inside a signed-in page. `context.request` does not carry the
+	// app's session here (every request is redirected to /login), which made the first version of
+	// this sweep read the login page and pass without checking anything: so each answer is also
+	// required to be the app's own page, not the login.
 	test('no staff screen says «Unknown», for any staff role', async ({ browser }) => {
 		test.setTimeout(300_000);
-		const config = resolveSeedConfig();
-		const roles = ['admin', 'operator', 'treasurer', 'read-only'] as const;
-		for (const role of roles) {
-			const user =
-				role === 'admin'
-					? config.admin
-					: config.fixtures.find((fixture) => fixture.roleNames.includes(role));
-			if (!user) throw new Error(`The fixture ${role} is missing: run seed:admin first.`);
-			const context = await browser.newContext({ baseURL, locale: 'es-AR' });
-			await login(await context.newPage(), user);
+		for (const role of ['admin', 'operator', 'treasurer', 'readOnly'] as const) {
+			const context = await browser.newContext({
+				baseURL,
+				serviceWorkers: 'block',
+				locale: 'es-AR',
+				storageState: STATE[role]
+			});
+			const page = await context.newPage();
+			await open(page, '/campaigns');
+			let answered = 0;
 			for (const screen of staff) {
-				const response = await context.request.get(screen.path);
+				const answer = await page.evaluate(async (path) => {
+					const response = await fetch(path, { credentials: 'same-origin' });
+					return { url: response.url, status: response.status, html: await response.text() };
+				}, screen.path);
 				expect
-					.soft(await response.text(), `${screen.slug} as ${role}`)
+					.soft(new URL(answer.url).pathname, `${screen.slug} as ${role} was sent to the login`)
+					.not.toMatch(/^\/login/);
+				expect
+					.soft(answer.html, `${screen.slug} as ${role}`)
 					.not.toMatch(/Unknown (buyer|collector|campaign|bond)/);
+				if (answer.status === 200) answered += 1;
 			}
+			// Every role opens a good part of the screens (read-only, the least, about half): a sweep
+			// that only met refusals proves nothing.
+			expect(answered, `screens answered with 200 as ${role}`).toBeGreaterThan(staff.length / 3);
 			await context.close();
 		}
 	});
