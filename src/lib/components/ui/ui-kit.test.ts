@@ -71,8 +71,10 @@ describe('Button', () => {
 		expect(out).toContain('bg-danger');
 		expect(out).not.toContain('bg-surface-sunken!');
 		expect(out).toContain('animate-spin');
-		// Label stays in the layout (invisible) so the width does not change.
-		expect(out).toContain('invisible');
+		// The label stays in the layout so the width does not change: transparent, never
+		// `visibility: hidden`, which would leave the busy button without an accessible name.
+		expect(out).toContain('opacity-0');
+		expect(out).not.toMatch(/class="[^"]*\binvisible\b/);
 		expect(out).toContain('Guardar cambios');
 	});
 

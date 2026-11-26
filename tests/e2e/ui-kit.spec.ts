@@ -45,6 +45,18 @@ test.describe.serial('UI kit: list components', () => {
 		await phone?.close();
 	});
 
+	test('Button: a loading button keeps its accessible name', async () => {
+		const page = await showcase(desktop);
+		// Every variant and size is shown loading. The label is transparent while the spinner turns,
+		// but it is still the button's name (it used to be `visibility: hidden`: axe `button-name`).
+		const loading = page.getByRole('button', { name: 'Cargando', exact: true });
+		expect(await loading.count()).toBeGreaterThan(0);
+		for (const button of await loading.all()) await expect(button).toHaveAttribute('aria-busy');
+		const results = await new AxeBuilder({ page }).withRules(['button-name']).analyze();
+		expect(results.violations.flatMap((v) => v.nodes.map((n) => n.html))).toEqual([]);
+		await page.close();
+	});
+
 	test('SegmentedControl: arrows move and select inside the group', async () => {
 		const page = await showcase(desktop);
 		const demo = page.locator('[data-demo="segmented"]');
