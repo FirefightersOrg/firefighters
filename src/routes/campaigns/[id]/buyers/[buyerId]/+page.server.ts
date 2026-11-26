@@ -21,7 +21,13 @@ import {
 	listBuyerBonds
 } from '$lib/server/repositories/parties';
 import { updateBuyer } from '$lib/server/services/parties';
-import { listBuyerSalesAndInstallments } from '$lib/server/repositories/sales';
+import {
+	listBuyerSalesAndInstallments,
+	listInstallmentPaymentsForSale,
+	listInstallmentsForSale
+} from '$lib/server/repositories/sales';
+import { isReadableName } from '$lib/domain/parties';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { CAMPAIGN_MESSAGES } from '$lib/server/services/campaigns';
 import {
 	buyerValues,
@@ -33,6 +39,11 @@ import {
 import { listBuyerPrizes } from '$lib/server/repositories/prizes';
 
 const valid = (id: string) => z.guid().safeParse(id).success;
+/**
+ * How many of the buyer's active sales the record reads in full (installments and payments, two
+ * small reads each) to say what is owed. A buyer rarely has more than a few bonds in a campaign.
+ */
+const SALES_DETAILED = 20;
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (permissionsUnavailable(locals.permissions))
 		error(500, { message: 'No se pudieron cargar los permisos.' });
@@ -86,9 +97,54 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		prizesResult.error
 	)
 		error(500, { message: 'No se pudo cargar el comprador. Volver a intentar.' });
+	// What is owed (UX plan PR 15): the installments of each active sale with what its payments
+	// applied, the same two reads as the bond and sale records, with the caller's client. A role that
+	// cannot read payments gets none, and the record falls back to the installments' own statuses.
+	const sales = salesResult.data?.sales ?? [];
+	const detailed = sales.filter((item) => item.sale.status === 'active').slice(0, SALES_DETAILED);
+	const details = await Promise.all(
+		detailed.map(async (item) => {
+			const [installments, payments] = await Promise.all([
+				listInstallmentsForSale(locals.supabase, item.sale.id),
+				listInstallmentPaymentsForSale(locals.supabase, item.sale.id)
+			]);
+			return { saleId: item.sale.id, installments, payments };
+		})
+	);
+	if (details.some((detail) => detail.installments.error || detail.payments.error))
+		error(500, { message: 'No se pudo cargar el comprador. Volver a intentar.' });
+	const can = (...permissions: Parameters<typeof hasPermissionIn>[1][]) =>
+		permissions.some((permission) => hasPermissionIn(locals.permissions, permission));
 	return {
 		campaign: campaignResult.data,
 		buyer,
+		today: todayInBuenosAires(),
+		/**
+		 * `sale id -> installments` of the active sales read in full, each with what confirmed payments
+		 * applied to it. A sale that is not here is listed without its debt.
+		 */
+		saleInstallments: Object.fromEntries(
+			details.map((detail) => [
+				detail.saleId,
+				(detail.installments.data ?? []).map((installment) => ({
+					number: installment.installmentNumber,
+					dueDate: installment.dueDate,
+					amount: installment.amount,
+					applied: detail.payments.data?.get(installment.id)?.applied ?? '0.00',
+					status: installment.status
+				}))
+			])
+		),
+		/** `sale id -> collector name`, only the names the role can read. */
+		saleCollectors: Object.fromEntries(
+			sales.flatMap((item) =>
+				isReadableName(item.collectorName) ? [[item.sale.id, item.collectorName]] : []
+			)
+		),
+		/** Without it, payments cannot be read: the record says so instead of guessing balances. */
+		canViewPayments: can('payment.view', 'payment.create', 'payment.annul'),
+		/** The role may load a payment in a settlement. */
+		canPay: can('settlement.create', 'settlement.update_open'),
 		collector: collectorResult.data,
 		collectors: [
 			...(optionsResult.data ?? []),
@@ -108,7 +164,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			hasPermissionIn(locals.permissions, 'collector.manage'),
 		campaignBonds: campaignBondsResult.data ?? [],
 		historicalBonds: historicalBondsResult.data ?? [],
-		sales: salesResult.data?.sales ?? [],
+		sales,
 		salesTotal: salesResult.data?.salesTotal ?? 0,
 		installments: salesResult.data?.installments ?? [],
 		installmentsTotal: salesResult.data?.installmentsTotal ?? 0,

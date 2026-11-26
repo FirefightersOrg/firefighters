@@ -195,6 +195,49 @@ A row starts with what the record is called, and that name carries the only link
 - Empty lists say how the first record comes to be: «Una venta se registra con un bono que ya tiene un cobrador y el comprador que lo lleva.», «Abrir una rendición para cargar los pagos que entrega un cobrador.», «Un remito se emite al entregar bonos a un cobrador, al reasignarlos o al recibirlos de vuelta.» With filters: «Ninguna venta coincide con los filtros» and «Probar con otros filtros o quitarlos para ver todas las ventas.»
 - A collector or a buyer the role cannot read: the phone sentence leaves the name out («Rendición 15», «Remito 0007»); where the row would otherwise have nothing, and in the desktop column, it is «Sin acceso al comprador» or «Sin acceso al cobrador» in muted text. Names are plain text on these lists, never links.
 
+## The collector record, the current account and the buyer record
+
+The three records open as the bond and sale records do: a figure with its name, sentences built from data by a pure function, then the one next step.
+
+**The collector record** (`src/lib/domain/collector-summary.ts`):
+
+| State                        | Sentences                                                                                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| With debt and a balance      | «{cobrador} tiene 35 bonos: 26 vendidos y 9 sin vender. Le falta cobrar $ 760.000, de los cuales $ 150.000 están vencidos. Tiene $ 17.000 a su favor en la cuenta corriente.» |
+| All overdue, balance against | «… Le falta cobrar $ 10.000, todo vencido. Su cuenta corriente tiene $ 5.000 a favor de Bomberos.»                                                                            |
+| Nothing to collect           | «{cobrador} tiene 9 bonos, todos sin vender.» / «… No le falta cobrar nada. Su cuenta corriente no tiene saldo.»                                                              |
+| No bonds                     | «{cobrador} no tiene bonos de esta campaña.»                                                                                                                                  |
+| With sales given up          | «… Le falta cobrar $ 10.000. Otros $ 50.000 se dieron por incobrables.»                                                                                                       |
+
+- «Falta cobrar» is what «Registrar pago» will offer: every unpaid installment by what it still owes, after every payment that is not annulled (a payment loaded in a settlement that is still open already counts). A sale given up as uncollectible is said apart.
+- A balance the role cannot read is left out of the sentence: never «$ 0», never a dash. The same for the settlements: a role that cannot read them does not see the heading.
+- The next step is «Registrar pago» when something is owed, or «Cargar pagos en la rendición 9» when the collector already has one open; with nothing owed it is «Entregar bonos».
+- Lists are named by what they hold, with the count beside the name: «Cuotas por cobrar 71», «Bonos 35», «Rendiciones 3». A row of what is owed is the bond, the buyer, «Cuota 2, venció el 25/09/2026» and the amount. What does not fit is behind «Ver las otras 61 cuotas» (never «Ver más»).
+- The bonds the collector still has are listed by number under «Sin vender: 9», with the delivery notes they came with («Entregados con el remito 0002.»); the sold ones are under «Bonos vendidos».
+- Bulk return and reassignment are under «Devolver o reasignar bonos», named by what they do. The buttons say how many («Devolver 2 bonos», «Reasignar 1 bono») and the dialog asks with the names: «¿Reasignar el bono 0705 de {cobrador} a {otro}?», «Pasa a manos de {otro}. Se emite un remito de reasignación.»
+
+**The current account** (`ledgerSheet` in `src/lib/domain/ledger.ts`):
+
+- The balance is said in words, with the figure without a sign: «Saldo a favor del cobrador», «Saldo a favor de Bomberos», «Sin saldo». Staff read «a favor de Bomberos» where the collector's portal says «a cargo del cobrador»: each side reads it from where it stands.
+- It is the lead of a sheet that adds up: «Comisiones generadas», «Ajustes a favor del cobrador», less «Comisiones liquidadas», «Ajustes a favor de Bomberos». «Efectivo rendido» and «Transferencias recibidas por Bomberos» are reference amounts under it.
+- One line says how to read it: «Suma los movimientos que no están anulados. Un importe con signo menos es a favor de Bomberos.»
+- A movement shows one amount with its sign and cents («− $ 17.000,00»), newest first. Only a movement that does not count carries a badge («Anulado», «Compensado»).
+- The dialog names the movement it annuls: «¿Anular el movimiento «Ajuste a favor de Bomberos» del 26/11/2026?», «Es de $ 800,00. …».
+
+**The buyer record** (`src/lib/domain/buyer-summary.ts`):
+
+| State         | Figure                  | Sentences                                                                                                                     |
+| ------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| One bond      | «Falta cobrar» $ 20.000 | «{comprador} compró el bono 0190 en esta campaña. Debe $ 20.000, de los cuales $ 10.000 están vencidos. Lo cobra {cobrador}.» |
+| Several bonds | «Falta cobrar» $ 70.000 | «{comprador} compró 2 bonos en esta campaña. Debe $ 70.000, de los cuales $ 10.000 están vencidos.»                           |
+| Paid          | «Pagado» $ 60.000       | «… No debe nada. Lo cobró {cobrador}.»                                                                                        |
+| No bonds      |                         | «{comprador} no compró bonos en esta campaña.»                                                                                |
+
+- The heading keeps the name as it is filed («Pérez, Verónica»); the sentence says it as it is spoken («Verónica Pérez»).
+- Each bond is a row with its terms and its debt in the words of the sale record: «Lo compró el 15/09/2026 en 6 cuotas, por $ 60.000. Pagó 2 cuotas y debe $ 40.000, de los cuales $ 10.000 están vencidos.» The collector is named once in the sentence when it is the same for every bond, and on each row when it is not.
+- The way to call is a button that says the number: «Llamar al 2364 53-8769».
+- «Registrar pago» is offered when everything that is owed is collected by one collector; otherwise each sale offers it.
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

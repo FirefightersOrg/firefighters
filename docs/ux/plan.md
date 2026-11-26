@@ -266,10 +266,16 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
 
 ### PR 15. Collector and buyer records, current account (A12)
 
-- **Scope.** `collectors/[collectorId]`, its `ledger`, and `buyers/[buyerId]`: header with the sentence and the next step, the first 10 rows of each inner list with a link to the filtered list, the current account as a `MoneySheet` over its movements, bulk return and reassignment behind «Corregir o anular».
+- **Scope.** `collectors/[collectorId]`, its `ledger`, and `buyers/[buyerId]`: header with the sentence and the next step, the first rows of each inner list with the way to the rest, the current account as a `MoneySheet` over its movements, bulk return and reassignment collapsed.
+  - The way to the rest is the filtered list where one exists (the sales and the settlements filter by collector) and a collapsed block on the record where it does not. (First written as «a link to the filtered list» for every list: the bonds list has no filter by collector, the sales list filters buyers by a name search, and there is no list of installments. A filter by collector on the bonds list needs no SQL, `bond_list` already carries `current_collector_id`, but it changes a screen that is not this PR's.)
+  - The collector's unsold bonds are shown by number, up to 15 (three lines on a phone), with the delivery notes they came with; the sold ones are collapsed under «Bonos vendidos». (First written as the first 10 rows: ten rows that all say «Sin vender, remito 0002» took four times the room of the numbers.)
+  - Bulk return and reassignment stay on the collector record, under «Devolver o reasignar bonos», choosing among the unsold bonds, with a dialog that names how many and to whom. (First written as «Corregir o anular», moved to the filtered bonds list: neither action corrects or annuls, and posting from the bonds list is more than layout.)
 - **Screens.** Collector record, current account, buyer record.
-- **Acceptance.** The collector record is 3 screens or shorter at 375 px with 35 bonds and 54 pending installments (12.9 today); the balance is in the first screenful; every existing action keeps working with its tests unchanged.
-- **Risk.** Medium. The bulk actions select from a list that is now partial: they move to the filtered bonds list, which already shows the collector.
+- **Acceptance.**
+  - The collector record is 3 screens or shorter at 375 px with 35 bonds and 54 pending installments (12.9 today). Measured on the demo campaign's six collectors (32 to 35 bonds, 57 to 83 pending installments): 2.87 to 3.06 screens (2333 to 2486 px), from 12.9 to 15.1. Four of the six are 6 to 50 px over 3 screens. The audit's collector (Héctor Acosta, 35 bonds, 57 pending installments today) goes from 12.9 to 3.06; the longest before (Jorge Medina, 35 bonds, 83 pending installments) from 15.1 to 3.01.
+  - The balance is in the first screenful of the collector record and of the current account (asserted at 375 x 812 in `tests/e2e/records.spec.ts`).
+  - Every existing action keeps working with its server tests unchanged.
+- **Risk.** Medium. What is left to collect is now a figure on the first screen: it is the sum of what `listCollectorPaymentCandidates` returns (what «Registrar pago» offers), so a payment loaded in a settlement that is still open already counts, while the sale record still says «debe» until that settlement closes.
 - **Depends on.** PRs 9, 14.
 
 ### PR 16. Deliveries and draws (A15)

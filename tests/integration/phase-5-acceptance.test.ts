@@ -670,15 +670,16 @@ describe('Phase 5: collectors and buyers', () => {
 			})
 		);
 		const collectorHtml = render(CollectorPage, { props: { data: collectorData } as never }).body;
+		// UX plan PR 15: the record opens with a sentence; its lists follow and the data, the history
+		// and the corrections are collapsed underneath.
+		expect(collectorHtml).toContain('data-collector-sentence');
 		for (const title of [
-			'Datos generales',
-			'Bonos asignados',
-			'Compradores asociados',
-			'Cuotas pendientes',
+			'Bonos',
 			'Rendiciones',
-			'Cuenta corriente',
-			'Informe mensual',
-			'Auditoría'
+			'Datos y correcciones',
+			'Editar los datos del cobrador',
+			'Reglas especiales de comisión',
+			'Movimientos registrados'
 		])
 			expect(collectorHtml).toContain(title);
 		expect(collectorHtml).toContain('collector.create');
@@ -688,13 +689,12 @@ describe('Phase 5: collectors and buyers', () => {
 			event(users.admin, `/campaigns/${campaignId}/buyers/${buyerId}`, { id: campaignId, buyerId })
 		);
 		const buyerHtml = render(BuyerPage, { props: { data: buyerData } as never }).body;
+		expect(buyerHtml).toContain('data-buyer-sentence');
 		for (const title of [
-			'Datos generales',
-			'Bonos comprados en esta campaña',
-			'Cuotas y deuda',
-			'Premios ganados',
-			'Números históricos',
-			'Auditoría'
+			'Datos e historial',
+			'Editar los datos del comprador',
+			'Bonos de otras campañas',
+			'Movimientos registrados'
 		])
 			expect(buyerHtml).toContain(title);
 		expect(buyerHtml).toContain('buyer.create');
@@ -704,9 +704,13 @@ describe('Phase 5: collectors and buyers', () => {
 				buyerId
 			})
 		);
-		expect(render(BuyerPage, { props: { data: operatorBuyerData } as never }).body).toContain(
-			'No hay permiso para ver el historial de auditoría.'
-		);
+		// Without `audit.view` the history is not offered at all.
+		const operatorBuyerHtml = render(BuyerPage, {
+			props: { data: operatorBuyerData } as never
+		}).body;
+		expect(operatorBuyerHtml).toContain('Editar los datos del comprador');
+		expect(operatorBuyerHtml).not.toContain('Movimientos registrados');
+		expect(operatorBuyerHtml).not.toContain('buyer.create');
 	});
 
 	it('shows the campaign sections only for the permissions available now', async () => {
