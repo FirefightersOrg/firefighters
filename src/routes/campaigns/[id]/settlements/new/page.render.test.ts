@@ -11,6 +11,7 @@ const page = (data: Record<string, unknown> = {}, form: unknown = null) =>
 				collectors: [{ id: 'x', displayName: 'Ana' }],
 				openSettlements: [],
 				forPayment: false,
+				preselectedCollectorId: null,
 				notesMax: 2000,
 				...data
 			},
@@ -49,6 +50,9 @@ describe('new settlement render', () => {
 		expect(body).toContain('href="/campaigns/c/settlements/s9"');
 		expect(body).toContain('Cargar pagos en la rendición 9');
 		expect(body).not.toContain('name="notes"');
+		// Reached from a bond's record: its collector comes chosen, so the way in is one click.
+		const fromBond = page({ openSettlements, preselectedCollectorId: 'x', forPayment: true });
+		expect(fromBond).toContain('Cargar pagos en la rendición 9');
 		// Nobody chosen yet: the form to open one.
 		expect(page({ openSettlements })).not.toContain('ya tiene abierta');
 	});

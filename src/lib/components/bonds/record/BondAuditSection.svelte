@@ -5,7 +5,7 @@
 	import { formatBondTimestamp, type BondRecordAudit } from './types';
 
 	/**
-	 * Bond record, 14. "Auditoría": the audit_log entries of this bond (and the grouping / ungrouping
+	 * Bond record, «Movimientos registrados»: the audit_log entries of this bond (and the grouping / ungrouping
 	 * of manual patas it was in), newest first. Only with `audit.view`. Old and new values go in a
 	 * `Disclosure`.
 	 */

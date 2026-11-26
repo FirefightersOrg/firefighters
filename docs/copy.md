@@ -71,6 +71,25 @@ The areas are «tesorería» (settlements, payments, commissions, current accoun
 | Campaign page           | «Registrar pago»                                                                      | Leads to the collector's open settlement, or opens one.                               |
 | Collector with one open | «{cobrador} ya tiene abierta la rendición 9», «Cargar pagos en la rendición 9»        | A collector has one open settlement at a time.                                        |
 
+## The bond record (`src/lib/domain/bond-summary.ts`)
+
+The record opens with sentences built from data, not with labels and values. Every state has its sentence (the full table is the test of that file):
+
+| State               | Sentence                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Available           | «Disponible. Todavía no se entregó a ningún cobrador.»                                                                         |
+| Delivered           | «Lo tiene {cobrador}. Todavía no se vendió.»                                                                                   |
+| Sold, with debt     | «Vendido a {comprador} en 6 cuotas. Lo cobra {cobrador}. Pagó 1 cuota y debe $ 50.000, de los cuales $ 40.000 están vencidos.» |
+| Sold in one payment | «Vendido a {comprador} en un pago. Lo cobra {cobrador}. Debe $ 60.000, que vence el 01/12/2026.»                               |
+| Sold, paid          | «Vendido a {comprador} en 6 cuotas. Lo cobró {cobrador}. Está pagado.»                                                         |
+| Lost                | «Extraviado. Lo tenía {cobrador}.»                                                                                             |
+| Annulled            | «Anulado el 20/11/2026. Motivo: {motivo}.»                                                                                     |
+
+- A name the role cannot read is left out («Vendido en 6 cuotas.»): never «Unknown», never a placeholder.
+- The next step is named by what it does: «Entregar a un cobrador», «Registrar venta», «Registrar pago».
+- An installment says «Pagada el 09/10/2026 en efectivo, rendición 14» only once that settlement is closed. Before that: «Pago de $ 10.000 en efectivo cargado en la rendición 3, que sigue abierta», or «Cobro de $ 10.000 enviado por el cobrador el 26/11/2026, sin procesar».
+- No text mentions phases of the project («fase 5»): the record describes the bond, not how the system was built.
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

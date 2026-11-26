@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Installment, PaymentPlan, Sale } from '$lib/domain/sales';
-import { toDecimalString } from '$lib/domain/money';
+import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
 import type { RepositoryResult } from './campaigns';
 import type { FinancialStatus } from '$lib/domain/financial-status';
 
@@ -108,6 +108,99 @@ export async function listInstallmentsForSale(
 		.order('installment_number')
 		.overrideTypes<InstallmentRow[], { merge: false }>();
 	return error ? { data: null, error } : { data: (data ?? []).map(mapInstallmentRow), error: null };
+}
+
+/** A payment that touched an installment: enough to say when, how and in which settlement. */
+export interface InstallmentPaymentRef {
+	date: string;
+	method: string;
+	settlementId: string | null;
+	settlementNumber: number | null;
+}
+
+/** What was paid on one installment, and what is on its way. */
+export interface InstallmentPayments {
+	/** Applied by payments whose settlement closed (confirmed), as a decimal string. */
+	applied: string;
+	/** The latest of those payments. */
+	last: InstallmentPaymentRef | null;
+	/**
+	 * Applied by payments that are not confirmed yet: loaded in a settlement that is still open, or
+	 * sent by the collector and not processed. The installment still owes this until the close.
+	 */
+	waiting: string;
+	/** The latest of those, and whether the collector sent it (`true`) or staff loaded it. */
+	waitingPayment: (InstallmentPaymentRef & { submittedByCollector: boolean }) | null;
+}
+
+/**
+ * What the payments of a sale applied to each installment of its active plan: `installment id ->
+ * payments`. A payment counts as paid once it is confirmed, which is when the installment's own
+ * status and the bond's financial state change; a payment that is still in an open settlement is
+ * reported apart, so the record never says «pagada» for money that was not handed over yet.
+ * Annulled payments count for nothing. Read with the caller's client: a role that cannot read
+ * payments gets an empty map, and the record falls back to the installments' statuses.
+ */
+export async function listInstallmentPaymentsForSale(
+	supabase: SupabaseClient,
+	saleId: string
+): Promise<RepositoryResult<Map<string, InstallmentPayments>>> {
+	type ApplicationRow = {
+		installment_id: string;
+		amount_applied: string | number;
+		payments: {
+			status: string;
+			payment_date: string;
+			payment_method: string;
+			settlement_id: string | null;
+			settlements: { settlement_number: number } | null;
+		};
+	};
+	// One sale has a handful of installments and payments: far below a page of PostgREST rows.
+	const { data, error } = await supabase
+		.from('payment_installments')
+		.select(
+			'installment_id,amount_applied,payments!inner(status,payment_date,payment_method,settlement_id,settlements(settlement_number)),installments!inner(payment_plans!inner(sale_id,status))'
+		)
+		.neq('payments.status', 'annulled')
+		.eq('installments.payment_plans.sale_id', saleId)
+		.eq('installments.payment_plans.status', 'active')
+		.order('payment_id')
+		.order('installment_id')
+		.overrideTypes<ApplicationRow[], { merge: false }>();
+	if (error) return { data: null, error };
+	const totals = new Map<string, { applied: number; waiting: number }>();
+	const result = new Map<string, InstallmentPayments>();
+	for (const row of data ?? []) {
+		const amount = parseMoneyToCents(toDecimalString(row.amount_applied)) ?? 0;
+		const waits =
+			row.payments.status === 'pending_in_settlement' || row.payments.status === 'draft';
+		const total = totals.get(row.installment_id) ?? { applied: 0, waiting: 0 };
+		if (waits) total.waiting += amount;
+		else total.applied += amount;
+		totals.set(row.installment_id, total);
+
+		const entry = result.get(row.installment_id) ?? {
+			applied: '0.00',
+			last: null,
+			waiting: '0.00',
+			waitingPayment: null
+		};
+		const ref: InstallmentPaymentRef = {
+			date: row.payments.payment_date,
+			method: row.payments.payment_method,
+			settlementId: row.payments.settlement_id,
+			settlementNumber: row.payments.settlements?.settlement_number ?? null
+		};
+		if (waits) {
+			if (!entry.waitingPayment || ref.date >= entry.waitingPayment.date)
+				entry.waitingPayment = { ...ref, submittedByCollector: row.payments.status === 'draft' };
+		} else if (!entry.last || ref.date >= entry.last.date) entry.last = ref;
+		entry.applied = centsToDecimalString(total.applied);
+		entry.waiting = centsToDecimalString(total.waiting);
+		result.set(row.installment_id, entry);
+	}
+	return { data: result, error: null };
 }
 
 export interface SaleListItem {

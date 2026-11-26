@@ -25,7 +25,7 @@
 		...data.collectors.map((c) => ({ value: c.id, label: c.displayName }))
 	]);
 	// Writable: starts from what the server sent back and follows the select.
-	let collectorId = $derived(result?.values?.collectorId ?? '');
+	let collectorId = $derived(result?.values?.collectorId ?? data.preselectedCollectorId ?? '');
 	/** The chosen collector's open settlement, if there is one: payments go there. */
 	const existing = $derived(data.openSettlements.find((s) => s.collectorId === collectorId));
 	const collectorName = $derived(

@@ -86,6 +86,16 @@ describe('new settlement', () => {
 			{ id: 's9', collectorId: COLLECTOR, settlementNumber: 9 }
 		]);
 		expect(data.forPayment).toBe(true);
+		expect(data.preselectedCollectorId).toBeNull();
+		// Only a collector of the list can come chosen: anything else in the URL is ignored.
+		vi.mocked(listActiveCollectorOptions).mockResolvedValueOnce({
+			data: [{ id: COLLECTOR, displayName: 'Ana' }],
+			error: null
+		} as never);
+		const chosen = (await load(event(`${url}?intent=payment&collector=${COLLECTOR}`))) as any;
+		expect(chosen.preselectedCollectorId).toBe(COLLECTOR);
+		const forged = (await load(event(`${url}?collector=%3Cscript%3E`))) as any;
+		expect(forged.preselectedCollectorId).toBeNull();
 		// A role that cannot read settlements still gets the form.
 		vi.mocked(listSettlements).mockResolvedValueOnce({
 			data: null,

@@ -84,6 +84,8 @@ function setup(
 		prizes?: QueryResult;
 		rpc?: QueryResult;
 		permissions?: string[];
+		/** Extra tables (collectors, buyers, sales, installments, payment_installments). */
+		tables?: Record<string, QueryResult>;
 	} = {}
 ) {
 	const mock = mockSupabase({
@@ -97,7 +99,8 @@ function setup(
 			bond_groups: options.groups ?? { data: [], error: null },
 			bond_list: options.bondList ?? { data: [], error: null },
 			audit_log: options.audit ?? { data: [], error: null },
-			prize_awards: options.prizes ?? { data: [], error: null }
+			prize_awards: options.prizes ?? { data: [], error: null },
+			...options.tables
 		},
 		rpc: options.rpc ?? { data: null, error: null }
 	});
@@ -167,6 +170,185 @@ describe('/campaigns/[id]/bonds/[bondId]', () => {
 				}
 			});
 			await expect(load(loadEvent(foreign.locals))).rejects.toMatchObject({ status: 404 });
+		});
+
+		describe('who has it, who bought it and what is owed (UX plan PR 8)', () => {
+			const COLLECTOR = 'c0000000-0000-0000-0000-000000000001';
+			const BUYER = 'd0000000-0000-0000-0000-000000000001';
+			const SALE = 'a0000000-0000-0000-0000-000000000001';
+			const stamp = '2026-11-17T12:00:00+00:00';
+			const sold = (permissions: string[], over: Record<string, QueryResult> = {}) =>
+				setup({
+					permissions,
+					bond: {
+						data: bondRow({
+							commercial_status: 'sold',
+							current_collector_id: COLLECTOR,
+							current_buyer_id: BUYER
+						}),
+						error: null
+					},
+					tables: {
+						collectors: {
+							data: {
+								id: COLLECTOR,
+								display_name: 'Héctor Acosta',
+								phone: null,
+								email: null,
+								address: null,
+								user_profile_id: null,
+								status: 'active',
+								created_by: null,
+								created_at: stamp,
+								updated_at: stamp
+							},
+							error: null
+						},
+						buyers: {
+							data: {
+								id: BUYER,
+								type: 'individual',
+								first_name: 'Stella',
+								last_name: 'Rodríguez',
+								business_name: null,
+								document_number: null,
+								tax_id: null,
+								phone: '2364 47-1234',
+								address: null,
+								usual_collector_id: null,
+								notes: null,
+								created_by: null,
+								created_at: stamp,
+								updated_at: stamp
+							},
+							error: null
+						},
+						sales: {
+							data: [
+								{
+									id: SALE,
+									campaign_id: CAMPAIGN_ID,
+									bond_id: BOND_ID,
+									buyer_id: BUYER,
+									collector_id: COLLECTOR,
+									sold_at: stamp,
+									payment_mode: 'installments',
+									total_amount: '20000.00',
+									status: 'active',
+									created_by: profile.id,
+									created_at: stamp,
+									updated_at: stamp,
+									payment_plans: [
+										{
+											id: 'plan',
+											sale_id: SALE,
+											installment_count: 2,
+											total_amount: '20000.00',
+											status: 'active',
+											created_at: stamp
+										}
+									]
+								}
+							],
+							error: null
+						},
+						installments: {
+							data: [1, 2].map((number) => ({
+								id: `i${number}`,
+								payment_plan_id: 'plan',
+								installment_number: number,
+								due_date: `2026-1${number}-22`,
+								amount: '10000.00',
+								status: number === 1 ? 'paid' : 'pending',
+								updated_at: stamp
+							})),
+							error: null
+						},
+						payment_installments: {
+							data: [
+								{
+									installment_id: 'i1',
+									amount_applied: '10000.00',
+									payments: {
+										status: 'confirmed',
+										payment_date: '2026-11-20',
+										payment_method: 'cash',
+										settlement_id: 'set',
+										settlements: { settlement_number: 14 }
+									}
+								}
+							],
+							error: null
+						},
+						payments: { data: [], error: null },
+						bond_assignments: { data: [], error: null },
+						...over
+					}
+				});
+
+			it('names the collector and the buyer, and says whether the role may open them', async () => {
+				const admin = (await load(
+					loadEvent(
+						sold([
+							...ADMIN,
+							'collector.view',
+							'buyer.view',
+							'bond.assign',
+							'sale.create',
+							'settlement.create'
+						]).locals
+					)
+				)) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+				expect(admin.parties).toEqual({
+					collector: { id: COLLECTOR, name: 'Héctor Acosta', canOpen: true },
+					buyer: { id: BUYER, name: 'Stella Rodríguez', phone: '2364 47-1234', canOpen: true }
+				});
+				expect(admin.next).toEqual({ deliver: true, sell: true, pay: true });
+				expect(admin.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+				const readOnly = (await load(loadEvent(sold(READ_ONLY).locals))) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+				expect(readOnly.parties.collector).toMatchObject({ name: 'Héctor Acosta', canOpen: false });
+				expect(readOnly.parties.buyer).toMatchObject({ canOpen: false });
+				expect(readOnly.next).toEqual({ deliver: false, sell: false, pay: false });
+			});
+
+			it('adds what was paid on each installment and its last payment', async () => {
+				const data = (await load(loadEvent(sold(READ_ONLY).locals))) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+				expect(
+					data.installments.map((item: Record<string, unknown>) => [
+						item.installmentNumber,
+						item.applied,
+						item.lastPayment
+					])
+				).toEqual([
+					[
+						1,
+						'10000.00',
+						{ date: '2026-11-20', method: 'cash', settlementId: 'set', settlementNumber: 14 }
+					],
+					[2, '0.00', null]
+				]);
+			});
+
+			it('a role that cannot read the buyer gets no name, and the record still loads', async () => {
+				const hidden = sold(READ_ONLY, {
+					buyers: { data: null, error: null },
+					collectors: { data: null, error: { message: 'permission denied' } }
+				});
+				const data = (await load(loadEvent(hidden.locals))) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+				expect(data.parties).toEqual({ collector: null, buyer: null });
+			});
+
+			it('an available bond has neither, and reads neither table', async () => {
+				const { locals, from } = setup();
+				const data = (await load(loadEvent(locals))) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+				expect(data.parties).toEqual({ collector: null, buyer: null });
+				expect(data.installments).toEqual([]);
+				const tables = from.mock.calls.map((call: unknown[]) => call[0]);
+				expect(tables).not.toContain('collectors');
+				expect(tables).not.toContain('buyers');
+				expect(tables).not.toContain('payment_installments');
+			});
 		});
 
 		it('returns 500 when the bond cannot be loaded', async () => {
