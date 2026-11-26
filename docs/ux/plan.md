@@ -329,6 +329,7 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
 - **Why.** The screenshots are evidence for the redesign, not something the repo needs to carry afterwards (about 35 MB before, and as much again after).
 - **Scope.** After PR 19 is merged and its summary is posted in #50: remove `docs/ux/before/`, `docs/ux/after/` and `docs/ux/prototypes/` from the tree, and `scripts/ux-walkthrough.ts` and `scripts/ux-flows.ts`. Keep `audit.md`, `direction.md`, `plan.md` and the final before-and-after table (with its numbers written in the document, since the images will be gone), and keep `scripts/seed-demo.ts` (`pnpm seed:demo`) and `scripts/demo-screens.ts`, which the E2E sweep from PR 1 uses.
 - **Acceptance.** No image is left under `docs/ux/`; no document links to a removed file; `pnpm lint` and `pnpm test:e2e` pass.
+- **As delivered.** Also removed: `scripts/ux-local.ts` and its test, which only guarded the two scripts. `audit.md` and `direction.md` embedded 32 of the screenshots: each is now a line with its caption and the path it had, and a note at the top of each document says where the files are (`README.md`, «Where the evidence went»).
 - **Note.** Removing files does not shrink the repository's history. Rewriting `main` to drop them is possible but is a separate decision (it changes every commit hash after #159), and is not part of this PR.
 
 ## Decisions

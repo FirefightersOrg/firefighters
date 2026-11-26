@@ -2,29 +2,28 @@
 
 Working documents of the frontend and UX/UI redesign (coordinated in #50).
 
-| File                           | What it is                                                                                |
-| ------------------------------ | ----------------------------------------------------------------------------------------- |
-| [`audit.md`](audit.md)         | What is wrong today, ordered by impact, with evidence, cause and a proposal for each item |
-| [`direction.md`](direction.md) | The vision: principles, navigation, patterns per kind of screen, prototypes, proposals    |
-| [`plan.md`](plan.md)           | The list of small PRs, in order, with scope, acceptance criteria and risk for each        |
-| [`before/`](before/)           | Screenshots and measurements of every screen before the redesign                          |
-| [`prototypes/`](prototypes/)   | Static HTML prototypes of the four key screens, with screenshots in `shots/`              |
-| [`after/`](after/)             | The same walkthrough and flows after the redesign, plus the screenshots of each PR        |
-| [`results.md`](results.md)     | Before and after for every measured flow and screen, and what became of each audit item   |
+| File                           | What it is                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| [`audit.md`](audit.md)         | What was wrong, ordered by impact, with evidence, cause and a proposal for each item    |
+| [`direction.md`](direction.md) | The vision: principles, navigation, patterns per kind of screen, prototypes, proposals  |
+| [`plan.md`](plan.md)           | The list of small PRs, in order, with scope, acceptance criteria and risk for each      |
+| [`results.md`](results.md)     | Before and after for every measured flow and screen, and what became of each audit item |
 
-## Reproducing the evidence
+## Where the evidence went
 
-Everything runs against the local stack and never against a remote one. The scripts refuse to run unless `APP_ENV=local` and the Supabase URL is on localhost, and the two browser scripts also refuse a `UX_BASE_URL` that is not on localhost, because they sign in with the seed credentials (`scripts/ux-local.ts`).
+The redesign produced about 100 MB of evidence that the repository does not need to carry: the screenshots of every screen before (`docs/ux/before/`) and after (`docs/ux/after/`, with the screenshots of each PR), the static prototypes (`docs/ux/prototypes/`), and the two scripts that measured (`scripts/ux-walkthrough.ts`, `scripts/ux-flows.ts`, with their guard `scripts/ux-local.ts`). PR 20 of the plan removed them from the tree. The numbers they produced are written in `audit.md` and `results.md`.
+
+Everything is still in the history. The last commit that has all of it is `d10234d` (the merge of #192):
 
 ```sh
-pnpm db:reset
-APP_ENV=local pnpm seed:admin          # retry until auth is up
-APP_ENV=local pnpm seed:demo           # one realistic campaign, see below
-pnpm dev --host 127.0.0.1 --port 5173  # in another terminal
-
-APP_ENV=local pnpm exec tsx scripts/ux-walkthrough.ts docs/ux/before
-APP_ENV=local pnpm exec tsx scripts/ux-flows.ts docs/ux/before/flows
+git show d10234d:docs/ux/after/report.json                   # one file
+git checkout d10234d -- docs/ux/before docs/ux/after         # the screenshots, back in the working tree
+git checkout d10234d -- scripts/ux-walkthrough.ts scripts/ux-flows.ts scripts/ux-local.ts
 ```
+
+The documents name those files by the path they had (`docs/ux/before/admin/375-light/42-settlement-open.jpg`). To run the scripts again, restore them as above and follow the README of that commit (`git show d10234d:docs/ux/README.md`): they need the local stack, `pnpm seed:demo` and a local server.
+
+## What stays for the tests
 
 ### `pnpm seed:demo` (`scripts/seed-demo.ts`)
 
@@ -32,24 +31,4 @@ Loads the campaign «Bono Contribución 2026» through the same audited SQL func
 
 ### `scripts/demo-screens.ts`
 
-The list of screens, addressed with records of the demo campaign (a sold bond, an open and a closed settlement, a frozen draw, …). The walkthrough and the realistic-data E2E sweep (`tests/e2e/realistic-data.spec.ts`) both use it, so they visit the same screens. A new screen is added here once.
-
-### `scripts/ux-walkthrough.ts`
-
-Signs in as each role (admin, treasurer, operator, read-only, collector) and opens every screen at 375 px and 1280 px, in light and dark. For each capture it writes a row in `report.json`: HTTP status, final path, page title and heading, page length in screens, horizontal overflow in pixels, and the number of controls, links and tables.
-
-To keep the folder small, screenshots are saved in full for the admin and the collector. For treasurer, operator and read-only they are saved only in light and only where the screen differs from the admin's (a different status, heading or number of controls or links); the report still has a row for every screen. Pages longer than eight screens are cut there.
-
-```txt
-before/<role>/<width>-<scheme>/<nn>-<screen>.jpg
-before/report.json
-```
-
-### `scripts/ux-flows.ts`
-
-Runs the critical flows on a 375 px screen and counts what each costs: screens the person has to read, taps, fields typed and choices made. It saves a screenshot per screen and `flows.json`. It writes data (a sale, payments, a closed settlement, a delivery, a draw, a collector payment), so reset and reseed before running it again. If a flow fails, its entry in `flows.json` is marked `failed` and the script exits with status 1, so an incomplete run cannot pass for a good one.
-
-```txt
-before/flows/<flow>/<nn>-<screen>.jpg
-before/flows/flows.json
-```
+The list of screens, addressed with records of the demo campaign (a sold bond, an open and a closed settlement, a frozen draw, …). The realistic-data E2E sweep (`tests/e2e/realistic-data.spec.ts`) uses it, and the walkthrough of the redesign visited the same screens. A new screen is added here once.
