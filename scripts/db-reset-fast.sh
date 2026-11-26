@@ -121,23 +121,22 @@ restore() {
 }
 
 # After a restore the services reconnect on their own, with a backoff. Starting a test run before they
-# are back makes it slow (they compete for locks while retrying), so wait until PostgREST and auth
-# (storage and the rest are off in the slot stacks) hold connections again and answer.
+# are back makes it slow and flaky, so probe the slot's HTTP API until auth answers and PostgREST serves
+# a real query through its (reloaded) schema cache, twice in a row.
 wait_healthy() {
-	local i n
-	for i in $(seq 1 90); do
-		n=$(sql postgres -c "select count(distinct usename) from pg_stat_activity where datname = 'postgres' and usename in ('authenticator', 'supabase_auth_admin')" 2>/dev/null || echo 0)
-		if [ "$n" -ge 2 ] && {
-			[ -z "${PUBLIC_SUPABASE_URL:-}" ] ||
-				{ curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/auth/v1/health" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}" &&
-					curl -fsS -o /dev/null "$PUBLIC_SUPABASE_URL/rest/v1/" -H "apikey: ${PUBLIC_SUPABASE_ANON_KEY:-}"; }
-		}; then
-			sleep 1
-			return 0
+	local url=${PUBLIC_SUPABASE_URL:-} key=${SUPABASE_SERVICE_ROLE_KEY:-${PUBLIC_SUPABASE_ANON_KEY:-}} i ok=0
+	[ -n "$url" ] || return 0
+	for i in $(seq 1 120); do
+		if curl -fsS -o /dev/null "$url/auth/v1/health" -H "apikey: $key" &&
+			curl -fsS -o /dev/null "$url/rest/v1/roles?select=id&limit=1" -H "apikey: $key" -H "Authorization: Bearer $key"; then
+			ok=$((ok + 1))
+			[ "$ok" -ge 2 ] && return 0
+		else
+			ok=0
 		fi
 		sleep 1
 	done
-	echo "db-reset-fast: auth/rest/storage did not reconnect" >&2
+	echo "db-reset-fast: auth/PostgREST did not answer on $url" >&2
 	return 1
 }
 
