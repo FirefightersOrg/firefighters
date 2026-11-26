@@ -3,9 +3,9 @@
 	import { resolve } from '$app/paths';
 	import {
 		Button,
-		Disclosure,
 		EmptyState,
 		Field,
+		FilterBar,
 		Money,
 		PageHeader,
 		Select,
@@ -15,7 +15,6 @@
 		type AppliedFilter,
 		type TableColumn
 	} from '$lib/components/ui';
-	import Glyph from '$lib/components/ui/Glyph.svelte';
 	import { isReadableName } from '$lib/domain/parties';
 	import { SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUSES } from '$lib/domain/payments';
 	import { formatDate, formatNumber } from '$lib/format';
@@ -25,8 +24,7 @@
 	/**
 	 * Settlements list (UX plan PR 14, audit A7 and A9). The open ones come first (the repository
 	 * orders them), and a row says «Rendición 15 de Héctor Acosta», its state and, once closed, its
-	 * total. GET filters, folded; the list has no text search, so the fold is a `Disclosure` and not
-	 * the `FilterBar` (which always has a search field). Below 720px each row is two lines.
+	 * total. GET filters, folded; the list has no text search, so `FilterBar` is used without one. Below 720px each row is two lines.
 	 */
 	let { data }: PageProps = $props();
 
@@ -128,60 +126,24 @@
 </PageHeader>
 
 <div class="flex flex-col gap-6">
-	<form method="GET" action={listHref} class="flex flex-col gap-3" role="search" data-filter-bar>
-		<Disclosure
-			summary="Filtrar"
-			meta={applied.length === 0
-				? undefined
-				: applied.length === 1
-					? '1 filtro aplicado'
-					: `${applied.length} filtros aplicados`}
-		>
-			<div class="flex flex-col gap-4">
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Field label="Cobrador" id="filter-collector">
-						<Select name="collector" value={values.collector} options={collectorOptions} />
-					</Field>
-					<Field label="Estado" id="filter-status">
-						<Select name="status" value={values.status} options={statusOptions} />
-					</Field>
-					<Field label="Abierta desde" id="filter-from">
-						<TextInput type="date" name="from" value={values.from} />
-					</Field>
-					<Field label="Abierta hasta" id="filter-to">
-						<TextInput type="date" name="to" value={values.to} />
-					</Field>
-				</div>
-				<div><Button type="submit">Aplicar filtros</Button></div>
+	<FilterBar action={listHref} {applied} clearHref={listHref}>
+		{#snippet filters()}
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				<Field label="Cobrador" id="filter-collector">
+					<Select name="collector" value={values.collector} options={collectorOptions} />
+				</Field>
+				<Field label="Estado" id="filter-status">
+					<Select name="status" value={values.status} options={statusOptions} />
+				</Field>
+				<Field label="Abierta desde" id="filter-from">
+					<TextInput type="date" name="from" value={values.from} />
+				</Field>
+				<Field label="Abierta hasta" id="filter-to">
+					<TextInput type="date" name="to" value={values.to} />
+				</Field>
 			</div>
-		</Disclosure>
-
-		{#if applied.length}
-			<ul
-				class="m-0 flex list-none flex-wrap items-center gap-2 p-0"
-				aria-label="Filtros aplicados"
-			>
-				{#each applied as filter (filter.label)}
-					<li>
-						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- built on a resolved path -->
-						<a
-							href={filter.removeHref}
-							aria-label="Quitar el filtro {filter.label}"
-							class="inline-flex min-h-control-sm items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3 text-body-sm text-text hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-touch"
-							>{filter.label}<Glyph name="x" size={14} /></a
-						>
-					</li>
-				{/each}
-				<li>
-					<a
-						href={listHref}
-						class="inline-flex min-h-control-sm items-center rounded-sm px-1 text-body-sm text-primary-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-touch"
-						>Quitar todos</a
-					>
-				</li>
-			</ul>
-		{/if}
-	</form>
+		{/snippet}
+	</FilterBar>
 
 	<section aria-labelledby="results-title" class="flex flex-col gap-3">
 		<h2 id="results-title" class="sr-only">Resultados</h2>

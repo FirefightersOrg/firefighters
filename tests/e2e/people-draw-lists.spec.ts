@@ -276,7 +276,7 @@ test.describe.serial('collectors, buyers and draws lists', () => {
 
 		const status = page.locator('#filter-status');
 		await expect(status).toBeHidden();
-		await page.locator('[data-draw-filters] summary').click();
+		await page.locator('[data-filter-bar] summary').click();
 		await status.selectOption('annulled');
 		await page.locator('#filter-type').selectOption('monthly');
 		await page.getByRole('button', { name: 'Aplicar filtros' }).click();

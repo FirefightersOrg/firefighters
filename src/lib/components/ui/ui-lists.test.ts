@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRawSnippet } from 'svelte';
 import { render } from 'svelte/server';
 import FilterBar from './FilterBar.svelte';
+import Pagination from './Pagination.svelte';
 import Row from './Row.svelte';
 import RowActions from './RowActions.svelte';
 import RowList from './RowList.svelte';
@@ -187,6 +188,22 @@ describe('FilterBar', () => {
 		);
 	});
 
+	it('works with no search: only the folded filters and the chips', () => {
+		const body = render(FilterBar, {
+			props: {
+				action: '/campaigns/c/draws',
+				filters: html('<select name="type"></select>'),
+				applied: [{ label: 'Tipo: Mayor', removeHref: '/campaigns/c/draws' }],
+				clearHref: '/campaigns/c/draws'
+			}
+		}).body;
+		expect(body).not.toContain('Buscar');
+		expect(body).not.toMatch(/<input/);
+		expect(body).toContain('<details');
+		expect(body).toContain('Quitar el filtro Tipo: Mayor');
+		expect(body).toContain('Quitar todos');
+	});
+
 	it('has no «Filtrar» block when the list only has the search', () => {
 		expect(render(FilterBar, { props: base }).body).not.toContain('<details');
 	});
@@ -290,9 +307,62 @@ describe('Table: containment and the stacked phone layout', () => {
 	});
 });
 
+describe('Pagination', () => {
+	const hrefFor = (n: number) => `/campaigns/c/bonds?page=${n}`;
+
+	it('renders nothing with a single page', () => {
+		expect(render(Pagination, { props: { page: 1, pageCount: 1, hrefFor } }).body).not.toContain(
+			'<nav'
+		);
+	});
+
+	it('is a named nav with the current page, in neutral Spanish', () => {
+		const body = render(Pagination, { props: { page: 2, pageCount: 3, hrefFor } }).body;
+		expect(body).toContain('<nav aria-label="Paginación"');
+		expect(body).toMatch(/aria-current="page"[^>]*>(?:<!---->)?Página 2 de 3/);
+		expect(body).toMatch(
+			/<a[^>]*href="\/campaigns\/c\/bonds\?page=1"[^>]*rel="prev"[^>]*>[\s\S]*?Anterior/
+		);
+		expect(body).toMatch(
+			/<a[^>]*href="\/campaigns\/c\/bonds\?page=3"[^>]*rel="next"[^>]*>[\s\S]*?Siguiente/
+		);
+		// Buttons reach 44px on touch screens.
+		expect(body).toContain('pointer-coarse:min-h-touch');
+	});
+
+	it('has no previous link on the first page and no next link on the last', () => {
+		const first = render(Pagination, { props: { page: 1, pageCount: 2, hrefFor } }).body;
+		expect(first).not.toContain('Anterior');
+		expect(first).toContain('Siguiente');
+		const last = render(Pagination, { props: { page: 2, pageCount: 2, hrefFor } }).body;
+		expect(last).toContain('Anterior');
+		expect(last).not.toContain('Siguiente');
+	});
+
+	it('keeps the way back when the URL asks for a page past the end', () => {
+		const body = render(Pagination, { props: { page: 5, pageCount: 1, hrefFor } }).body;
+		expect(body).toContain('Anterior');
+	});
+
+	it('takes the landmark name', () => {
+		const body = render(Pagination, {
+			props: { page: 1, pageCount: 2, hrefFor, label: 'Páginas del padrón' }
+		}).body;
+		expect(body).toContain('aria-label="Páginas del padrón"');
+	});
+});
+
 describe('barrel', () => {
 	it('exports the list components', () => {
-		for (const name of ['RowList', 'Row', 'RowActions', 'FilterBar', 'SegmentedControl', 'TaskBar'])
+		for (const name of [
+			'RowList',
+			'Row',
+			'RowActions',
+			'FilterBar',
+			'Pagination',
+			'SegmentedControl',
+			'TaskBar'
+		])
 			expect(ui).toHaveProperty(name);
 	});
 });

@@ -4,10 +4,9 @@
 	import type { ResolvedPathname } from '$app/types';
 	import {
 		Button,
-		Disclosure,
 		EmptyState,
 		Field,
-		Icon,
+		FilterBar,
 		PageHeader,
 		Select,
 		StatusBadge,
@@ -124,54 +123,18 @@
 {/snippet}
 
 <div class="flex flex-col gap-6">
-	<!-- The folded filters and the chips of `FilterBar`, without its search field: this list has no
-	     search (the load only filters by type and status), and `FilterBar` requires one. -->
-	<form method="GET" action={listHref} class="flex flex-col gap-3" data-draw-filters>
-		<Disclosure
-			summary="Filtrar"
-			meta={applied.length === 0
-				? undefined
-				: applied.length === 1
-					? '1 filtro aplicado'
-					: `${applied.length} filtros aplicados`}
-		>
-			<div class="flex flex-col gap-4">
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-					<Field label="Tipo" id="filter-type">
-						<Select name="type" options={typeOptions} value={type} />
-					</Field>
-					<Field label="Estado" id="filter-status">
-						<Select name="status" options={statusOptions} value={status} />
-					</Field>
-				</div>
-				<div><Button type="submit">Aplicar filtros</Button></div>
+	<FilterBar action={listHref} {applied} clearHref={listHref}>
+		{#snippet filters()}
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				<Field label="Tipo" id="filter-type">
+					<Select name="type" options={typeOptions} value={type} />
+				</Field>
+				<Field label="Estado" id="filter-status">
+					<Select name="status" options={statusOptions} value={status} />
+				</Field>
 			</div>
-		</Disclosure>
-		{#if applied.length}
-			<ul
-				class="m-0 flex list-none flex-wrap items-center gap-2 p-0"
-				aria-label="Filtros aplicados"
-			>
-				{#each applied as filter (filter.label)}
-					<li>
-						<a
-							href={filter.removeHref as ResolvedPathname}
-							aria-label="Quitar el filtro {filter.label}"
-							class="inline-flex min-h-control-sm items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3 text-body-sm text-text hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-touch"
-							>{filter.label}<Icon name="x" size="sm" /></a
-						>
-					</li>
-				{/each}
-				<li>
-					<a
-						href={listHref}
-						class="inline-flex min-h-control-sm items-center rounded-sm px-1 text-body-sm text-primary-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-touch"
-						>Quitar todos</a
-					>
-				</li>
-			</ul>
-		{/if}
-	</form>
+		{/snippet}
+	</FilterBar>
 
 	<section aria-labelledby="results-title" class="flex flex-col gap-6">
 		<h2 id="results-title" class="sr-only">Resultados</h2>

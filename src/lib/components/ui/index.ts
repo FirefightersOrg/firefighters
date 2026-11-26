@@ -66,6 +66,7 @@ export { default as RowActions } from './RowActions.svelte';
 export type { RowAction } from './RowActions.svelte';
 export { default as FilterBar } from './FilterBar.svelte';
 export type { AppliedFilter } from './FilterBar.svelte';
+export { default as Pagination } from './Pagination.svelte';
 export { default as SegmentedControl } from './SegmentedControl.svelte';
 export type { SegmentedOption } from './SegmentedControl.svelte';
 export { default as TaskBar } from './TaskBar.svelte';

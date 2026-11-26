@@ -9,6 +9,7 @@
 		FilterBar,
 		Money,
 		PageHeader,
+		Pagination,
 		Select,
 		StatusBadge,
 		statusMeta,
@@ -21,7 +22,7 @@
 	import { formatCampaignNumber } from '$lib/domain/numbering';
 	import { isReadableName } from '$lib/domain/parties';
 	import { PAYMENT_MODE_LABELS } from '$lib/domain/sales';
-	import { formatDate, formatNumber } from '$lib/format';
+	import { formatDate } from '$lib/format';
 	import { listUrl, showingRange } from '$lib/list-query';
 	import type { PageProps } from './$types';
 
@@ -259,26 +260,10 @@
 			</Table>
 		{/if}
 
-		{#if pagination.pageCount > 1 || pagination.page > 1}
-			<nav aria-label="Paginación" class="flex items-center justify-between gap-3 text-body-sm">
-				{#if pagination.page > 1}
-					<Button href={listUrl(listHref, values, { page: pagination.page - 1 })} rel="prev"
-						>Anterior</Button
-					>
-				{:else}
-					<span></span>
-				{/if}
-				<span class="text-muted tabular-nums"
-					>Página {formatNumber(pagination.page)} de {formatNumber(pagination.pageCount)}</span
-				>
-				{#if pagination.page < pagination.pageCount}
-					<Button href={listUrl(listHref, values, { page: pagination.page + 1 })} rel="next"
-						>Siguiente</Button
-					>
-				{:else}
-					<span></span>
-				{/if}
-			</nav>
-		{/if}
+		<Pagination
+			page={pagination.page}
+			pageCount={pagination.pageCount}
+			hrefFor={(n: number) => listUrl(listHref, values, { page: n })}
+		/>
 	</section>
 </div>

@@ -9,6 +9,7 @@
 		Field,
 		FilterBar,
 		PageHeader,
+		Pagination,
 		Select,
 		Table,
 		type AppliedFilter,
@@ -194,23 +195,11 @@
 	{/if}
 
 	{#if data.pagination.pages > 1}
-		<nav
-			aria-label="Páginas del padrón"
-			class="flex items-center justify-between gap-3 text-body-sm"
-		>
-			{#if data.pagination.page > 1}
-				<Button href={pageLink(data.pagination.page - 1)} rel="prev">Anterior</Button>
-			{:else}
-				<span></span>
-			{/if}
-			<span class="text-muted tabular-nums"
-				>Página {formatNumber(data.pagination.page)} de {formatNumber(data.pagination.pages)}</span
-			>
-			{#if data.pagination.page < data.pagination.pages}
-				<Button href={pageLink(data.pagination.page + 1)} rel="next">Siguiente</Button>
-			{:else}
-				<span></span>
-			{/if}
-		</nav>
+		<Pagination
+			page={data.pagination.page}
+			pageCount={data.pagination.pages}
+			hrefFor={pageLink}
+			label="Páginas del padrón"
+		/>
 	{/if}
 </div>
