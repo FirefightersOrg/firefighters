@@ -101,13 +101,14 @@ export async function deliverAndSell(
 	await open(page, `/campaigns/${campaignId}/sales/new`);
 	await page.locator('#query').fill(String(base));
 	await page.locator('form[action="?/lookup"] button[type="submit"]').click();
-	await page.getByRole('radio').first().check();
+	// UX plan PR 12: the one bond that matches is chosen, and each answered step is one line.
+	await expect(page.locator('[data-chosen-bond]')).toBeVisible();
 	await page.getByText('Crear un comprador').click();
 	await page.locator('#buyer-firstName').fill('Ana');
 	await page.locator('#buyer-lastName').fill(`Comprador ${collector}`);
 	await page.getByRole('button', { name: 'Crear comprador' }).click();
-	await expect(page.locator('#buyerId')).not.toHaveValue('');
-	await page.getByRole('button', { name: 'Confirmar venta' }).click();
+	await expect(page.locator('[data-chosen-buyer]')).toBeVisible();
+	await page.getByRole('button', { name: /^Confirmar venta del bono/ }).click();
 	await expect(page).toHaveURL(/\/sales\/[0-9a-f-]{36}$/);
 	const saleId = page.url().split('/').pop()!;
 	await expect(page.getByText('Pago total').first()).toBeVisible();

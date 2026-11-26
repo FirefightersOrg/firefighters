@@ -163,14 +163,18 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.screen('Registrar venta, vacío');
 			await r.type(r.page.locator('#query'), '35', 'Número del bono');
 			await r.tap(r.page.locator('form[action="?/lookup"] button[type="submit"]'), 'Buscar');
+			// UX plan PR 12: the one bond that matches is chosen without another action.
+			await r.page.locator('[data-chosen-bond]').waitFor();
 			await r.screen('Bono encontrado');
-			await r.check(r.page.getByRole('radio').first(), 'Elegir el bono encontrado');
-			const buyers = await r.page.locator('#buyerId option').count();
-			r.note(`The buyer <select> lists ${buyers - 1} buyers with no type-ahead.`);
-			await r.choose(r.page.locator('#buyerId'), { index: 5 }, 'Comprador');
-			await r.choose(r.page.locator('#paymentMode'), { value: 'installments' }, 'Modalidad');
+			// A tap, not `check()`: the step collapses as soon as the buyer is chosen.
+			await r.tap(r.page.locator('[data-step="buyer"] input[type="radio"]').nth(4), 'Comprador');
+			await r.page.locator('[data-chosen-buyer]').waitFor();
+			await r.tap(
+				r.page.locator('[data-step="payment"]').getByText('En cuotas', { exact: true }),
+				'Modalidad'
+			);
 			await r.screen('Venta lista para confirmar');
-			await r.tap(r.page.getByRole('button', { name: 'Confirmar venta' }), 'Confirmar venta');
+			await r.tap(r.page.locator('[data-confirm-sale]'), 'Confirmar venta');
 			await r.page.waitForURL(/\/sales\/[0-9a-f-]{36}$/);
 			await r.screen('Venta registrada');
 		}
@@ -182,14 +186,18 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}/sales/new`);
 			await r.type(r.page.locator('#query'), '34', 'Número del bono');
 			await r.tap(r.page.locator('form[action="?/lookup"] button[type="submit"]'), 'Buscar');
-			await r.check(r.page.getByRole('radio').first(), 'Elegir el bono encontrado');
+			await r.page.locator('[data-chosen-bond]').waitFor();
 			await r.screen('Bono elegido');
 			await r.type(r.page.locator('#buyer-search'), 'Gómez', 'Buscar compradores');
-			await r.tap(r.page.locator('form[method="GET"] button[type="submit"]'), 'Buscar comprador');
+			await r.tap(
+				r.page.locator('[data-step="buyer"] form[role="search"] button[type="submit"]'),
+				'Buscar comprador'
+			);
+			await r.page.waitForURL(/[?&]buyer=/);
 			await r.screen('Después de buscar el comprador');
-			const radios = await r.page.getByRole('radio').count();
+			const kept = await r.page.locator('[data-chosen-bond]').count();
 			r.note(
-				radios === 0
+				kept === 0
 					? 'Searching for a buyer reloads the page and DROPS the bond that was found: it has to be searched again.'
 					: 'The found bond survives the buyer search.'
 			);

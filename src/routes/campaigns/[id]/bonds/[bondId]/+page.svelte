@@ -145,7 +145,12 @@
 		if (summary.nextStep === 'sell' && data.next.sell)
 			return {
 				label: 'Registrar venta',
-				href: resolve('/campaigns/[id]/sales/new', { id: campaign.id })
+				// The sale arrives with this bond already found.
+				href: `${resolve('/campaigns/[id]/sales/new', { id: campaign.id })}${
+					record.numbers.find((n) => n.kind === 'base')
+						? `?bond=${record.numbers.find((n) => n.kind === 'base')!.formatted}`
+						: ''
+				}`
 			};
 		if (summary.nextStep === 'pay' && data.next.pay)
 			return {
