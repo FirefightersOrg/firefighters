@@ -20,6 +20,7 @@
 		"db:slot": "scripts/with-db-lock.sh",
 		"db:slots:stop": "scripts/slots-stop.sh",
 		"db:reset": "scripts/with-db-lock.sh scripts/supabase-cli.sh db reset",
+		"db:reset:fast": "scripts/with-db-lock.sh scripts/db-reset-fast.sh",
 		"db:test": "scripts/with-db-lock.sh scripts/supabase-cli.sh test db",
 		"db:test:parallel": "scripts/with-db-lock.sh scripts/test-db-parallel.sh",
 		"seed:admin": "scripts/with-db-lock.sh tsx scripts/seed-admin.ts",
