@@ -111,7 +111,7 @@
 		const url = new URL(page.url);
 		if (buyerQuery.trim()) url.searchParams.set('buyer', buyerQuery.trim());
 		else url.searchParams.delete('buyer');
-		 
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same page, only the search changes
 		await goto(`${url.pathname}${url.search}`, {
 			keepFocus: true,
 			noScroll: true,
