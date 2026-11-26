@@ -121,7 +121,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 
 - **Scope.**
   - `+error.svelte` at the root, under `/campaigns/[id]` and under `/portal`: what happened, in Spanish, inside the shell, with the way back. A 403 says which area it is («Esta sección es de tesorería»), from a map of route to label.
-  - `/`: signed-in staff go to the active campaign when there is exactly one, otherwise to `/campaigns`. The session card moves to a «Mi cuenta» entry in the top bar.
+  - `/`: signed-in staff go to the active campaign when there is exactly one, otherwise to `/campaigns`. The session card stays on `/` for whoever cannot open campaigns (no new «Mi cuenta» route).
   - `PageHeader`: one back link to the parent section instead of the breadcrumb trail (the `breadcrumbs` prop stays accepted, and the last parent becomes the link, so pages do not all change in this PR).
   - Page titles and the ledger's labels name the institution instead of «Firefighters» (moved here from PR 5 to keep the shell PR to the shell: it is a mechanical change in about forty pages).
 - **Screens.** Home, every 403 and 404, every page header.

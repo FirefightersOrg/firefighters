@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import TransitionAction from '$lib/components/campaigns/TransitionAction.svelte';
@@ -122,7 +123,7 @@
 {/snippet}
 
 <svelte:head>
-	<title>{campaign.name} - Campañas - Firefighters</title>
+	<title>{campaign.name} - Campañas - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import {
@@ -59,7 +60,7 @@
 </script>
 
 <svelte:head>
-	<title>Mis bonos - Firefighters</title>
+	<title>Mis bonos - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

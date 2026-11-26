@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import AppNav from '$lib/components/layout/AppNav.svelte';
 	import { Alert, Badge, Button, Card, PageHeader } from '$lib/components/ui';
@@ -8,7 +9,7 @@
 </script>
 
 <svelte:head>
-	<title>Inicio - Firefighters</title>
+	<title>Inicio - {institutionName()}</title>
 </svelte:head>
 
 {#if data.user && data.profile}
@@ -16,7 +17,7 @@
 {/if}
 
 <main class="mx-auto max-w-content px-4 py-8 sm:px-6">
-	<PageHeader title="Firefighters" description="Sistema de gestión de Bomberos Voluntarios" />
+	<PageHeader title={institutionName()} description="Sistema de gestión de bonos." />
 
 	{#if data.user && data.profile}
 		<div class="flex max-w-form flex-col gap-6">

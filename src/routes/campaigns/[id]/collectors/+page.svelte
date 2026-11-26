@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import Pagination from '$lib/components/layout/Pagination.svelte';
 	import {
@@ -49,7 +50,7 @@
 	];
 </script>
 
-<svelte:head><title>Cobradores - {data.campaign.name} - Firefighters</title></svelte:head>
+<svelte:head><title>Cobradores - {data.campaign.name} - {institutionName()}</title></svelte:head>
 
 <PageHeader
 	title="Cobradores"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import AnnulRuleAction from '$lib/components/commissions/AnnulRuleAction.svelte';
 	import CommissionRuleForm from '$lib/components/commissions/CommissionRuleForm.svelte';
@@ -112,7 +113,7 @@
 </script>
 
 <svelte:head>
-	<title>Reglas de comisión - {campaign.name} - Firefighters</title>
+	<title>Reglas de comisión - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 {#snippet ruleCell(row: RuleRow, column: TableColumn<RuleRow>)}

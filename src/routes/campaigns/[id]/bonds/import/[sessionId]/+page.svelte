@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
@@ -131,7 +132,7 @@
 </script>
 
 <svelte:head>
-	<title>Revisión de importación - {campaign.name} - Firefighters</title>
+	<title>Revisión de importación - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

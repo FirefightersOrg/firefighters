@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import CollectorForm from '$lib/components/collectors/CollectorForm.svelte';
 	import { PageHeader } from '$lib/components/ui';
@@ -8,7 +9,8 @@
 	const listHref = $derived(resolve('/campaigns/[id]/collectors', { id: data.campaign.id }));
 </script>
 
-<svelte:head><title>Nuevo cobrador - {data.campaign.name} - Firefighters</title></svelte:head>
+<svelte:head><title>Nuevo cobrador - {data.campaign.name} - {institutionName()}</title></svelte:head
+>
 
 <PageHeader
 	title="Nuevo cobrador"

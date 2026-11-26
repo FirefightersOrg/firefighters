@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import { Button, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
@@ -31,7 +32,7 @@
 </script>
 
 <svelte:head>
-	<title>Campañas - Firefighters</title>
+	<title>Campañas - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader title="Campañas" description="Campañas de bonos, de la más reciente a la más antigua.">

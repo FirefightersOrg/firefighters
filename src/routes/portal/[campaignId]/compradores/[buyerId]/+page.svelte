@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import { Card, EmptyState, PageHeader, StatusBadge, Table } from '$lib/components/ui';
 	import type { TableColumn } from '$lib/components/ui';
@@ -19,7 +20,7 @@
 	];
 </script>
 
-<svelte:head><title>{data.buyer.displayName} - Firefighters</title></svelte:head>
+<svelte:head><title>{data.buyer.displayName} - {institutionName()}</title></svelte:head>
 
 <PageHeader
 	title={data.buyer.displayName}

@@ -128,6 +128,23 @@ export async function listCampaigns(
  * One campaign by id, or `data: null` when it does not exist or is not visible to the caller.
  * `id` must already be a valid uuid (an invalid one is a PostgREST error, not "not found").
  */
+/**
+ * Ids of the active campaigns the caller can read, at most `limit`. Used to decide where a person
+ * lands: with exactly one active campaign there is nothing to choose.
+ */
+export async function listActiveCampaignIds(
+	client: SupabaseClient,
+	limit = 2
+): Promise<RepositoryResult<string[]>> {
+	const { data, error } = await client
+		.from('campaigns')
+		.select('id')
+		.eq('status', 'active')
+		.limit(limit);
+	if (error) return { data: null, error };
+	return { data: (data ?? []).map((row) => row.id as string), error: null };
+}
+
 export async function getCampaignById(
 	supabase: SupabaseClient,
 	id: string

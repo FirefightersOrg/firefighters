@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import {
 		Card,
@@ -52,7 +53,7 @@
 </script>
 
 <svelte:head>
-	<title>Bono {join(bond.baseNumbers)} - Firefighters</title>
+	<title>Bono {join(bond.baseNumbers)} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

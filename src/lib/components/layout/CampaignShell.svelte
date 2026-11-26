@@ -2,6 +2,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
+	import { setPageHeaderRoots } from '$lib/components/ui/page-header-context';
 	import { campaignNav, type CampaignNavItem, type CampaignSectionKey } from '$lib/navigation';
 
 	/**
@@ -49,6 +50,10 @@
 	const href = (item: CampaignNavItem) => resolve(item.route, { id: campaign.id });
 	const homeHref = $derived(resolve('/campaigns/[id]', { id: campaign.id }));
 	const bondsHref = $derived(resolve('/campaigns/[id]/bonds', { id: campaign.id }));
+
+	// The shell already offers the campaign's home and the campaign list on every page: a page header
+	// does not repeat them as its «Volver a …» link.
+	setPageHeaderRoots(() => [homeHref, resolve('/campaigns')]);
 
 	/** Stroke icons (24px grid), one per section that can be a tab. */
 	const ICONS: Partial<Record<CampaignSectionKey | 'more', string>> = {

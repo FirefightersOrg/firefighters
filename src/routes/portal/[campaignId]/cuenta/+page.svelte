@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import {
 		Alert,
@@ -73,7 +74,7 @@
 </script>
 
 <svelte:head>
-	<title>Mi cuenta corriente - {data.campaign.name} - Firefighters</title>
+	<title>Mi cuenta corriente - {data.campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

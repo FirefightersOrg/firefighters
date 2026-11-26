@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import {
@@ -56,7 +57,7 @@
 	const filtered = $derived(Object.values(data.filters).some(Boolean));
 </script>
 
-<svelte:head><title>Remitos de entrega - {campaign.name} - Firefighters</title></svelte:head>
+<svelte:head><title>Remitos de entrega - {campaign.name} - {institutionName()}</title></svelte:head>
 
 <PageHeader
 	title="Remitos de entrega"

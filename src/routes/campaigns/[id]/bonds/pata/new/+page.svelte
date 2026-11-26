@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
@@ -128,7 +129,7 @@
 </script>
 
 <svelte:head>
-	<title>Cargar una pata - {campaign.name} - Firefighters</title>
+	<title>Cargar una pata - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 {#snippet codeFields()}

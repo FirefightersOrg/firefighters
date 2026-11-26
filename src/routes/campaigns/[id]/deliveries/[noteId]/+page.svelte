@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import { Button, Card, PageHeader } from '$lib/components/ui';
@@ -19,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>{deliveryNoteLabel(note.noteNumber)} - {campaign.name} - Firefighters</title>
+	<title>{deliveryNoteLabel(note.noteNumber)} - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader
