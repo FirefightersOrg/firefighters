@@ -324,10 +324,10 @@
 
 	{#if data.sale}
 		<section aria-labelledby="installments-title" id="installments">
-			<div class="flex items-baseline justify-between gap-3 border-b border-border-strong pb-2">
+			<div class="flex items-center justify-between gap-3 border-b border-border-strong">
 				<h2 id="installments-title" class="m-0 text-heading-3 text-text">Cuotas</h2>
 				<a
-					class="rounded-sm text-body-sm text-primary-text underline underline-offset-2"
+					class="inline-flex min-h-touch items-center rounded-sm text-body-sm text-primary-text underline underline-offset-2"
 					href={resolve('/campaigns/[id]/sales/[saleId]', {
 						id: campaign.id,
 						saleId: data.sale.sale.id
