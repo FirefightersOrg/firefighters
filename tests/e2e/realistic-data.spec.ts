@@ -24,7 +24,6 @@ import { login, open } from './helpers';
  * its entry is removed, and a screen that is not listed fails as soon as it overflows.
  */
 const KNOWN_OVERFLOW: Record<string, string> = {
-	'03-campaign-workbench': 'audit A7, «pendiente $ 4.370.000» does not wrap (plan PR 13)',
 	'44-settlement-print': 'audit A7, the note is wider than the phone (plan PR 18)',
 	'81-reports-financial': 'audit A7, the export buttons do not wrap (plan PR 17)',
 	'82-reports-financial-collector': 'audit A7, the export buttons do not wrap (plan PR 17)'
@@ -115,6 +114,24 @@ test.describe.serial('realistic data at 375 px', () => {
 
 	test('portal screens do not scroll sideways', async () => {
 		await sweep(collectorPhone, portal);
+	});
+
+	// UX plan PR 13 (audit A7 and A10): the home of a campaign with real volumes is short, says
+	// what waits and where it is resolved, and shows whole pesos.
+	test('the campaign home is 2.5 screens or shorter, with no cents', async () => {
+		const page = await adminPhone.newPage();
+		await open(page, staff.find((screen) => screen.slug === '03-campaign-workbench')!.path);
+		const screens = await page.evaluate(
+			() => document.scrollingElement!.scrollHeight / window.innerHeight
+		);
+		expect(screens, 'screens at 375 x 812 with the demo campaign').toBeLessThanOrEqual(2.5);
+		const text = (await page.getByRole('main').innerText()).replace(/\u00a0/g, ' ');
+		expect(text).not.toMatch(/\$ [\d.]+,\d/);
+		// The demo has payments sent by a collector: the item leads to that collector's settlement.
+		const sent = page.locator('#dash-todo [data-task^="submitted-"]').first();
+		await expect(sent).toContainText('sin procesar');
+		await expect(sent.getByRole('link')).toHaveAttribute('href', /\/settlements\/[0-9a-f-]{36}$/);
+		await page.close();
 	});
 
 	// UX plan PR 12b (audit A9): a party the role cannot read is left out or named in Spanish, never
