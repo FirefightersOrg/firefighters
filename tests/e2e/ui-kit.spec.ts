@@ -128,7 +128,8 @@ test.describe.serial('UI kit: list components', () => {
 		// Still a table for assistive tech, with its header row (visually hidden).
 		await expect(table.getByRole('table')).toBeVisible();
 		await expect(table.getByRole('columnheader')).toHaveCount(6);
-		await expect(row.getByRole('cell')).toHaveCount(6);
+		// Five cells are exposed: the sixth column is hidden on phones, so it leaves the tree too.
+		await expect(row.getByRole('cell')).toHaveCount(5);
 		const box = async (text: string) => (await row.getByText(text, { exact: true }).boundingBox())!;
 		const bond = await box('0181 / 5181');
 		const value = await box('$ 60.000');
@@ -139,9 +140,9 @@ test.describe.serial('UI kit: list components', () => {
 		expect(buyer.y).toBeGreaterThan(bond.y + bond.height - 2);
 		// A column without a role is a line labelled with its header; a hidden one is not shown.
 		await expect(row.getByText('Héctor Acosta')).toBeVisible();
-		await expect(row.getByRole('cell').nth(5)).toBeHidden();
+		await expect(row.locator('td').nth(5)).toBeHidden();
 		const label = await row
-			.getByRole('cell')
+			.locator('td')
 			.nth(3)
 			.evaluate((cell) => getComputedStyle(cell, '::before').content);
 		expect(label).toContain('Cobrador');
@@ -188,7 +189,11 @@ test.describe.serial('UI kit: list components', () => {
 			// Open a row menu and the filters, so their content is checked too.
 			await page.locator('summary[aria-label="Acciones del pago del bono 0019"]').click();
 			await page.locator('[data-demo="filters"] summary').click();
-			const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+			// Only this PR's sections: the rest of the showcase is covered where each component is used.
+			const results = await new AxeBuilder({ page })
+				.include('[data-demo]')
+				.withTags(AXE_TAGS)
+				.analyze();
 			const serious = results.violations.filter((v) =>
 				['serious', 'critical'].includes(v.impact ?? '')
 			);
@@ -212,6 +217,8 @@ test.describe.serial('UI kit: list components', () => {
 					const box = el.getBoundingClientRect();
 					if (!box.width) return false;
 					if (el.tagName === 'A' && getComputedStyle(el).display === 'inline') return false;
+					// A row link's target is the whole row (its ::after covers it), measured below.
+					if (el.tagName === 'A' && el.closest('[data-row]')) return false;
 					return box.height < 44;
 				})
 				.map(
@@ -220,6 +227,17 @@ test.describe.serial('UI kit: list components', () => {
 				)
 		);
 		expect(small).toEqual([]);
+		// Rows that are links: the row is the target, and it is at least 56px tall.
+		const rowHeights = await page
+			.locator('[data-row]:has(> div > a)')
+			.evaluateAll((rows) => rows.map((row) => Math.round(row.getBoundingClientRect().height)));
+		expect(rowHeights.length).toBeGreaterThan(0);
+		for (const height of rowHeights) expect(height).toBeGreaterThanOrEqual(56);
+		// And a tap anywhere on the row follows its link.
+		const row = page.locator('[data-row]:has(> div > a)').first();
+		const box = (await row.boundingBox())!;
+		await page.mouse.click(box.x + box.width - 60, box.y + box.height - 6);
+		await expect(page).toHaveURL(/#sorteo$/);
 		await page.close();
 	});
 });

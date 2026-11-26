@@ -114,7 +114,9 @@
 		data-stack={stack ? 'true' : undefined}
 	>
 		{#if caption}
-			<caption class="px-4 py-3 text-left text-label text-text">{caption}</caption>
+			<caption class="px-4 py-3 text-left text-label text-text {stack ? 'max-[719px]:block' : ''}"
+				>{caption}</caption
+			>
 		{/if}
 		<thead class={stack ? 'max-[719px]:sr-only' : undefined} role={stack ? 'rowgroup' : undefined}>
 			<tr role={stack ? 'row' : undefined}>

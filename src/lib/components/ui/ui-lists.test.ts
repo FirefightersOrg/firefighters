@@ -106,7 +106,10 @@ describe('RowList and Row', () => {
 				props: { title: 'x', href: '/a', actions: html('<button>…</button>') }
 			}).body
 		);
-		expect(body).toMatch(/<div class="relative z-\[1\] shrink-0"><button>…<\/button><\/div>/);
+		// After the link in the DOM and positioned: above the row link, with no stacking context that
+		// would trap an open menu under the next rows.
+		expect(body).toMatch(/<div class="relative shrink-0"><button>…<\/button><\/div>/);
+		expect(body.indexOf('href="/a"')).toBeLessThan(body.indexOf('<button>…'));
 	});
 
 	it('places the lead before the text and the trailing content after it', () => {

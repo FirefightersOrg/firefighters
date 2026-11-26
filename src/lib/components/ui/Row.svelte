@@ -59,7 +59,9 @@
 		{/if}
 	</div>
 	{#if trailing}<div class="shrink-0 text-right">{@render trailing()}</div>{/if}
-	{#if actions}<div class="relative z-[1] shrink-0">{@render actions()}</div>{/if}
+	<!-- Positioned after the link, so it paints above the row link without a z-index of its own: an
+	     open menu inside it can then rise above the rows that follow. -->
+	{#if actions}<div class="relative shrink-0">{@render actions()}</div>{/if}
 	{#if href && !actions}
 		<svg
 			class="shrink-0 text-subtle"
