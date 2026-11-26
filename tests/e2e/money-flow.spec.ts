@@ -4,7 +4,6 @@ import {
 	createBond,
 	createCollector,
 	deliverSellAndSettle,
-	login,
 	runId
 } from './helpers';
 
@@ -13,7 +12,6 @@ test('create campaign, load a bond, deliver it, sell it, pay it and close the se
 	page
 }) => {
 	const run = runId();
-	await login(page);
 	const campaignId = await createActiveCampaign(page, `E2E dinero ${run}`);
 	await createCollector(page, campaignId, `Cobrador ${run}`);
 	await createBond(page, campaignId, 100);
