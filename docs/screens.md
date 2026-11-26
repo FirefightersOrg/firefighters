@@ -69,24 +69,14 @@ Actions:
 
 ### Bond record
 
-Objective: complete bond file.
+Objective: say, on the first screen, what the bond is, who has it, who bought it, what is owed and what to do next (UX plan PR 8).
 
-Sections:
+Order:
 
-- General data.
-- Participating numbers.
-- Barcode.
-- Current collector.
-- Assignment history (deliveries, reassignments, returns and losses, with their notes; Return, Reassign and Mark lost actions).
-- Current buyer.
-- Sale.
-- Installments.
-- Payments.
-- Settlements.
-- Commissions.
-- Draws and rosters.
-- Prizes.
-- Audit.
+- **Summary.** The bond's stub (base and associated numbers); one or two sentences built from data («Vendido a … en 6 cuotas. Lo cobra …. Pagó 1 cuota y debe $ 50.000, de los cuales $ 40.000 están vencidos.»), with the buyer and the collector as links when the role can open them; the commercial and financial states; the one next step of the state (deliver, register the sale, register a payment) when the role may take it; the buyer's phone as a call link. The table of state to sentence is in `src/lib/domain/bond-summary.test.ts`.
+- **Installments** (sold bonds). What is still owed on each, with the amount to collect as the lead figure. A payment counts once its settlement is closed; one that is still in an open settlement, or sent by the collector and not processed, is shown on its installment as waiting.
+- **Draws.** One line per draw: the numbers it takes part with and whether it is eligible, with the reason when it is not. Prizes under it.
+- **History and corrections**, collapsed: payments and certificates; deliveries and returns (with Return, Reassign and Mark lost); the bond's data (general data, participating numbers, barcode, pata members); recorded movements (with `audit.view`); correct or annul (correct the collector, ungroup, annul). A group opens by itself when the server answered about something inside it.
 
 ### Barcode loading
 
