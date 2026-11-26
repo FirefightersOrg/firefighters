@@ -8,8 +8,8 @@ import {
 } from '../../scripts/demo-screens';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import { seedDemo } from '../../scripts/seed-demo';
-import { STATE } from './auth-state';
-import { open } from './helpers';
+import { ANONYMOUS, STATE } from './auth-state';
+import { login, open } from './helpers';
 
 /**
  * Realistic-data sweep (UX plan, PR 1). The a11y sweep builds a campaign with two bonds and
@@ -25,6 +25,7 @@ import { open } from './helpers';
  * its entry is removed, and a screen that is not listed fails as soon as it overflows.
  */
 const KNOWN_OVERFLOW: Record<string, string> = {
+	'00-home': 'audit A7, the campaign card «pendiente $ 4.370.000» does not wrap (plan PR 13)',
 	'03-campaign-workbench': 'audit A7, «pendiente $ 4.370.000» does not wrap (plan PR 13)',
 	'44-settlement-print': 'audit A7, the note is wider than the phone (plan PR 18)',
 	'81-reports-financial': 'audit A7, the export buttons do not wrap (plan PR 17)',
@@ -126,7 +127,11 @@ test.describe.serial('realistic data at 375 px', () => {
 					? config.admin
 					: config.fixtures.find((fixture) => fixture.roleNames.includes(role));
 			if (!user) throw new Error(`The fixture ${role} is missing: run seed:admin first.`);
-			const context = await browser.newContext({ baseURL, locale: 'es-AR' });
+			const context = await browser.newContext({
+				baseURL,
+				locale: 'es-AR',
+				storageState: ANONYMOUS
+			});
 			await login(await context.newPage(), user);
 			for (const screen of staff) {
 				const response = await context.request.get(screen.path);
