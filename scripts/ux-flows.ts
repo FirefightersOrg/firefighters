@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { resolveSeedConfig } from './seed-admin';
+import { DEMO_CAMPAIGN_NAME } from './seed-demo';
 import { assertOnBaseUrl, resolveLocalBaseUrl, runEach } from './ux-local';
 
 /**
@@ -22,7 +23,6 @@ import { assertOnBaseUrl, resolveLocalBaseUrl, runEach } from './ux-local';
  * If a flow fails, the report still has what it recorded (marked `failed`), and the script exits 1.
  */
 
-const CAMPAIGN_NAME = 'Bono Contribución 2026';
 const BASE_URL = resolveLocalBaseUrl(process.env.UX_BASE_URL);
 
 interface Step {
@@ -314,7 +314,7 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 			await r.page.goto(`${BASE_URL}/portal`);
 			await r.screen('Portal');
 			// With more than one campaign the portal starts on a list of campaigns.
-			const campaign = r.page.getByRole('link', { name: CAMPAIGN_NAME });
+			const campaign = r.page.getByRole('link', { name: DEMO_CAMPAIGN_NAME });
 			if (await campaign.count()) {
 				await r.tap(campaign.first(), 'Elegir la campaña');
 				await r.screen('Mis bonos');
@@ -359,7 +359,11 @@ async function main() {
 		...options,
 		global: { headers: { Authorization: `Bearer ${session.data.session.access_token}` } }
 	});
-	const campaign = await admin.from('campaigns').select('id').eq('name', CAMPAIGN_NAME).single();
+	const campaign = await admin
+		.from('campaigns')
+		.select('id')
+		.eq('name', DEMO_CAMPAIGN_NAME)
+		.single();
 	if (campaign.error) throw new Error(`Demo campaign not found: ${campaign.error.message}`);
 	const eligible = await admin
 		.from('draw_roster_entries')
