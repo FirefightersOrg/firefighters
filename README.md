@@ -19,6 +19,7 @@ Scripts: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm check`, `pnpm lint`, `p
 
 ```bash
 pnpm db:reset            # supabase db reset
+pnpm db:reset:fast       # same result (migrated + seed:admin users) restored from a template, ~1 s
 pnpm db:test             # supabase test db (pgTAP)
 APP_ENV=local pnpm seed:admin
 APP_ENV=local pnpm seed:demo   # optional: one realistic campaign for manual testing (docs/ux/README.md)
@@ -26,6 +27,8 @@ APP_ENV=local pnpm test:integration
 ```
 
 Prefer these over calling `supabase db reset` / `supabase test db` directly. A waiting run prints "waiting for local Supabase lock…" and proceeds when the holder finishes. Tune with `DB_LOCK_WAIT_SECONDS` and `DB_LOCK_STALE_SECONDS`. `pnpm seed:admin` also goes through the lock (it writes Auth users, profiles and roles). If the Supabase CLI is not on your `PATH`, set `SUPABASE_BIN` to the path of the binary (default: `supabase`).
+
+**Fast reset (`pnpm db:reset:fast`):** `db reset` plus `seed:admin` take ~40 s. `scripts/db-reset-fast.sh` snapshots the migrated and seeded `postgres` database once as a template database (`ff_template_<project_id>`, inside the stack's own Postgres) and later re-creates `postgres` from it in about a second. The snapshot is keyed by a hash of `supabase/migrations/*`, `supabase/seed.sql`, `supabase/config.toml` and the seed-admin inputs, stored as the template's comment. If the hash differs, or there is no template, it runs `supabase db reset` and `seed:admin`, and snapshots again, so after a migration change the first run costs the usual ~40 s. It leaves the same state as `db reset` + `APP_ENV=local pnpm seed:admin` (so running `seed:admin` afterwards is harmless). Force a rebuild with `DB_RESET_FAST_REBUILD=1`. What it does to the services: sessions on `postgres` are terminated and the database is dropped and created from the template; auth, storage, PostgREST, realtime, pg_cron and pg_net reconnect on their own, and the script re-applies the database-level settings and ACL a template does not carry (`app.settings.jwt_secret`/`jwt_exp`) and sends `NOTIFY pgrst, 'reload schema'`. Existing sessions/JWTs from before the reset are no longer in `auth.sessions`, like after a normal reset. Use the full `pnpm db:reset` after upgrading the Supabase CLI or the local Postgres image, or if anything looks off. The script reads the stack from env (`SUPABASE_PROJECT_ID`, `SUPABASE_DB_CONTAINER`, `DB_TEMPLATE_NAME`, `SUPABASE_BIN`, `SUPABASE_RESET_ARGS`, `API_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`) with today's single stack as default, so a pool of stacks only has to export those per slot.
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only and must only be used under `src/lib/server/`.
 
