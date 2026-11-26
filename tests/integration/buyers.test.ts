@@ -183,7 +183,7 @@ describe('buyers (local Supabase)', () => {
 		expect(updates).toHaveLength(1);
 	});
 
-	it('warns about duplicates and read-only cannot enter', async () => {
+	it('warns about duplicates and read-only can view the list', async () => {
 		const first = await create(operator, individual({ documentNumber: `${NUM}1` }));
 		const second = await create(
 			operator,
@@ -205,7 +205,7 @@ describe('buyers (local Supabase)', () => {
 		)) as { status: number };
 		expect(duplicate.status).toBe(409);
 		expect(first).toBeTruthy();
-		await expect(buyersLoad(event(readOnly, '/buyers'))).rejects.toMatchObject({ status: 403 });
+		await expect(buyersLoad(event(readOnly, '/buyers'))).resolves.toHaveProperty('buyers');
 	});
 
 	it('warns about a duplicate whose document number is formatted differently', async () => {

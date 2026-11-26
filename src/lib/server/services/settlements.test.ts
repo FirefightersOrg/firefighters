@@ -61,6 +61,17 @@ describe('settlement services', () => {
 			})
 		);
 	});
+	it('maps a payment dated before the sale to a Spanish validation message', () => {
+		expect(
+			mapSettlementRpcError({
+				code: '22023',
+				message: 'payment date cannot be before the sale date'
+			})
+		).toMatchObject({
+			kind: 'validation',
+			message: 'La fecha del cobro no puede ser anterior a la fecha de la venta.'
+		});
+	});
 	it.each([
 		[{ code: '42501' }, 'permission'],
 		[{ code: 'P0002' }, 'not_found'],

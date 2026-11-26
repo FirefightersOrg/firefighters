@@ -56,7 +56,7 @@ El color de estado está reservado para estados.
 - `primary` para la acción principal, enlaces y selección. Un solo botón `primary` por vista; el resto `secondary` o `ghost`.
 - `primary-soft` marca lo seleccionado (fila, hover de navegación). El ítem activo del `AppHeader` usa el subrayado `accent` y peso 600.
 - Estados: cada uno tiene `*-soft` (fondo), `*-text` (texto sobre ese fondo) y el color base (ícono y borde). Éxito `success`, advertencia `warning`, error/destructivo `danger`, informativo `primary`, neutral `neutral-soft` + `text-muted`.
-- Ningún estado se comunica solo por color: siempre ícono y palabra («Activa», «Anulada»).
+- Ningún estado se comunica solo por color: siempre marca y palabra («Activa», «Anulada»), y la marca del `Badge` cambia de forma con el tono (redonda, rombo para advertencia, cuadrada para un problema).
 - `border` es decorativo (divisores); los controles usan `border-strong`, que cumple 3:1.
 - Todos los pares de texto cumplen 4,5:1 en los temas Claro y Oscuro. `text-disabled` está exento y siempre va acompañado de otra señal.
 

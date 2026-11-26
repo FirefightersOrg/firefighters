@@ -1,3 +1,4 @@
+import { load as ledgerLoad } from '../../src/routes/campaigns/[id]/collectors/[collectorId]/ledger/+page.server';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, inject, it } from 'vitest';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
@@ -435,6 +436,101 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		});
 	});
 
+	it('persists and audits an explicit payment date, and rejects future dates without writes', async () => {
+		const sale = await createSale('dated', baDate(-3));
+		const settlementId = await openSettlement(
+			users.operator.client,
+			{ campaignId, collectorId, notes: 'dated payment' },
+			ctx(users.operator)
+		);
+		const paymentDate = baDate(-2);
+		const requestId = rid('dated-payment');
+		const paymentId = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 10,
+				paymentMethod: 'cash',
+				paymentDate,
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 10 }]
+			},
+			ctx(users.operator, requestId)
+		);
+		const stored = await users.admin.client
+			.from('payments')
+			.select('payment_date')
+			.eq('id', paymentId)
+			.single();
+		expect(stored.error).toBeNull();
+		expect(stored.data?.payment_date).toBe(paymentDate);
+		const audit = await users.admin.client
+			.from('audit_log')
+			.select('new_value')
+			.eq('request_id', requestId)
+			.eq('action', 'payment.add')
+			.single();
+		expect(audit.error).toBeNull();
+		expect(audit.data?.new_value).toMatchObject({ payment_date: paymentDate });
+		const futureRequest = rid('future-payment');
+		const before = await users.admin.client
+			.from('payments')
+			.select('id')
+			.eq('settlement_id', settlementId);
+		await noWrites(futureRequest, async () => {
+			const result = await users.operator.client.rpc('settlement_add_payment', {
+				p_settlement_id: settlementId,
+				p_sale_id: sale.saleId,
+				p_amount: 10,
+				p_payment_method: 'cash',
+				p_payment_date: baDate(1),
+				p_request_id: futureRequest,
+				p_applications: [{ installment_id: sale.installments[0].id, amount_applied: 10 }]
+			});
+			expect(result.error?.code).toBe('22023');
+		});
+		const after = await users.admin.client
+			.from('payments')
+			.select('id')
+			.eq('settlement_id', settlementId);
+		expect(after.data).toEqual(before.data);
+	});
+
+	it('rejects a staff payment dated before the sale date and accepts the sale day', async () => {
+		const sale = await createSale('before-sale', baDate(-3));
+		const settlementId = await openSettlement(
+			users.operator.client,
+			{ campaignId, collectorId, notes: 'before sale' },
+			ctx(users.operator)
+		);
+		const early = rid('before-sale-payment');
+		await noWrites(early, async () => {
+			const result = await users.operator.client.rpc('settlement_add_payment', {
+				p_settlement_id: settlementId,
+				p_sale_id: sale.saleId,
+				p_amount: 10,
+				p_payment_method: 'cash',
+				p_payment_date: baDate(-4),
+				p_request_id: early,
+				p_applications: [{ installment_id: sale.installments[0].id, amount_applied: 10 }]
+			});
+			expect(result.error?.code).toBe('22023');
+			expect(result.error?.message).toMatch(/before the sale date/);
+		});
+		const onSaleDay = await addPaymentToSettlement(
+			users.operator.client,
+			{
+				settlementId,
+				saleId: sale.saleId,
+				amount: 10,
+				paymentMethod: 'cash',
+				paymentDate: baDate(-3),
+				applications: [{ installmentId: sale.installments[0].id, amountApplied: 10 }]
+			},
+			ctx(users.operator, rid('sale-day-payment'))
+		);
+		expect(onSaleDay).toBeTruthy();
+	});
 	it('C2 closes atomically, confirms applications across settlements, records snapshots and audits', async () => {
 		const advance = await createSale('advance', baDate());
 		const overdue = await createSale('overdue', baDate(-2));
@@ -703,7 +799,7 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 	});
 
 	it('C5 verifies printable documents and settlement workspace against real closed and open data', async () => {
-		const sale = await createSale('c5-print', baDate());
+		const sale = await createSale('c5-print', baDate(-1));
 		const { data: bondNumbers, error: bondNumbersError } = await service
 			.from('bond_numbers')
 			.select('number_value')
@@ -891,6 +987,15 @@ describe('Phase 8: payments and assisted settlement closing (backend)', () => {
 		const closedWorkspace = (await settlementLoad(
 			event(users.treasurer, `/campaigns/${campaignId}/settlements/${settlementId}`, routeParams)
 		)) as Exclude<Awaited<ReturnType<typeof settlementLoad>>, void>;
+		const linkedCollector = closedWorkspace.settlement.collectorId;
+		await expect(
+			ledgerLoad(
+				event(users.treasurer, `/campaigns/${campaignId}/collectors/${linkedCollector}/ledger`, {
+					id: campaignId,
+					collectorId: linkedCollector
+				})
+			)
+		).resolves.toMatchObject({ collector: { id: collectorId } });
 		expect(closedWorkspace.totals).toEqual({
 			totalCash: Number(stored!.total_cash).toFixed(2),
 			totalTransfer: Number(stored!.total_transfer).toFixed(2),

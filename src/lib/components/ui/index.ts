@@ -49,6 +49,16 @@ export { default as FormErrorSummary } from './FormErrorSummary.svelte';
 export { default as FormResult } from './FormResult.svelte';
 // --- end SAN-132 ---
 
+// --- UX plan PR 3: figures (bond number, money, sheet, stub) ---
+export { default as BondNumber } from './BondNumber.svelte';
+export type { BondNumberSize } from './BondNumber.svelte';
+export { default as Money } from './Money.svelte';
+export type { MoneyContext } from './Money.svelte';
+export { default as MoneySheet } from './MoneySheet.svelte';
+export type { MoneySheetRow } from './MoneySheet.svelte';
+export { default as BondStub } from './BondStub.svelte';
+// --- end UX plan PR 3 ---
+
 // --- UX plan PR 4: lists (rows, filters, two-way choice, task bar, row actions) ---
 export { default as RowList } from './RowList.svelte';
 export { default as Row } from './Row.svelte';

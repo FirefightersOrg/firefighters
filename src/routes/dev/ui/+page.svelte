@@ -9,6 +9,10 @@
 		Checkbox,
 		RadioGroup,
 		Badge,
+		BondNumber,
+		BondStub,
+		Money,
+		MoneySheet,
 		Dialog,
 		FilterBar,
 		Row,
@@ -35,6 +39,20 @@
 		{ value: 'x', label: 'No disponible', disabled: true }
 	];
 	const variants = ['primary', 'secondary', 'ghost', 'danger'] as const;
+	const tones = [
+		['neutral', 'Borrador'],
+		['info', 'Vendido'],
+		['success', 'Al día'],
+		['warning', 'En cierre'],
+		['danger', 'En mora']
+	] as const;
+	const sheet = [
+		{ label: 'Efectivo (7 pagos)', value: 70000 },
+		{ label: 'Transferencias (3 pagos)', value: 30000 },
+		{ label: 'Total cobrado', value: 100000, kind: 'subtotal' as const },
+		{ label: 'Comisión que se queda el cobrador', value: 7000, kind: 'deduction' as const },
+		{ label: 'Neto para Bomberos', value: 93000, kind: 'lead' as const }
+	];
 
 	let payMethod = $state('cash');
 	let removing = $state<string | null>(null);
@@ -49,21 +67,21 @@
 			bond: '0019',
 			buyer: 'Patricia Rodríguez',
 			detail: 'Pago total, efectivo',
-			amount: '$ 60.000'
+			amount: 60000
 		},
 		{
 			id: '2',
 			bond: '0003',
 			buyer: 'Daniel Luna',
 			detail: 'Cuota 4, transferencia',
-			amount: '$ 10.000'
+			amount: 10000
 		},
 		{
 			id: '3',
 			bond: '0008',
 			buyer: 'Graciela Ojeda',
 			detail: 'Cuota 3, efectivo',
-			amount: '$ 10.000'
+			amount: 10000
 		}
 	];
 	const bondColumns = [
@@ -185,101 +203,136 @@
 			<p class="text-body-sm text-muted">Seleccionado: {method}</p>
 		</section>
 
-		<section class="flex flex-col gap-4" data-demo="segmented">
-			<h2 class="text-heading-2">SegmentedControl</h2>
-			<div class="max-w-80">
-				<SegmentedControl legend="Medio de pago" options={payMethods} bind:value={payMethod} />
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Estados</h2>
+			<p class="text-body-sm text-muted">
+				La marca cambia de forma con el tono: redonda, rombo para advertencia, cuadrada para un
+				problema.
+			</p>
+			<div class="flex flex-wrap gap-2">
+				{#each tones as [tone, label] (tone)}<Badge {tone}>{label}</Badge>{/each}
 			</div>
-			<p class="text-body-sm text-muted" data-demo-value>Elegido: {payMethod}</p>
 		</section>
 
-		<section class="flex flex-col gap-4" data-demo="filters">
-			<h2 class="text-heading-2">FilterBar</h2>
-			<FilterBar
-				action="/dev/ui"
-				searchName="base"
-				searchLabel="Número de bono"
-				inputmode="numeric"
-				applied={[
-					{ label: 'Estado: Vendido', removeHref: '/dev/ui?type=simple' },
-					{ label: 'Tipo: Bono simple', removeHref: '/dev/ui?status=sold' }
-				]}
-				clearHref="/dev/ui"
-			>
-				{#snippet filters()}
-					<Field label="Estado comercial" id="demo-status">
-						<Select name="status" options={['Cualquiera', 'Disponible', 'Vendido']} />
-					</Field>
-				{/snippet}
-			</FilterBar>
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Número de bono</h2>
+			<div class="flex flex-wrap items-baseline gap-6">
+				<BondNumber number={181} size="sm" />
+				<BondNumber number={181} associated={5181} />
+				<BondNumber number={181} associated={5181} size="lg" />
+				<BondNumber number={24} href="#bono" />
+			</div>
+			<div><BondStub number="0181" caption="Bono" detail="Número asociado 5181" /></div>
+			<div><BondStub number="0181" caption="Bono" size="md" /></div>
 		</section>
 
-		<section class="flex flex-col gap-4" data-demo="rows">
-			<h2 class="text-heading-2">RowList, Row y RowActions</h2>
-			<RowList label="Pagos de esta rendición">
-				{#each payments as payment (payment.id)}
-					<Row title={payment.buyer} detail={payment.detail}>
-						{#snippet lead()}<span class="font-figure text-[20px] font-bold tabular-nums"
-								>{payment.bond}</span
-							>{/snippet}
-						{#snippet trailing()}<span class="tabular-nums">{payment.amount}</span>{/snippet}
-						{#snippet actions()}
-							<RowActions
-								label="Acciones del pago del bono {payment.bond}"
-								actions={[
-									{
-										label: 'Corregir el medio de pago',
-										onselect: () => (lastAction = `corregir ${payment.bond}`)
-									},
-									{
-										label: 'Quitar de la rendición',
-										tone: 'danger',
-										onselect: () => (removing = payment.bond)
-									}
-								]}
-							/>
-						{/snippet}
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Montos</h2>
+			<div class="flex flex-wrap items-baseline gap-6">
+				<Money value={150500} />
+				<Money value="1500.50" />
+				<Money value={150500} context="document" />
+				<Money value={-7000} />
+				<Money value={null} />
+			</div>
+			<div class="max-w-[420px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5">
+				<MoneySheet rows={sheet} secondary={[{ label: 'Comisión generada', value: 10000 }]} />
+			</div>
+
+			<section class="flex flex-col gap-4" data-demo="segmented">
+				<h2 class="text-heading-2">SegmentedControl</h2>
+				<div class="max-w-80">
+					<SegmentedControl legend="Medio de pago" options={payMethods} bind:value={payMethod} />
+				</div>
+				<p class="text-body-sm text-muted" data-demo-value>Elegido: {payMethod}</p>
+			</section>
+
+			<section class="flex flex-col gap-4" data-demo="filters">
+				<h2 class="text-heading-2">FilterBar</h2>
+				<FilterBar
+					action="/dev/ui"
+					searchName="base"
+					searchLabel="Número de bono"
+					inputmode="numeric"
+					applied={[
+						{ label: 'Estado: Vendido', removeHref: '/dev/ui?type=simple' },
+						{ label: 'Tipo: Bono simple', removeHref: '/dev/ui?status=sold' }
+					]}
+					clearHref="/dev/ui"
+				>
+					{#snippet filters()}
+						<Field label="Estado comercial" id="demo-status">
+							<Select name="status" options={['Cualquiera', 'Disponible', 'Vendido']} />
+						</Field>
+					{/snippet}
+				</FilterBar>
+			</section>
+
+			<section class="flex flex-col gap-4" data-demo="rows">
+				<h2 class="text-heading-2">RowList, Row y RowActions</h2>
+				<RowList label="Pagos de esta rendición">
+					{#each payments as payment (payment.id)}
+						<Row title={payment.buyer} detail={payment.detail}>
+							{#snippet lead()}<BondNumber number={payment.bond} />{/snippet}
+							{#snippet trailing()}<Money value={payment.amount} />{/snippet}
+							{#snippet actions()}
+								<RowActions
+									label="Acciones del pago del bono {payment.bond}"
+									actions={[
+										{
+											label: 'Corregir el medio de pago',
+											onselect: () => (lastAction = `corregir ${payment.bond}`)
+										},
+										{
+											label: 'Quitar de la rendición',
+											tone: 'danger',
+											onselect: () => (removing = payment.bond)
+										}
+									]}
+								/>
+							{/snippet}
+						</Row>
+					{/each}
+					<Row title="Sorteo de noviembre" href="#sorteo">
+						{#snippet meta()}<Badge tone="warning">No habilitado</Badge> Falta la cuota 2{/snippet}
 					</Row>
-				{/each}
-				<Row title="Sorteo de noviembre" href="#sorteo">
-					{#snippet meta()}<Badge tone="warning">No habilitado</Badge> Falta la cuota 2{/snippet}
-				</Row>
-			</RowList>
-			<p class="text-body-sm text-muted" data-demo-action>
-				Última acción: {lastAction || 'ninguna'}
-			</p>
-			<Dialog
-				open={removing !== null}
-				onClose={() => (removing = null)}
-				onConfirm={() => {
-					lastAction = `quitar ${removing}`;
-					removing = null;
-				}}
-				title="¿Quitar el pago del bono {removing}?"
-				description="El pago sale de esta rendición y la cuota vuelve a quedar pendiente."
-				confirmLabel="Quitar pago"
-			/>
-		</section>
+				</RowList>
+				<p class="text-body-sm text-muted" data-demo-action>
+					Última acción: {lastAction || 'ninguna'}
+				</p>
+				<Dialog
+					open={removing !== null}
+					onClose={() => (removing = null)}
+					onConfirm={() => {
+						lastAction = `quitar ${removing}`;
+						removing = null;
+					}}
+					title="¿Quitar el pago del bono {removing}?"
+					description="El pago sale de esta rendición y la cuota vuelve a quedar pendiente."
+					confirmLabel="Quitar pago"
+				/>
+			</section>
 
-		<section class="flex flex-col gap-4" data-demo="table">
-			<h2 class="text-heading-2">Table apilada en el teléfono</h2>
-			<p class="text-body-sm text-muted">
-				Por debajo de 720 px cada fila pasa a ser un bloque de líneas; arriba es la tabla de
-				siempre.
-			</p>
-			<Table columns={bondColumns} rows={bondRows} caption="Bonos de la campaña" stack />
-		</section>
+			<section class="flex flex-col gap-4" data-demo="table">
+				<h2 class="text-heading-2">Table apilada en el teléfono</h2>
+				<p class="text-body-sm text-muted">
+					Por debajo de 720 px cada fila pasa a ser un bloque de líneas; arriba es la tabla de
+					siempre.
+				</p>
+				<Table columns={bondColumns} rows={bondRows} caption="Bonos de la campaña" stack />
+			</section>
 
-		<section class="flex flex-col gap-4" data-demo="taskbar">
-			<h2 class="text-heading-2">TaskBar</h2>
-			<p class="text-body-sm text-muted">
-				En teléfono queda fija al pie de la pantalla; desde 1024 px es un bloque más.
-			</p>
-			<TaskBar label="Cierre de la rendición">
-				<span class="block text-body-sm text-muted">Entrega en efectivo</span>
-				<span class="font-figure text-figure">$ 63.000</span>
-				{#snippet action()}<Button variant="primary">Revisar y cerrar</Button>{/snippet}
-			</TaskBar>
+			<section class="flex flex-col gap-4" data-demo="taskbar">
+				<h2 class="text-heading-2">TaskBar</h2>
+				<p class="text-body-sm text-muted">
+					En teléfono queda fija al pie de la pantalla; desde 1024 px es un bloque más.
+				</p>
+				<TaskBar label="Cierre de la rendición">
+					<span class="block text-body-sm text-muted">Entrega en efectivo</span>
+					<span class="font-figure text-figure">$ 63.000</span>
+					{#snippet action()}<Button variant="primary">Revisar y cerrar</Button>{/snippet}
+				</TaskBar>
+			</section>
 		</section>
 	</div>
 {/snippet}

@@ -2,7 +2,11 @@
 	import type { Snippet } from 'svelte';
 	import type { Tone } from './tones';
 
-	/** Short status or category label: a colored dot plus a word, never color alone. */
+	/**
+	 * Short status or category label: a mark plus a word, never colour alone. The mark's shape follows
+	 * the tone (round for neutral, info and success; a diamond for warning; a square for danger), so a
+	 * state can be told apart without seeing its colour.
+	 */
 	let {
 		tone = 'neutral',
 		dot = true,
@@ -17,11 +21,18 @@
 		danger: 'bg-danger-soft text-danger-text'
 	};
 	const DOT_CLASS: Record<Tone, string> = {
-		neutral: 'bg-subtle',
-		info: 'bg-primary',
-		success: 'bg-success',
-		warning: 'bg-warning',
-		danger: 'bg-danger'
+		neutral: 'rounded-full bg-subtle',
+		info: 'rounded-full bg-primary',
+		success: 'rounded-full bg-success',
+		warning: 'rotate-45 bg-warning',
+		danger: 'rounded-[1px] bg-danger'
+	};
+	const SHAPE: Record<Tone, 'round' | 'diamond' | 'square'> = {
+		neutral: 'round',
+		info: 'round',
+		success: 'round',
+		warning: 'diamond',
+		danger: 'square'
 	};
 </script>
 
@@ -31,6 +42,7 @@
 	]}"
 	data-tone={tone}
 >
-	{#if dot}<span class="size-2 rounded-full {DOT_CLASS[tone]}" aria-hidden="true"></span>{/if}
+	{#if dot}<span class="size-2 {DOT_CLASS[tone]}" data-shape={SHAPE[tone]} aria-hidden="true"
+		></span>{/if}
 	{@render children()}
 </span>

@@ -9,6 +9,7 @@
 		Disclosure,
 		EmptyState,
 		Field,
+		MoneySheet,
 		PageHeader,
 		Select,
 		Stat,
@@ -17,7 +18,7 @@
 		Textarea,
 		TextInput
 	} from '$lib/components/ui';
-	import type { TableColumn } from '$lib/components/ui';
+	import type { MoneySheetRow, TableColumn } from '$lib/components/ui';
 	import { unprocessedSubmittedMessage } from '$lib/copy';
 	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
 	import { parseMoneyToCents } from '$lib/domain/money';
@@ -81,6 +82,30 @@
 	const confirmedCount = (method: PaymentMethod) =>
 		data.payments.filter((p) => p.method === method && p.status === 'confirmed').length;
 	const pagos = (n: number) => (n === 1 ? '1 pago' : `${n} pagos`);
+	/** The closed settlement as a cash sheet: what came in, what the collector kept, what is left. */
+	const sheetRows = $derived<MoneySheetRow[]>([
+		{
+			label: `Efectivo recibido (${pagos(confirmedCount('cash'))})`,
+			value: data.totals.totalCash
+		},
+		{
+			label: `Transferencias (${pagos(confirmedCount('transfer'))})`,
+			value: data.totals.totalTransfer
+		},
+		{ label: 'Total cobrado', value: data.totals.totalAmount, kind: 'subtotal' },
+		{
+			label: 'Comisión que el cobrador se quedó del efectivo',
+			value: data.totals.commissionPaidAmount,
+			kind: 'deduction'
+		},
+		{ label: 'Neto para Bomberos', value: data.totals.netToFirefighters, kind: 'lead' }
+	]);
+	const sheetSecondary = $derived([
+		{ label: 'Comisión generada', value: data.totals.commissionAmount },
+		...(cents(data.totals.collectorCreditBalance) !== 0
+			? [{ label: 'Saldo a favor del cobrador', value: data.totals.collectorCreditBalance }]
+			: [])
+	]);
 	const meta = $derived(
 		sheet && data.settlement.closedAt
 			? `${data.settlement.collectorName}, cerrada el ${formatDateTime(data.settlement.closedAt)}`
@@ -191,47 +216,7 @@
 			class="max-w-[560px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5"
 		>
 			<h2 id="sheet-title" class="sr-only">Totales de la rendición</h2>
-			<dl class="m-0 tabular-nums">
-				<div class="flex justify-between gap-3 py-2.5">
-					<dt>Efectivo recibido ({pagos(confirmedCount('cash'))})</dt>
-					<dd class="m-0 font-medium whitespace-nowrap">{money(data.totals.totalCash)}</dd>
-				</div>
-				<div class="flex justify-between gap-3 py-2.5">
-					<dt>Transferencias ({pagos(confirmedCount('transfer'))})</dt>
-					<dd class="m-0 font-medium whitespace-nowrap">{money(data.totals.totalTransfer)}</dd>
-				</div>
-				<div class="flex justify-between gap-3 border-t border-border-strong py-2.5 font-semibold">
-					<dt>Total cobrado</dt>
-					<dd class="m-0 whitespace-nowrap">{money(data.totals.totalAmount)}</dd>
-				</div>
-				<div class="flex justify-between gap-3 py-2.5 text-muted">
-					<dt>Comisión que el cobrador se quedó del efectivo</dt>
-					<dd class="m-0 whitespace-nowrap">
-						<span aria-hidden="true">−</span><span class="sr-only">menos</span>
-						{money(data.totals.commissionPaidAmount)}
-					</dd>
-				</div>
-				<div
-					class="mt-1 flex items-baseline justify-between gap-3 border-t-[3px] border-double border-text pt-3.5"
-				>
-					<dt class="text-body font-semibold">Neto para Bomberos</dt>
-					<dd class="m-0 font-figure text-figure-lg whitespace-nowrap">
-						{money(data.totals.netToFirefighters)}
-					</dd>
-				</div>
-			</dl>
-			<dl class="m-0 mt-3 grid gap-1 text-body-sm text-muted tabular-nums">
-				<div class="flex justify-between gap-3">
-					<dt>Comisión generada</dt>
-					<dd class="m-0 whitespace-nowrap">{money(data.totals.commissionAmount)}</dd>
-				</div>
-				{#if cents(data.totals.collectorCreditBalance) !== 0}
-					<div class="flex justify-between gap-3">
-						<dt>Saldo a favor del cobrador</dt>
-						<dd class="m-0 whitespace-nowrap">{money(data.totals.collectorCreditBalance)}</dd>
-					</div>
-				{/if}
-			</dl>
+			<MoneySheet context="document" rows={sheetRows} secondary={sheetSecondary} />
 			{#if data.settlement.status === 'corrected'}
 				<p class="m-0 mt-3 text-body-sm text-warning-text">
 					Esta rendición tiene una corrección registrada. Los totales de arriba son los del cierre;
@@ -398,6 +383,31 @@
 						</table>
 					</div>
 				{/if}
+				<Field
+					label="Fecha del pago"
+					id="paymentDate"
+					error={form?.form === 'add' &&
+					form.errors &&
+					'paymentDate' in form.errors &&
+					Array.isArray(form.errors.paymentDate)
+						? form.errors.paymentDate?.[0]
+						: undefined}
+					required
+				>
+					<TextInput
+						name="paymentDate"
+						type="date"
+						value={form?.form === 'add' &&
+						'values' in form &&
+						form.values &&
+						typeof form.values === 'object' &&
+						'paymentDate' in form.values
+							? String(form.values.paymentDate)
+							: data.today}
+						max={data.today}
+						required
+					/>
+				</Field>
 				<Field label="Método" id="paymentMethod">
 					<Select name="paymentMethod" options={methodOptions} value="cash" />
 				</Field>

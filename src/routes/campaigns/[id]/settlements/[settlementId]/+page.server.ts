@@ -1,5 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { todayInBuenosAires } from '$lib/domain/reports';
 import { z } from 'zod';
 import {
 	hasPermissionIn,
@@ -84,6 +85,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(500, { message: 'No se pudo cargar la rendición.' });
 	return {
 		campaign: campaign.data,
+		today: todayInBuenosAires(),
 		settlement: settlement.data,
 		totals: open
 			? totals.data
@@ -243,17 +245,28 @@ export const actions: Actions = {
 			amountApplied: field(f, `amount-${id}`)
 		}));
 		const method = field(f, 'paymentMethod');
+		const today = todayInBuenosAires();
+		const paymentDate = f.has('paymentDate') ? field(f, 'paymentDate') : today;
+		if (!z.iso.date().safeParse(paymentDate).success || paymentDate > today)
+			return fail(400, {
+				form: 'add',
+				values: { paymentDate },
+				errors: { paymentDate: ['Ingresar una fecha válida hasta hoy.'] },
+				message: 'Revisar los campos marcados.'
+			});
 		if (!uuid.safeParse(saleId).success || !ids.length || !['cash', 'transfer'].includes(method))
 			return fail(400, {
 				form: 'add',
+				values: { paymentDate },
 				errors: { installmentId: ['Elegir una o más cuotas.'] },
 				message: 'Revisar los campos marcados.'
 			});
 		const settlement = await getSettlement(locals.supabase, params.id, params.settlementId);
-		if (settlement.error) return serviceFailure(settlement.error, 'add');
+		if (settlement.error) return serviceFailure(settlement.error, 'add', { paymentDate });
 		if (!settlement.data || settlement.data.status !== 'open')
 			return fail(400, {
 				form: 'add',
+				values: { paymentDate },
 				errors: {},
 				message: 'Esta rendición ya no está abierta.'
 			});
@@ -262,7 +275,7 @@ export const actions: Actions = {
 			params.id,
 			settlement.data.collectorId
 		);
-		if (candidates.error) return serviceFailure(candidates.error, 'add');
+		if (candidates.error) return serviceFailure(candidates.error, 'add', { paymentDate });
 		const available = new Map(
 			(candidates.data ?? [])
 				.filter((candidate) => candidate.saleId === saleId)
@@ -290,6 +303,7 @@ export const actions: Actions = {
 		if (Object.keys(validationErrors).length)
 			return fail(400, {
 				form: 'add',
+				values: { paymentDate },
 				errors: validationErrors,
 				message: 'Revisar los campos marcados.'
 			});
@@ -301,6 +315,7 @@ export const actions: Actions = {
 					settlementId: params.settlementId,
 					saleId,
 					amount,
+					paymentDate,
 					paymentMethod: method as 'cash' | 'transfer',
 					applications
 				},
@@ -308,7 +323,7 @@ export const actions: Actions = {
 			);
 			return { form: 'add', success: true, message: 'Pago agregado.', errors: {} };
 		} catch (e) {
-			return serviceFailure(e, 'add');
+			return serviceFailure(e, 'add', { paymentDate });
 		}
 	},
 	annulPayment: async ({ request, locals, params, url }) => {

@@ -114,13 +114,13 @@ insert into expected_matrix values
   'buyer.view','buyer.manage','collector.view','sale.view','sale.create','payment.view','payment.create',
   'settlement.view','settlement.create','settlement.update_open','draw.view','draw.load_winner',
   'report.view_operational','report.export']),
-('treasurer', array[
+('treasurer', array['buyer.view','collector.view',
   'campaign.view','bond.view','sale.view','sale.mark_uncollectible','collector.ledger.view','payment.view','payment.create','payment.annul',
   'settlement.view','settlement.create','settlement.close','settlement.correct',
   'commission.view','commission.adjust','draw.view','draw.freeze_roster','draw.load_winner',
   'report.view_operational','report.view_financial','report.export','audit.view']),
 ('collector', array['campaign.view','bond.view_own','sale.view_own','collector.ledger.view_own','payment.create_own']),
-('read-only', array['campaign.view','bond.view','commission.view','report.view_operational',
+('read-only', array['buyer.view','collector.view','campaign.view','bond.view','commission.view','report.view_operational',
   'report.view_financial','report.export']);
 update expected_matrix set codes = (select array_agg(c order by c) from unnest(codes) c);
 create function pg_temp.granted(role_name text) returns text[] language sql stable as $$
@@ -230,7 +230,7 @@ values ('c6580000-0000-0000-0000-000000000016', 'c6580000-0000-0000-0000-0000000
 create temp table probe_tables(tbl text primary key, readonly_sees boolean);
 insert into probe_tables values
   ('bonds', true), ('bond_assignments', true), ('delivery_notes', true), ('commission_rules', true),
-  ('sales', true), ('buyers', false), ('collectors', false), ('payments', false), ('settlements', false),
+  ('sales', true), ('buyers', true), ('collectors', true), ('payments', false), ('settlements', false),
   ('collector_ledger_entries', false), ('audit_log', false), ('draws', false), ('draw_rosters', false),
   ('prizes', false), ('winning_numbers', false), ('import_sessions', false);
 create temp table probe(who text, tbl text, n int, primary key (who, tbl));
@@ -264,7 +264,7 @@ select is(array(select tbl::text from probe where who = 'anon' and n <> 0 order 
   'anon sees 0 rows in every sensitive table');
 select is(array(select p.tbl::text || ':' || (p.n > 0) from probe p join probe_tables t using (tbl)
                 where p.who = 'read-only' and (p.n > 0) <> t.readonly_sees order by 1), '{}'::text[],
-  'read-only sees exactly bonds, delivery notes, assignments and commission rules and sales (via bond.view), commission rules and nothing else');
+  'read-only sees only the expected tables, including buyers and collectors');
 
 select * from finish();
 rollback;

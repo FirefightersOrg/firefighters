@@ -300,7 +300,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 ### PR 20. Clean-up
 
 - **Why.** The screenshots are evidence for the redesign, not something the repo needs to carry afterwards (about 35 MB before, and as much again after).
-- **Scope.** After PR 19 is merged and its summary is posted in #50: remove `docs/ux/before/`, `docs/ux/after/` and `docs/ux/prototypes/` from the tree, and `scripts/ux-walkthrough.ts` and `scripts/ux-flows.ts`. Keep `audit.md`, `direction.md`, `plan.md` and the final before-and-after table (with its numbers written in the document, since the images will be gone), and keep `scripts/seed-demo.ts` (`pnpm seed:demo`), which the E2E sweep from PR 1 uses.
+- **Scope.** After PR 19 is merged and its summary is posted in #50: remove `docs/ux/before/`, `docs/ux/after/` and `docs/ux/prototypes/` from the tree, and `scripts/ux-walkthrough.ts` and `scripts/ux-flows.ts`. Keep `audit.md`, `direction.md`, `plan.md` and the final before-and-after table (with its numbers written in the document, since the images will be gone), and keep `scripts/seed-demo.ts` (`pnpm seed:demo`) and `scripts/demo-screens.ts`, which the E2E sweep from PR 1 uses.
 - **Acceptance.** No image is left under `docs/ux/`; no document links to a removed file; `pnpm lint` and `pnpm test:e2e` pass.
 - **Note.** Removing files does not shrink the repository's history. Rewriting `main` to drop them is possible but is a separate decision (it changes every commit hash after #159), and is not part of this PR.
 

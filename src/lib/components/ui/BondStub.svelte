@@ -1,13 +1,15 @@
 <script lang="ts">
 	/**
-	 * The winning number drawn as the stub of a bond (redesign): a brand-red stripe, a dotted cut with
-	 * two notches, and the number in Plex Sans Condensed. The only bold visual gesture of the product;
-	 * use it for winning numbers only.
+	 * A bond number drawn as the stub of the paper bond (redesign): a brand-red stripe, a dotted cut
+	 * with two notches, and the number in Plex Sans Condensed. The only bold visual gesture of the
+	 * product: use it where the bond itself is the subject (a winning number, the header of a bond
+	 * record), never as decoration in a list.
 	 */
 	let {
 		number,
 		caption,
-		detail
+		detail,
+		size = 'lg'
 	}: {
 		/** Already formatted with the campaign's digits (e.g. "0100"). */
 		number: string;
@@ -15,6 +17,8 @@
 		caption: string;
 		/** Optional line under the number. */
 		detail?: string;
+		/** `lg` (default) for the number as the subject of the page; `md` inside a denser header. */
+		size?: 'md' | 'lg';
 	} = $props();
 </script>
 
@@ -31,8 +35,10 @@
 	<span class="min-w-0 px-4 pt-3 pb-2.5 sm:px-5">
 		<span class="block text-caption text-muted">{caption}</span>
 		<span
-			class="block font-figure text-[40px] leading-none font-bold tracking-wide break-all tabular-nums sm:text-[54px]"
-			>{number}</span
+			class="block font-figure leading-none font-bold tracking-wide break-all tabular-nums {size ===
+			'lg'
+				? 'text-[40px] sm:text-[54px]'
+				: 'text-[32px] sm:text-[40px]'}">{number}</span
 		>
 		{#if detail}<span class="block text-body-sm text-muted">{detail}</span>{/if}
 	</span>
