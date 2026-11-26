@@ -9,6 +9,7 @@ import {
 } from '$lib/server/auth/permissions';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import { listSettlements } from '$lib/server/repositories/settlements';
 import { openSettlement, SettlementServiceError } from '$lib/server/services/settlements';
 import { SETTLEMENT_NOTES_MAX } from '$lib/domain/payments';
 import { GENERIC_ERROR_MESSAGE } from '$lib/copy';
@@ -18,9 +19,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		error(500, { message: 'No se pudieron cargar los permisos.' });
 	requireCampaignViewer(locals, url);
 	requirePermissionIn(locals.permissions, 'settlement.create');
-	const [campaign, collectors] = await Promise.all([
+	const [campaign, collectors, open] = await Promise.all([
 		getCampaignById(locals.supabase, params.id),
-		listActiveCollectorOptions(locals.supabase)
+		listActiveCollectorOptions(locals.supabase),
+		// A collector has one open settlement at a time: the page sends there instead of opening another.
+		listSettlements(locals.supabase, params.id, { status: 'open' })
 	]);
 	if (campaign.error || collectors.error)
 		error(500, { message: 'No se pudo cargar el formulario de la rendición.' });
@@ -28,6 +31,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	return {
 		campaign: campaign.data,
 		collectors: collectors.data ?? [],
+		/** Open settlements under the caller's RLS; empty when they cannot be read (the form still works). */
+		openSettlements: (open.data ?? []).map((settlement) => ({
+			id: settlement.id,
+			collectorId: settlement.collectorId,
+			settlementNumber: settlement.settlementNumber
+		})),
+		/** `?intent=payment`: reached from «Registrar pago», so the page is worded around the payment. */
+		forPayment: url.searchParams.get('intent') === 'payment',
 		notesMax: SETTLEMENT_NOTES_MAX
 	};
 };

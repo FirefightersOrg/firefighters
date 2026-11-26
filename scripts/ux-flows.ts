@@ -85,6 +85,12 @@ class Recorder {
 		await target.selectOption(option);
 		this.steps.push({ kind: 'choose', label });
 	}
+	/** A key pressed on a field (Enter to search, Enter to confirm): an action like a tap. */
+	async press(target: Locator, key: string, label: string) {
+		await this.settle();
+		await target.press(key);
+		this.steps.push({ kind: 'tap', label });
+	}
 	async check(target: Locator, label: string) {
 		await this.settle();
 		await target.check();
@@ -194,24 +200,43 @@ const flows: Record<string, { role: 'admin' | 'collector'; run: Flow }> = {
 		run: async (r, campaign) => {
 			await r.page.goto(`${BASE_URL}/campaigns/${campaign}`);
 			await r.screen('Campaña');
-			await r.tap(r.page.getByRole('link', { name: 'Abrir rendición' }), 'Abrir rendición');
-			await r.screen('Nueva rendición');
+			await r.tap(r.page.getByRole('link', { name: 'Registrar pago' }), 'Registrar pago');
+			await r.screen('Registrar pago: elegir el cobrador');
 			await r.choose(r.page.locator('#collectorId'), { label: 'Héctor Acosta' }, 'Cobrador');
-			await r.tap(r.page.getByRole('button', { name: 'Abrir rendición' }), 'Abrir rendición');
+			await r.tap(
+				r.page.getByRole('button', { name: 'Abrir rendición y cargar pagos' }),
+				'Abrir rendición y cargar pagos'
+			);
 			await r.page.waitForURL(/\/settlements\/[0-9a-f-]{36}$/);
 			await r.screen('Rendición abierta');
-			const sales = await r.page.locator('#sale option').count();
-			r.note(`The "Bono / comprador" <select> lists ${sales - 1} sales with no search.`);
-			for (const index of [1, 2]) {
-				await r.choose(r.page.locator('#sale'), { index }, 'Bono / comprador');
-				await r.check(r.page.locator('input[name="installmentId"]').first(), 'Cuota a aplicar');
-				if (index === 1) await r.screen('Pago listo para agregar');
-				await r.tap(r.page.getByRole('button', { name: 'Agregar pago' }), 'Agregar pago');
+			// Not part of the flow: which of the collector's bonds have debt (the person reads the number
+			// on the stub; the script has to look for two).
+			const number = r.page.getByLabel('Número del bono que pagó');
+			const bonds: number[] = [];
+			for (let n = 1; n <= 240 && bonds.length < 2; n++) {
+				await number.fill(String(n));
+				await number.press('Enter');
+				if (await r.page.locator('[data-found-sale]').count()) bonds.push(n);
+			}
+			await number.fill('');
+			if (bonds.length < 2)
+				throw new Error('The demo collector has fewer than two bonds with debt.');
+			r.note('Each payment is: the bond number, Enter (shows who and how much), Enter (adds it).');
+			for (const [index, bond] of bonds.entries()) {
+				await r.type(number, String(bond), 'Número del bono');
+				await r.press(number, 'Enter', 'Enter: buscar');
+				await r.page.locator('[data-found-sale]').waitFor();
+				if (index === 0) await r.screen('Pago listo para agregar');
+				await r.press(number, 'Enter', 'Enter: agregar pago');
 				await r.page.getByText('Pago agregado.').waitFor();
+				await r.page.locator('[data-found-sale]').waitFor({ state: 'detached' });
 			}
 			await r.screen('Dos pagos agregados');
+			// «Revisar y cerrar» in the task bar on a phone, «Cerrar rendición» beside the sheet on desktop.
 			await r.tap(
-				r.page.getByRole('button', { name: 'Cerrar rendición' }).first(),
+				r.page
+					.locator('button:visible', { hasText: /^\s*(Revisar y cerrar|Cerrar rendición)\s*$/ })
+					.first(),
 				'Cerrar rendición'
 			);
 			await r.page.getByRole('dialog').waitFor();

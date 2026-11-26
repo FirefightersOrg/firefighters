@@ -79,8 +79,8 @@
 			],
 			[
 				data.can.openSettlement,
-				'Abrir rendición',
-				resolve('/campaigns/[id]/settlements/new', { id })
+				'Registrar pago',
+				`${resolve('/campaigns/[id]/settlements/new', { id })}?intent=payment`
 			],
 			[data.can.loadBonds, 'Cargar bonos', resolve('/campaigns/[id]/bonds/new', { id })],
 			[data.can.loadBonds, 'Cargar una pata', resolve('/campaigns/[id]/bonds/pata/new', { id })]

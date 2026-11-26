@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$lib/server/repositories/campaigns', () => ({ getCampaignById: vi.fn() }));
 vi.mock('$lib/server/repositories/parties', () => ({ listActiveCollectorOptions: vi.fn() }));
+vi.mock('$lib/server/repositories/settlements', () => ({ listSettlements: vi.fn() }));
 vi.mock('$lib/server/services/settlements', async (o) => ({
 	...(await o<any>()),
 	openSettlement: vi.fn()
@@ -9,6 +10,7 @@ vi.mock('$lib/server/services/settlements', async (o) => ({
 import { actions, load } from './+page.server';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import { listActiveCollectorOptions } from '$lib/server/repositories/parties';
+import { listSettlements } from '$lib/server/repositories/settlements';
 import { openSettlement, SettlementServiceError } from '$lib/server/services/settlements';
 import { CAMPAIGN_ID, makeLocals } from '../../../test-helpers';
 const COLLECTOR = 'c0000000-0000-0000-0000-000000000001',
@@ -30,6 +32,7 @@ const run = async (permissions: string[], fields: Record<string, string>) => {
 beforeEach(() => {
 	vi.mocked(getCampaignById).mockResolvedValue({ data: { id: CAMPAIGN_ID }, error: null } as never);
 	vi.mocked(listActiveCollectorOptions).mockResolvedValue({ data: [], error: null } as never);
+	vi.mocked(listSettlements).mockResolvedValue({ data: [], error: null } as never);
 	vi.mocked(openSettlement).mockResolvedValue('s');
 });
 describe('new settlement', () => {
@@ -62,5 +65,34 @@ describe('new settlement', () => {
 		expect(
 			await run(['campaign.view', 'settlement.create'], { collectorId: COLLECTOR, notes: '' })
 		).toMatchObject({ status: 409 });
+	});
+	it('loads the open settlements, and reads the intent from the URL (UX plan PR 7)', async () => {
+		vi.mocked(listSettlements).mockResolvedValueOnce({
+			data: [{ id: 's9', collectorId: COLLECTOR, settlementNumber: 9, collectorName: 'Ana' }],
+			error: null
+		} as never);
+		const event = (href: string) =>
+			({
+				locals: makeLocals({ permissions: ['campaign.view', 'settlement.create'] }),
+				params: { id: CAMPAIGN_ID },
+				url: new URL(href)
+			}) as never;
+		const data = (await load(event(`${url}?intent=payment`))) as any;
+		expect(listSettlements).toHaveBeenCalledWith(expect.anything(), CAMPAIGN_ID, {
+			status: 'open'
+		});
+		// Only what the page needs: where to send, never the settlement's totals.
+		expect(data.openSettlements).toEqual([
+			{ id: 's9', collectorId: COLLECTOR, settlementNumber: 9 }
+		]);
+		expect(data.forPayment).toBe(true);
+		// A role that cannot read settlements still gets the form.
+		vi.mocked(listSettlements).mockResolvedValueOnce({
+			data: null,
+			error: new Error('denied')
+		} as never);
+		const plain = (await load(event(url))) as any;
+		expect(plain.openSettlements).toEqual([]);
+		expect(plain.forPayment).toBe(false);
 	});
 });

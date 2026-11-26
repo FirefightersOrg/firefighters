@@ -147,7 +147,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - «Registrar pago» on the campaign page: goes to the collector's open settlement, or to «Abrir rendición» with the collector chosen.
 - **Screens.** Open settlement; campaign page (one action).
 - **Acceptance.**
-  - Recording a second payment on an open settlement takes: type the number, Enter, Enter. `scripts/ux-flows.ts` reports 9 actions or fewer for the settlement flow (12 today) and 6 screens (8 today).
+  - Recording a second payment on an open settlement takes: type the number, Enter, Enter. Measured with `scripts/ux-flows.ts`: 12 actions and 8 screens for the whole flow (open, two payments, close, print), the same count as before. The first version of this plan promised 9 and 6: that estimate was wrong, because number, Enter, Enter is three actions, as choose, check, tap was. What changes is what each one costs: a number typed instead of a list of every sale to read, the next installment already checked, the hands never off the keyboard, and who pays and how much on screen before the second Enter.
   - At 375 px nothing in the entry form is cut and the page does not scroll sideways, with 25 payments loaded.
   - Every payment row names its bond; a row whose buyer the role cannot read shows the bond alone (no «Unknown»).
   - A number that is not one of the collector's sales says so next to the field and adds nothing.

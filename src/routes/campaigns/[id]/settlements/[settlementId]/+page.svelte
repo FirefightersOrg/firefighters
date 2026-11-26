@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { enhance } from '$app/forms';
 	import {
 		Alert,
 		Button,
 		Card,
-		Dialog,
 		Disclosure,
 		EmptyState,
 		Field,
@@ -19,7 +17,6 @@
 		TextInput
 	} from '$lib/components/ui';
 	import type { MoneySheetRow, TableColumn } from '$lib/components/ui';
-	import { unprocessedSubmittedMessage } from '$lib/copy';
 	import { formatDate, formatDateTime, formatMoney } from '$lib/format';
 	import { parseMoneyToCents } from '$lib/domain/money';
 	import {
@@ -27,20 +24,15 @@
 		type PaymentMethod,
 		type PaymentStatus
 	} from '$lib/domain/payments';
+	import OpenSettlement, {
+		type OpenSettlementForm,
+		type OpenSettlementTotals
+	} from '$lib/components/settlements/OpenSettlement.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
-	let saleId = $state('');
 	let commissionDelta = $state('0.00');
 	let cashRetainedDelta = $state('0.00');
-	let closeOpen = $state(false);
-	const selected = $derived(data.candidates.filter((x) => x.saleId === saleId));
-	const saleOptions = $derived([
-		{ value: '', label: 'Elegir un bono o comprador…' },
-		...data.candidates
-			.filter((c, i, all) => all.findIndex((x) => x.saleId === c.saleId) === i)
-			.map((c) => ({ value: c.saleId, label: `Bono ${c.bond} — ${c.buyer}` }))
-	]);
 	const methodOptions = [
 		{ value: 'cash', label: PAYMENT_METHOD_LABELS.cash },
 		{ value: 'transfer', label: PAYMENT_METHOD_LABELS.transfer }
@@ -71,11 +63,6 @@
 				]
 	);
 	const open = $derived(data.settlement.status === 'open');
-	/** Collector-submitted payments nobody has included or rejected: they block the close (SAN-156). */
-	const pendingSubmitted = $derived(open ? data.submitted.length : 0);
-	const pendingSubmittedTotal = $derived(
-		money(data.submitted.reduce((sum, p) => sum + cents(p.amount), 0) / 100)
-	);
 	/** Closed (or closed and corrected) settlements read as a cash sheet (redesign). */
 	const sheet = $derived(['closed', 'corrected'].includes(data.settlement.status));
 	const cents = (value: string | number) => parseMoneyToCents(String(value)) ?? 0;
@@ -117,18 +104,8 @@
 		{ key: 'amount', header: 'Importe', align: 'right' },
 		{ key: 'method', header: 'Método' },
 		{ key: 'status', header: 'Estado' },
-		...(open ? [] : [{ key: 'document', header: 'Comprobante' }]),
-		...(data.can.remove || data.can.correctPayment ? [{ key: 'actions', header: 'Acciones' }] : [])
-	]);
-	type Submitted = (typeof data.submitted)[number];
-	const submittedColumns = $derived<TableColumn<Submitted>[]>([
-		{ key: 'date', header: 'Fecha' },
-		{ key: 'sale', header: 'Venta' },
-		{ key: 'installments', header: 'Cuotas' },
-		{ key: 'amount', header: 'Importe', align: 'right' },
-		{ key: 'method', header: 'Método' },
-		{ key: 'note', header: 'Nota' },
-		...(data.can.reviewSubmitted ? [{ key: 'actions', header: 'Acciones' }] : [])
+		{ key: 'document', header: 'Comprobante' },
+		...(data.can.correctPayment ? [{ key: 'actions', header: 'Acciones' }] : [])
 	]);
 	const reasonHint = $derived(`Hasta ${data.reasonMax} caracteres.`);
 	const ledgerPreview = $derived(
@@ -166,8 +143,10 @@
 >
 
 <PageHeader
-	title="Rendición #{data.settlement.settlementNumber}"
-	description={meta}
+	title={open
+		? `Rendición ${data.settlement.settlementNumber} de ${data.settlement.collectorName}`
+		: `Rendición #${data.settlement.settlementNumber}`}
+	description={open ? `Desde el ${formatDate(data.settlement.openedAt)}` : meta}
 	breadcrumbs={[
 		{ label: 'Campañas', href: resolve('/campaigns') },
 		{ label: data.campaign.name, href: resolve('/campaigns/[id]', { id: data.campaign.id }) },
@@ -180,89 +159,81 @@
 >
 	{#snippet actions()}
 		<StatusBadge kind="settlement" status={data.settlement.status} />
-		{#if data.can.close}
-			<Button
-				variant="danger"
-				disabled={pendingSubmitted > 0}
-				aria-describedby={pendingSubmitted > 0 ? 'close-blocked' : undefined}
-				onclick={() => (closeOpen = true)}>Cerrar rendición</Button
-			>
-		{/if}
 	{/snippet}
 </PageHeader>
 
-<div class="space-y-6">
-	{#if form?.message}
-		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
-	{/if}
-
-	{#if pendingSubmitted > 0}
-		<Alert
-			tone="warning"
-			title={pendingSubmitted === 1
-				? '1 cobro enviado sin procesar'
-				: `${pendingSubmitted} cobros enviados sin procesar`}
-		>
-			<span id="close-blocked">
-				{unprocessedSubmittedMessage(pendingSubmitted)} Importe pendiente: {pendingSubmittedTotal}.
-			</span>
-		</Alert>
-	{/if}
-
-	{#if sheet}
-		<!-- Redesign: a closed settlement reads like a cash sheet, top to bottom. -->
-		<section
-			aria-labelledby="sheet-title"
-			class="max-w-[560px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5"
-		>
-			<h2 id="sheet-title" class="sr-only">Totales de la rendición</h2>
-			<MoneySheet context="document" rows={sheetRows} secondary={sheetSecondary} />
-			{#if data.settlement.status === 'corrected'}
-				<p class="m-0 mt-3 text-body-sm text-warning-text">
-					Esta rendición tiene una corrección registrada. Los totales de arriba son los del cierre;
-					la corrección y sus movimientos están en la cuenta corriente del cobrador.
-				</p>
-			{/if}
-			<div class="mt-4 flex flex-wrap gap-2">
-				<Button
-					variant="primary"
-					href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
-					>Imprimir remito de rendición</Button
-				>
-				{#if data.can.viewLedger}
-					<Button
-						href={resolve('/campaigns/[id]/collectors/[collectorId]/ledger', {
-							id: data.campaign.id,
-							collectorId: data.settlement.collectorId
-						})}>Ver cuenta corriente de {data.settlement.collectorName}</Button
-					>
-				{/if}
-			</div>
-			{#if data.can.correctSettlement}
-				<div class="mt-4 border-t border-border pt-3">
-					<Disclosure summary="Corregir esta rendición">
-						<p class="m-0 mb-3 text-body-sm text-muted">
-							La rendición cerrada no se edita: se registra una corrección con motivo, que queda en
-							la cuenta corriente.
-						</p>
-						{@render correctionForm()}
-					</Disclosure>
-				</div>
-			{/if}
-		</section>
-	{:else}
-		{#if annulled}
-			<Alert tone="warning" title="Rendición anulada">
-				Sus pagos, su comisión y sus movimientos no cuentan. Se muestran solo los importes que se
-				habían registrado.
-			</Alert>
+{#if open}
+	<OpenSettlement
+		campaignId={data.campaign.id}
+		settlement={data.settlement}
+		totals={data.totals as OpenSettlementTotals}
+		payments={data.payments}
+		candidates={data.candidates}
+		submitted={data.submitted}
+		today={data.today}
+		reasonMax={data.reasonMax}
+		can={data.can}
+		form={form as OpenSettlementForm | null}
+	/>
+{:else}
+	<div class="space-y-6">
+		{#if form?.message}
+			<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
 		{/if}
-		<section aria-label="Totales" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-			{#each metrics as item (item.label)}
-				<Stat label={item.label} value={money(item.value)} />
-			{/each}
-		</section>
-		{#if !open}
+
+		{#if sheet}
+			<!-- Redesign: a closed settlement reads like a cash sheet, top to bottom. -->
+			<section
+				aria-labelledby="sheet-title"
+				class="max-w-[560px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5"
+			>
+				<h2 id="sheet-title" class="sr-only">Totales de la rendición</h2>
+				<MoneySheet context="document" rows={sheetRows} secondary={sheetSecondary} />
+				{#if data.settlement.status === 'corrected'}
+					<p class="m-0 mt-3 text-body-sm text-warning-text">
+						Esta rendición tiene una corrección registrada. Los totales de arriba son los del
+						cierre; la corrección y sus movimientos están en la cuenta corriente del cobrador.
+					</p>
+				{/if}
+				<div class="mt-4 flex flex-wrap gap-2">
+					<Button
+						variant="primary"
+						href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
+						>Imprimir remito de rendición</Button
+					>
+					{#if data.can.viewLedger}
+						<Button
+							href={resolve('/campaigns/[id]/collectors/[collectorId]/ledger', {
+								id: data.campaign.id,
+								collectorId: data.settlement.collectorId
+							})}>Ver cuenta corriente de {data.settlement.collectorName}</Button
+						>
+					{/if}
+				</div>
+				{#if data.can.correctSettlement}
+					<div class="mt-4 border-t border-border pt-3">
+						<Disclosure summary="Corregir esta rendición">
+							<p class="m-0 mb-3 text-body-sm text-muted">
+								La rendición cerrada no se edita: se registra una corrección con motivo, que queda
+								en la cuenta corriente.
+							</p>
+							{@render correctionForm()}
+						</Disclosure>
+					</div>
+				{/if}
+			</section>
+		{:else}
+			{#if annulled}
+				<Alert tone="warning" title="Rendición anulada">
+					Sus pagos, su comisión y sus movimientos no cuentan. Se muestran solo los importes que se
+					habían registrado.
+				</Alert>
+			{/if}
+			<section aria-label="Totales" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				{#each metrics as item (item.label)}
+					<Stat label={item.label} value={money(item.value)} />
+				{/each}
+			</section>
 			<Card title="Documentos de la rendición">
 				<Button
 					href={resolve(`/campaigns/${data.campaign.id}/settlements/${data.settlement.id}/print`)}
@@ -270,300 +241,110 @@
 				>
 			</Card>
 		{/if}
-	{/if}
-	{#if open && (data.submitted.length || data.can.reviewSubmitted)}
-		<Card
-			title={pendingSubmitted > 0
-				? `Cobros enviados por el cobrador: ${pendingSubmitted} sin procesar`
-				: 'Cobros enviados por el cobrador'}
-			id="submitted-payments"
-			flush
-		>
-			<p class="m-0 px-4 pt-3 text-body-sm text-muted">
-				Los cobros que el cobrador registró desde su portal no cuentan en los totales hasta que se
-				incluyan en esta rendición y se cierre. Mientras haya alguno sin procesar no se puede cerrar
-				la rendición: incluya cada cobro o rechácelo con un motivo.
-			</p>
-			<Table
-				columns={submittedColumns}
-				rows={data.submitted}
-				caption="Cobros enviados por el cobrador"
-			>
-				{#snippet cell({ row, column })}
-					{#if column.key === 'date'}
-						{formatDate(row.date)}
-					{:else if column.key === 'sale'}
-						Bono {row.bond || '—'} · {row.buyer}
-					{:else if column.key === 'installments'}
-						{row.installments.join(', ') || '—'}
-					{:else if column.key === 'amount'}
-						<span class="tabular-nums">{money(row.amount)}</span>
-					{:else if column.key === 'method'}
-						{PAYMENT_METHOD_LABELS[row.method as PaymentMethod] ?? row.method}
-					{:else if column.key === 'note'}
-						{row.note ?? '—'}
-					{:else if column.key === 'actions'}
-						{#if data.can.reviewSubmitted}
-							<div class="space-y-2">
-								<form method="POST" action="?/includeSubmitted" use:enhance>
-									<input type="hidden" name="paymentId" value={row.id} />
-									<Button type="submit" variant="primary">Incluir en la rendición</Button>
-								</form>
-								<form
-									method="POST"
-									action="?/rejectSubmitted"
-									use:enhance
-									class="flex items-end gap-2"
-								>
-									<input type="hidden" name="paymentId" value={row.id} />
-									<TextInput
-										name="reason"
-										required
-										aria-label="Motivo del rechazo (obligatorio, hasta {data.reasonMax} caracteres)"
-										placeholder="Motivo del rechazo"
-									/>
-									<Button type="submit">Rechazar</Button>
-								</form>
-							</div>
-						{/if}
-					{/if}
-				{/snippet}
-				{#snippet empty()}
-					<EmptyState title="No hay cobros enviados por el cobrador" />
-				{/snippet}
-			</Table>
-		</Card>
-	{/if}
-	{#if open && data.can.add}
-		<Card title="Carga rápida de pagos">
-			<form method="POST" action="?/add" use:enhance class="space-y-4">
-				<Field label="Bono / comprador" id="sale" required>
-					<Select name="saleId" options={saleOptions} bind:value={saleId} />
-				</Field>
-				{#if selected.length}
-					<div class="overflow-x-auto">
-						<table class="w-full border-collapse text-body-sm">
-							<caption class="sr-only">Cuotas a las que se aplica el pago</caption>
-							<thead>
-								<tr class="border-b border-border text-left text-label text-muted">
-									<th scope="col" class="px-3 py-2">Aplicar</th>
-									<th scope="col" class="px-3 py-2">Cuota</th>
-									<th scope="col" class="px-3 py-2">Vence</th>
-									<th scope="col" class="px-3 py-2 text-right">Importe</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each selected as item (item.id)}
-									<tr class="border-b border-border last:border-b-0">
-										<td class="px-3 py-2">
-											<input
-												type="checkbox"
-												name="installmentId"
-												value={item.id}
-												aria-label="Aplicar a la cuota {item.number}"
-												class="size-5 accent-primary"
-											/>
-										</td>
-										<td class="px-3 py-2"
-											>{item.number}
-											<StatusBadge kind="installment" status={item.status as never} /></td
-										>
-										<td class="px-3 py-2">{formatDate(item.dueDate)}</td>
-										<td class="px-3 py-2 text-right">
-											<TextInput
-												name="amount-{item.id}"
-												value={item.amount}
-												aria-label="Importe para la cuota {item.number}"
-												class="text-right tabular-nums"
-											/>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-				<Field
-					label="Fecha del pago"
-					id="paymentDate"
-					error={form?.form === 'add' &&
-					form.errors &&
-					'paymentDate' in form.errors &&
-					Array.isArray(form.errors.paymentDate)
-						? form.errors.paymentDate?.[0]
-						: undefined}
-					required
-				>
-					<TextInput
-						name="paymentDate"
-						type="date"
-						value={form?.form === 'add' &&
-						'values' in form &&
-						form.values &&
-						typeof form.values === 'object' &&
-						'paymentDate' in form.values
-							? String(form.values.paymentDate)
-							: data.today}
-						max={data.today}
-						required
-					/>
-				</Field>
-				<Field label="Método" id="paymentMethod">
-					<Select name="paymentMethod" options={methodOptions} value="cash" />
-				</Field>
-				<Button type="submit" variant="primary" icon="plus">Agregar pago</Button>
-			</form>
-		</Card>
-	{/if}
-
-	<Table {columns} rows={data.payments} caption="Pagos de la rendición">
-		{#snippet cell({ row, column })}
-			{#if column.key === 'date'}
-				{formatDate(row.date)}
-			{:else if column.key === 'amount'}
-				<span class="tabular-nums">{money(row.amount)}</span>
-			{:else if column.key === 'method'}
-				{PAYMENT_METHOD_LABELS[row.method as PaymentMethod] ?? row.method}
-			{:else if column.key === 'status'}
-				<StatusBadge kind="payment" status={row.status as PaymentStatus} />
-			{:else if column.key === 'document'}
-				{#if row.status === 'confirmed'}
-					<a
-						class="rounded-sm text-primary-text underline-offset-2 hover:underline"
-						href={resolve(`/campaigns/${data.campaign.id}/payments/${row.id}/print`)}>Comprobante</a
-					>
-				{:else}—{/if}
-			{:else if column.key === 'actions'}
-				<div class="space-y-2">
-					{#if data.can.remove}
-						<form method="POST" action="?/remove" class="flex items-end gap-2">
-							<input type="hidden" name="paymentId" value={row.id} />
-							<TextInput
-								name="reason"
-								aria-label="Motivo obligatorio (hasta {data.reasonMax} caracteres)"
-								placeholder="Motivo obligatorio"
-							/>
-							<Button type="submit">Quitar</Button>
-						</form>
-					{/if}
-					{#if data.can.correctPayment}
-						<Disclosure summary="Corregir / anular">
-							<div class="space-y-4">
-								<Alert tone="info">
-									<strong>Vista indicativa:</strong> la base de datos es la que decide. La anulación revierte
-									la comisión generada y, en efectivo, acredita la comisión retenida. La corrección de
-									método registra solo la diferencia de la retención en efectivo.
-								</Alert>
-								<form method="POST" action="?/annulPayment" class="space-y-3">
-									<input type="hidden" name="paymentId" value={row.id} />
-									<Field
-										label="Motivo de la anulación"
-										id="annul-reason-{row.id}"
-										required
-										hint={reasonHint}
-									>
-										<Textarea name="reason" />
-									</Field>
-									<Button type="submit" variant="danger">Anular pago</Button>
-								</form>
-								<form method="POST" action="?/correctPaymentMethod" class="space-y-3">
-									<input type="hidden" name="paymentId" value={row.id} />
-									<Field label="Método correcto" id="method-{row.id}">
-										<Select name="newMethod" options={methodOptions} value="cash" />
-									</Field>
-									<Field label="Motivo" id="method-reason-{row.id}" required hint={reasonHint}>
-										<Textarea name="reason" />
-									</Field>
-									<Button type="submit">Confirmar corrección de método</Button>
-								</form>
-								{#if row.method === 'transfer'}
-									<form method="POST" action="?/reassociateTransfer" class="space-y-3">
+		<Table {columns} rows={data.payments} caption="Pagos de la rendición">
+			{#snippet cell({ row, column })}
+				{#if column.key === 'date'}
+					{formatDate(row.date)}
+				{:else if column.key === 'amount'}
+					<span class="tabular-nums">{money(row.amount)}</span>
+				{:else if column.key === 'method'}
+					{PAYMENT_METHOD_LABELS[row.method as PaymentMethod] ?? row.method}
+				{:else if column.key === 'status'}
+					<StatusBadge kind="payment" status={row.status as PaymentStatus} />
+				{:else if column.key === 'document'}
+					{#if row.status === 'confirmed'}
+						<a
+							class="rounded-sm text-primary-text underline-offset-2 hover:underline"
+							href={resolve(`/campaigns/${data.campaign.id}/payments/${row.id}/print`)}
+							>Comprobante</a
+						>
+					{:else}—{/if}
+				{:else if column.key === 'actions'}
+					<div class="space-y-2">
+						{#if data.can.correctPayment}
+							<Disclosure summary="Corregir / anular">
+								<div class="space-y-4">
+									<Alert tone="info">
+										<strong>Vista indicativa:</strong> la base de datos es la que decide. La anulación
+										revierte la comisión generada y, en efectivo, acredita la comisión retenida. La corrección
+										de método registra solo la diferencia de la retención en efectivo.
+									</Alert>
+									<form method="POST" action="?/annulPayment" class="space-y-3">
 										<input type="hidden" name="paymentId" value={row.id} />
-										<Field label="Venta / cuota de destino" id="destination-{row.id}" required>
-											<Select
-												name="installmentId"
-												options={[
-													{ value: '', label: 'Elegir…' },
-													...data.candidates.map((candidate) => ({
-														value: candidate.id,
-														label: `${candidate.bond} — ${candidate.buyer} — cuota ${candidate.number} — resta ${money(candidate.amount)}`
-													}))
-												]}
-											/>
-										</Field>
 										<Field
-											label="Id de la venta de destino"
-											id="destination-sale-{row.id}"
-											required
-										>
-											<TextInput name="newSaleId" mono />
-										</Field>
-										<Field label="Importe aplicado" id="destination-amount-{row.id}" required>
-											<TextInput name="amountApplied" value={row.amount} class="tabular-nums" />
-										</Field>
-										<Field
-											label="Motivo"
-											id="destination-reason-{row.id}"
+											label="Motivo de la anulación"
+											id="annul-reason-{row.id}"
 											required
 											hint={reasonHint}
 										>
 											<Textarea name="reason" />
 										</Field>
-										<Button type="submit">Confirmar reasociación</Button>
+										<Button type="submit" variant="danger">Anular pago</Button>
 									</form>
-								{/if}
-							</div>
-						</Disclosure>
-					{/if}
-				</div>
-			{/if}
-		{/snippet}
-		{#snippet empty()}
-			<EmptyState title="Todavía no hay pagos registrados" />
-		{/snippet}
-	</Table>
+									<form method="POST" action="?/correctPaymentMethod" class="space-y-3">
+										<input type="hidden" name="paymentId" value={row.id} />
+										<Field label="Método correcto" id="method-{row.id}">
+											<Select name="newMethod" options={methodOptions} value="cash" />
+										</Field>
+										<Field label="Motivo" id="method-reason-{row.id}" required hint={reasonHint}>
+											<Textarea name="reason" />
+										</Field>
+										<Button type="submit">Confirmar corrección de método</Button>
+									</form>
+									{#if row.method === 'transfer'}
+										<form method="POST" action="?/reassociateTransfer" class="space-y-3">
+											<input type="hidden" name="paymentId" value={row.id} />
+											<Field label="Venta / cuota de destino" id="destination-{row.id}" required>
+												<Select
+													name="installmentId"
+													options={[
+														{ value: '', label: 'Elegir…' },
+														...data.candidates.map((candidate) => ({
+															value: candidate.id,
+															label: `${candidate.bond} — ${candidate.buyer} — cuota ${candidate.number} — resta ${money(candidate.amount)}`
+														}))
+													]}
+												/>
+											</Field>
+											<Field
+												label="Id de la venta de destino"
+												id="destination-sale-{row.id}"
+												required
+											>
+												<TextInput name="newSaleId" mono />
+											</Field>
+											<Field label="Importe aplicado" id="destination-amount-{row.id}" required>
+												<TextInput name="amountApplied" value={row.amount} class="tabular-nums" />
+											</Field>
+											<Field
+												label="Motivo"
+												id="destination-reason-{row.id}"
+												required
+												hint={reasonHint}
+											>
+												<Textarea name="reason" />
+											</Field>
+											<Button type="submit">Confirmar reasociación</Button>
+										</form>
+									{/if}
+								</div>
+							</Disclosure>
+						{/if}
+					</div>
+				{/if}
+			{/snippet}
+			{#snippet empty()}
+				<EmptyState title="Todavía no hay pagos registrados" />
+			{/snippet}
+		</Table>
 
-	{#if data.can.correctSettlement && !sheet}
-		<Card
-			title="Corregir la rendición cerrada"
-			description="Crea una corrección inmutable; los totales originales no se editan."
-		>
-			{@render correctionForm()}
-		</Card>
-	{/if}
-
-	{#if data.can.close}
-		<Dialog
-			open={closeOpen}
-			onClose={() => (closeOpen = false)}
-			action="?/close"
-			title="Cerrar la rendición #{data.settlement.settlementNumber}"
-			description="Cerrar confirma los pagos, la comisión y los movimientos de la cuenta corriente. Una rendición cerrada no se reabre."
-			confirmLabel="Cerrar rendición"
-			tone="danger"
-		>
-			<dl class="grid gap-2 text-body sm:grid-cols-2">
-				<div class="flex justify-between gap-4 sm:block">
-					<dt class="text-muted">Total en efectivo</dt>
-					<dd class="tabular-nums">{money(data.totals.totalCash)}</dd>
-				</div>
-				<div class="flex justify-between gap-4 sm:block">
-					<dt class="text-muted">Total en transferencias</dt>
-					<dd class="tabular-nums">{money(data.totals.totalTransfer)}</dd>
-				</div>
-				<div class="flex justify-between gap-4 sm:block">
-					<dt class="text-muted">Total general</dt>
-					<dd class="tabular-nums font-semibold">{money(data.totals.totalAmount)}</dd>
-				</div>
-				<div class="flex justify-between gap-4 sm:block">
-					<dt class="text-muted">Comisión</dt>
-					<dd class="tabular-nums">{money(data.totals.commissionAmount)}</dd>
-				</div>
-				<div class="flex justify-between gap-4 sm:block">
-					<dt class="text-muted">Neto para Bomberos</dt>
-					<dd class="tabular-nums">{money(data.totals.netToFirefighters)}</dd>
-				</div>
-			</dl>
-		</Dialog>
-	{/if}
-</div>
+		{#if data.can.correctSettlement && !sheet}
+			<Card
+				title="Corregir la rendición cerrada"
+				description="Crea una corrección inmutable; los totales originales no se editan."
+			>
+				{@render correctionForm()}
+			</Card>
+		{/if}
+	</div>
+{/if}

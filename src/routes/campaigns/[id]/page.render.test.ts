@@ -422,9 +422,11 @@ describe('campaign workbench (redesign)', () => {
 		const body = renderPage(campaign({ status: 'active' }), null, {
 			can: { registerSale: true, deliverBonds: true, openSettlement: true }
 		});
-		for (const text of ['Registrar venta', 'Entregar bonos a un cobrador', 'Abrir rendición'])
+		for (const text of ['Registrar venta', 'Entregar bonos a un cobrador', 'Registrar pago'])
 			expect(body).toContain(text);
-		expect(body.indexOf('Registrar venta')).toBeLessThan(body.indexOf('Abrir rendición'));
+		expect(body.indexOf('Registrar venta')).toBeLessThan(body.indexOf('Registrar pago'));
+		// «Registrar pago» goes through the collector: to their open settlement, or to open one.
+		expect(body).toContain('/settlements/new?intent=payment');
 	});
 	it('keeps Datos y reglas one click away, and the rules off the workbench', () => {
 		const body = renderPage(campaign(), null, {

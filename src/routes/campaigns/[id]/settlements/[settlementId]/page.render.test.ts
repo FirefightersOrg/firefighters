@@ -28,7 +28,17 @@ const page = (status = 'open') =>
 				settlement: { ...settlement, status },
 				totals,
 				payments: [
-					{ id: 'p', date: '2026-01-01', amount: '3.00', method: 'cash', status: 'confirmed' }
+					{
+						id: 'p',
+						date: '2026-01-01',
+						amount: '3.00',
+						method: 'cash',
+						status: status === 'open' ? 'pending_in_settlement' : 'confirmed',
+						bondId: 'b',
+						bond: '0068',
+						buyer: 'Ada Lovelace',
+						installments: [2, 3]
+					}
 				],
 				candidates: [],
 				submitted: [],
@@ -39,18 +49,114 @@ const page = (status = 'open') =>
 		} as any
 	}).body;
 describe('settlement workspace render', () => {
-	it('renders seven metrics and open forms', () => {
+	it('open: the entry by bond number, the running sheet and the close (UX plan PR 7)', () => {
 		const body = page();
-		// Every Stat value is tabular (acceptance: amounts right-aligned and tabular).
-		expect(body.match(/text-number-lg[^"]*tabular-nums/g)).toHaveLength(7);
+		expect(body).toContain('Rendición 1 de Ana');
+		expect(body).toContain('Desde el 31/12/2025');
+		// The entry asks for the bond number and posts to the same action.
 		expect(body).toContain('?/add');
-		expect(body).toContain('Fecha del pago');
-		expect(body).toContain('name="paymentDate"');
-		expect(body).toContain('?/remove');
+		expect(body).toContain('id="bond-number"');
+		expect(body).toContain('Número del bono que pagó');
+		// No sale with debt in this fixture: the hint says so instead of inviting to type.
+		expect(body).toContain('Ana no tiene ventas con deuda en esta campaña.');
+		// The sheet: what came in, what the collector keeps, what is left, and the cash to hand over.
+		expect(body).toContain('Hasta ahora');
+		expect(body).toContain('Efectivo (1 pago)');
+		expect(body).toContain('Transferencias (0 pagos)');
+		expect(body).toContain('Neto para Bomberos');
+		expect(body).toMatch(/Ana tiene que entregar\s*<strong[^>]*>\$\u00a01<\/strong>\s*en efectivo/);
+		// One list of amounts: the sheet is a <dl> whose groups only hold dt and dd.
+		expect(body).not.toContain('text-number-lg');
 		expect(body).toContain('?/close');
-		expect(body).toContain('31/12/2025');
 		// Native maxlength counts UTF-16 units, unlike the database's code-point limit.
 		expect(body).not.toContain('maxlength=');
+	});
+	it('open: every payment names its bond, its buyer and its installments (audit A4)', () => {
+		const body = page();
+		expect(body).toContain('Pagos de esta rendición');
+		expect(body).toContain('0068');
+		expect(body).toContain('/campaigns/c/bonds/b');
+		expect(body).toContain('Ada Lovelace');
+		expect(body).toContain('Cuotas 2 y 3, efectivo, 01/01/2026');
+		// «Quitar» is behind the row menu, which says what it acts on; nothing is posted without a reason.
+		expect(body).toContain('Acciones del pago del bono 0068');
+		expect(body).not.toContain('action="?/remove"');
+		expect(body).not.toContain('Motivo obligatorio');
+	});
+	it('open: a payment taken out stays on record, apart, and does not count', () => {
+		const payment = {
+			id: 'p1',
+			date: '2026-11-25',
+			amount: '3.00',
+			method: 'cash',
+			status: 'pending_in_settlement',
+			bondId: 'b',
+			bond: '0068',
+			buyer: 'Ada Lovelace',
+			installments: [1]
+		};
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					today: '2026-11-25',
+					settlement,
+					totals,
+					payments: [payment, { ...payment, id: 'p2', bond: '0070', status: 'annulled' }],
+					candidates: [],
+					submitted: [],
+					reasonMax: 2000,
+					can: { add: true, remove: true, close: true, correctPayment: true }
+				},
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+		expect(body).toContain('Efectivo (1 pago)');
+		expect(body).toContain('1 pago quitado');
+		expect(body).toContain('Pagos quitados de esta rendición');
+		expect(body).toContain('Anulado');
+		// Only the payment that is still in the settlement has a menu.
+		expect(body).toContain('Acciones del pago del bono 0068');
+		expect(body).not.toContain('Acciones del pago del bono 0070');
+	});
+	it('open: a payment whose buyer the role cannot read shows the bond alone', () => {
+		const body = render(Page, {
+			props: {
+				data: {
+					campaign: { id },
+					today: '2026-11-25',
+					settlement,
+					totals,
+					payments: [
+						{
+							id: 'p',
+							date: '2026-11-25',
+							amount: '3.00',
+							method: 'transfer',
+							status: 'pending_in_settlement',
+							bondId: null,
+							bond: '0068',
+							buyer: null,
+							installments: [4]
+						}
+					],
+					candidates: [],
+					submitted: [],
+					reasonMax: 2000,
+					can: { add: false, remove: false, close: false }
+				},
+				params: { id, settlementId: 's' }
+			} as any
+		}).body;
+		expect(body).toContain('0068');
+		expect(body).toContain('Cuota 4');
+		expect(body).toContain('Transferencia, hoy');
+		expect(body).not.toContain('Unknown');
+		expect(body).not.toContain('Comprador sin nombre');
+		// Read-only: no entry, no row menu, no close.
+		expect(body).not.toContain('?/add');
+		expect(body).not.toContain('Acciones del pago');
+		expect(body).not.toContain('?/close');
 	});
 	it('renders closed documents read-only', () => {
 		const body = page('closed');
@@ -61,6 +167,7 @@ describe('settlement workspace render', () => {
 	});
 	it('labels the commission as generated only once the settlement closed', () => {
 		expect(page('open')).toContain('Comisión preliminar');
+		expect(page('open')).toContain('Comisión que se queda el cobrador');
 		// An annulled settlement shows no commission at all, and says it is annulled.
 		const annulled = page('annulled');
 		expect(annulled).toContain('Rendición anulada');
@@ -121,30 +228,34 @@ describe('collector submissions (SAN-147)', () => {
 				params: { id, settlementId: 's' }
 			} as any
 		}).body;
-	it('lists the drafts with include and reject (reason required)', () => {
+	it('lists the drafts with include and reject', () => {
 		const html = render_({ reviewSubmitted: true }, [row]);
-		expect(html).toContain('Cobros enviados por el cobrador');
-		expect(html).toContain('Bono 0068');
+		expect(html).toContain('Cobros que envió Ana');
+		expect(html).toContain('0068');
 		expect(html).toContain('Ada Lovelace');
-		expect(html).toContain('Pagó el vecino');
+		expect(html).toContain('cuotas 1 y 2');
+		expect(html).toContain('Nota del cobrador: «Pagó el vecino»');
 		expect(html).toContain('action="?/includeSubmitted"');
-		expect(html).toContain('action="?/rejectSubmitted"');
 		expect(html).toContain('Incluir en la rendición');
-		expect(html).toContain('Rechazar');
 		expect(html).toContain('name="paymentId" value="pay-1"');
-		expect(html).toMatch(/name="reason"[^>]*required|required[^>]*name="reason"/);
+		// «Rechazar» opens a dialog that asks for the reason (E2E): nothing is posted from the row.
+		expect(html).toContain('Rechazar');
+		expect(html).not.toContain('action="?/rejectSubmitted"');
 	});
 	it('blocks the close and says what to do while drafts are pending (SAN-156)', () => {
 		const html = render_({ reviewSubmitted: true, close: true }, [row, { ...row, id: 'pay-2' }]);
-		expect(html).toContain('2 cobros enviados sin procesar');
+		expect(html).toContain('2 sin procesar');
+		expect(html).toContain('suman $\u00a0140');
 		expect(html).toContain(
 			'Hay 2 cobros enviados por el cobrador sin procesar. Inclúyalos o rechácelos antes de cerrar la rendición.'
 		);
-		expect(html).toContain('Cobros enviados por el cobrador: 2 sin procesar');
-		// The header button is disabled and points at the explanation.
+		// The close button is disabled and points at the explanation.
 		const closeButton = html.match(/<button[^>]*aria-describedby="close-blocked"[^>]*>/)?.[0];
 		expect(closeButton).toMatch(/\sdisabled/);
 		expect(html).toContain('id="close-blocked"');
+		// On a phone the task bar leads to what blocks the close instead of a dead button.
+		expect(html).toContain('href="#submitted-payments"');
+		expect(html).toContain('Ver 2 cobros sin procesar');
 	});
 	it('singular wording and an enabled close button when nothing is pending', () => {
 		expect(render_({ reviewSubmitted: true, close: true }, [row])).toContain(
@@ -157,15 +268,14 @@ describe('collector submissions (SAN-147)', () => {
 	});
 	it('is read-only without the settlement permissions', () => {
 		const html = render_({ reviewSubmitted: false }, [row]);
-		expect(html).toContain('Cobros enviados por el cobrador');
+		expect(html).toContain('Cobros que envió Ana');
 		expect(html).not.toContain('?/includeSubmitted');
 		expect(html).not.toContain('?/rejectSubmitted');
 	});
 	it('is absent when there is nothing to review and no permission, and for closed settlements', () => {
-		expect(render_({ reviewSubmitted: false }, [])).not.toContain(
-			'Cobros enviados por el cobrador'
-		);
-		expect(page('closed')).not.toContain('Cobros enviados por el cobrador');
+		expect(render_({ reviewSubmitted: false }, [])).not.toContain('Cobros que envió');
+		expect(render_({ reviewSubmitted: true }, [])).not.toContain('Cobros que envió');
+		expect(page('closed')).not.toContain('Cobros que envió');
 	});
 });
 describe('settlement workspace corrections (SAN-73)', () => {
@@ -204,7 +314,7 @@ describe('settlement workspace corrections (SAN-73)', () => {
 		expect(allowed).toContain('name="commissionDelta"');
 		expect(closed({ correctSettlement: false })).not.toContain('Vista indicativa del libro');
 	});
-	it('offers one fast-entry option per sale, also for sales with several pending installments', () => {
+	it('asks for the bond number instead of listing every sale', () => {
 		const body = render(Page, {
 			props: {
 				data: {
@@ -253,10 +363,16 @@ describe('settlement workspace corrections (SAN-73)', () => {
 				params: { id, settlementId: 's' }
 			} as any
 		}).body;
-		// Before SAN-135 a sale with more than one candidate installment was hidden from the selector.
-		expect(body.match(/<option value="sale-a"/g)).toHaveLength(1);
-		expect(body.match(/<option value="sale-b"/g)).toHaveLength(1);
-		expect(body).toContain('Bono 0068 — Ana');
+		// The sale is found by number in the browser (domain/settlement-entry.test.ts, and the E2E):
+		// nothing about a sale is on the page until its number is typed.
+		expect(body).toContain('id="bond-number"');
+		expect(body).toContain('inputmode="numeric"');
+		expect(body).toContain(
+			'Solo los bonos que vendió Ana. Enter busca; otro Enter agrega el pago.'
+		);
+		expect(body).not.toContain('<option value="sale-a"');
+		expect(body).not.toContain('name="saleId"');
+		expect(body).not.toContain('name="installmentId"');
 	});
 
 	it('reads a closed settlement as a cash sheet (redesign)', () => {
