@@ -436,6 +436,26 @@ export async function listBuyerBonds(
 }
 
 /**
+ * How many bonds of a campaign each of the given buyers has, in one grouped query
+ * (`public.buyer_bond_counts`, security invoker: `bond.view` RLS applies). A buyer without bonds is
+ * absent from the map (count 0). `buyerIds` must be valid uuids.
+ */
+export async function countBondsByBuyer(
+	supabase: SupabaseClient,
+	campaignId: string,
+	buyerIds: readonly string[]
+): Promise<RepositoryResult<Map<string, number>>> {
+	if (buyerIds.length === 0) return { data: new Map(), error: null };
+	const { data, error } = await supabase.rpc('buyer_bond_counts', {
+		p_campaign_id: campaignId,
+		p_buyer_ids: [...new Set(buyerIds)]
+	});
+	if (error) return { data: null, error };
+	const rows = (data ?? []) as { buyer_id: string; bond_count: number }[];
+	return { data: new Map(rows.map((row) => [row.buyer_id, Number(row.bond_count)])), error: null };
+}
+
+/**
  * Digits only, or null when there are none. Mirrors the generated `*_normalized` columns on
  * `buyers`, so '30.111.222', '30111222' and ' 30 111 222 ' are the same identification.
  */

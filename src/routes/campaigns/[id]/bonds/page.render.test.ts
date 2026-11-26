@@ -30,7 +30,15 @@ const campaign: Campaign = {
 	updatedAt: '2026-11-17T10:00:00+00:00'
 };
 
-const EMPTY_VALUES = { base: '', associated: '', code: '', type: '', status: '', financial: '' };
+const EMPTY_VALUES = {
+	base: '',
+	associated: '',
+	code: '',
+	type: '',
+	status: '',
+	financial: '',
+	collector: ''
+};
 
 type Row = BondListItem & { collectorName: string | null; buyerName: string | null };
 
@@ -60,6 +68,7 @@ function renderPage(
 		bonds?: Row[];
 		values?: Partial<typeof EMPTY_VALUES>;
 		errors?: Record<string, string>;
+		collectorName?: string | null;
 		page?: number;
 		total?: number;
 		canCreate?: boolean;
@@ -72,6 +81,7 @@ function renderPage(
 	const values = { ...EMPTY_VALUES, ...options.values };
 	const data = {
 		campaign,
+		filterCollectorName: options.collectorName ?? null,
 		query: { values, errors: options.errors ?? {} },
 		bonds,
 		pagination: {
@@ -215,5 +225,52 @@ describe('/campaigns/[id]/bonds page', () => {
 		expect(invalid).toMatch(/<input[^>]*name="base"[^>]*aria-invalid="true"/);
 		expect(invalid).toContain('Corregir los filtros marcados para ver los bonos.');
 		expect(renderPage({ bonds: [], total: 3, page: 9 })).toContain('No hay bonos en esta página');
+	});
+
+	describe('collector filter', () => {
+		const COLLECTOR = 'c0000000-0000-0000-0000-0000000000c1';
+
+		it('shows the collector as a chip that links to the list without it, and keeps it in the form', () => {
+			const body = renderPage({
+				values: { collector: COLLECTOR, status: 'sold' },
+				collectorName: 'Héctor Acosta'
+			});
+			expect(body).toContain('Quitar el filtro Cobrador: Héctor Acosta');
+			expect(body).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds?status=sold"`);
+			expect(body).toMatch(/<input[^>]*type="hidden"[^>]*name="collector"/);
+		});
+
+		it('says so, with no error, when the collector is unknown and no bond matches', () => {
+			const body = renderPage({
+				bonds: [],
+				total: 0,
+				values: { collector: COLLECTOR },
+				collectorName: null
+			});
+			expect(body).toContain('No se encontró el cobrador indicado');
+			expect(body).not.toContain('Corregir los filtros');
+		});
+
+		it('names the collector when they simply have no bonds', () => {
+			const body = renderPage({
+				bonds: [],
+				total: 0,
+				values: { collector: COLLECTOR },
+				collectorName: 'Héctor Acosta'
+			});
+			expect(body).toContain('Héctor Acosta');
+			expect(body).toContain('no tiene bonos');
+		});
+
+		it('explains an invalid id and offers to remove it', () => {
+			const body = renderPage({
+				bonds: [],
+				total: 0,
+				values: { collector: 'xx' },
+				errors: { collector: 'El cobrador indicado no es válido.' }
+			});
+			expect(body).toContain('El cobrador indicado no es válido.');
+			expect(body).toContain('Quitar ese filtro');
+		});
 	});
 });

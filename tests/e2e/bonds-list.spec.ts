@@ -57,6 +57,22 @@ test.describe.serial('bonds list and bond search', () => {
 		await page.close();
 	});
 
+	test('the collector record links to the list of that collector’s bonds', async () => {
+		const page = await admin.newPage();
+		await open(page, `/campaigns/${campaignId}/collectors`);
+		await page.getByRole('link', { name: collector }).first().click();
+		await page.getByRole('link', { name: 'Ver todos sus bonos' }).click();
+		await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/bonds\\?collector=${UUID}$`));
+		await expect(
+			page.getByRole('link', { name: `Quitar el filtro Cobrador: ${collector}` })
+		).toBeVisible();
+		await expect(page.getByText(`Mostrando 1–1 de 1 bono`)).toBeVisible();
+		// An id that is not one explains itself instead of failing.
+		await open(page, `/campaigns/${campaignId}/bonds?collector=nope`);
+		await expect(page.getByText('El cobrador indicado no es válido.')).toBeVisible();
+		await page.close();
+	});
+
 	test('no match, or a search with another filter, keeps the list', async () => {
 		const page = await admin.newPage();
 		await open(page, `/campaigns/${campaignId}/bonds?base=9999`);

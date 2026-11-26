@@ -5,8 +5,8 @@ import { hasPermissionIn, requirePermissionIn } from '$lib/server/auth/permissio
 import { requireCampaignViewer } from '$lib/server/campaigns/route-helpers';
 import { getCampaignById } from '$lib/server/repositories/campaigns';
 import {
+	countBondsByBuyer,
 	getCollectorsByIds,
-	listBuyerBonds,
 	listBuyers,
 	PARTY_PAGE_SIZE
 } from '$lib/server/repositories/parties';
@@ -32,8 +32,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (result.error)
 		error(500, { message: 'No se pudieron cargar los compradores. Volver a intentar.' });
 	const buyers = result.data?.items ?? [];
-	// UX plan PR 14b: each row says how many bonds of this campaign the buyer has, with the function
-	// the buyer record uses (one read per buyer of the page). Only for roles that read bonds: without
+	// UX plan PR 14b: each row says how many bonds of this campaign the buyer has, with one grouped
+	// query for the whole page. Only for roles that read bonds: without
 	// `bond.view` the RLS would return nothing and the row would say «Sin bonos».
 	const canCountBonds = hasPermissionIn(locals.permissions, 'bond.view');
 	const [collectors, bonds] = await Promise.all([
@@ -42,22 +42,22 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			buyers.flatMap((b) => (b.usualCollectorId ? [b.usualCollectorId] : []))
 		),
 		canCountBonds
-			? Promise.all(
-					buyers.map((buyer) =>
-						listBuyerBonds(locals.supabase, buyer.id, { campaignId: campaignResult.data!.id })
-					)
+			? countBondsByBuyer(
+					locals.supabase,
+					campaignResult.data.id,
+					buyers.map((b) => b.id)
 				)
 			: null
 	]);
-	if (collectors.error || bonds?.some((entry) => entry.error))
+	if (collectors.error || bonds?.error)
 		error(500, { message: 'No se pudieron cargar los compradores. Volver a intentar.' });
 	const total = result.data?.total ?? 0;
 	return {
 		campaign: campaignResult.data,
-		buyers: buyers.map((buyer, index) => ({
+		buyers: buyers.map((buyer) => ({
 			...buyer,
 			/** Bonds of this campaign in the buyer's name; null when the role cannot read bonds. */
-			bondCount: bonds ? (bonds[index].data?.length ?? 0) : null
+			bondCount: bonds ? (bonds.data?.get(buyer.id) ?? 0) : null
 		})),
 		collectors: [...(collectors.data ?? new Map()).values()],
 		query: { q: url.searchParams.get('q') ?? '', type: typeFilter ?? '' },

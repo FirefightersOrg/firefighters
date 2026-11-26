@@ -8,6 +8,7 @@ import {
 	actions as buyerActions,
 	load as buyerLoad
 } from '../../src/routes/campaigns/[id]/buyers/[buyerId]/+page.server';
+import { countBondsByBuyer, listBuyerBonds } from '../../src/lib/server/repositories/parties';
 import { loadPermissions } from './permissions';
 import { resolveSeedConfig } from '../../scripts/seed-admin';
 import type { UserProfile } from '../../src/app';
@@ -181,6 +182,56 @@ describe('buyers (local Supabase)', () => {
 			.eq('entity_id', individualId)
 			.eq('action', 'buyer.update');
 		expect(updates).toHaveLength(1);
+	});
+
+	it('the list counts bonds per buyer with one grouped query, equal to the per-buyer read', async () => {
+		const buyerA = await create(operator, individual({ documentNumber: `${NUM}7` }));
+		const buyerB = await create(operator, individual({ documentNumber: `${NUM}8` }));
+		const buyerC = await create(operator, individual({ documentNumber: `${NUM}9` }));
+		const bondIds: string[] = [];
+		for (const n of [101, 102, 103]) {
+			const { data, error } = await operator.client.rpc('bond_create', {
+				p_campaign_id: campaignId,
+				p_base_numbers: [n],
+				p_request_id: `it-buyers-${RUN}-bond-${n}`
+			});
+			if (error) throw new Error(`bond_create failed: ${error.message}`);
+			bondIds.push(data as string);
+		}
+		// A has two bonds, B one, C none (the service role skips the sale flow: only the owner matters).
+		for (const [bond, buyer] of [
+			[bondIds[0], buyerA],
+			[bondIds[1], buyerA],
+			[bondIds[2], buyerB]
+		]) {
+			const { error } = await service
+				.from('bonds')
+				.update({ current_buyer_id: buyer })
+				.eq('id', bond);
+			if (error) throw new Error(`bond update failed: ${error.message}`);
+		}
+		const page = (await buyersLoad(
+			event(operator, '/buyers?q=' + encodeURIComponent(`Buyer-${RUN}`))
+		)) as {
+			buyers: { id: string; bondCount: number | null }[];
+		};
+		const counts = new Map(page.buyers.map((b) => [b.id, b.bondCount]));
+		expect(counts.get(buyerA)).toBe(2);
+		expect(counts.get(buyerB)).toBe(1);
+		expect(counts.get(buyerC)).toBe(0);
+		// Same numbers as the per-buyer read the list used before.
+		for (const buyer of page.buyers) {
+			const perBuyer = await listBuyerBonds(operator.client, buyer.id, { campaignId });
+			expect(perBuyer.error).toBeNull();
+			expect(buyer.bondCount).toBe(perBuyer.data?.length);
+		}
+		// A role that cannot read bonds gets no counts instead of zeros.
+		const hidden = await countBondsByBuyer(
+			createClient(supabaseUrl, anonKey, options),
+			campaignId,
+			[buyerA]
+		);
+		expect(hidden.data?.get(buyerA) ?? 0).toBe(0);
 	});
 
 	it('warns about duplicates and read-only can view the list', async () => {
