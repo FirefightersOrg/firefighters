@@ -38,6 +38,12 @@ const event = (permissions: string[] | null, suffix = '') =>
 		url: new URL(url + suffix)
 	}) as never;
 describe('roster load', () => {
+	it('says whether the role can load winners, to name the way on from a frozen roster', async () => {
+		expect((await load(event(['campaign.view', 'draw.view'])))?.canLoadWinner).toBe(false);
+		expect(
+			(await load(event(['campaign.view', 'draw.view', 'draw.load_winner'])))?.canLoadWinner
+		).toBe(true);
+	});
 	it('fails closed and denies without draw.view', async () => {
 		await expect(load(event(null))).rejects.toMatchObject({ status: 500 });
 		await expect(load(event(['campaign.view']))).rejects.toMatchObject({ status: 403 });

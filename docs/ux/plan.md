@@ -267,6 +267,13 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
   - Draws: on each state of a draw the next step is a button (generate, freeze, load winners); «Registrar resolución» names the outcome («Adjudicar el premio», «Dejar sin adjudicar»); the roster as stacked rows.
 - **Screens.** New delivery, delivery note, draw record, roster, winners.
 - **Acceptance.** Delivering 35 bonds keeps the submit button within 2 screens at 375 px; the delivery and draw flows keep their action counts (7 and 19) or lower; the draw-flow E2E passes with selectors updated.
+- **As delivered.**
+  - Measured with `scripts/ux-flows.ts` at 375 px: the delivery is 7 actions and 5 screens before and after. The draw is 19 actions and 10 screens, and it was 20 on `main` before this PR, not the 19 written above: since PR 5 «Sorteos» is under «Más» in the phone's tab bar, one tap more than when the plan was written. The tap this PR removes is «Configurar un premio»: with no prizes yet, the form of the first prize is already open.
+  - With the bonds added as one range the submit button ends 872 px down at 375 px, 1.07 screens (the E2E delivers 35 bonds and asserts 2 screens or fewer).
+  - The draw record lists the four steps of a draw in order (generate, freeze, load winners, complete) and puts the one primary button on the current one. To choose between «Cargar ganadores» and «Completar sorteo» on a frozen draw, its `load` now reads the draw's prizes (the repository function the winners page uses, with the caller's client) and counts them the way `draw_complete` does; while a prize is unresolved «Completar sorteo» is not offered and the step says what is missing.
+  - «Dejar sin adjudicar» asks in a dialog, because it cannot be changed afterwards; «Adjudicar el premio» posts directly, as «Registrar resolución» did. Both post `?/resolve` with the same fields.
+  - To group bonds into ranges the delivery screens need the numbers, so the bond the lookup and the note return gained `baseNumbers` and `associatedNumbers` beside `label`. Nothing was removed; `?/deliver` still gets one `bondIds` per bond.
+  - A range has one «Quitar»: taking one bond out of the middle of a range means removing the range and adding the two halves. Not solved here.
 - **Risk.** Low. Same actions; the draw screens were redesigned in #148.
 - **Depends on.** PRs 3, 4.
 

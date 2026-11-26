@@ -40,7 +40,8 @@ test('generate and freeze a roster, then load and validate the winning number', 
 	// Configure a prize and load the winning number against the frozen roster.
 	const drawUrl = page.url().replace(/\/roster$/, '');
 	await open(page, `${drawUrl}/winners`);
-	await page.getByText('Configurar un premio').click();
+	// UX plan PR 16: with no prizes yet, the form of the first prize is already open.
+	await expect(page.getByText('Configurar un premio')).toBeVisible();
 	await page.locator('#create-position').fill('1');
 	await page.locator('#create-name').fill('Bicicleta');
 	await page.getByRole('button', { name: 'Crear premio' }).click();
@@ -55,9 +56,9 @@ test('generate and freeze a roster, then load and validate the winning number', 
 	await expect(result.getByText('Habilitado', { exact: true })).toBeVisible();
 	await expect(result.getByText('Pendiente de resolución.')).toBeVisible();
 
-	// Award it: the prize moves to pending delivery.
+	// Award it (the button names the outcome): the prize moves to pending delivery.
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Registrar resolución' }).click();
+	await page.getByRole('button', { name: 'Adjudicar el premio' }).click();
 	await expect(page.getByText('Premio resuelto.')).toBeVisible();
 	await expect(page.getByText('Pendiente de entrega').first()).toBeVisible();
 });

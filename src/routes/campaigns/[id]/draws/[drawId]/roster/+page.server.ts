@@ -77,6 +77,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		roster: roster.data,
 		entries: filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
 		filters: { q: url.searchParams.get('q') ?? '', eligibility },
-		pagination: { page, pages, total: filtered.length }
+		pagination: { page, pages, total: filtered.length },
+		// UX plan PR 16: names the way on from a frozen roster («Cargar ganadores» or «Ver ganadores»).
+		canLoadWinner: hasPermissionIn(locals.permissions, 'draw.load_winner')
 	};
 };

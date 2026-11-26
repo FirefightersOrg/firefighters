@@ -90,9 +90,10 @@ export async function deliverAndSell(
 	await open(page, `/campaigns/${campaignId}/deliveries/new`);
 	await page.locator('#query').fill(String(base));
 	await page.getByRole('button', { name: 'Agregar' }).click();
-	await expect(page.getByText('1 agregados.')).toBeVisible();
+	await expect(page.getByText('1 bono agregado.')).toBeVisible();
 	await page.locator('#collectorId').selectOption({ label: collector });
-	await page.getByRole('button', { name: 'Entregar y emitir remito' }).click();
+	// UX plan PR 16: the button says how many bonds go to whom.
+	await page.getByRole('button', { name: `Entregar 1 bono a ${collector}` }).click();
 	await expect(page).toHaveURL(/\/deliveries\/[0-9a-f-]{36}$/);
 	const noteId = page.url().split('/').pop()!;
 	await expect(page.getByRole('heading', { name: /Remito \d{4}/ })).toBeVisible();

@@ -229,9 +229,9 @@ test.describe.serial('campaign shell', () => {
 		await open(page, `/campaigns/${campaignId}/deliveries/new`);
 		await page.locator('#query').fill('100');
 		await page.getByRole('button', { name: 'Agregar' }).click();
-		await expect(page.getByText('1 agregados.')).toBeVisible();
+		await expect(page.getByText('1 bono agregado.')).toBeVisible();
 		await page.locator('#collectorId').selectOption({ label: 'Cobrador shell' });
-		await page.getByRole('button', { name: 'Entregar y emitir remito' }).click();
+		await page.getByRole('button', { name: 'Entregar 1 bono a Cobrador shell' }).click();
 		await expect(page).toHaveURL(new RegExp(`/deliveries/${UUID}$`));
 		await expect(page.locator('[data-campaign-rail]')).toHaveCount(1);
 		await open(page, `${new URL(page.url()).pathname}/print`);

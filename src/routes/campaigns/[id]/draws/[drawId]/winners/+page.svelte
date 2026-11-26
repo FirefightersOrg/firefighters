@@ -6,18 +6,26 @@
 		Button,
 		Card,
 		Checkbox,
+		Dialog,
 		Disclosure,
 		EmptyState,
 		Field,
 		PageHeader,
-		Select,
 		StatusBadge,
 		Textarea,
 		TextInput
 	} from '$lib/components/ui';
+	import { countDrawPrizes } from '$lib/domain/draw-steps';
 	import { WINNING_NUMBER_STATUS_LABELS } from '$lib/domain/prizes';
 	import type { PageProps } from './$types';
 
+	/**
+	 * Winners and prizes of a draw. UX plan PR 16: the next thing to do is the one primary button of
+	 * the page (configure the first prize, validate a number, award it, hand it over), the resolution
+	 * is two buttons that name their outcome («Adjudicar el premio», «Dejar sin adjudicar») and say
+	 * that it cannot be changed, and a draw whose prizes are all resolved leads back to its record to
+	 * be completed. The actions and their fields are the same.
+	 */
 	let { data, form }: PageProps = $props();
 	const submittedValues = $derived(
 		form && 'values' in form ? (form.values as Record<string, string>) : {}
@@ -25,10 +33,40 @@
 	const immediateResult = $derived(
 		form?.form === 'loadWinner' && form.success ? form.result : null
 	);
-	const decisionOptions = [
-		{ value: 'award', label: 'Adjudicar el premio' },
-		{ value: 'unaward', label: 'Dejar no adjudicado' }
-	];
+	type Prize = (typeof data.prizes)[number];
+	/** A prize waiting for its number or its resolution: what the draw itself is waiting for. */
+	const unresolvedStep = (prize: Prize) =>
+		(data.can.loadWinner && prize.status === 'pending_validation' && !prize.winningNumber) ||
+		(data.can.resolve &&
+			prize.status === 'pending_validation' &&
+			prize.winningNumber?.resultStatus === 'eligible_winner');
+	/**
+	 * The prize that carries the page's primary button: the first one to load or resolve, in prize
+	 * order; when none is waiting, the first one to hand over (a delivery can wait, a draw cannot be
+	 * completed with a prize unresolved).
+	 */
+	const nextPrizeId = $derived(
+		(
+			data.prizes.find(unresolvedStep) ??
+			data.prizes.find((prize) => data.can.deliver && prize.status === 'pending_delivery')
+		)?.id ?? null
+	);
+	const emphasis = (prize: Prize) => (prize.id === nextPrizeId ? 'primary' : 'secondary');
+	const counts = $derived(countDrawPrizes(data.prizes));
+	/** Every prize resolved on a frozen draw: what is left is completing the draw, on its record. */
+	const readyToComplete = $derived(
+		data.draw.status === 'roster_frozen' && counts.unresolved === 0 && counts.resolved > 0
+	);
+	const drawHref = $derived(
+		resolve('/campaigns/[id]/draws/[drawId]', { id: data.campaign.id, drawId: data.draw.id })
+	);
+	const rosterPending = $derived(
+		data.draw.status === 'scheduled' || data.draw.status === 'roster_generated'
+	);
+	/** The prize being left unawarded: asked in a dialog, because it cannot be changed afterwards. */
+	let unawarding = $state<Prize | null>(null);
+	const RESOLUTION_NOTE =
+		'La resolución no se puede cambiar: para corregirla hay que anular el premio y crear su reemplazo.';
 	const reasonHint = $derived(`Hasta ${data.reasonMax} caracteres.`);
 	const certificateHref = (prizeId: string, kind: 'delivery' | 'unawarded') =>
 		kind === 'delivery'
@@ -80,6 +118,12 @@
 	{#if form?.message}
 		<Alert tone={form.success ? 'success' : 'danger'}>{form.message}</Alert>
 	{/if}
+	{#if rosterPending}
+		<Alert tone="info" title="El padrón todavía no está congelado">
+			Los números ganadores se cargan contra el padrón congelado. Mientras tanto se pueden
+			configurar los premios.
+		</Alert>
+	{/if}
 
 	{#if immediateResult}
 		<div aria-live="polite">
@@ -127,7 +171,10 @@
 	{/if}
 
 	{#if data.can.create}
-		<Disclosure summary="Configurar un premio">
+		<Disclosure
+			summary="Configurar un premio"
+			defaultOpen={data.prizes.length === 0 || (form?.form === 'create' && !form.success)}
+		>
 			<form method="POST" action="?/create" class="grid gap-4 sm:grid-cols-2">
 				<Field label="Posición" id="create-position" required>
 					<TextInput name="position" type="number" min="1" />
@@ -147,7 +194,11 @@
 						label="Excluye a este bono de los sorteos de consuelo"
 					/>
 				</div>
-				<div><Button type="submit" variant="primary">Crear premio</Button></div>
+				<div>
+					<Button type="submit" variant={data.prizes.length === 0 ? 'primary' : 'secondary'}
+						>Crear premio</Button
+					>
+				</div>
 			</form>
 		</Disclosure>
 	{/if}
@@ -155,7 +206,7 @@
 	<section class="space-y-4" aria-label="Premios del sorteo">
 		{#each data.prizes as prize (prize.id)}
 			<Card
-				title="#{prize.position} — {prize.name}"
+				title="Premio {prize.position}: {prize.name}"
 				description={prize.description ?? undefined}
 				as="article"
 			>
@@ -193,9 +244,22 @@
 									<strong>Cobrador:</strong>
 									{prize.winningNumber.collectorLabel}
 								</p>
+								{#if prize.winningNumber.bondId}
+									<p class="mt-1">
+										<a
+											class="inline-flex items-center rounded-sm text-primary-text underline underline-offset-2 pointer-coarse:min-h-touch"
+											href={resolve('/campaigns/[id]/bonds/[bondId]', {
+												id: data.campaign.id,
+												bondId: prize.winningNumber.bondId
+											})}>Ver la ficha del bono</a
+										>
+									</p>
+								{/if}
 								<p class="mt-1">
-									{prize.winningNumber.eligible ? 'Habilitado' : 'No habilitado'}
-									{#if prize.winningNumber.reasonLabel}— {prize.winningNumber.reasonLabel}{/if}
+									{prize.winningNumber.eligible
+										? 'Habilitado'
+										: 'No habilitado'}{#if prize.winningNumber.reasonLabel}: {prize.winningNumber
+											.reasonLabel}{/if}
 								</p>
 								<p class="mt-1">
 									{prize.winningNumber.eligible && prize.status === 'pending_validation'
@@ -250,7 +314,9 @@
 							<Field label="Notas" id="load-notes-{prize.id}" optional>
 								<Textarea name="notes" />
 							</Field>
-							<Button type="submit" variant="primary">Validar contra el padrón congelado</Button>
+							<Button type="submit" variant={emphasis(prize)}
+								>Validar contra el padrón congelado</Button
+							>
 						</form>
 					{/if}
 
@@ -261,13 +327,17 @@
 							class="space-y-3 rounded-md border border-border p-3"
 						>
 							<input type="hidden" name="prizeId" value={prize.id} />
-							<Field label="Resolución" id="decision-{prize.id}" required>
-								<Select name="decision" options={decisionOptions} value="award" />
-							</Field>
+							<input type="hidden" name="decision" value="award" />
+							<p class="text-body text-text" data-resolution-note>{RESOLUTION_NOTE}</p>
 							<Field label="Notas" id="resolve-notes-{prize.id}" optional>
 								<Textarea name="notes" />
 							</Field>
-							<Button type="submit" variant="primary">Registrar resolución</Button>
+							<div class="flex flex-wrap gap-2">
+								<Button type="submit" variant={emphasis(prize)}>Adjudicar el premio</Button>
+								<Button variant="ghost" onclick={() => (unawarding = prize)}
+									>Dejar sin adjudicar</Button
+								>
+							</div>
 						</form>
 					{/if}
 
@@ -281,7 +351,7 @@
 							<Field label="Observaciones de la entrega" id="delivery-notes-{prize.id}" required>
 								<Textarea name="notes" />
 							</Field>
-							<Button type="submit" variant="primary">Registrar entrega</Button>
+							<Button type="submit" variant={emphasis(prize)}>Registrar entrega</Button>
 						</form>
 					{/if}
 
@@ -311,7 +381,11 @@
 						</div>
 					{:else if prize.status === 'unawarded'}
 						<div class="flex flex-wrap items-center gap-3">
-							<Button href={certificateHref(prize.id, 'unawarded')} target="_blank" rel="noreferrer"
+							<Button
+								href={certificateHref(prize.id, 'unawarded')}
+								target="_blank"
+								rel="noreferrer"
+								class="h-auto! min-h-control-md py-2 whitespace-normal!"
 								>Imprimir constancia de premio no adjudicado</Button
 							>
 						</div>
@@ -341,7 +415,7 @@
 										checked={prize.excludesFromConsolation}
 										label="Excluye del consuelo"
 									/>
-									<Button type="submit" variant="primary">Crear premio de reemplazo</Button>
+									<Button type="submit">Crear premio de reemplazo</Button>
 								</form>
 							</Disclosure>
 						{/if}
@@ -349,7 +423,49 @@
 				</div>
 			</Card>
 		{:else}
-			<EmptyState title="Todavía no hay premios configurados" />
+			<EmptyState title="Todavía no hay premios configurados">
+				{data.can.create
+					? 'Configurar el primer premio para poder cargar su número ganador.'
+					: 'Los premios los configura quien administra los sorteos.'}
+			</EmptyState>
 		{/each}
 	</section>
+
+	{#if readyToComplete}
+		<section
+			class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-border-strong pt-4"
+			aria-label="Siguiente paso"
+			data-next-step
+		>
+			<p class="m-0 min-w-0 flex-1 basis-56 text-body text-text">
+				Todos los premios están resueltos. El sorteo se completa desde su ficha.
+			</p>
+			<Button href={drawHref} variant={nextPrizeId ? 'secondary' : 'primary'}
+				>Ir a completar el sorteo</Button
+			>
+		</section>
+	{/if}
 </div>
+
+{#if data.can.resolve}
+	<Dialog
+		open={unawarding !== null}
+		onClose={() => (unawarding = null)}
+		action="?/resolve"
+		tone="danger"
+		title={unawarding
+			? `¿Dejar sin adjudicar el premio ${unawarding.position}, ${unawarding.name}?`
+			: '¿Dejar sin adjudicar el premio?'}
+		description="El número {unawarding?.winningNumber?.formattedNumber ??
+			''} está habilitado, pero el premio queda sin ganador. {RESOLUTION_NOTE}"
+		confirmLabel="Dejar sin adjudicar"
+	>
+		{#if unawarding}
+			<input type="hidden" name="prizeId" value={unawarding.id} />
+			<input type="hidden" name="decision" value="unaward" />
+			<Field label="Notas" id="unaward-notes" optional>
+				<Textarea name="notes" />
+			</Field>
+		{/if}
+	</Dialog>
+{/if}

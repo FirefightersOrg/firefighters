@@ -138,6 +138,28 @@ The record leads with a figure and its name, then says the sale in sentences bui
 - Each one asks for its reason in a dialog whose title is the question («¿Corregir el cobrador de la venta del bono 0190?»), whose text says what figures today and what the change does, and whose button repeats the action. «Marcar como incobrable» says who can undo it: «Solo un administrador puede revertir la marca.»
 - In tables, where a sentence cannot be rebuilt, a party the role cannot read is «Sin acceso al comprador» or «Sin acceso al cobrador» (`src/lib/domain/parties.ts`), as plain text with no link. No screen says «Unknown».
 
+## Deliveries (`src/lib/domain/delivery-summary.ts`)
+
+- The bonds of a delivery are named as the ranges the operator has in the hand: «0211 a 0215» and «5 bonos», a lone bond «0220» and «1 bono», a pata «0100 + 0101» and «Pata de 2 números». Ranges are in number order, whatever the order they were added in, and a gap splits a range, so a missing number is seen.
+- Each range has one «Quitar»; for assistive tech it says what it removes: «Quitar los bonos 0211 a 0215», «Quitar el bono 0220», «Quitar la pata 0100 + 0101».
+- After each search the line beside «Agregar» says what happened: «5 bonos agregados.», «1 bono agregado.», «Ya está en la lista.», «2 bonos agregados. 1 ya estaba en la lista.», «Ningún bono disponible coincide.». For a range it names what could not be added: «El 0220 no está disponible.», «No están disponibles: 0201 a 0210.», and beyond three gaps only the count («12 números de ese rango no están disponibles.»).
+- The button says what is about to be recorded: «Entregar 35 bonos a Jorge Medina». Before there is a collector it is «Entregar 35 bonos»; before there are bonds, «Entregar bonos», not available.
+- With several ranges the total is said once under them: «36 bonos en esta entrega.» Units are mentioned only when a pata makes them differ: «3 bonos en esta entrega, 4 unidades contando las patas.»
+- The note record says the note in one sentence, with the verb of its reason: «Se entregaron 35 bonos a {cobrador} el 24/11/2026, 10:02.», «Se reasignaron 3 bonos a {cobrador} el …», «{cobrador} devolvió 4 bonos el …». A collector the role cannot read is left out («Se entregaron 35 bonos el …»). Then «Lo registró {persona}.» and «Observaciones: …» when there are any.
+- Its one action is «Imprimir». Under the ranges, «Abrir la ficha de un bono» unfolds every bond as a link.
+
+## Draws (`src/lib/domain/draw-steps.ts`)
+
+- A draw is described as «Sorteo mensual del 25/11/2026» («Sorteo final del …», «Sorteo de consuelo del …», «Sorteo extraordinario por pago total del …»).
+- The record lists the four steps of a draw in order, each named as an action: «Generar el padrón», «Congelar el padrón», «Cargar los ganadores», «Completar el sorteo». A done step says when («Generado el 24/11/2026, 10:02.», «Congelado el …»); the current one carries the page's one primary button; a later one says what it waits for («Cuando todos los premios estén resueltos, adjudicados o sin adjudicar.»).
+- The button of each state: «Generar padrón», «Congelar padrón», «Cargar ganadores» («Ver ganadores y premios» for a role that cannot load them), «Completar sorteo», and on a finished draw with prizes to hand over «Registrar la entrega del premio» / «Registrar las entregas de premios».
+- The winners step says how far it is: «Todavía no hay premios configurados. …», «Falta resolver 2 de 3 premios.», «2 premios resueltos. Falta entregar 1.». «Completar sorteo» is not offered while a prize is waiting; the step says why instead.
+- What cannot be undone says so before its button. Freezing: «Congelar es definitivo. Un padrón congelado no se vuelve a calcular nunca, aunque después se registren pagos.», with its checkbox. The resolution of a prize: «La resolución no se puede cambiar: para corregirla hay que anular el premio y crear su reemplazo.» Annulling a draw: «Un sorteo anulado no se puede volver a activar.»
+- The resolution is two buttons that name their outcome, not «Registrar resolución» over a list: «Adjudicar el premio» and «Dejar sin adjudicar». The second asks in a dialog («¿Dejar sin adjudicar el premio 1, Bicicleta?», «El número 0100 está habilitado, pero el premio queda sin ganador.»). The status word stays «No adjudicado».
+- A prize is titled «Premio 1: Televisor», not «#1 — Televisor». When every prize is resolved the winners page says «Todos los premios están resueltos. El sorteo se completa desde su ficha.» with «Ir a completar el sorteo».
+- Before the roster is frozen the winners page says «El padrón todavía no está congelado. Los números ganadores se cargan contra el padrón congelado. Mientras tanto se pueden configurar los premios.»
+- Roster: on a phone a number is two or three lines, «0100» with «Habilitado» or «No habilitado», then «{comprador}, lo cobra {cobrador}» (a bond nobody bought: «Lo tiene {cobrador}»), then the reason when it is not eligible. The eligibility filter reads «Habilitados» / «No habilitados». A generated roster says «Este padrón todavía puede cambiar: se puede volver a generar hasta que se congele. Se congela desde el sorteo.»
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.

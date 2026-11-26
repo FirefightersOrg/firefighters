@@ -83,18 +83,92 @@ describe('draw detail render', () => {
 		).toContain('Congelar padrón');
 		expect(
 			render(Page, { props: { data: data('scheduled', 'consolation'), form: null } as any }).body
-		).toContain('premios de los sorteos anteriores');
+		).toMatch(/premios de los sorteos\s+anteriores/);
 	});
 	it('offers completion only on a frozen draw (SAN-123)', () => {
 		const frozen = render(Page, { props: { data: data('roster_frozen'), form: null } as any }).body;
 		expect(frozen).toContain('action="?/complete"');
-		expect(frozen).toContain('Todos los premios tienen que estar resueltos');
+		expect(frozen).toContain('Cuando todos los premios estén resueltos');
 		expect(
 			render(Page, { props: { data: data('roster_generated'), form: null } as any }).body
 		).not.toContain('action="?/complete"');
 		expect(
 			render(Page, { props: { data: data('completed'), form: null } as any }).body
 		).not.toContain('action="?/complete"');
+	});
+	describe('the next step (UX plan PR 16)', () => {
+		const body = (status: string, extra: Record<string, unknown> = {}, can = {}) => {
+			const value: any = { ...data(status), ...extra };
+			value.can = { ...value.can, loadWinner: true, ...can };
+			return render(Page, { props: { data: value, form: null } as any }).body;
+		};
+		/** The step marked as current, and the text of the primary buttons and links of the page. */
+		const current = (html: string) => html.match(/aria-current="step" data-step="(\w+)"/)?.[1];
+		const primaries = (html: string) =>
+			[...html.matchAll(/<(?:a|button)[^>]*bg-primary [^>]*>([\s\S]*?)<\/(?:a|button)>/g)].map(
+				(match) => match[1].replace(/<[^>]+>/g, '').trim()
+			);
+		const counts = (extra: Record<string, number>) => ({
+			total: 0,
+			unresolved: 0,
+			resolved: 0,
+			pendingDelivery: 0,
+			...extra
+		});
+
+		it('scheduled: generating the roster is the one primary button', () => {
+			const html = body('scheduled');
+			expect(current(html)).toBe('generate');
+			expect(primaries(html)).toEqual(['Generar padrón']);
+			expect(html).toContain('Sorteo mensual del 01/12/2026');
+		});
+		it('generated: freezing is the primary button, and it says it is definitive', () => {
+			const html = body('roster_generated');
+			expect(current(html)).toBe('freeze');
+			expect(primaries(html)).toEqual(['Congelar padrón']);
+			expect(html).toContain('Congelar es definitivo');
+			expect(html).toContain('Regenerar padrón');
+			expect(html).toContain('Ver padrón');
+		});
+		it('frozen with prizes waiting: the winners are the primary button, and completion is not offered', () => {
+			const html = body('roster_frozen', {
+				prizes: counts({ total: 2, unresolved: 1, resolved: 1 })
+			});
+			expect(current(html)).toBe('winners');
+			expect(primaries(html)).toEqual(['Cargar ganadores']);
+			expect(html).toContain('Falta resolver 1 de 2 premios.');
+			expect(html).not.toContain('action="?/complete"');
+			expect(html).toMatch(/href="\/campaigns\/c\/draws\/d\/winners"/);
+		});
+		it('frozen, read without the permission to load winners: the button says «Ver»', () => {
+			const html = body('roster_frozen', { prizes: counts({}) }, { loadWinner: false });
+			expect(primaries(html)).toEqual(['Ver ganadores y premios']);
+		});
+		it('frozen with every prize resolved: completing the draw is the primary button', () => {
+			const html = body('roster_frozen', { prizes: counts({ total: 2, resolved: 2 }) });
+			expect(current(html)).toBe('complete');
+			expect(primaries(html)).toEqual(['Completar sorteo']);
+			expect(html).toContain('Ver ganadores y premios');
+		});
+		it('completed: no step is current; a prize to hand over is the primary button', () => {
+			const pending = body('completed', {
+				prizes: counts({ total: 2, resolved: 2, pendingDelivery: 1 })
+			});
+			expect(current(pending)).toBeUndefined();
+			expect(primaries(pending)).toEqual(['Registrar la entrega del premio']);
+			const done = body('completed', { prizes: counts({ total: 2, resolved: 2 }) });
+			expect(primaries(done)).toEqual([]);
+			expect(done).toContain('Sorteo realizado.');
+		});
+		it('annulled: no steps, the reason instead', () => {
+			const value: any = data('annulled');
+			value.draw.annulReason = 'Se suspendió la cena';
+			value.draw.annulledAt = '2026-11-20T15:00:00Z';
+			const html = render(Page, { props: { data: value, form: null } as any }).body;
+			expect(html).not.toContain('data-draw-steps');
+			expect(html).toContain('Sorteo anulado');
+			expect(html).toContain('Motivo: Se suspendió la cena');
+		});
 	});
 	it('hides actions in a terminal state', () =>
 		expect(render(Page, { props: { data: data('closed'), form: null } as any }).body).not.toContain(
