@@ -1,6 +1,6 @@
 -- B1: reuse the existing own-sales scope; no new buyer access.
 begin;
-select plan(22);
+select plan(25);
 
 insert into auth.users(id, email)
 select ('a7810000-0000-0000-0000-00000000000' || n)::uuid, 'b1-' || n || '@example.com' from generate_series(1, 3) n;
@@ -19,7 +19,8 @@ grant execute on function pg_temp.act(int) to authenticated, anon;
 create temp table ids(k text primary key, id uuid not null default gen_random_uuid());
 grant select on ids to authenticated, anon;
 insert into ids(k) select unnest(array['c1', 'c2', 'ca', 'cb', 'buyer_a1', 'buyer_a2', 'buyer_b', 'bond_a1', 'bond_a2', 'bond_b',
-  'sale_a1', 'sale_a2', 'sale_b', 'plan_a1', 'plan_a2', 'plan_b', 'i_a1', 'i_a2', 'i_b']);
+  'sale_a1', 'sale_a2', 'sale_b', 'plan_a1', 'plan_a2', 'plan_b', 'i_a1', 'i_a2', 'i_b',
+  'buyer_annulled', 'bond_annulled', 'sale_annulled', 'plan_annulled', 'i_annulled']);
 create function pg_temp.id(k text) returns uuid language sql stable as $$ select id from ids where ids.k = $1 $$;
 grant execute on function pg_temp.id(text) to authenticated, anon;
 create function pg_temp.actor() returns uuid language sql immutable as $$ select 'b7810000-0000-0000-0000-000000000003'::uuid $$;
@@ -57,6 +58,29 @@ insert into public.installments(id, payment_plan_id, installment_number, due_dat
   (pg_temp.id('i_b'), pg_temp.id('plan_b'), 1, (now() at time zone 'America/Argentina/Buenos_Aires')::date - 5, 300, 'pending');
 
 
+-- This buyer has exactly one own sale, now annulled, but its installment remains pending.
+-- Keep the plan active so only the active-sale scope can exclude this fixture.
+insert into public.buyers(id, type, first_name, last_name, phone, address) values
+  (pg_temp.id('buyer_annulled'), 'individual', 'Elena', 'Anulada', '444', 'Calle Exclusiva Anulada 78');
+insert into public.bonds(id, campaign_id, kind, origin, commercial_unit_count, total_value, commercial_status, current_collector_id) values
+  (pg_temp.id('bond_annulled'), pg_temp.id('c1'), 'simple', 'printed', 1, 300, 'available', pg_temp.id('ca'));
+insert into public.bond_numbers(campaign_id, bond_id, number_value, number_kind) values
+  (pg_temp.id('c1'), pg_temp.id('bond_annulled'), 24, 'base');
+insert into public.sales(id, campaign_id, bond_id, buyer_id, collector_id, sold_at, payment_mode, total_amount, created_by) values
+  (pg_temp.id('sale_annulled'), pg_temp.id('c1'), pg_temp.id('bond_annulled'), pg_temp.id('buyer_annulled'), pg_temp.id('ca'), now(), 'installments', 300, pg_temp.actor());
+insert into public.payment_plans(id, sale_id, installment_count, total_amount) values
+  (pg_temp.id('plan_annulled'), pg_temp.id('sale_annulled'), 1, 300);
+insert into public.installments(id, payment_plan_id, installment_number, due_date, amount, status) values
+  (pg_temp.id('i_annulled'), pg_temp.id('plan_annulled'), 1, (now() at time zone 'America/Argentina/Buenos_Aires')::date - 5, 300, 'pending');
+update public.sales set status = 'annulled' where id = pg_temp.id('sale_annulled');
+select is((select count(*)::int from public.sales s
+  join public.payment_plans pp on pp.sale_id = s.id
+  join public.installments i on i.payment_plan_id = pp.id
+  where s.id = pg_temp.id('sale_annulled') and s.collector_id = pg_temp.id('ca')
+    and s.status = 'annulled' and pp.status = 'active' and i.status = 'pending'),
+  1, 'the annulled own sale retains its pending installment on an active plan');
+
+
 select function_privs_are('public', 'portal_my_campaign_due_installments', array['uuid','integer','integer','integer'], 'authenticated', array['EXECUTE'], 'authenticated retains execute');
 select function_privs_are('public', 'portal_my_campaign_due_installments', array['uuid','integer','integer','integer'], 'anon', array[]::text[], 'anon has no privileges');
 select function_privs_are('public', 'portal_my_campaign_due_installments', array['uuid','integer','integer','integer'], 'service_role', array[]::text[], 'service_role has no privileges');
@@ -76,6 +100,12 @@ select is((select count(*)::int from pg_proc p, lateral aclexplode(p.proacl) a
 
 select pg_temp.act(1);
 set local role authenticated;
+select is((select count(*)::int from public.portal_my_campaign_due_installments(pg_temp.id('c1'))
+  where sale_id = pg_temp.id('sale_annulled') or buyer_id = pg_temp.id('buyer_annulled') or installment_id = pg_temp.id('i_annulled')),
+  0, 'the buyer with only an annulled own sale has no due row');
+select is((select count(*)::int from public.portal_my_campaign_due_installments(pg_temp.id('c1'))
+  where buyer_address = 'Calle Exclusiva Anulada 78'),
+  0, 'the address of the buyer with only an annulled own sale is not exposed');
 select is((select buyer_address from public.portal_my_campaign_due_installments(pg_temp.id('c1'))),
   'Calle 1', 'own installment returns the buyer address');
 select is((select count(*)::int from public.portal_my_campaign_due_installments(pg_temp.id('c2'))),

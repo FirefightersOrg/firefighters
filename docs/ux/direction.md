@@ -195,7 +195,7 @@ What changes from today:
 - A payment that was sent stays in the list as «Enviado» until treasury includes it, so the collector does not ask for it twice.
 - The reason an installment matters is shown when the data has it («Sin esta cuota no entra al Sorteo de noviembre»).
 - Routes and server contracts stay as in #142: the sheet posts to the existing `?/registrar` action of `/portal/[campaignId]/ventas/[saleId]`, with the same fields. If posting to another route's action from the list turns out to need a server change, «Cobrar» links to that sale with the form open on that installment instead (one more screen, same contracts).
-- Data not available today: the buyer's address (see B1) and the draw note. Both are left out until approved.
+- B1 (#197) now shows the buyer's address below the name in «Por cobrar», when present. The draw note is left out until approved.
 
 ## Proposals that change what was approved
 
@@ -213,7 +213,7 @@ What changes from today:
 
 Outside this redesign's limits (no SQL, migrations, permissions or service contracts). None blocks the plan.
 
-**Decision (2026-11-26, #50): B3 accepted, tracked in #162.** B1, B2, B4 and B5 are still open. The business questions raised by the audit were also answered: see [`audit.md`](audit.md#proposals-that-need-business-changes).
+**Decision (2026-11-26, #50): B3 accepted, tracked in #162.** B1 is done in #197 (`20270131000000_portal_due_buyer_address.sql`, pgTAP 078): the buyer's address is shown in «Por cobrar» within the existing active-own-sale scope. B2, B4 and B5 are still open. The business questions raised by the audit were also answered: see [`audit.md`](audit.md#proposals-that-need-business-changes).
 
 | #   | Proposal                                                                                                             | What it needs                                                                | Value                                                                   |
 | --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |

@@ -75,7 +75,7 @@ The collector role reads rows through policies of the form `global permission OR
 
 ## Alcance por campaña del portal (SAN-148)
 
-`portal_my_campaign_buyers(p_campaign_id, ...)` and `portal_my_campaign_due_installments(p_campaign_id, ...)` (SECURITY DEFINER, empty search_path, `authenticated` only) are the campaign-filtered variants of the SAN-145 lists. They check `sale.view_own` and only read the caller's own sales; a `NULL` campaign gives the SAN-145 result, and `portal_my_buyers_page` / `portal_my_due_installments` now delegate to them. pgTAP `068_portal_campaign_scope`; end-to-end isolation and the payment flow are in `tests/integration/phase-16-acceptance.test.ts`.
+`portal_my_campaign_buyers(p_campaign_id, ...)` and `portal_my_campaign_due_installments(p_campaign_id, ...)` (SECURITY DEFINER, empty search_path, `authenticated` only) are the campaign-filtered variants of the SAN-145 lists. They check `sale.view_own` and only read the caller's own active sales; a `NULL` campaign gives the SAN-145 result, and `portal_my_buyers_page` / `portal_my_due_installments` now delegate to them. B1 (#197, `20270131000000_portal_due_buyer_address.sql`) appends `buyer_address` to the due list: buyer data stays limited to name, phone and address of active own sales; a buyer with only an annulled own sale and their address are excluded (pgTAP `078_portal_due_buyer_address`). pgTAP `068_portal_campaign_scope`; end-to-end isolation and the payment flow are in `tests/integration/phase-16-acceptance.test.ts`.
 
 ## Mi cuenta corriente (SAN-146)
 
