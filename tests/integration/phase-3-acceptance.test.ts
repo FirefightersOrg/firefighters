@@ -1110,7 +1110,20 @@ describe('Phase 3 end-to-end acceptance (local Supabase)', () => {
 			const loaded = await record(users.operator, C, c.s68);
 			expect(loaded.record.numbers.map((n) => n.formatted)).toEqual(['00068', '48778']);
 			for (const typed of ['68', '00068']) {
-				const found = await list(users.operator, C, `?base=${typed}`);
+				// UX plan PR 9: a number alone that matches one bond opens its record...
+				await expect(
+					Promise.resolve(
+						listLoad(
+							event(users.operator, {
+								path: `/campaigns/${C}/bonds`,
+								params: { id: C },
+								search: `?base=${typed}`
+							})
+						)
+					)
+				).rejects.toMatchObject({ status: 303, location: `/campaigns/${C}/bonds/${c.s68}` });
+				// ...and with another filter it stays on the list, with the same match.
+				const found = await list(users.operator, C, `?base=${typed}&type=simple`);
 				expect(found.bonds.map((x) => x.id)).toEqual([c.s68]);
 				expect(found.bonds[0]).toMatchObject({
 					baseFormatted: ['00068'],
