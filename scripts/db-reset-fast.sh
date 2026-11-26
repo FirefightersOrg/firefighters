@@ -13,12 +13,17 @@
 # `APP_ENV=local pnpm seed:admin`: a migrated database with the seeded users and nothing else.
 #
 # Restore = ALLOW_CONNECTIONS false on `postgres`, terminate its sessions (auth, storage, PostgREST,
-# realtime, pg_cron and pg_net reconnect by themselves), DROP, CREATE ... TEMPLATE, then re-apply what
-# a template does not carry (database-level settings such as app.settings.jwt_secret, and the
-# database ACL), then `NOTIFY pgrst, 'reload schema'`. The pg_net background worker sometimes segfaults
-# around the DROP/CREATE and Postgres crash-recovers; so the script waits for the server to be out of
-# recovery before it starts, watches the server processes for 5 s after the restore (redoing the restore
-# once if they were re-forked), and prints psql's stderr when a restore fails and falls back.
+# realtime, pg_cron and pg_net reconnect by themselves), CREATE postgres_new ... TEMPLATE, swap it in
+# with two RENAMEs in ONE transaction (so the name `postgres` never disappears: the pg_net background
+# worker segfaulted on Linux when its database was dropped from under it), DROP the old one, then re-apply
+# what a template does not carry (database-level settings such as app.settings.jwt_secret, and the
+# database ACL) and `NOTIFY pgrst, 'reload schema'`. Those settings and that ACL are read from `postgres`
+# ONCE, when the snapshot is taken, and stored in the template's COMMENT after the hash, so a restore
+# never depends on `postgres` existing or being complete. The restore is idempotent: it can start from
+# any state (postgres missing, half-built, leftovers of an interrupted run) and always ends with a fresh
+# copy. As a safety net, the script waits for the server to be out of crash recovery before it starts,
+# watches the server processes for 5 s after the restore (redoing the restore once if they were
+# re-forked), and prints psql's stderr when a restore fails and falls back.
 #
 # Env, as exported by scripts/with-db-lock.sh for the slot it took (defaults = the single legacy stack):
 #   SUPABASE_PROJECT_ID     project_id of the target stack (default: from supabase/config.toml)
@@ -29,6 +34,8 @@
 #   DB_TEMPLATE_NAME        template database name (default: ff_template_<project_id>: one per slot, each
 #                           inside its own stack's Postgres, so slots never share or clobber a template)
 #   DB_RESET_FAST_REBUILD=1 ignore the existing template and rebuild it
+#   DB_RESET_FAST_FAULT     test only: kill the DB container once, mid-restore, at `before-swap`, `after-swap`
+#                           or `no-postgres` (drops postgres first, the state a crash left on Linux)
 # This script does not take the DB lock itself: run it through `pnpm db:reset:fast`.
 set -eu
 
@@ -43,7 +50,7 @@ start=$(date +%s)
 sql() { # sql <database> [psql args...]
 	local db=$1
 	shift
-	docker exec -i "$container" psql -U supabase_admin -d "$db" -v ON_ERROR_STOP=1 -qAt "$@"
+	docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "$container" psql -U supabase_admin -d "$db" -v ON_ERROR_STOP=1 -qAt "$@"
 }
 
 # Hash of every input that shapes the migrated + seeded database.
@@ -54,6 +61,7 @@ compute_hash() {
 			src/lib/server/services/user-admin.ts; do
 			[ -f "$f" ] && { echo "== $f"; cat "$f"; }
 		done
+		echo "== template format: 2 (comment = hash + settings/ACL)"
 		echo "== seed env: ${INITIAL_ADMIN_EMAIL:-} ${INITIAL_ADMIN_NAME:-} ${APP_ENV:-local}"
 	} | shasum -a 256 | cut -c1-24
 }
@@ -89,36 +97,75 @@ full_reset_and_snapshot() {
 	snapshot
 }
 
-snapshot() {
-	if [ "$(sql template1 -c "select count(*) from pg_database where datname = '$template'")" = "1" ]; then
-		sql template1 -c "alter database \"$template\" with is_template false" -c "drop database \"$template\""
-	fi
-	close_database postgres
-	sql template1 -c "create database \"$template\" template postgres is_template true allow_connections false" \
-		-c "comment on database \"$template\" is '$hash'" \
-		-c "alter database postgres with allow_connections true"
-	echo "db-reset-fast: snapshot $template saved (hash $hash)"
-}
-
-restore() {
-	# What a template does not carry over: database-level settings and the database ACL.
+# What a template does not carry over: database-level settings and the database ACL, as SQL to replay
+# on the restored `postgres`. Read from the live `postgres` (healthy: we have just reset it).
+read_extras() {
 	local settings acl
-	settings=$(sql template1 -c "select format('alter database postgres set %I to %L', split_part(c, '=', 1), substr(c, position('=' in c) + 1))
+	settings=$(sql postgres -c "select format('alter database postgres set %I to %L', split_part(c, '=', 1), substr(c, position('=' in c) + 1))
 		from pg_db_role_setting s join pg_database d on d.oid = s.setdatabase, unnest(s.setconfig) c
 		where d.datname = 'postgres' and s.setrole = 0")
-	acl=$(sql template1 -c "select format('grant %s on database postgres to %s', string_agg(privilege_type, ', '),
+	acl=$(sql postgres -c "select format('grant %s on database postgres to %s', string_agg(privilege_type, ', '),
 		case grantee when 0 then 'public' else quote_ident(grantee::regrole::text) end)
 		from pg_database d, aclexplode(d.datacl) where d.datname = 'postgres' group by grantee")
 	if [ -z "$settings" ] || [ -z "$acl" ]; then
 		echo "db-reset-fast: cannot read the settings/ACL of postgres" >&2
 		return 1
 	fi
+	{ echo "$settings"; echo "$acl"; } | sed 's/$/;/'
+}
+
+snapshot() {
+	local extras
+	extras=$(read_extras) || return 1
+	if [ "$(sql template1 -c "select count(*) from pg_database where datname = '$template'")" = "1" ]; then
+		sql template1 -c "alter database \"$template\" with is_template false" -c "drop database \"$template\""
+	fi
+	close_database postgres
+	# Comment = hash on the first line, then the SQL that restore() replays.
+	sql template1 -c "create database \"$template\" template postgres is_template true allow_connections false" \
+		-c "comment on database \"$template\" is \$ffx\$$hash
+$extras\$ffx\$" \
+		-c "alter database postgres with allow_connections true"
+	echo "db-reset-fast: snapshot $template saved (hash $hash)"
+}
+
+fault_fired=0
+fault() { # fault <point>: test-only fault injection, fires once
+	[ "${DB_RESET_FAST_FAULT:-}" = "$1" ] && [ "$fault_fired" = "0" ] || return 0
+	fault_fired=1
+	echo "db-reset-fast: injecting a fault at $1: killing $container" >&2
+	[ "$1" = "no-postgres" ] && { close_database postgres; sql template1 -c 'drop database postgres' >/dev/null || true; }
+	docker kill "$container" >/dev/null && docker start "$container" >/dev/null
+	return 1
+}
+
+database_exists() { [ "$(sql template1 -c "select count(*) from pg_database where datname = '$1'")" = "1" ]; }
+
+restore() {
+	# The settings/ACL come from the template's comment, never from `postgres` (it may not exist).
+	local extras
+	extras=$(sql template1 -c "select substr(c, position(E'\n' in c) + 1) from (select coalesce(shobj_description(oid, 'pg_database'), '') c from pg_database where datname = '$template') t")
+	if [ -z "$extras" ]; then
+		echo "db-reset-fast: the template $template carries no settings/ACL" >&2
+		return 1
+	fi
 	# `set -e` is off inside a function called with `||`, so every step reports its own failure.
-	close_database postgres || return 1
-	sql template1 -c 'drop database postgres' \
-		-c "create database postgres template \"$template\" owner postgres" \
-		-c 'revoke all on database postgres from public' >/dev/null || return 1
-	{ echo "$settings"; echo "$acl"; } | sed 's/$/;/' | sql template1 || return 1
+	# Start from a clean slate: leftovers of an interrupted run are dropped.
+	sql template1 -c 'drop database if exists postgres_new' -c 'drop database if exists postgres_old' >/dev/null || return 1
+	fault no-postgres || return 1
+	if database_exists postgres; then close_database postgres || return 1; fi
+	sql template1 -c "create database postgres_new template \"$template\" owner postgres" >/dev/null || return 1
+	fault before-swap || return 1
+	if database_exists postgres; then
+		sql template1 -c 'begin' -c 'alter database postgres rename to postgres_old' \
+			-c 'alter database postgres_new rename to postgres' -c 'commit' >/dev/null || return 1
+		sql template1 -c 'drop database postgres_old' >/dev/null || return 1
+	else
+		sql template1 -c 'alter database postgres_new rename to postgres' >/dev/null || return 1
+	fi
+	fault after-swap || return 1
+	sql template1 -c 'revoke all on database postgres from public' >/dev/null || return 1
+	echo "$extras" | sql template1 || return 1
 	sql postgres -c "notify pgrst, 'reload schema'" >/dev/null || return 1
 	echo "db-reset-fast: restored postgres from $template in $(($(date +%s) - start))s"
 }
@@ -208,7 +255,7 @@ restore_checked() {
 
 wait_db_ready
 hash=$(compute_hash)
-stored=$(sql template1 -c "select coalesce(shobj_description(oid, 'pg_database'), '') from pg_database where datname = '$template'" 2>/dev/null || true)
+stored=$(sql template1 -c "select split_part(coalesce(shobj_description(oid, 'pg_database'), ''), E'\n', 1) from pg_database where datname = '$template'" 2>/dev/null || true)
 
 if [ "${DB_RESET_FAST_REBUILD:-}" != "1" ] && [ "$stored" = "$hash" ]; then
 	restore_checked || { echo "db-reset-fast: restore failed, falling back to a full reset" >&2; full_reset_and_snapshot; }
