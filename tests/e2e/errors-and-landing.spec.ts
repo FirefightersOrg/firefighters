@@ -221,4 +221,27 @@ test.describe.serial('error pages, landing and the back link', () => {
 		}
 		await page.close();
 	});
+
+	test('the login helper also works on a context that is already signed in', async ({
+		browser
+	}) => {
+		// A saved session applied to every new context (see #178) must not leave `login()` waiting
+		// for a form that a signed-in user never sees: it signs the wanted user in over it.
+		const fixtures = resolveSeedConfig().fixtures;
+		const readOnlyUser = fixtures.find((user) => user.roleNames.includes('read-only'))!;
+		const context = await browser.newContext({
+			baseURL,
+			locale: 'es-AR',
+			storageState: await admin.storageState()
+		});
+		const page = await context.newPage();
+		await login(page);
+		await expect(page).not.toHaveURL(/\/login/);
+		// Still the admin: the page only an admin's role can open answers.
+		expect((await page.goto('/campaigns/new'))?.status()).toBe(200);
+		// Another user over the admin's session: now that page is forbidden.
+		await login(page, readOnlyUser);
+		expect((await page.goto('/campaigns/new'))?.status()).toBe(403);
+		await context.close();
+	});
 });
