@@ -313,6 +313,21 @@
 			close();
 		});
 
+	/** One line that says which payment a dialog is about: who, how much, how and when. */
+	const summaryOf = (payment: {
+		buyer: string | null;
+		amount: string;
+		method: string;
+		date: string;
+	}) =>
+		`${[
+			payment.buyer,
+			formatMoney(payment.amount),
+			lowerFirst(methodLabel(payment.method)),
+			day(payment.date)
+		]
+			.filter(Boolean)
+			.join(', ')}.`;
 	const paymentTitle = (payment: OpenSettlementPayment) =>
 		payment.buyer ?? (installmentsLabel(payment.installments) || methodLabel(payment.method));
 	const paymentDetail = (payment: OpenSettlementPayment) => {
@@ -677,12 +692,7 @@
 		tone="danger"
 	>
 		<input type="hidden" name="paymentId" value={payment.id} />
-		<p class="m-0 text-body">
-			{#if payment.buyer}{payment.buyer},
-			{/if}<Money value={payment.amount} />, {lowerFirst(methodLabel(payment.method))}, {day(
-				payment.date
-			)}.
-		</p>
+		<p class="m-0 text-body">{summaryOf(payment)}</p>
 		<Field label="Motivo" id="correction-reason" required hint={reasonHint}>
 			<Textarea name="reason" required />
 		</Field>
@@ -702,9 +712,7 @@
 		tone="danger"
 	>
 		<input type="hidden" name="paymentId" value={row.id} />
-		<p class="m-0 text-body">
-			{row.buyer}, <Money value={row.amount} />, {lowerFirst(methodLabel(row.method))}.
-		</p>
+		<p class="m-0 text-body">{summaryOf(row)}</p>
 		<Field label="Motivo del rechazo" id="reject-reason" required hint={reasonHint}>
 			<Textarea name="reason" required />
 		</Field>
