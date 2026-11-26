@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { centsToDecimalString, parseMoneyToCents, toDecimalString } from '$lib/domain/money';
 import type { SettlementStatus } from '$lib/domain/payments';
+import { UNREADABLE_BUYER } from '$lib/domain/settlement-entry';
 import type { RepositoryResult } from './campaigns';
 
 type Row = Record<string, unknown>;
@@ -173,11 +174,18 @@ export async function getSettlementTotals(
 		? { data: null, error }
 		: { data: totals((data as unknown as Row[] | null)?.[0] ?? {}), error: null };
 }
+const baseNumbers = (bond: Row | null) =>
+	((bond?.bond_numbers as Row[] | null) ?? [])
+		.filter((n) => n.number_kind === 'base')
+		.map((n) => n.number_value)
+		.join(', ');
 export async function listSettlementPayments(client: SupabaseClient, id: string) {
 	const { data, error } = await readPages((from, to) =>
 		client
 			.from('payments')
-			.select('id,amount,payment_method,payment_date,status,sales(bond_id)')
+			.select(
+				'id,amount,payment_method,payment_date,status,buyers(first_name,last_name,business_name),sales(bond_id,bonds(bond_numbers(number_value,number_kind))),payment_installments(installments(installment_number))'
+			)
 			.eq('settlement_id', id)
 			.order('created_at', { ascending: false })
 			.order('id')
@@ -187,14 +195,29 @@ export async function listSettlementPayments(client: SupabaseClient, id: string)
 	return error
 		? { data: null, error }
 		: {
-				data: (data ?? []).map((p) => ({
-					id: p.id as string,
-					amount: money(p.amount),
-					method: p.payment_method as string,
-					date: p.payment_date as string,
-					status: p.status as string,
-					bondId: ((p.sales as Row | null)?.bond_id ?? null) as string | null
-				})),
+				data: (data ?? []).map((p) => {
+					const sale = p.sales as Row | null;
+					const buyer = p.buyers as Row | null;
+					return {
+						id: p.id as string,
+						amount: money(p.amount),
+						method: p.payment_method as string,
+						date: p.payment_date as string,
+						status: p.status as string,
+						bondId: (sale?.bond_id ?? null) as string | null,
+						/** The bond's base number(s), so every payment can be told apart (audit A4). */
+						bond: baseNumbers(sale?.bonds as Row | null),
+						/** Null when the caller's role cannot read the buyer: the row shows the bond alone. */
+						buyer:
+							(buyer?.business_name as string | null) ||
+							[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
+							null,
+						installments: ((p.payment_installments as Row[] | null) ?? [])
+							.map((a) => ((a.installments as Row | null)?.installment_number ?? 0) as number)
+							.filter(Boolean)
+							.sort((a, b) => a - b)
+					};
+				}),
 				error: null
 			};
 }
@@ -289,9 +312,9 @@ export async function listCollectorPaymentCandidates(
 					saleId: sale.id as string,
 					bond: numbers,
 					buyer:
-						buyer?.business_name ||
+						(buyer?.business_name as string | null) ||
 						[buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ') ||
-						'Unknown buyer',
+						UNREADABLE_BUYER,
 					dueDate: row.due_date as string,
 					amount: centsToDecimalString(
 						Math.max(

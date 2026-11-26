@@ -125,9 +125,12 @@ export async function deliverSellAndSettle(
 	await expect(page).toHaveURL(/\/settlements\/[0-9a-f-]{36}$/);
 	const settlementId = page.url().split('/').pop()!;
 	await page.waitForLoadState('networkidle');
-	await page.locator('#sale').selectOption({ index: 1 });
-	await page.locator('input[name="installmentId"]').first().check();
-	await page.getByRole('button', { name: 'Agregar pago' }).click();
+	// UX plan PR 7: the number, Enter (finds the sale), Enter (adds the payment).
+	const number = page.getByLabel('Número del bono que pagó');
+	await number.fill(String(base));
+	await number.press('Enter');
+	await expect(page.locator('[data-found-sale]')).toBeVisible();
+	await number.press('Enter');
 	await expect(page.getByText('Pago agregado.')).toBeVisible();
 	await page.getByRole('button', { name: 'Cerrar rendición' }).first().click();
 	const dialog = page.getByRole('dialog');
