@@ -16,7 +16,7 @@ The visual direction approved in #50 and merged in #145 to #148 stays as it is:
 
 Those three screens proved the language. This direction applies it to the rest of the app and fixes what the language alone does not fix: how people move between screens, and how many steps the daily work takes.
 
-Five changes to what was approved are listed as explicit proposals in [Proposals that change what was approved](#proposals-that-change-what-was-approved). They are not assumed anywhere else in the plan until Santi and Juan accept them.
+Five changes to what was approved were listed as explicit proposals in [Proposals that change what was approved](#proposals-that-change-what-was-approved). Santi accepted all five on 2026-11-26, after reviewing them with Juan.
 
 ## Who uses it, and where
 
@@ -207,7 +207,7 @@ What changes from today:
 
 ## Proposals that change what was approved
 
-Each needs an explicit yes or no in #50. The plan will not depend on a proposal that is still open.
+**Decision (2026-11-26, #50): P1 to P5 accepted by Santi, after reviewing them with Juan.** They are part of [`plan.md`](plan.md).
 
 | #   | Proposal                                                                                                                                                                                        | Why                                                                                                                                                               | If rejected                                                         |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -219,7 +219,9 @@ Each needs an explicit yes or no in #50. The plan will not depend on a proposal 
 
 ## Proposals that need backend or business changes
 
-Outside this redesign's limits (no SQL, migrations, permissions or service contracts). Written up here so they can be decided in #50; none blocks the plan.
+Outside this redesign's limits (no SQL, migrations, permissions or service contracts). None blocks the plan.
+
+**Decision (2026-11-26, #50): B3 accepted, tracked in #162.** B1, B2, B4 and B5 are still open. The business questions raised by the audit were also answered: see [`audit.md`](audit.md#proposals-that-need-business-changes).
 
 | #   | Proposal                                                                                                             | What it needs                                                                | Value                                                                   |
 | --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |

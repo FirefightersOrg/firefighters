@@ -6,7 +6,7 @@ Working documents of the frontend and UX/UI redesign (coordinated in #50).
 | ------------------------------ | ----------------------------------------------------------------------------------------- |
 | [`audit.md`](audit.md)         | What is wrong today, ordered by impact, with evidence, cause and a proposal for each item |
 | [`direction.md`](direction.md) | The vision: principles, navigation, patterns per kind of screen, prototypes, proposals    |
-| `plan.md`                      | The list of small PRs (written once the direction is approved)                            |
+| [`plan.md`](plan.md)           | The list of small PRs, in order, with scope, acceptance criteria and risk for each        |
 | [`before/`](before/)           | Screenshots and measurements of every screen before the redesign                          |
 | [`prototypes/`](prototypes/)   | Static HTML prototypes of the four key screens, with screenshots in `shots/`              |
 | `after/`                       | The same walkthrough after the redesign (phase 4)                                         |
