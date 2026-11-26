@@ -2,9 +2,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEMO_CAMPAIGN_NAME } from './seed-demo';
 
 /**
- * The screens of the app, addressed with records of the demo campaign (`pnpm seed:demo`). Shared by
- * the UX walkthrough (`ux-walkthrough.ts`) and by the realistic-data E2E sweep
- * (`tests/e2e/realistic-data.spec.ts`), so both visit the same list.
+ * The screens of the app, addressed with records of the demo campaign (`pnpm seed:demo`). Used by
+ * the realistic-data E2E sweep (`tests/e2e/realistic-data.spec.ts`); the UX walkthrough also used
+ * this list during the redesign and was removed in PR 20.
  */
 
 export interface DemoIds {

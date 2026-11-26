@@ -4,6 +4,8 @@ How the direction in [`direction.md`](direction.md) becomes code: a list of smal
 
 Santi approved the plan on 2026-11-26 and answered its three open points (see [Decisions](#decisions)). Implementation starts when #159 is approved on GitHub and merged.
 
+The walkthrough and flow scripts were used during the redesign and removed in PR 20.
+
 ## Rules for every PR
 
 - One branch per PR, cut from an up-to-date `origin/main`. Never more than two UI PRs open at once.
@@ -59,7 +61,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
 
 ### PR 2. Cimiento: navy dark palette (P3)
 
-- **Scope.** `docs/design-system/tokens.json`, `src/lib/styles/tokens.css` (both dark blocks), the dark `theme-color` in `src/app.html`, `static/offline.html`, `docs/design-system/README.md` («Tema oscuro»). Values as in `prototypes/proto.css`.
+- **Scope.** `docs/design-system/tokens.json`, `src/lib/styles/tokens.css` (both dark blocks), the dark `theme-color` in `src/app.html`, `static/offline.html`, `docs/design-system/README.md` («Tema oscuro»). Values followed the prototype palette, removed in PR 20.
 - **Screens.** Every screen, in dark only.
 - **Acceptance.**
   - `tokens.test.ts` passes (JSON and CSS match, in both dark blocks).
@@ -198,7 +200,7 @@ PRs 2, 3 and 4 are Cimiento only. 5 and 6 are the shell. From 7 on, each PR is a
   - A sent payment stays in the list as «Enviado».
 - **Screens.** Portal home, «Por cobrar», sale.
 - **Acceptance.**
-  - `scripts/ux-flows.ts` reports 3 taps and 3 screens to send a payment (6 and 7 today), or 4 and 4 with the fallback.
+  - `scripts/ux-flows.ts` reported 3 taps and 3 screens to send a payment (6 and 7 today), or 4 and 4 with the fallback.
   - At 375 px nothing is cut on «Por cobrar» or on the sale, and every phone number is a `tel:` link.
   - A collector with one active and one draft campaign lands on «Por cobrar» of the active one and is never offered the draft. A campaign in closing is listed; a closed or annulled one is not.
   - The Phase 16 acceptance suite and `portal-a11y.spec.ts` pass, with the landing expectation updated.
@@ -224,7 +226,7 @@ Delivered as two PRs so each can be reviewed on its own: 12a, registering a sale
   - A buyer or a collector the role cannot read is left out of the record's sentences, and shows as «Sin acceso al comprador» or «Sin acceso al cobrador» with no link in tables (the Spanish fallback from A9, one constant in `src/lib/domain/parties.ts` used by the repositories).
 - **Screens.** New sale, sale record.
 - **Acceptance.**
-  - Searching for a buyer after choosing the bond keeps the bond (the probe flow in `ux-flows.ts` reports it kept).
+  - Searching for a buyer after choosing the bond keeps the bond (the probe flow in `ux-flows.ts` reported it kept).
   - The sale flow is 6 actions or fewer (7 today). Measured: 6 actions and 5 screens. The screens stay at 5, not the 4 first written here: the bond found, with who has it, is still a state the person reads before choosing the buyer, and it is counted as before.
   - Without JavaScript the form still registers a sale (the search falls back to today's GET).
   - No screen shows «Unknown buyer» or «Unknown collector» for any role (a crawl in the E2E sweep asserts it).
