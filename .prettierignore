@@ -11,3 +11,6 @@ bun.lockb
 # Vendored agent skills (installed with `npx skills add`; keep verbatim, hashed in skills-lock.json)
 .agents/
 skills-lock.json
+
+# Generated per-slot Supabase workdirs (SAN-165)
+/supabase/slots/

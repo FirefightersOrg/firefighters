@@ -42,7 +42,10 @@ function readEnvFile(cwd: string): Record<string, string | undefined> {
 /** Keys of the running local stack (`supabase status -o env`), or {} if the CLI fails. */
 function readSupabaseStatus(cwd: string): Record<string, string | undefined> {
 	try {
-		const output = execFileSync('supabase', ['status', '-o', 'env'], {
+		// Under the slot lock SUPABASE_WORKDIR points at the slot's stack (scripts/with-db-lock.sh).
+		const workdir = process.env.SUPABASE_WORKDIR;
+		const args = ['status', '-o', 'env', ...(workdir ? ['--workdir', workdir] : [])];
+		const output = execFileSync('supabase', args, {
 			cwd,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'ignore']
