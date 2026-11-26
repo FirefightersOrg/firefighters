@@ -199,6 +199,24 @@ The three lists follow the bonds list: the search first, the other filters under
 | Buyers     | «Todavía no hay compradores» / «Se cargan al registrar una venta, o antes con «Nuevo comprador».» Without the permission: «Se cargan al registrar una venta.»        | «Ningún comprador coincide con la búsqueda» / «Probar con otro nombre, teléfono o documento.» / «Ver todos los compradores»   |
 | Draws      | «Todavía no hay sorteos» / «Crear el primero con «Nuevo sorteo».» Without the permission: «Los crea quien administra la campaña.»                                    | «Ningún sorteo coincide con los filtros» / «Probar con otro tipo u otro estado.» / «Ver todos los sorteos»                    |
 
+## Operation lists: sales, settlements, delivery notes
+
+A row starts with what the record is called, and that name carries the only link of the row. Then its state, in words, and its amount in whole pesos.
+
+| List           | The row, as it is said                                                             | Second line on a phone                                             | State                                                                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sales          | «0190 Oscar Pérez»: the bond number is the sale's identifier and opens the sale    | «Lo cobra Héctor Acosta» and the total of the sale                 | How its payments stand, under «Pagos» as on the bonds list: «Sin pagos», «Al día», «En mora», «Pagado». Not active: «Corregida», «Anulada» |
+| Settlements    | «Rendición 15 de Héctor Acosta»                                                    | «Abierta el 26/11/2026», or «Cerrada el 26/11/2026» and its total  | «Abierta», «Cerrada», «Anulada», «Corregida». The open ones come first                                                                     |
+| Delivery notes | «Remito 0007 a Jorge Medina»; «Remito 0013 de Lucía Fernández» when it is a return | «Entrega del 26/11/2026», «Reasignación del …», «Devolución del …» | «5 bonos» ends the first line; an annulled note adds «Anulado» to its reason                                                               |
+
+- No «#15» and no column of ids: a settlement is «Rendición 15», a note is «Remito 0007» (four digits, as printed).
+- An open settlement has no total yet (it is computed when it closes): a dash on the desktop table, nothing on the phone. Never «$ 0».
+- The search field is named by what it takes: «Nombre del comprador» on sales, «Número de remito» on delivery notes. Settlements have no search, only «Filtrar».
+- A date filter says which date it is: «Abierta desde» and «Abierta hasta» (settlements), «Emitido desde» and «Emitido hasta» (delivery notes). Its chip writes the date as people do: «Abierta desde: 01/11/2026».
+- The count above the table: «Mostrando 1–25 de 148 ventas», «Mostrando 1–13 de 13 remitos», and for settlements, which are not paged, «16 rendiciones, 3 abiertas».
+- Empty lists say how the first record comes to be: «Una venta se registra con un bono que ya tiene un cobrador y el comprador que lo lleva.», «Abrir una rendición para cargar los pagos que entrega un cobrador.», «Un remito se emite al entregar bonos a un cobrador, al reasignarlos o al recibirlos de vuelta.» With filters: «Ninguna venta coincide con los filtros» and «Probar con otros filtros o quitarlos para ver todas las ventas.»
+- A collector or a buyer the role cannot read: the phone sentence leaves the name out («Rendición 15», «Remito 0007»); where the row would otherwise have nothing, and in the desktop column, it is «Sin acceso al comprador» or «Sin acceso al cobrador» in muted text. Names are plain text on these lists, never links.
+
 ## Glossary
 
 The code, database and existing docs are in English; the UI and printable documents use these Spanish terms. Table and enum names do not change.
