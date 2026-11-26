@@ -7,7 +7,12 @@
 		Select,
 		Textarea,
 		Checkbox,
-		RadioGroup
+		RadioGroup,
+		Badge,
+		BondNumber,
+		BondStub,
+		Money,
+		MoneySheet
 	} from '$lib/components/ui';
 	import { ICON_NAMES } from '$lib/components/ui/icon-names';
 
@@ -26,6 +31,20 @@
 		{ value: 'x', label: 'No disponible', disabled: true }
 	];
 	const variants = ['primary', 'secondary', 'ghost', 'danger'] as const;
+	const tones = [
+		['neutral', 'Borrador'],
+		['info', 'Vendido'],
+		['success', 'Al día'],
+		['warning', 'En cierre'],
+		['danger', 'En mora']
+	] as const;
+	const sheet = [
+		{ label: 'Efectivo (7 pagos)', value: 70000 },
+		{ label: 'Transferencias (3 pagos)', value: 30000 },
+		{ label: 'Total cobrado', value: 100000, kind: 'subtotal' as const },
+		{ label: 'Comisión que se queda el cobrador', value: 7000, kind: 'deduction' as const },
+		{ label: 'Neto para Bomberos', value: 93000, kind: 'lead' as const }
+	];
 </script>
 
 <svelte:head><title>UI kit (dev)</title></svelte:head>
@@ -106,6 +125,43 @@
 			<RadioGroup legend="Medio de pago" name="method" options={methods} bind:value={method} />
 			<RadioGroup legend="Con error" options={methods} error="Elegir un medio de pago." />
 			<p class="text-body-sm text-muted">Seleccionado: {method}</p>
+		</section>
+
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Estados</h2>
+			<p class="text-body-sm text-muted">
+				La marca cambia de forma con el tono: redonda, rombo para advertencia, cuadrada para un
+				problema.
+			</p>
+			<div class="flex flex-wrap gap-2">
+				{#each tones as [tone, label] (tone)}<Badge {tone}>{label}</Badge>{/each}
+			</div>
+		</section>
+
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Número de bono</h2>
+			<div class="flex flex-wrap items-baseline gap-6">
+				<BondNumber number={181} size="sm" />
+				<BondNumber number={181} associated={5181} />
+				<BondNumber number={181} associated={5181} size="lg" />
+				<BondNumber number={24} href="#bono" />
+			</div>
+			<div><BondStub number="0181" caption="Bono" detail="Número asociado 5181" /></div>
+			<div><BondStub number="0181" caption="Bono" size="md" /></div>
+		</section>
+
+		<section class="flex flex-col gap-4">
+			<h2 class="text-heading-2">Montos</h2>
+			<div class="flex flex-wrap items-baseline gap-6">
+				<Money value={150500} />
+				<Money value="1500.50" />
+				<Money value={150500} context="document" />
+				<Money value={-7000} />
+				<Money value={null} />
+			</div>
+			<div class="max-w-[420px] rounded-lg border border-border bg-surface px-6 pt-2 pb-5">
+				<MoneySheet rows={sheet} secondary={[{ label: 'Comisión generada', value: 10000 }]} />
+			</div>
 		</section>
 	</div>
 {/snippet}
