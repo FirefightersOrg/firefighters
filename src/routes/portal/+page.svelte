@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import { Card, EmptyState, PageHeader, StatusBadge } from '$lib/components/ui';
 	import type { PageProps } from './$types';
@@ -7,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Mi portal - Firefighters</title>
+	<title>Mi portal - {institutionName()}</title>
 </svelte:head>
 
 {#if data.collector}

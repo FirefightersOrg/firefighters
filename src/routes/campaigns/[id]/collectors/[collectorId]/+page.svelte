@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import CollectorForm from '$lib/components/collectors/CollectorForm.svelte';
@@ -134,7 +135,8 @@
 </script>
 
 <svelte:head
-	><title>{data.collector.displayName} - {data.campaign.name} - Firefighters</title></svelte:head
+	><title>{data.collector.displayName} - {data.campaign.name} - {institutionName()}</title
+	></svelte:head
 >
 
 <PageHeader

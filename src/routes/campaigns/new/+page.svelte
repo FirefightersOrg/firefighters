@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Alert, Button, Card, FormResult, PageHeader } from '$lib/components/ui';
@@ -34,7 +35,7 @@
 </script>
 
 <svelte:head>
-	<title>Nueva campaña - Firefighters</title>
+	<title>Nueva campaña - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

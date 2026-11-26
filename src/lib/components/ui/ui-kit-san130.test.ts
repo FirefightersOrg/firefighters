@@ -145,22 +145,41 @@ describe('PageHeader', () => {
 		expect(body).toContain('<a>Nueva</a>');
 	});
 
-	it('renders breadcrumbs with the last crumb as current page, unlinked', () => {
+	it('shows one link back to the last parent, not the whole trail', () => {
 		const { body } = render(PageHeader, {
 			props: {
-				title: 'Detalle',
-				breadcrumbs: [{ label: 'Campañas', href: '/campaigns' }, { label: 'Rifa 2026' }]
+				title: 'Registrar venta',
+				breadcrumbs: [
+					{ label: 'Campañas', href: '/campaigns' },
+					{ label: 'Rifa 2026', href: '/campaigns/c' },
+					{ label: 'Ventas', href: '/campaigns/c/sales' },
+					{ label: 'Registrar venta' }
+				]
 			}
 		});
-		expect(body).toContain('aria-label="Ruta de navegación"');
-		expect(body).toContain('href="/campaigns"');
-		expect(body).toMatch(/<span aria-current="page">Rifa 2026<\/span>/);
+		expect(body.match(/<a /g)).toHaveLength(1);
+		expect(body).toMatch(/<a href="\/campaigns\/c\/sales"[^>]*data-back-link/);
+		expect(body.replace(/\s+/g, ' ')).toContain('Volver a Ventas</a>');
+		expect(body).not.toContain('Ruta de navegación');
+		expect(body).not.toContain('href="/campaigns"');
+		// A real target on touch screens.
+		expect(body).toContain('pointer-coarse:min-h-touch');
 		expect(body).not.toContain('Inicio');
+	});
+
+	it('has no back link on a page with no parent', () => {
+		const top = render(PageHeader, {
+			props: { title: 'Campañas', breadcrumbs: [{ label: 'Campañas' }] }
+		}).body;
+		expect(top).not.toContain('data-back-link');
+		expect(render(PageHeader, { props: { title: 'Solo título' } }).body).not.toContain(
+			'data-back-link'
+		);
 	});
 
 	it('omits optional regions', () => {
 		const { body } = render(PageHeader, { props: { title: 'Solo título' } });
-		expect(body).not.toContain('<nav');
+		expect(body).not.toContain('<a');
 		expect(body).not.toContain('<p');
 	});
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import {
@@ -45,7 +46,7 @@
 </script>
 
 <svelte:head>
-	<title>Importar bonos - {campaign.name} - Firefighters</title>
+	<title>Importar bonos - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

@@ -107,7 +107,7 @@ describe('collector current account page', () => {
 		])
 			expect(body).toMatch(new RegExp(`>\\s*${column}\\s*</th>`));
 		expect(body).toContain('Comisión generada');
-		expect(body).toContain('Ajuste a favor de Firefighters');
+		expect(body).toContain('Ajuste a favor de Bomberos');
 		expect(body).toMatch(/data-testid="ledger-balance"[\s\S]*\$.17,50/);
 		expect(body).toContain('19/11/2026');
 		expect(body).toContain(
@@ -177,7 +177,7 @@ describe('collector current account page', () => {
 			{
 				id: 'e5',
 				direction: 'collector_debit',
-				label: '20/11/2026 · Ajuste a favor de Firefighters (queda $ 2,00)'
+				label: '20/11/2026 · Ajuste a favor de Bomberos (queda $ 2,00)'
 			}
 		]);
 		expect(body).toContain('Efectivo rendido');

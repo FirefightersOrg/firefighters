@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import {
@@ -129,7 +130,7 @@
 
 <svelte:head>
 	<title
-		>Cuenta corriente - {data.collector.displayName} - {data.campaign.name} - Firefighters</title
+		>Cuenta corriente - {data.collector.displayName} - {data.campaign.name} - {institutionName()}</title
 	>
 </svelte:head>
 
@@ -258,7 +259,7 @@
 							name="direction"
 							options={[
 								{ value: 'in_favor_of_collector', label: 'El cobrador' },
-								{ value: 'in_favor_of_firefighters', label: 'Firefighters' }
+								{ value: 'in_favor_of_firefighters', label: 'Bomberos' }
 							]}
 						/>
 					</Field>
@@ -317,7 +318,7 @@
 							bind:value={ledgerDirection}
 							options={[
 								{ value: 'collector_credit', label: 'Crédito (a favor del cobrador)' },
-								{ value: 'collector_debit', label: 'Débito (a favor de Firefighters)' }
+								{ value: 'collector_debit', label: 'Débito (a favor de Bomberos)' }
 							]}
 						/>
 					</Field>

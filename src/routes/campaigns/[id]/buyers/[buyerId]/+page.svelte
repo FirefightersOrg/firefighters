@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import BuyerForm from '$lib/components/buyers/BuyerForm.svelte';
 	import { EmptyState, PageHeader, Section, Stat, StatusBadge, Table } from '$lib/components/ui';
@@ -72,7 +73,8 @@
 </script>
 
 <svelte:head
-	><title>{buyerDisplayName(data.buyer)} - {data.campaign.name} - Firefighters</title></svelte:head
+	><title>{buyerDisplayName(data.buyer)} - {data.campaign.name} - {institutionName()}</title
+	></svelte:head
 >
 
 <PageHeader

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import BaseNumberPreview from '$lib/components/bonds/BaseNumberPreview.svelte';
@@ -83,7 +84,7 @@
 </script>
 
 <svelte:head>
-	<title>Cargar bonos - {campaign.name} - Firefighters</title>
+	<title>Cargar bonos - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

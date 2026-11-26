@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Field from '$lib/components/ui/Field.svelte';
@@ -87,7 +88,9 @@
 	);
 </script>
 
-<svelte:head><title>Reportes financieros - {campaign.name} - Firefighters</title></svelte:head>
+<svelte:head
+	><title>Reportes financieros - {campaign.name} - {institutionName()}</title></svelte:head
+>
 
 <div class="space-y-6">
 	<div>

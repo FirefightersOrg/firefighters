@@ -14,9 +14,9 @@ export const LEDGER_ENTRY_TYPE_LABELS: Record<LedgerEntryType, string> = {
 	commission_generated: 'Comisión generada',
 	commission_settled: 'Comisión liquidada',
 	cash_settled: 'Efectivo rendido',
-	transfer_received_by_firefighters: 'Transferencia recibida por Firefighters',
+	transfer_received_by_firefighters: 'Transferencia recibida por Bomberos',
 	adjustment_in_favor_of_collector: 'Ajuste a favor del cobrador',
-	adjustment_in_favor_of_firefighters: 'Ajuste a favor de Firefighters',
+	adjustment_in_favor_of_firefighters: 'Ajuste a favor de Bomberos',
 	annulment: 'Anulación'
 };
 

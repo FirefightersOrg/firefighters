@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import BondActionsSection from '$lib/components/bonds/record/BondActionsSection.svelte';
 	import BondAuditSection from '$lib/components/bonds/record/BondAuditSection.svelte';
@@ -111,7 +112,7 @@
 </script>
 
 <svelte:head>
-	<title>{title} - {campaign.name} - Firefighters</title>
+	<title>{title} - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

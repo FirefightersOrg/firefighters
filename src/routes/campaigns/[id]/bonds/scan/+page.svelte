@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -100,7 +101,7 @@
 </script>
 
 <svelte:head>
-	<title>Escanear bonos - {campaign.name} - Firefighters</title>
+	<title>Escanear bonos - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader

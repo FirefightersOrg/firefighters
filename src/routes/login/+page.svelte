@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { enhance } from '$app/forms';
 	import { Alert, Button, Card, Field, FormErrorSummary, TextInput } from '$lib/components/ui';
 	import type { ActionData, PageData } from './$types';
@@ -11,14 +12,14 @@
 </script>
 
 <svelte:head>
-	<title>Iniciar sesión - Firefighters</title>
+	<title>Iniciar sesión - {institutionName()}</title>
 </svelte:head>
 
 <main class="mx-auto flex min-h-screen max-w-form flex-col justify-center gap-6 px-4 py-12">
 	<div class="text-center">
-		<p class="m-0 text-heading-3 text-text">Firefighters</p>
+		<p class="m-0 text-heading-3 text-text">{institutionName()}</p>
 		<h1 class="mt-2 text-heading-1 text-text">Iniciar sesión</h1>
-		<p class="mt-1 text-body text-muted">Sistema de gestión de Bomberos Voluntarios</p>
+		<p class="mt-1 text-body text-muted">Sistema de gestión de bonos</p>
 	</div>
 
 	<Card>

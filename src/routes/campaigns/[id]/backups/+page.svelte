@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
@@ -19,7 +20,9 @@
 	};
 </script>
 
-<svelte:head><title>Exportaciones de respaldo - {campaign.name} - Firefighters</title></svelte:head>
+<svelte:head
+	><title>Exportaciones de respaldo - {campaign.name} - {institutionName()}</title></svelte:head
+>
 
 <PageHeader
 	title="Exportaciones de respaldo"

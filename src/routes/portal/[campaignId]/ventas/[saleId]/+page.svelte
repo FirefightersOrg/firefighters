@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import {
 		Alert,
@@ -50,7 +51,7 @@
 	];
 </script>
 
-<svelte:head><title>Venta {bond} - Firefighters</title></svelte:head>
+<svelte:head><title>Venta {bond} - {institutionName()}</title></svelte:head>
 
 <PageHeader
 	title={`Venta del bono ${bond}`}

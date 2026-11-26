@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institutionName } from '$lib/institution';
 	import { resolve } from '$app/paths';
 	import RiskyOperationChecklist from '$lib/components/backups/RiskyOperationChecklist.svelte';
 	import CampaignGeneralForm from '$lib/components/campaigns/CampaignGeneralForm.svelte';
@@ -29,7 +30,7 @@
 </script>
 
 <svelte:head>
-	<title>Datos y reglas - {campaign.name} - Firefighters</title>
+	<title>Datos y reglas - {campaign.name} - {institutionName()}</title>
 </svelte:head>
 
 <PageHeader
