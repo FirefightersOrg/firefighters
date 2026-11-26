@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="es-AR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Rendición 3 de Jorge Medina - Bono Contribución 2026</title>
+		<link rel="stylesheet" href="proto.css" />
+		<style>
+			.back {
+				display: inline-flex;
+				align-items: center;
+				min-height: 44px;
+				font-size: 14px;
+			}
+			.entry {
+				margin-top: 20px;
+				padding: 16px;
+				background: var(--surface);
+				border: 1px solid var(--border-strong);
+				border-radius: 12px;
+			}
+			.match {
+				margin-top: 12px;
+				padding-top: 12px;
+				border-top: 1px solid var(--border);
+			}
+			.match .who {
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+			}
+			.quotas label {
+				display: grid;
+				grid-template-columns: 24px 1fr auto;
+				align-items: center;
+				gap: 10px;
+				min-height: 48px;
+				border-bottom: 1px solid var(--border);
+			}
+			.quotas input {
+				width: 20px;
+				height: 20px;
+				accent-color: var(--primary);
+			}
+			.pay {
+				display: grid;
+				gap: 12px;
+				margin-top: 14px;
+			}
+			.sent {
+				display: grid;
+				gap: 10px;
+				padding: 12px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.sent .who {
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+			}
+			.sent .do {
+				display: flex;
+				gap: 8px;
+			}
+			.paid .amount {
+				font-weight: 500;
+			}
+			.paid .more {
+				width: 44px;
+				height: 44px;
+				border: 0;
+				background: none;
+				color: var(--text-subtle);
+				font: 700 18px/1 var(--sans);
+				letter-spacing: 1px;
+				margin-right: -12px;
+			}
+			.sheet h2 {
+				padding: 12px 0 4px;
+			}
+			.sheet .hand {
+				margin-top: 12px;
+				padding: 12px;
+				border-radius: 8px;
+				background: var(--primary-soft);
+				color: var(--primary-text);
+			}
+			.sheet .btn {
+				margin-top: 16px;
+			}
+			.sheet .why {
+				margin-top: 8px;
+			}
+			.closebar {
+				position: fixed;
+				inset: auto 0 0 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+				background: var(--surface);
+				border-top: 1px solid var(--border-strong);
+			}
+			.closebar .grow {
+				flex: 1;
+				min-width: 0;
+				line-height: 20px;
+			}
+			@media (min-width: 1024px) {
+				.work {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) 360px;
+					gap: 40px;
+					align-items: start;
+				}
+				.sheet {
+					position: sticky;
+					top: 84px;
+				}
+				.pay {
+					grid-template-columns: 1fr auto;
+					align-items: end;
+				}
+				.closebar {
+					display: none;
+				}
+			}
+			@media (max-width: 1023px) {
+				.sheet .btn,
+				.sheet .why {
+					display: none;
+				}
+				.sheet {
+					margin-top: 32px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="topbar-in">
+				<div class="id">
+					<a class="mark" href="01-campaign-workbench.html">Bomberos Voluntarios</a>
+					<a class="camp" href="01-campaign-workbench.html">Bono Contribución 2026</a>
+				</div>
+				<form class="search" role="search">
+					<label class="sr" for="top-search">Número de bono</label>
+					<input class="input" id="top-search" inputmode="numeric" placeholder="Buscar bono" />
+				</form>
+				<button class="icon-btn" aria-label="Buscar un bono">
+					<svg viewBox="0 0 24 24">
+						<circle cx="11" cy="11" r="7" />
+						<path d="m20 20-3.5-3.5" />
+					</svg>
+				</button>
+				<span class="who">Laura Quiroga, tesorería</span>
+			</div>
+		</header>
+
+		<div class="layout">
+			<nav class="rail" aria-label="Campaña">
+				<a href="01-campaign-workbench.html">Inicio</a>
+				<p>Operación</p>
+				<a href="02-bond-record.html">Bonos</a>
+				<a href="#">Entregas</a>
+				<a href="#">Ventas</a>
+				<a href="#" aria-current="page">Rendiciones <span class="count">3</span></a>
+				<p>Personas</p>
+				<a href="#">Cobradores</a>
+				<a href="#">Compradores</a>
+				<p>Sorteos y reportes</p>
+				<a href="#">Sorteos</a>
+				<a href="#">Reportes</a>
+				<p>Administración</p>
+				<a href="#">Datos y reglas</a>
+				<a href="#">Comisiones</a>
+				<a href="#">Auditoría</a>
+				<a href="#">Copias de seguridad</a>
+			</nav>
+
+			<main>
+				<a class="back" href="#">Rendiciones</a>
+				<h1>Rendición 3 de Jorge Medina</h1>
+				<p class="muted small"><span class="badge warn">Abierta</span> desde el 25/11/2026</p>
+
+				<div class="work">
+					<div>
+						<form class="entry" id="entry" aria-labelledby="entry-title">
+							<h2 id="entry-title" class="sr">Agregar un pago</h2>
+							<div class="field">
+								<label for="bond">Número del bono que pagó</label>
+								<input
+									class="input number"
+									id="bond"
+									inputmode="numeric"
+									value="24"
+									autocomplete="off"
+									aria-describedby="bond-hint"
+								/>
+								<p class="muted small" id="bond-hint" style="margin-top: 4px">
+									Solo los bonos que vendió Jorge Medina. Enter busca; otro Enter agrega el pago.
+								</p>
+							</div>
+							<div class="match" aria-live="polite">
+								<p class="who">
+									<span class="bond">0024 <small>/ 5024</small></span>
+									<span><strong>Verónica Pérez</strong></span>
+								</p>
+								<p class="muted small">
+									Pagó 2 de 6 cuotas. Debe $&nbsp;40.000, $&nbsp;30.000 vencidos.
+								</p>
+								<div class="quotas" role="group" aria-label="Cuotas que paga">
+									<label
+										><input type="checkbox" checked /><span
+											>Cuota 3 <span class="badge bad">Vencida</span>
+											<span class="muted small">09/09/2026</span></span
+										><span class="amount">$&nbsp;10.000</span></label
+									>
+									<label
+										><input type="checkbox" /><span
+											>Cuota 4 <span class="badge bad">Vencida</span>
+											<span class="muted small">09/10/2026</span></span
+										><span class="amount">$&nbsp;10.000</span></label
+									>
+									<label
+										><input type="checkbox" /><span
+											>Cuota 5 <span class="badge bad">Vencida</span>
+											<span class="muted small">09/11/2026</span></span
+										><span class="amount">$&nbsp;10.000</span></label
+									>
+								</div>
+								<div class="pay">
+									<div class="segmented" role="radiogroup" aria-label="Medio de pago">
+										<label><input type="radio" name="m" checked />Efectivo</label>
+										<label><input type="radio" name="m" />Transferencia</label>
+									</div>
+									<button class="btn primary lg" type="submit">
+										Agregar pago de $&nbsp;10.000
+									</button>
+								</div>
+							</div>
+						</form>
+
+						<section class="section" aria-labelledby="sent">
+							<header>
+								<h2 id="sent">Cobros que envió Jorge Medina</h2>
+								<span class="badge warn">1 sin procesar</span>
+							</header>
+							<div class="sent">
+								<p class="who">
+									<span class="bond">0001 <small>/ 5001</small></span>
+									<span class="grow"><strong>Miguel Gómez</strong>, cuota 5</span>
+									<span class="amount">$&nbsp;10.000</span>
+								</p>
+								<p class="muted small">
+									Efectivo, cobrado hoy. Nota del cobrador: «Cobrado en el domicilio».
+								</p>
+								<div class="do">
+									<button class="btn primary">Incluir en la rendición</button>
+									<button class="btn">Rechazar</button>
+								</div>
+							</div>
+						</section>
+
+						<section class="section" aria-labelledby="paid">
+							<header>
+								<h2 id="paid">Pagos de esta rendición</h2>
+								<span class="muted small">10 pagos</span>
+							</header>
+							<ul class="rows paid" id="paid-list">
+								<li>
+									<span class="bond">0019</span>
+									<div class="grow">
+										<p>Patricia Rodríguez</p>
+										<p class="muted small">Pago total, efectivo, hoy</p>
+									</div>
+									<span class="amount">$&nbsp;60.000</span>
+									<button class="more" aria-label="Quitar o corregir el pago del bono 0019">
+										…
+									</button>
+								</li>
+								<li>
+									<span class="bond">0003</span>
+									<div class="grow">
+										<p>Daniel Luna</p>
+										<p class="muted small">Cuota 4, transferencia, ayer</p>
+									</div>
+									<span class="amount">$&nbsp;10.000</span>
+									<button class="more" aria-label="Quitar o corregir el pago del bono 0003">
+										…
+									</button>
+								</li>
+								<li>
+									<span class="bond">0008</span>
+									<div class="grow">
+										<p>Graciela Ojeda</p>
+										<p class="muted small">Cuota 3, efectivo, ayer</p>
+									</div>
+									<span class="amount">$&nbsp;10.000</span>
+									<button class="more" aria-label="Quitar o corregir el pago del bono 0008">
+										…
+									</button>
+								</li>
+								<li>
+									<span class="bond">0015</span>
+									<div class="grow">
+										<p>Ferretería El Tornillo</p>
+										<p class="muted small">Cuotas 2 y 3, transferencia, ayer</p>
+									</div>
+									<span class="amount">$&nbsp;20.000</span>
+									<button class="more" aria-label="Quitar o corregir el pago del bono 0015">
+										…
+									</button>
+								</li>
+							</ul>
+							<p style="margin-top: 8px"><a href="#">Ver los 10 pagos</a></p>
+						</section>
+					</div>
+
+					<aside class="sheet" aria-labelledby="sheet-title">
+						<h2 id="sheet-title">Hasta ahora</h2>
+						<dl>
+							<div>
+								<dt>Efectivo <span class="muted small">7 pagos</span></dt>
+								<dd class="amount" id="cash">$&nbsp;70.000</dd>
+							</div>
+							<div>
+								<dt>Transferencias <span class="muted small">3 pagos</span></dt>
+								<dd class="amount">$&nbsp;30.000</dd>
+							</div>
+							<div class="sum">
+								<dt>Total cobrado</dt>
+								<dd class="amount" id="total">$&nbsp;100.000</dd>
+							</div>
+							<div class="muted">
+								<dt>Comisión que se queda el cobrador</dt>
+								<dd class="amount">− $&nbsp;7.000</dd>
+							</div>
+							<div class="lead">
+								<dt>Neto para Bomberos</dt>
+								<dd class="amount figure-lg" id="net">$&nbsp;93.000</dd>
+							</div>
+						</dl>
+						<p class="hand">
+							Jorge Medina tiene que entregar <strong id="hand">$&nbsp;63.000</strong> en efectivo.
+						</p>
+						<button class="btn primary lg block" disabled aria-describedby="why">
+							Cerrar rendición
+						</button>
+						<p class="muted small why" id="why">
+							Falta incluir o rechazar 1 cobro enviado por el cobrador.
+						</p>
+					</aside>
+				</div>
+			</main>
+		</div>
+
+		<div class="closebar">
+			<div class="grow">
+				<span class="muted small">Entrega en efectivo</span><br />
+				<strong class="figure" id="hand-bar">$&nbsp;63.000</strong>
+			</div>
+			<button class="btn primary lg">Revisar y cerrar</button>
+		</div>
+
+		<script>
+			// Prototype only: shows the loop "number, Enter, Enter" and the totals moving.
+			const fmt = (n) => '$\u00a0' + n.toLocaleString('es-AR');
+			let cash = 70000;
+			let total = 100000;
+			document.getElementById('entry').addEventListener('submit', (event) => {
+				event.preventDefault();
+				cash += 10000;
+				total += 10000;
+				const hand = cash - 8000;
+				document.getElementById('cash').textContent = fmt(cash);
+				document.getElementById('total').textContent = fmt(total);
+				document.getElementById('net').textContent = fmt(total - 8000);
+				document.getElementById('hand').textContent = fmt(hand);
+				document.getElementById('hand-bar').textContent = fmt(hand);
+				document
+					.getElementById('paid-list')
+					.insertAdjacentHTML(
+						'afterbegin',
+						'<li><span class="bond">0024</span><div class="grow"><p>Verónica Pérez</p><p class="muted small">Cuota 3, efectivo, hoy</p></div><span class="amount">$&nbsp;10.000</span><button class="more" aria-label="Quitar o corregir el pago del bono 0024">…</button></li>'
+					);
+				const input = document.getElementById('bond');
+				input.value = '';
+				input.focus();
+				document.querySelector('.match').hidden = true;
+			});
+		</script>
+	</body>
+</html>

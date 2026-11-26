@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="es-AR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Bono 0181 - Bono Contribución 2026</title>
+		<link rel="stylesheet" href="proto.css" />
+		<style>
+			.back {
+				display: inline-flex;
+				align-items: center;
+				min-height: 44px;
+				font-size: 14px;
+			}
+			.verdict {
+				margin-top: 16px;
+				font: 500 18px/28px var(--sans);
+				max-width: 46ch;
+			}
+			.next {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				margin-top: 16px;
+			}
+			.plan li {
+				display: grid;
+				grid-template-columns: 28px 1fr auto;
+				align-items: center;
+				gap: 12px;
+				min-height: 52px;
+				padding: 8px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.plan .n {
+				font: 700 18px/24px var(--figure);
+				color: var(--text-subtle);
+			}
+			.plan .late .n {
+				color: var(--danger-text);
+			}
+			.plan .total {
+				border-bottom: 0;
+				font-weight: 600;
+			}
+			.people {
+				display: grid;
+				gap: 0;
+			}
+			.people li {
+				justify-content: space-between;
+			}
+			details {
+				border-bottom: 1px solid var(--border);
+			}
+			summary {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				min-height: 52px;
+				font-weight: 500;
+				cursor: pointer;
+				list-style: none;
+			}
+			summary::-webkit-details-marker {
+				display: none;
+			}
+			summary::after {
+				content: '';
+				width: 8px;
+				height: 8px;
+				border: solid var(--text-subtle);
+				border-width: 0 1.75px 1.75px 0;
+				transform: rotate(45deg);
+				margin-right: 6px;
+			}
+			details[open] summary::after {
+				transform: rotate(-135deg);
+			}
+			details .rows li {
+				min-height: 44px;
+			}
+			details .rows li:last-child {
+				border-bottom: 0;
+			}
+			@media (min-width: 1024px) {
+				.cols {
+					display: grid;
+					grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+					gap: 40px;
+				}
+				.stub {
+					max-width: 420px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="topbar-in">
+				<div class="id">
+					<a class="mark" href="01-campaign-workbench.html">Bomberos Voluntarios</a>
+					<a class="camp" href="01-campaign-workbench.html">Bono Contribución 2026</a>
+				</div>
+				<form class="search" role="search">
+					<label class="sr" for="top-search">Número de bono</label>
+					<input class="input" id="top-search" inputmode="numeric" placeholder="Buscar bono" />
+				</form>
+				<button class="icon-btn" aria-label="Buscar un bono">
+					<svg viewBox="0 0 24 24">
+						<circle cx="11" cy="11" r="7" />
+						<path d="m20 20-3.5-3.5" />
+					</svg>
+				</button>
+				<span class="who">Laura Quiroga, tesorería</span>
+			</div>
+		</header>
+
+		<div class="layout">
+			<nav class="rail" aria-label="Campaña">
+				<a href="01-campaign-workbench.html">Inicio</a>
+				<p>Operación</p>
+				<a href="#" aria-current="page">Bonos</a>
+				<a href="#">Entregas</a>
+				<a href="#">Ventas</a>
+				<a href="03-open-settlement.html">Rendiciones <span class="count">3</span></a>
+				<p>Personas</p>
+				<a href="#">Cobradores</a>
+				<a href="#">Compradores</a>
+				<p>Sorteos y reportes</p>
+				<a href="#">Sorteos</a>
+				<a href="#">Reportes</a>
+				<p>Administración</p>
+				<a href="#">Datos y reglas</a>
+				<a href="#">Comisiones</a>
+				<a href="#">Auditoría</a>
+				<a href="#">Copias de seguridad</a>
+			</nav>
+
+			<main>
+				<a class="back" href="#">Bonos</a>
+				<h1 class="sr">Bono 0181</h1>
+
+				<div class="stub" role="img" aria-label="Bono 0181, número asociado 5181">
+					<span class="n">0181</span>
+					<div>
+						<p class="muted small">Número asociado</p>
+						<p class="bond">5181</p>
+					</div>
+				</div>
+
+				<p class="verdict">
+					Vendido a <a href="#">Stella Rodríguez</a> en 6 cuotas. Lo cobra
+					<a href="#">Héctor Acosta</a>. Pagó 1 cuota y debe <strong>$&nbsp;50.000</strong>, de los
+					cuales $&nbsp;40.000 están vencidos.
+				</p>
+				<p style="margin-top: 8px">
+					<span class="badge info">Vendido</span> <span class="badge bad">En mora</span>
+				</p>
+
+				<div class="next">
+					<a class="btn primary lg" href="03-open-settlement.html">Registrar pago</a>
+					<a class="btn lg" href="tel:+542364471234">Llamar al 2364 47-1234</a>
+				</div>
+
+				<div class="cols">
+					<section class="section" aria-labelledby="plan">
+						<header>
+							<h2 id="plan">Cuotas</h2>
+							<a href="#">Ver la venta</a>
+						</header>
+						<ol class="plan">
+							<li>
+								<span class="n">1</span>
+								<span
+									>Pagada el 09/10/2026
+									<span class="muted small">en efectivo, rendición 14</span></span
+								>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li class="late">
+								<span class="n">2</span>
+								<span>Venció el 22/08/2026 <span class="badge bad">Vencida</span></span>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li class="late">
+								<span class="n">3</span>
+								<span>Venció el 22/09/2026 <span class="badge bad">Vencida</span></span>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li class="late">
+								<span class="n">4</span>
+								<span>Venció el 22/10/2026 <span class="badge bad">Vencida</span></span>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li class="late">
+								<span class="n">5</span>
+								<span>Venció el 22/11/2026 <span class="badge bad">Vencida</span></span>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li>
+								<span class="n">6</span>
+								<span>Vence el 22/12/2026</span>
+								<span class="amount">$&nbsp;10.000</span>
+							</li>
+							<li class="total">
+								<span></span>
+								<span>Falta cobrar</span>
+								<span class="amount figure">$&nbsp;50.000</span>
+							</li>
+						</ol>
+					</section>
+
+					<div>
+						<section class="section" aria-labelledby="draws">
+							<header>
+								<h2 id="draws">Sorteos</h2>
+							</header>
+							<ul class="rows">
+								<li>
+									<div class="grow">
+										<p>Sorteo de octubre</p>
+										<p class="muted small">Participó con 0181 y 5181</p>
+									</div>
+									<span class="badge ok">Habilitado</span>
+								</li>
+								<li>
+									<div class="grow">
+										<p>Sorteo de noviembre</p>
+										<p class="muted small">Falta la cuota 2 antes del 05/12</p>
+									</div>
+									<span class="badge warn">No habilitado</span>
+								</li>
+							</ul>
+						</section>
+
+						<section class="section" aria-labelledby="more">
+							<header>
+								<h2 id="more">Historial y correcciones</h2>
+							</header>
+							<details>
+								<summary>Entregas y devoluciones</summary>
+								<ul class="rows">
+									<li>
+										<div class="grow">
+											<p>Entregado a Héctor Acosta</p>
+											<p class="muted small">25/06/2026, remito 0011</p>
+										</div>
+										<a href="#">Ver remito</a>
+									</li>
+								</ul>
+							</details>
+							<details>
+								<summary>Movimientos registrados</summary>
+								<ul class="rows">
+									<li>
+										<div class="grow">
+											<p>Pago de la cuota 1</p>
+											<p class="muted small">09/10/2026, 18:20, Laura Quiroga</p>
+										</div>
+									</li>
+									<li>
+										<div class="grow">
+											<p>Venta registrada</p>
+											<p class="muted small">22/07/2026, 10:02, Laura Quiroga</p>
+										</div>
+									</li>
+								</ul>
+							</details>
+							<details>
+								<summary>Corregir o anular</summary>
+								<p class="muted small" style="padding-bottom: 12px">
+									Cambiar el cobrador, marcar el bono como extraviado o anularlo. Cada corrección
+									pide un motivo y queda en la auditoría.
+								</p>
+							</details>
+						</section>
+					</div>
+				</div>
+			</main>
+		</div>
+
+		<nav class="tabbar" aria-label="Campaña">
+			<a href="01-campaign-workbench.html"
+				><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z" /></svg>Inicio</a
+			>
+			<a href="#" aria-current="page"
+				><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM9 7v10" /></svg>Bonos</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z" /></svg>Ventas</a
+			>
+			<a href="03-open-settlement.html"
+				><svg viewBox="0 0 24 24">
+					<rect x="3" y="6" width="18" height="12" rx="2" />
+					<circle cx="12" cy="12" r="2.5" /></svg
+				>Rendiciones</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>Más</a
+			>
+		</nav>
+	</body>
+</html>

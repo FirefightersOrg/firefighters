@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="es-AR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Por cobrar - Bono Contribución 2026</title>
+		<link rel="stylesheet" href="proto.css" />
+		<style>
+			.layout {
+				display: block;
+				max-width: 640px;
+			}
+			.today {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 12px;
+				margin-top: 12px;
+				padding: 12px 0;
+				border-top: 1px solid var(--border-strong);
+				border-bottom: 1px solid var(--border-strong);
+			}
+			.due {
+				padding: 14px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.due .top {
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+			}
+			.due .top .grow {
+				flex: 1;
+				min-width: 0;
+				font-weight: 600;
+			}
+			.due .what {
+				margin-left: 62px;
+			}
+			.due .do {
+				display: grid;
+				grid-template-columns: 1fr 2fr;
+				gap: 8px;
+				margin-top: 10px;
+			}
+			.due.sent .do {
+				display: none;
+			}
+			.due .bond {
+				width: 52px;
+				flex: none;
+			}
+			/* The collect sheet opens over the list (shown here with :target; a Dialog in the app). */
+			.overlay {
+				display: none;
+				position: fixed;
+				inset: 0;
+				z-index: 40;
+				background: rgba(14, 16, 20, 0.48);
+				align-items: flex-end;
+				justify-content: center;
+			}
+			.overlay:target {
+				display: flex;
+			}
+			.collect {
+				width: 100%;
+				max-width: 640px;
+				padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+				background: var(--surface);
+				border-radius: 16px 16px 0 0;
+				box-shadow: var(--shadow-lg);
+				display: grid;
+				gap: 14px;
+			}
+			.collect header {
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+			}
+			.collect .two {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 12px;
+			}
+			.collect .input.money {
+				font: 700 28px/32px var(--figure);
+				min-height: 56px;
+				text-align: right;
+			}
+			@media (min-width: 1024px) {
+				.tabbar {
+					display: grid;
+					position: static;
+					max-width: 640px;
+					margin: 0 auto;
+					border: 0;
+					background: none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="topbar-in" style="max-width: 640px">
+				<div class="id">
+					<a class="mark" href="#">Bomberos Voluntarios</a>
+					<a class="camp" href="#">Bono Contribución 2026</a>
+				</div>
+				<span class="who" style="display: block; margin-left: auto">Jorge Medina</span>
+			</div>
+		</header>
+
+		<main class="layout">
+			<h1>Por cobrar</h1>
+			<div class="today">
+				<span>9 cuotas de 7 compradores</span>
+				<strong class="figure">$&nbsp;90.000</strong>
+			</div>
+
+			<section class="section" aria-labelledby="late" style="margin-top: 20px">
+				<header>
+					<h2 id="late">Vencidas</h2>
+					<span class="muted small">6 cuotas, $&nbsp;60.000</span>
+				</header>
+
+				<article class="due">
+					<p class="top">
+						<a class="bond" href="#">0024</a>
+						<span class="grow">Verónica Pérez</span>
+						<span class="amount figure">$&nbsp;10.000</span>
+					</p>
+					<p class="what muted small">Cuota 3 de 6, venció el 09/09/2026</p>
+					<p class="what muted small">Debe 2 cuotas más: $&nbsp;20.000</p>
+					<div class="do">
+						<a class="btn" href="tel:+542364471234">Llamar</a>
+						<a class="btn primary" href="#cobrar">Cobrar</a>
+					</div>
+				</article>
+
+				<article class="due sent">
+					<p class="top">
+						<a class="bond" href="#">0001</a>
+						<span class="grow">Miguel Gómez</span>
+						<span class="amount figure">$&nbsp;10.000</span>
+					</p>
+					<p class="what muted small">Cuota 5 de 6, venció el 20/11/2026</p>
+					<p class="what" style="margin-top: 6px">
+						<span class="badge info">Enviado</span>
+						<span class="muted small">hoy, falta que tesorería lo incluya en la rendición</span>
+					</p>
+				</article>
+
+				<article class="due">
+					<p class="top">
+						<a class="bond" href="#">0012</a>
+						<span class="grow">Sergio Cabrera</span>
+						<span class="amount figure">$&nbsp;10.000</span>
+					</p>
+					<p class="what muted small">Cuota 1 de 6, venció el 02/10/2026</p>
+					<p class="what muted small">Sin esta cuota no entra al Sorteo de noviembre</p>
+					<div class="do">
+						<a class="btn" href="tel:+542364512203">Llamar</a>
+						<a class="btn primary" href="#cobrar">Cobrar</a>
+					</div>
+				</article>
+			</section>
+
+			<section class="section" aria-labelledby="soon">
+				<header>
+					<h2 id="soon">Vencen esta semana</h2>
+					<span class="muted small">3 cuotas, $&nbsp;30.000</span>
+				</header>
+
+				<article class="due">
+					<p class="top">
+						<a class="bond" href="#">0020</a>
+						<span class="grow">Ferretería El Tornillo</span>
+						<span class="amount figure">$&nbsp;10.000</span>
+					</p>
+					<p class="what muted small">Cuota 4 de 6, vence el 28/11/2026</p>
+					<div class="do">
+						<a class="btn" href="tel:+542364408812">Llamar</a>
+						<a class="btn primary" href="#cobrar">Cobrar</a>
+					</div>
+				</article>
+
+				<article class="due">
+					<p class="top">
+						<a class="bond" href="#">0006</a>
+						<span class="grow">Stella Peralta</span>
+						<span class="amount figure">$&nbsp;10.000</span>
+					</p>
+					<p class="what muted small">Cuota 6 de 6, vence el 30/11/2026</p>
+					<div class="do">
+						<a class="btn" href="tel:+542364471187">Llamar</a>
+						<a class="btn primary" href="#cobrar">Cobrar</a>
+					</div>
+				</article>
+			</section>
+		</main>
+
+		<nav class="tabbar" aria-label="Portal del cobrador">
+			<a href="#" aria-current="page"
+				><svg viewBox="0 0 24 24">
+					<rect x="3" y="6" width="18" height="12" rx="2" />
+					<circle cx="12" cy="12" r="2.5" /></svg
+				>Por cobrar</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM9 7v10" /></svg>Bonos</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z" /></svg>Ventas</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24">
+					<circle cx="12" cy="8" r="4" />
+					<path d="M4 21a8 8 0 0 1 16 0" /></svg
+				>Compradores</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM9 9h6M9 13h6" /></svg>Mi cuenta</a
+			>
+		</nav>
+
+		<div class="overlay" id="cobrar">
+			<form class="collect" role="dialog" aria-modal="true" aria-labelledby="collect-title">
+				<header>
+					<span class="bond">0024</span>
+					<h2 id="collect-title" style="flex: 1">Cobrar a Verónica Pérez</h2>
+				</header>
+				<p class="muted small" style="margin-top: -8px">Cuota 3 de 6, venció el 09/09/2026</p>
+				<div class="field">
+					<label for="amount">Importe</label>
+					<input class="input money" id="amount" inputmode="decimal" value="$ 10.000" />
+				</div>
+				<div class="two">
+					<div>
+						<span class="label">Medio</span>
+						<div class="segmented" role="radiogroup" aria-label="Medio de pago">
+							<label><input type="radio" name="m" checked />Efectivo</label>
+							<label><input type="radio" name="m" />Transf.</label>
+						</div>
+					</div>
+					<div class="field">
+						<label for="date">Fecha del cobro</label>
+						<input class="input" id="date" value="25/11/2026" />
+					</div>
+				</div>
+				<p class="muted small">
+					Queda como enviado hasta que tesorería lo incluya en la rendición. Después de enviarlo no
+					se puede editar.
+				</p>
+				<button class="btn primary lg block">Enviar cobro de $&nbsp;10.000</button>
+				<a class="btn quiet block" href="#">Cancelar</a>
+			</form>
+		</div>
+	</body>
+</html>

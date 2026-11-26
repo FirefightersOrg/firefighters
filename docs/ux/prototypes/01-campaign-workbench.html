@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es-AR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Bono Contribución 2026 - Bomberos Voluntarios</title>
+		<link rel="stylesheet" href="proto.css" />
+		<style>
+			.hero {
+				display: grid;
+				gap: 8px;
+			}
+			.actions {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+				margin-top: 16px;
+			}
+			.actions .btn {
+				justify-content: flex-start;
+				min-height: 52px;
+			}
+			.figures {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 20px 16px;
+				padding: 16px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.figures dt {
+				font-size: 13px;
+				line-height: 20px;
+				color: var(--text-muted);
+			}
+			.figures dd .small {
+				display: block;
+			}
+			.balances li {
+				justify-content: space-between;
+				min-height: 44px;
+			}
+			@media (min-width: 1024px) {
+				.hero {
+					grid-template-columns: minmax(0, 420px) auto;
+					align-items: end;
+					justify-content: start;
+				}
+				.actions {
+					grid-template-columns: repeat(4, max-content);
+				}
+				.figures {
+					grid-template-columns: repeat(4, 1fr);
+				}
+				.cols {
+					display: grid;
+					grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+					gap: 40px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="topbar-in">
+				<div class="id">
+					<a class="mark" href="#">Bomberos Voluntarios</a>
+					<a class="camp" href="#">Bono Contribución 2026</a>
+				</div>
+				<form class="search" role="search">
+					<label class="sr" for="top-search">Número de bono</label>
+					<input class="input" id="top-search" inputmode="numeric" placeholder="Buscar bono" />
+				</form>
+				<button class="icon-btn" aria-label="Cuenta y campañas">
+					<svg viewBox="0 0 24 24">
+						<circle cx="12" cy="8" r="4" />
+						<path d="M4 21a8 8 0 0 1 16 0" />
+					</svg>
+				</button>
+				<span class="who">Laura Quiroga, tesorería</span>
+			</div>
+		</header>
+
+		<div class="layout">
+			<nav class="rail" aria-label="Campaña">
+				<a href="#" aria-current="page">Inicio</a>
+				<p>Operación</p>
+				<a href="02-bond-record.html">Bonos</a>
+				<a href="#">Entregas</a>
+				<a href="#">Ventas</a>
+				<a href="03-open-settlement.html">Rendiciones <span class="count">3</span></a>
+				<p>Personas</p>
+				<a href="#">Cobradores</a>
+				<a href="#">Compradores</a>
+				<p>Sorteos y reportes</p>
+				<a href="#">Sorteos</a>
+				<a href="#">Reportes</a>
+				<p>Administración</p>
+				<a href="#">Datos y reglas</a>
+				<a href="#">Comisiones</a>
+				<a href="#">Auditoría</a>
+				<a href="#">Copias de seguridad</a>
+			</nav>
+
+			<main>
+				<h1>Bono Contribución 2026</h1>
+				<p class="muted small">
+					<span class="badge ok">Activa</span> Hasta el 28/06/2027, 6 cuotas de $&nbsp;10.000
+				</p>
+
+				<form class="hero" role="search" style="margin-top: 20px">
+					<div class="field">
+						<label for="bond">Buscar un bono</label>
+						<input
+							class="input number"
+							id="bond"
+							inputmode="numeric"
+							placeholder="Número del bono, por ejemplo 181"
+						/>
+					</div>
+					<button class="btn primary lg">Buscar</button>
+				</form>
+
+				<div class="actions">
+					<a class="btn" href="#"
+						><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>Registrar venta</a
+					>
+					<a class="btn" href="03-open-settlement.html"
+						><svg viewBox="0 0 24 24">
+							<rect x="3" y="6" width="18" height="12" rx="2" />
+							<circle cx="12" cy="12" r="2.5" /></svg
+						>Registrar pago</a
+					>
+					<a class="btn" href="#"
+						><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>Entregar bonos</a
+					>
+					<a class="btn" href="#"
+						><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM9 7v10" /></svg>Cargar bonos</a
+					>
+				</div>
+
+				<section class="section" aria-labelledby="todo">
+					<header>
+						<h2 id="todo">Para resolver</h2>
+					</header>
+					<a class="task" href="03-open-settlement.html">
+						<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20zM12 10v4M12 17v.5" /></svg>
+						<span
+							><strong>1 cobro enviado por Jorge Medina sin procesar</strong><br /><span
+								class="muted small"
+								>$&nbsp;10.000. Bloquea el cierre de su rendición hasta incluirlo o
+								rechazarlo.</span
+							></span
+						>
+						<span class="go">Abrir rendición</span>
+					</a>
+					<a class="task" href="#">
+						<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20zM12 10v4M12 17v.5" /></svg>
+						<span
+							><strong>8 bonos vendidos no entran al Sorteo de octubre</strong><br /><span
+								class="muted small"
+								>Les falta la cuota 1. El corte fue el 24/11/2026 a las 23:59.</span
+							></span
+						>
+						<span class="go">Ver bonos</span>
+					</a>
+					<a class="task" href="#">
+						<svg viewBox="0 0 24 24">
+							<circle cx="12" cy="12" r="9" />
+							<path d="M12 7v5l3 2" />
+						</svg>
+						<span
+							><strong>3 rendiciones abiertas</strong><br /><span class="muted small"
+								>Jorge Medina, Marta Giménez y Carlos Benítez.</span
+							></span
+						>
+						<span class="go">Ver rendiciones</span>
+					</a>
+				</section>
+
+				<section class="section" aria-labelledby="state">
+					<header>
+						<h2 id="state">Estado de la campaña</h2>
+						<a href="#">Reportes</a>
+					</header>
+					<dl class="figures">
+						<div>
+							<dt>Bonos vendidos</dt>
+							<dd><span class="figure">147</span> <span class="muted small">de 240</span></dd>
+						</div>
+						<div>
+							<dt>En manos de cobradores</dt>
+							<dd><span class="figure">59</span> <span class="muted small">sin vender</span></dd>
+						</div>
+						<div>
+							<dt>Cobrado</dt>
+							<dd>
+								<span class="figure">$&nbsp;4.450.000</span>
+								<div class="progress" role="img" aria-label="50 % de lo vendido">
+									<i style="width: 50%"></i>
+								</div>
+								<span class="muted small">de $&nbsp;8.820.000 vendidos</span>
+							</dd>
+						</div>
+						<div>
+							<dt>Cuotas vencidas sin cobrar</dt>
+							<dd>
+								<span class="figure">$&nbsp;1.030.000</span>
+								<span class="muted small">103 cuotas de 71 bonos</span>
+							</dd>
+						</div>
+					</dl>
+				</section>
+
+				<div class="cols">
+					<section class="section" aria-labelledby="balances">
+						<header>
+							<h2 id="balances">Saldo a favor de cada cobrador</h2>
+							<a href="#">Cobradores</a>
+						</header>
+						<ul class="rows balances">
+							<li><a href="#">Carlos Benítez</a><span class="amount">$&nbsp;41.000</span></li>
+							<li><a href="#">Lucía Fernández</a><span class="amount">$&nbsp;39.000</span></li>
+							<li><a href="#">Héctor Acosta</a><span class="amount">$&nbsp;30.000</span></li>
+							<li><a href="#">Jorge Medina</a><span class="amount">$&nbsp;17.000</span></li>
+							<li><a href="#">Raúl Sosa</a><span class="amount">$&nbsp;14.000</span></li>
+							<li><a href="#">Marta Giménez</a><span class="amount">$&nbsp;9.500</span></li>
+							<li style="font-weight: 600; border-bottom: 0">
+								<span>Comisión sin liquidar</span><span class="amount">$&nbsp;150.500</span>
+							</li>
+						</ul>
+					</section>
+
+					<section class="section" aria-labelledby="draw">
+						<header>
+							<h2 id="draw">Próximo sorteo</h2>
+							<a href="#">Sorteos</a>
+						</header>
+						<ul class="rows">
+							<li>
+								<div class="grow">
+									<p><strong>Sorteo de noviembre</strong></p>
+									<p class="muted small">Mensual, exige la cuota 2 paga</p>
+								</div>
+								<div class="amount">
+									<span class="figure">07/12</span><br /><span class="muted small"
+										>corte el 05/12 a las 23:59</span
+									>
+								</div>
+							</li>
+						</ul>
+					</section>
+				</div>
+			</main>
+		</div>
+
+		<nav class="tabbar" aria-label="Campaña">
+			<a href="#" aria-current="page"
+				><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z" /></svg>Inicio</a
+			>
+			<a href="02-bond-record.html"
+				><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM9 7v10" /></svg>Bonos</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z" /></svg>Ventas</a
+			>
+			<a href="03-open-settlement.html"
+				><svg viewBox="0 0 24 24">
+					<rect x="3" y="6" width="18" height="12" rx="2" />
+					<circle cx="12" cy="12" r="2.5" /></svg
+				>Rendiciones</a
+			>
+			<a href="#"
+				><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>Más</a
+			>
+		</nav>
+	</body>
+</html>
