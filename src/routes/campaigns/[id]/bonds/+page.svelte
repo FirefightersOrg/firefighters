@@ -116,7 +116,8 @@
 		code: 'Código',
 		type: 'Tipo',
 		status: 'Estado',
-		financial: 'Pagos'
+		financial: 'Pagos',
+		collector: 'Cobrador'
 	} as const;
 	const optionLabel = (options: { value: string; label: string }[], value: string) =>
 		options.find((option) => option.value === value)?.label ?? value;
@@ -138,13 +139,17 @@
 							? optionLabel(statusOptions, values.status)
 							: key === 'financial'
 								? optionLabel(financialOptions, values.financial)
-								: values[key]
+								: key === 'collector'
+									? (data.filterCollectorName ?? 'sin nombre')
+									: values[key]
 				}`,
 				removeHref: without(key)
 			}))
 	);
 	const foldedError = $derived(
-		(Object.keys(FILTER_LABELS) as (keyof typeof FILTER_LABELS)[]).some((key) => errors[key])
+		(Object.keys(FILTER_LABELS) as (keyof typeof FILTER_LABELS)[]).some(
+			(key) => key !== 'collector' && errors[key]
+		)
 	);
 </script>
 
@@ -200,6 +205,10 @@
 			open={foldedError}
 		>
 			{#snippet filters()}
+				<!-- The collector filter comes from a link; keep it when the other filters are applied. -->
+				{#if values.collector}
+					<input type="hidden" name="collector" value={values.collector} />
+				{/if}
 				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 					<Field label="Número asociado" id="filter-associated" error={errors.associated}>
 						<TextInput
@@ -235,15 +244,32 @@
 	<section aria-labelledby="results-title" class="flex flex-col gap-3">
 		<h2 id="results-title" class="sr-only">Resultados</h2>
 		{#if Object.keys(errors).length > 0}
-			<Alert tone="danger">Corregir los filtros marcados para ver los bonos.</Alert>
+			<Alert tone="danger">
+				{#if errors.collector}
+					{errors.collector}
+					<a href={without('collector')} class="underline underline-offset-2">Quitar ese filtro</a>.
+				{/if}
+				{#if Object.keys(errors).some((key) => key !== 'collector')}
+					Corregir los filtros marcados para ver los bonos.
+				{/if}
+			</Alert>
 		{:else if pagination.total === 0}
 			<EmptyState
 				title={data.filtered ? 'Ningún bono coincide con los filtros' : 'Todavía no hay bonos'}
 				icon={data.filtered ? 'search' : 'inbox'}
 			>
-				{data.filtered
-					? 'Probar con otros filtros o quitarlos para ver todos los bonos.'
-					: 'Esta campaña todavía no tiene bonos. Cargar un bono, cargar una pata o importar un archivo para empezar.'}
+				{#if values.collector && !data.filterCollectorName}
+					No se encontró el cobrador indicado, o no hay bonos a su nombre. Quitar el filtro para ver
+					todos los bonos.
+				{:else if values.collector}
+					{data.filterCollectorName} no tiene bonos con estos filtros. Probar con otros filtros o quitarlos
+					para ver todos los bonos.
+				{:else if data.filtered}
+					Probar con otros filtros o quitarlos para ver todos los bonos.
+				{:else}
+					Esta campaña todavía no tiene bonos. Cargar un bono, cargar una pata o importar un archivo
+					para empezar.
+				{/if}
 			</EmptyState>
 		{:else if data.bonds.length === 0}
 			<EmptyState title="No hay bonos en esta página" icon="search">

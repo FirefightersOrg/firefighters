@@ -125,6 +125,13 @@ describe('collector record: the first screen', () => {
 		expect(body).toContain('Ver cuenta corriente');
 	});
 
+	it('links to the bonds list filtered by this collector, only when they have bonds', () => {
+		const withBonds = page({ bonds: [bond(68, 'sold')], bondsTotal: 1 });
+		expect(withBonds).toContain(`href="/campaigns/${CAMPAIGN_ID}/bonds?collector=${COLLECTOR_ID}"`);
+		expect(withBonds).toContain('Ver todos sus bonos');
+		expect(page({ bonds: [], bondsTotal: 0 })).not.toContain('Ver todos sus bonos');
+	});
+
 	it('sends to the open settlement when the collector has one', () => {
 		const body = page({
 			debts: [debt('i1', 70, '2026-12-10')],

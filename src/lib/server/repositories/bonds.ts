@@ -596,6 +596,8 @@ export interface BondListFilters {
 	kind?: BondKind | null;
 	commercialStatus?: BondCommercialStatus | null;
 	financialStatus?: BondFinancialStatus | null;
+	/** The collector who currently has the bond (`current_collector_id`). */
+	collectorId?: string | null;
 }
 
 export interface BondListRow {
@@ -733,6 +735,7 @@ function filteredBondList(supabase: SupabaseClient, campaignId: string, filters:
 		const code = quotePostgrestValue(filters.code);
 		query = query.or(`barcode.eq.${code},internal_code.eq.${code}`);
 	}
+	if (filters.collectorId) query = query.eq('current_collector_id', filters.collectorId);
 	if (filters.kind) query = query.eq('kind', filters.kind);
 	if (filters.commercialStatus) query = query.eq('commercial_status', filters.commercialStatus);
 	if (filters.financialStatus) {

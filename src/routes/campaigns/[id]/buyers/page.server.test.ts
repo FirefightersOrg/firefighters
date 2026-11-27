@@ -68,13 +68,6 @@ describe('/campaigns/[id]/buyers', () => {
 			params: { id: CAMPAIGN_ID },
 			url: new URL(`http://localhost/campaigns/${CAMPAIGN_ID}/buyers`)
 		}) as never;
-	const bondRow = (bondId: string) => ({
-		id: bondId,
-		campaign_id: CAMPAIGN_ID,
-		bond_numbers: [{ number_value: 12, number_kind: 'base' }],
-		campaigns: { name: 'Campaign 2027', number_digits: 4 }
-	});
-
 	it('does not read bonds without bond.view', async () => {
 		const mock = mockSupabase({
 			tables: {
@@ -84,40 +77,41 @@ describe('/campaigns/[id]/buyers', () => {
 		});
 		const data = await load(listEvent(mock, [...ADMIN_PERMISSIONS, 'buyer.view']));
 		expect(mock.chains.bonds).toBeUndefined();
+		expect(mock.rpc).not.toHaveBeenCalled();
 		expect(data?.buyers[0].bondCount).toBeNull();
 		expect(data?.can.bondCounts).toBe(false);
 	});
 
-	it('counts the bonds of this campaign in the name of each buyer with bond.view', async () => {
+	it('counts the bonds of this campaign per buyer with one grouped query', async () => {
 		const second = { ...BUYER, id: 'b0000000-0000-0000-0000-000000000002', last_name: 'Byron' };
 		const mock = mockSupabase({
 			tables: {
 				campaigns: { data: campaignRow(), error: null },
-				buyers: { data: [BUYER, second], error: null },
-				bonds: [
-					{ data: [bondRow('1'), bondRow('2')], error: null },
-					{ data: [], error: null }
-				]
-			}
+				buyers: { data: [BUYER, second], error: null }
+			},
+			// A buyer without bonds is absent from the grouped result.
+			rpc: { data: [{ buyer_id: BUYER.id, bond_count: 2 }], error: null }
 		});
 		const data = await load(listEvent(mock, [...ADMIN_PERMISSIONS, 'buyer.view', 'bond.view']));
-		expect(mock.chains.bonds).toHaveLength(2);
-		expect(mock.chains.bonds[0].eq).toHaveBeenCalledWith('current_buyer_id', BUYER.id);
-		expect(mock.chains.bonds[0].eq).toHaveBeenCalledWith('campaign_id', CAMPAIGN_ID);
-		expect(mock.chains.bonds[1].eq).toHaveBeenCalledWith('current_buyer_id', second.id);
+		expect(mock.rpc).toHaveBeenCalledTimes(1);
+		expect(mock.rpc).toHaveBeenCalledWith('buyer_bond_counts', {
+			p_campaign_id: CAMPAIGN_ID,
+			p_buyer_ids: [BUYER.id, second.id]
+		});
+		expect(mock.chains.bonds).toBeUndefined();
 		expect(data?.buyers.map((buyer: { bondCount: number | null }) => buyer.bondCount)).toEqual([
 			2, 0
 		]);
 		expect(data?.can.bondCounts).toBe(true);
 	});
 
-	it('fails when the bonds cannot be read, instead of saying a buyer has none', async () => {
+	it('fails when the bonds cannot be counted, instead of saying a buyer has none', async () => {
 		const mock = mockSupabase({
 			tables: {
 				campaigns: { data: campaignRow(), error: null },
-				buyers: { data: [BUYER], error: null },
-				bonds: { data: null, error: { message: 'boom' } }
-			}
+				buyers: { data: [BUYER], error: null }
+			},
+			rpc: { data: null, error: { message: 'boom' } }
 		});
 		await expect(
 			load(listEvent(mock, [...ADMIN_PERMISSIONS, 'buyer.view', 'bond.view']))

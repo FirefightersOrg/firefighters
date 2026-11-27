@@ -163,7 +163,7 @@ Other rows that got longer, and why:
 - **Backend proposals B2, B4 and B5** in [`direction.md`](direction.md#proposals-that-need-backend-or-business-changes) (search by name from the header, a payment from a bond with no open settlement, remembering the last collector): undecided, not started.
 - **The screens that load bonds** (above, A10).
 - **Decisions the PRs left for Santi and Juan**, with no answer written down yet: two Enters to add a payment (PR 7); a search by number that opens the record on a single match (PR 9); the amount prefilled as `10.000,00` in «Cobrar» (PR 10); «Falta cobrar» on the collector record counting payments in an open settlement while the sale record says «debe» until it closes (PR 15); the cash and commission cards leaving the campaign home (PR 13); the corrections needing JavaScript now that they are dialogs (PR 12b, PR 15, PR 16).
-- **Follow-ups noted in the PRs and not done:** a `FilterBar` whose search is optional (the settlements and draws lists copy its chips); one pagination component (three lists carry a copy); a collector filter on the bonds list, so the collector record can link to it; a grouped bond count for the buyers list (today one read per buyer on the page); type-checking `tests/e2e` (two specs broke on `main` without any check noticing); the pre-commit hook removing a lint directive in a fresh worktree.
+- **Follow-ups noted in the PRs and not done:** a `FilterBar` whose search is optional (the settlements and draws lists copy its chips); one pagination component (three lists carry a copy); type-checking `tests/e2e` (two specs broke on `main` without any check noticing); the pre-commit hook removing a lint directive in a fresh worktree.
 
 ## Not verified
 

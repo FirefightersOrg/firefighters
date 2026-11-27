@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
 	BOND_COMMERCIAL_STATUSES,
 	BOND_FINANCIAL_STATUSES,
@@ -24,7 +25,8 @@ export const BOND_LIST_QUERY_FIELDS = [
 	'code',
 	'type',
 	'status',
-	'financial'
+	'financial',
+	'collector'
 ] as const;
 export type BondListQueryField = (typeof BOND_LIST_QUERY_FIELDS)[number];
 
@@ -76,8 +78,15 @@ export function parseBondListQuery(params: URLSearchParams, campaign: Campaign):
 		code: values.code || null,
 		kind: choice<BondKind>('type', BOND_KINDS),
 		commercialStatus: choice<BondCommercialStatus>('status', BOND_COMMERCIAL_STATUSES),
-		financialStatus: choice<BondFinancialStatus>('financial', BOND_FINANCIAL_STATUSES)
+		financialStatus: choice<BondFinancialStatus>('financial', BOND_FINANCIAL_STATUSES),
+		// A collector id from a link (the collector record). Anything that is not an id is refused
+		// here, so it never reaches the database; an unknown id simply matches no bond.
+		collectorId: null
 	};
+	if (values.collector) {
+		if (z.guid().safeParse(values.collector).success) filters.collectorId = values.collector;
+		else errors.collector = 'El cobrador indicado no es válido.';
+	}
 	if (values.code.length > MAX_CODE_SEARCH_LENGTH) {
 		errors.code = `Ingresar hasta ${MAX_CODE_SEARCH_LENGTH} caracteres.`;
 	}

@@ -154,7 +154,8 @@ describe('/campaigns/[id]/bonds', () => {
 			code: 'A,B"c',
 			type: 'pata',
 			status: 'sold',
-			financial: 'overdue'
+			financial: 'overdue',
+			collector: ''
 		});
 		expect(data.filtered).toBe(true);
 	});
@@ -173,6 +174,59 @@ describe('/campaigns/[id]/bonds', () => {
 		});
 		expect(data.bonds).toEqual([]);
 		expect(data.pagination.page).toBe(1);
+	});
+
+	describe('collector filter', () => {
+		const COLLECTOR = 'c0000000-0000-0000-0000-0000000000c1';
+
+		it('filters by current_collector_id and names the collector', async () => {
+			const { locals, chains } = setup({
+				tables: {
+					collectors: { data: [{ id: COLLECTOR, display_name: 'Héctor Acosta' }], error: null }
+				}
+			});
+			const data = (await load(loadEvent(locals, `?collector=${COLLECTOR}&page=2`)))!;
+			expect(chains.bond_list[0].eq).toHaveBeenCalledWith('current_collector_id', COLLECTOR);
+			expect(chains.bond_list[0].range).toHaveBeenCalledWith(25, 49);
+			expect(data.filterCollectorName).toBe('Héctor Acosta');
+			expect(data.query.values.collector).toBe(COLLECTOR);
+			expect(data.filtered).toBe(true);
+		});
+
+		it('refuses an id that is not a uuid without querying', async () => {
+			const { locals, chains } = setup();
+			const data = (await load(loadEvent(locals, '?collector=drop%20table')))!;
+			expect(chains.bond_list).toBeUndefined();
+			expect(data.query.errors.collector).toBeTruthy();
+			expect(data.bonds).toEqual([]);
+		});
+
+		it('gives an empty list, not an error, for an unknown collector', async () => {
+			const { locals } = setup({
+				list: { data: [], error: null, count: 0 },
+				tables: { collectors: { data: [], error: null } }
+			});
+			const data = (await load(loadEvent(locals, `?collector=${COLLECTOR}`)))!;
+			expect(data.bonds).toEqual([]);
+			expect(data.pagination.total).toBe(0);
+			expect(data.filterCollectorName).toBeNull();
+		});
+
+		it('still lists the bonds when the collector name cannot be read', async () => {
+			const { locals } = setup({
+				tables: { collectors: { data: null, error: { message: 'permission denied' } } }
+			});
+			const data = (await load(loadEvent(locals, `?collector=${COLLECTOR}`)))!;
+			expect(data.bonds).toHaveLength(1);
+			expect(data.filterCollectorName).toBeNull();
+		});
+
+		it('still requires bond.view', async () => {
+			const { locals } = setup({ permissions: ['campaign.view'] });
+			await expect(load(loadEvent(locals, `?collector=${COLLECTOR}`))).rejects.toMatchObject({
+				status: 403
+			});
+		});
 	});
 
 	it('names the manual pata of a grouped member and labels patas', async () => {

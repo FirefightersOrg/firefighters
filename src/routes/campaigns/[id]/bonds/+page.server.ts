@@ -100,9 +100,25 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				error: failed
 			});
 
+	// The collector the list is filtered by (a link from the collector record), by name. Read with the
+	// caller's client: a role that cannot read collectors, or an unknown id, leaves `null` and the
+	// chip says «Cobrador». An unknown id matches no bond, so the list is empty; never an error.
+	let filterCollectorName: string | null = null;
+	if (query.filters.collectorId) {
+		const found = await getCollectorsByIds(locals.supabase, [query.filters.collectorId]);
+		if (found.error)
+			console.error('[bonds] bonds list collector read failed', {
+				requestId: locals.requestId,
+				campaignId: params.id,
+				error: found.error
+			});
+		filterCollectorName = found.data?.get(query.filters.collectorId)?.displayName ?? null;
+	}
+
 	const permissions = locals.permissions ?? [];
 	return {
 		campaign,
+		filterCollectorName,
 		query: { values: query.values, errors: query.errors },
 		bonds: buildBondListItems(entries, basesResult.data ?? new Map(), campaign).map((bond) => {
 			const holder = holders.data?.get(bond.id);

@@ -242,6 +242,61 @@ describe('bonds list (local Supabase)', () => {
 	});
 });
 
+describe('bonds list: collector filter (local Supabase)', () => {
+	let collectorId: string;
+	let emptyCollectorId: string;
+	beforeAll(async () => {
+		const { data, error } = await serviceClient
+			.from('collectors')
+			.insert([
+				{ display_name: `[it-bond-list ${RUN_ID}] with bonds`, status: 'active' },
+				{ display_name: `[it-bond-list ${RUN_ID}] without bonds`, status: 'active' }
+			])
+			.select('id, display_name');
+		if (error || !data) throw new Error(`collector insert failed: ${error?.message}`);
+		collectorId = data.find((c) => c.display_name.endsWith('with bonds'))!.id;
+		emptyCollectorId = data.find((c) => c.display_name.endsWith('without bonds'))!.id;
+		// 26 bonds, more than a page: 0004..0028 and the printed pata (0001/0002 are grouped, 0003 is
+		// annulled). Plus one bond in another campaign, which must never be listed here.
+		const mine = [...Array.from({ length: 25 }, (_, i) => ids[`s${i + 4}`]), ids.printed];
+		const { error: updateError } = await serviceClient
+			.from('bonds')
+			.update({ current_collector_id: collectorId })
+			.in('id', [...mine, ids.foreign]);
+		if (updateError) throw new Error(`bond update failed: ${updateError.message}`);
+		ids.mineCount = String(mine.length);
+	});
+
+	it("lists only this collector's bonds of the campaign, paged in a stable order", async () => {
+		const first = await list(readOnly, `?collector=${collectorId}`);
+		const total = Number(ids.mineCount);
+		expect(first.pagination).toMatchObject({ page: 1, total, pageCount: 2 });
+		expect(first.bonds).toHaveLength(25);
+		const second = await list(readOnly, `?collector=${collectorId}&page=2`);
+		const all = [...first.bonds, ...second.bonds].map((b) => b.id);
+		expect(all).toHaveLength(total);
+		expect(new Set(all).size).toBe(total);
+		expect(all).not.toContain(ids.foreign);
+		expect(all).not.toContain(ids.s3);
+		// Combines with the other filters.
+		const sold = await list(readOnly, `?collector=${collectorId}&status=sold`);
+		expect(sold.pagination.total).toBe(0);
+	});
+
+	it('is empty, not an error, for a collector without bonds or an unknown one', async () => {
+		expect((await list(readOnly, `?collector=${emptyCollectorId}`)).pagination.total).toBe(0);
+		const unknown = await list(readOnly, `?collector=${randomUUID()}`);
+		expect(unknown.pagination.total).toBe(0);
+		expect(unknown.bonds).toEqual([]);
+	});
+
+	it('refuses an id that is not a uuid without a server error', async () => {
+		const invalid = await list(readOnly, '?collector=not-an-id');
+		expect(invalid.query.errors.collector).toBeDefined();
+		expect(invalid.bonds).toEqual([]);
+	});
+});
+
 describe('bond record audit (local Supabase)', () => {
 	it('admin (audit.view) sees the bond entries with names; the operator gets a note', async () => {
 		const own = await record(admin, ids.s5);

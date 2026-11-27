@@ -392,6 +392,13 @@
 			<h2 id="bonds-title" class="m-0 py-2 text-heading-3 text-text">
 				Bonos <span class="font-normal text-muted">{data.bondsTotal}</span>
 			</h2>
+			{#if data.bondsTotal > 0}
+				<a
+					class="inline-flex min-h-touch items-center rounded-sm text-body-sm text-primary-text underline underline-offset-2"
+					href="{resolve('/campaigns/[id]/bonds', { id: campaign.id })}?collector={collector.id}"
+					data-collector-bonds-link>Ver todos sus bonos</a
+				>
+			{/if}
 			{#if deliverHref && nextStep?.href !== deliverHref}
 				<a
 					class="inline-flex min-h-touch items-center rounded-sm text-body-sm text-primary-text underline underline-offset-2"
